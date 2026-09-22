@@ -36,8 +36,27 @@ async function createApp() {
   return app;
 }
 
-function tokenFor(account: any) {
-  return signAccessToken({ accountId: account.id, tag: account.tag, role: account.role, sessionId: `sess-${uuidv4()}` });
+async function tokenFor(account: any) {
+  const sessId = `sess-${uuidv4()}`;
+  const now = Date.now();
+  const { RvbSessionModel } = await import("./src/models/rvb-session.model");
+  const { hashRefreshToken, parseExpiryToMs, getRefreshTTL } = await import("./src/lib/rvb-auth");
+  const refreshToken = `refresh-${sessId}-${uuidv4()}`;
+  const hash = hashRefreshToken(refreshToken);
+  const ttl = parseExpiryToMs(getRefreshTTL());
+  try {
+    await RvbSessionModel.create({
+      id: sessId,
+      accountId: account.id,
+      refreshTokenHash: hash,
+      createdAt: now,
+      expiresAt: now + ttl,
+      revokedAt: null,
+      lastUsedAt: now,
+      rotationFamilyId: `fam-${uuidv4()}`,
+    } as any);
+  } catch {}
+  return signAccessToken({ accountId: account.id, tag: account.tag, role: account.role, sessionId: sessId });
 }
 
 async function main() {
@@ -179,15 +198,15 @@ async function main() {
   const supervisorAcc = await createAccount("supervisor1", "supervisor", "worker", workerA.id);
 
   const tokens: any = {
-    manager: tokenFor(managerAcc),
-    admin: tokenFor(adminAcc),
-    workerA: tokenFor(workerAccA),
-    workerB: tokenFor(workerAccB),
-    supplierA: tokenFor(supplierAccA),
-    supplierB: tokenFor(supplierAccB),
-    customerA: tokenFor(customerAccA),
-    customerB: tokenFor(customerAccB),
-    supervisor: tokenFor(supervisorAcc),
+    manager: await tokenFor(managerAcc),
+    admin: await tokenFor(adminAcc),
+    workerA: await tokenFor(workerAccA),
+    workerB: await tokenFor(workerAccB),
+    supplierA: await tokenFor(supplierAccA),
+    supplierB: await tokenFor(supplierAccB),
+    customerA: await tokenFor(customerAccA),
+    customerB: await tokenFor(customerAccB),
+    supervisor: await tokenFor(supervisorAcc),
   };
 
   // Test RBAC: Worker tries supplier request list -> 403

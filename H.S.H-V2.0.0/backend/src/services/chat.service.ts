@@ -4,6 +4,8 @@ import { MessageModel } from "../models/message.model";
 import { MessageAuditModel } from "../models/message-audit.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { NotificationModel } from "../models/notification.model";
+import { createRvbNotification } from "./rvb-notification.service";
+import { RvbChatReminderModel } from "../models/rvb-chat-reminder.model";
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;
@@ -108,6 +110,20 @@ export async function syncMainMembership() {
   for (const [cid, ids] of Object.entries(groups)) {
     const conv: any = await ConversationModel.findOne({ id: cid });
     if (!conv) continue;
+    const desiredSet = new Set(ids);
+    const currentActive = (conv.participants as any[]).filter((p: any) => !p.leftAt);
+    const currentIds = new Set(currentActive.map((p: any) => p.accountId));
+    // Compare membership + role snapshot before writing
+    let same = desiredSet.size === currentIds.size && [...desiredSet].every((id) => currentIds.has(id));
+    if (same) {
+      // Check role snapshot drift
+      for (const aid of ids) {
+        const acc: any = byId.get(aid);
+        const cur = (conv.participants as any[]).find((p: any) => p.accountId === aid && !p.leftAt);
+        if (!cur || cur.role !== (acc?.role || cur.role)) { same = false; break; }
+      }
+    }
+    if (same) continue; // already correct, avoid unnecessary write
     // Build participants with role snapshot
     const newParts = ids.map((aid) => {
       const acc: any = byId.get(aid);
@@ -119,7 +135,6 @@ export async function syncMainMembership() {
         leftAt: null,
       };
     });
-    // Remove stale participants not in ids but keep leftAt? For main we remove outright
     conv.participants = newParts;
     conv.updatedAt = now;
     await conv.save();
@@ -381,7 +396,7 @@ export async function updateGroup(convId: string, accountId: string, input: { na
 }
 
 // Message operations
-export async function sendMessage(convId: string, senderId: string, content: string, replyTo?: string | null, reminderAt?: number | null) {
+export async function sendMessage(convId: string, senderId: string, content: string, replyTo?: string | null, reminderMinutes?: number | null, reminderAtLegacy?: number | null) {
   if (!content || !content.trim()) throw codeError("RVB_CONTENT_REQUIRED", 400);
   if (content.trim().length > MESSAGE_MAX) throw codeError("RVB_CONTENT_TOO_LONG", 400);
   const conv: any = await ConversationModel.findOne({ id: convId });
@@ -409,6 +424,17 @@ export async function sendMessage(convId: string, senderId: string, content: str
   }
   // For private/dms, mentions may be irrelevant but allow
   const now = Date.now();
+  // Normalize reminder: prefer reminderMinutes (30|60|120), fallback to legacy reminderAt
+  // Support legacy call where 5th arg is timestamp (Date.now()+...)
+  let effectiveReminderAt: number | null = null;
+  if (reminderMinutes && [30, 60, 120].includes(Number(reminderMinutes))) {
+    effectiveReminderAt = now + Number(reminderMinutes) * 60 * 1000;
+  } else if (reminderAtLegacy && Number(reminderAtLegacy) > now) {
+    effectiveReminderAt = Number(reminderAtLegacy);
+  } else if (reminderMinutes && Number(reminderMinutes) > now) {
+    // legacy call: sendMessage(..., reminderAt) where reminderAt is timestamp in 5th position
+    effectiveReminderAt = Number(reminderMinutes);
+  }
   const msg: any = await MessageModel.create({
     id: `msg-${uuidv4()}`,
     createdAt: now,
@@ -425,7 +451,7 @@ export async function sendMessage(convId: string, senderId: string, content: str
     reactions: [],
     readBy: [{ accountId: senderId, readAt: now }],
     mentions,
-    reminderAt: reminderAt || null,
+    reminderAt: effectiveReminderAt,
   } as any);
   await MessageAuditModel.create({
     id: `audit-${uuidv4()}`,
@@ -441,60 +467,142 @@ export async function sendMessage(convId: string, senderId: string, content: str
   conv.lastMessageSenderId = senderId;
   conv.updatedAt = now;
   await conv.save();
-  // Notifications for mentions/DMs/replies - deduplicate via sourceEventId
+  // Centralized R.V.B notification delivery with precise targeting
   try {
     const sourceEventId = `chat:msg:${msg.id}:notif`;
-    const exists = await NotificationModel.findOne({ sourceEventId }).lean();
-    if (!exists) {
-      // Determine audience: for DM -> other participant; for mentions -> mentioned users/groups; otherwise participants excluding sender
-      let audienceType: any = "user";
-      let audienceIds: string[] = [];
-      if (conv.type === "dm") {
-        const other = (conv.participants as any[]).find((p: any) => p.accountId !== senderId && !p.leftAt);
-        if (other) audienceIds = [other.accountId];
-      } else if (mentions.length > 0) {
-        // For group mentions, notify all participants matching role tag? Simplified: notify all participants except sender
-        const participantsExSender = (conv.participants as any[]).filter((p: any) => p.accountId !== senderId && !p.leftAt).map((p: any) => p.accountId);
-        audienceIds = participantsExSender;
-        audienceType = "user";
-      } else {
-        // General message in group: notify participants except sender but throttled? For large official groups, avoid flooding: only notify if not high-volume? For now notify all except sender
-        // But for official groups with many members, we still create one notification per conversation? We'll create audience user for each.
-        const participantsExSender = (conv.participants as any[]).filter((p: any) => p.accountId !== senderId && !p.leftAt).map((p: any) => p.accountId);
-        // If large group >20, limit to mention only? For now if no mentions and large group, skip to avoid flood.
-        if (conv.type === "official_group" && participantsExSender.length > 20 && mentions.length === 0) {
-          // skip notification to avoid flood
-          audienceIds = [];
-        } else {
-          audienceIds = participantsExSender;
+    // Determine precise recipients
+    let recipientIds: string[] = [];
+    let isMention = false;
+    let isReply = false;
+    const participants = (conv.participants as any[]).filter((p: any) => !p.leftAt).map((p: any) => p.accountId);
+    const participantsExSender = participants.filter((id) => id !== senderId);
+    // Fetch participant accounts for role resolution
+    const participantAccounts: any[] = await RvbAccountModel.find({ id: { $in: participantsExSender } }).lean().catch(() => [] as any[]);
+    const accountById = new Map(participantAccounts.map((a: any) => [a.id, a]));
+    const isParticipant = (id: string) => participants.includes(id);
+
+    // DM: direct recipient
+    if (conv.type === "dm") {
+      const other = (conv.participants as any[]).find((p: any) => p.accountId !== senderId && !p.leftAt);
+      if (other && isParticipant(other.accountId)) recipientIds = [other.accountId];
+    } else {
+      // Group mentions: @workers, @suppliers, @customers, @managers, @everyone
+      const groupMentionMap: Record<string, (acc: any) => boolean> = {
+        workers: (acc) => acc?.role === "worker",
+        suppliers: (acc) => acc?.role === "supplier",
+        customers: (acc) => acc?.role === "customer",
+        managers: (acc) => ["manager", "admin", "supervisor"].includes(acc?.role),
+        everyone: () => true,
+      };
+      for (const tag of mentions) {
+        const matcher = groupMentionMap[tag.toLowerCase()];
+        if (matcher) {
+          isMention = true;
+          for (const pid of participantsExSender) {
+            const acc = accountById.get(pid);
+            if (acc && matcher(acc)) recipientIds.push(pid);
+          }
         }
       }
-      if (audienceIds.length > 0) {
-        const isMention = mentions.length > 0 || content.includes(`@${sender.tag}`) || audienceIds.length === 1;
-        await NotificationModel.create({
-          id: `notif-${uuidv4()}`,
-          createdAt: now,
-          updatedAt: now,
-          syncStatus: "synced",
-          type: "system",
-          severity: isMention ? "warning" : "info",
-          title: conv.type === "dm" ? `New message from @${sender.tag}` : isMention ? `You were mentioned in ${conv.name || getOfficialName(conv)}` : `New message in ${conv.name || getOfficialName(conv)}`,
-          message: content.trim().slice(0, 120),
-          entityType: "conversation",
-          entityId: convId,
-          route: "/rvb/chats",
-          sourceEventId,
-          audienceType,
-          audienceIds,
-          priority: isMention ? "high" : "normal",
-          archivedAt: null,
-        } as any);
+      // Individual @tag mentions
+      const individualTagRegex = /@([a-z0-9._]{3,30})/gi;
+      let m: any;
+      const contentLower = content.toLowerCase();
+      // Use original content for tag extraction but compare lower
+      const tagMatches = [...content.matchAll(/@([a-z0-9._]{3,30})/gi)].map((x) => x[1].toLowerCase());
+      for (const tag of tagMatches) {
+        // Skip group tags already handled
+        if (["workers", "suppliers", "customers", "managers", "everyone"].includes(tag)) continue;
+        const acc = participantAccounts.find((a: any) => a.tag.toLowerCase() === tag);
+        if (acc && isParticipant(acc.id)) {
+          isMention = true;
+          recipientIds.push(acc.id);
+        }
+      }
+      // Reply notification
+      if (replyTo) {
+        const orig: any = await MessageModel.findOne({ id: replyTo }).lean().catch(() => null);
+        if (orig && orig.senderAccountId !== senderId && isParticipant(orig.senderAccountId)) {
+          isReply = true;
+          recipientIds.push(orig.senderAccountId);
+        }
+      }
+      // Deduplicate
+      recipientIds = [...new Set(recipientIds)];
+      // If no mention/reply and not DM, do not flood group with generic message notification
+      // Only notify for DMs, mentions, replies, or if explicitly needed
+      if (recipientIds.length === 0) {
+        // No precise target, skip general group message notification
+      }
+    }
+
+    // Ensure we don't notify sender and deduplicate
+    recipientIds = [...new Set(recipientIds.filter((id) => id !== senderId && isParticipant(id)))];
+
+    if (recipientIds.length > 0) {
+      const title = conv.type === "dm" ? `New message from @${sender.tag}` : isMention || isReply ? `You were mentioned in ${conv.name || getOfficialName(conv)}` : `New message in ${conv.name || getOfficialName(conv)}`;
+      const category: any = isMention || isReply ? "mentions" : conv.type === "dm" ? "chats" : "chats";
+      await createRvbNotification({
+        type: "system",
+        severity: isMention || isReply ? "warning" : "info",
+        title,
+        message: content.trim().slice(0, 120),
+        entityType: "conversation",
+        entityId: convId,
+        route: "/rvb/chats",
+        sourceEventId,
+        audienceType: "user",
+        audienceIds: recipientIds,
+        priority: isMention || isReply ? "high" : "normal",
+        category,
+        mandatory: false,
+        isMention,
+        isReply,
+      } as any);
+      // Per-recipient reminders
+      if (effectiveReminderAt && recipientIds.length > 0) {
+        const mins = Math.round((effectiveReminderAt - now) / 60000);
+        if ([30, 60, 120].includes(mins)) {
+          for (const rid of recipientIds) {
+            try {
+              await RvbChatReminderModel.updateOne(
+                { messageId: msg.id, recipientAccountId: rid },
+                {
+                  $setOnInsert: {
+                    id: `rem-${uuidv4()}`,
+                    messageId: msg.id,
+                    conversationId: convId,
+                    recipientAccountId: rid,
+                    createdByAccountId: senderId,
+                    dueAt: effectiveReminderAt,
+                    createdAt: now,
+                  },
+                },
+                { upsert: true },
+              );
+            } catch {}
+          }
+        }
       }
     }
   } catch {}
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");
-    await RvbActivityModel.create({ id: `rvba-${uuidv4()}`, createdAt: now, actorAccountId: senderId, actorTag: sender.tag, actorRole: sender.role, entityType: "conversation", entityId: convId, action: "message_sent", sourceType: "chats", sourceId: msg.id, title: `Message sent in ${conv.name || getOfficialName(conv)}`, details: content.trim().slice(0, 120) } as any);
+    // Privacy: do not store message content in activity details
+    await RvbActivityModel.create({
+      id: `rvba-${uuidv4()}`,
+      createdAt: now,
+      actorAccountId: senderId,
+      actorTag: sender.tag,
+      actorRole: sender.role,
+      entityType: "conversation",
+      entityId: convId,
+      action: "message_sent",
+      sourceType: "chats",
+      sourceId: msg.id,
+      title: `Message sent in ${conv.name || getOfficialName(conv)}`,
+      details: conv.type === "official_group" ? `Message in ${getOfficialName(conv)}` : "Message sent in conversation",
+    } as any);
   } catch {}
   return msg.toObject ? msg.toObject() : msg;
 }
@@ -618,22 +726,19 @@ export async function unpinMessage(conversationId: string, messageId: string, ac
 export async function markRead(conversationId: string, accountId: string, upToMessageId?: string) {
   const conv: any = await ConversationModel.findOne({ id: conversationId }).lean();
   if (!conv || !isParticipant(conv, accountId)) throw codeError("RVB_FORBIDDEN", 403);
-  // Mark all messages up to now as read, or up to specific message
-  let query: any = { conversationId, isDeleted: false };
+  const now = Date.now();
+  const filter: any = {
+    conversationId,
+    isDeleted: false,
+    readBy: { $not: { $elemMatch: { accountId } } },
+  };
   if (upToMessageId) {
     const upMsg: any = await MessageModel.findOne({ id: upToMessageId }).lean();
     if (!upMsg) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
-    query.createdAt = { $lte: upMsg.createdAt };
+    filter.createdAt = { $lte: upMsg.createdAt };
   }
-  const msgs: any[] = await MessageModel.find(query).lean();
-  const now = Date.now();
-  for (const m of msgs) {
-    const already = (m.readBy as any[])?.some((r: any) => r.accountId === accountId);
-    if (!already) {
-      await MessageModel.updateOne({ id: m.id }, { $push: { readBy: { accountId, readAt: now } } });
-    }
-  }
-  // Also ensure last read? For simplicity set readBy for convo via messages
+  // Efficient single updateMany, no duplicate readBy
+  await MessageModel.updateMany(filter as any, { $push: { readBy: { accountId, readAt: now } } } as any);
   return { success: true };
 }
 
@@ -654,16 +759,24 @@ export async function listMessages(conversationId: string, requesterId: string, 
 
 export async function getUnreadCounts(accountId: string) {
   const convs = await listConversationsForUser(accountId);
+  if (convs.length === 0) return {};
+  const convIds = (convs as any[]).map((c) => c.id);
   const counts: Record<string, number> = {};
-  for (const c of convs as any[]) {
-    const msgs = await MessageModel.find({ conversationId: c.id, isDeleted: false }).lean();
-    let unread = 0;
-    for (const m of msgs as any[]) {
-      if (m.senderAccountId === accountId) continue;
-      const read = (m.readBy as any[])?.some((r: any) => r.accountId === accountId);
-      if (!read) unread++;
-    }
-    counts[c.id] = unread;
+  for (const id of convIds) counts[id] = 0;
+  // Use aggregation to avoid loading bodies, exclude own messages and already-read
+  const agg = await MessageModel.aggregate([
+    {
+      $match: {
+        conversationId: { $in: convIds },
+        isDeleted: false,
+        senderAccountId: { $ne: accountId },
+        readBy: { $not: { $elemMatch: { accountId } } },
+      },
+    },
+    { $group: { _id: "$conversationId", count: { $sum: 1 } } },
+  ]);
+  for (const row of agg as any[]) {
+    counts[row._id] = row.count;
   }
   return counts;
 }

@@ -3,7 +3,7 @@ import { Schema, model, type InferSchemaType } from "mongoose";
 const rvbActivitySchema = new Schema(
   {
     id: { type: String, required: true, unique: true },
-    createdAt: { type: Number, required: true, index: true },
+    createdAt: { type: Number, required: true },
     actorAccountId: { type: String, required: false, default: null, index: true },
     actorTag: { type: String, required: false, default: null },
     actorRole: { type: String, required: false, default: null },

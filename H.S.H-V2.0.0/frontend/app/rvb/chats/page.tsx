@@ -499,14 +499,10 @@ function ChatsInner() {
     const text = composer.trim();
     if (!text || !selectedId) return;
     if (text.length > 2000) { alert("Message too long"); return; }
-    if (selectedConv?.isSystemManaged && false) {} // placeholder
     // Check archived cannot send: backend will reject, but disable UI if user archived? user is active via auth
     const trimmed = text;
-    // Reminder handling
-    let reminderAt: number | null = null;
-    if (reminderChoice) {
-      reminderAt = Date.now() + reminderChoice * 60 * 1000;
-    }
+    // Reminder handling — server-trusted minutes (30|60|120)
+    const reminderMinutes: number | null = reminderChoice && [30, 60, 120].includes(Number(reminderChoice)) ? Number(reminderChoice) : null;
     // Optimistic: clear composer
     const prevComposer = composer;
     setComposer("");
@@ -517,7 +513,7 @@ function ChatsInner() {
     try {
       const sent = editing
         ? await chatService.editMessage(editing.id, trimmed)
-        : await chatService.sendMessage(selectedId, trimmed, replyTo?.id || null, reminderAt);
+        : await chatService.sendMessage(selectedId, trimmed, replyTo?.id || null, reminderMinutes);
       if (editing) {
         setMessages((prev) => prev.map((m) => (m.id === sent.id ? sent : m)));
         setEditing(null);

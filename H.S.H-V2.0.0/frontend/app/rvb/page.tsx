@@ -21,10 +21,10 @@ import { RvbPortalPlaceholder } from "../../src/components/rvb/RvbRoleGuard";
 const TRANSLATIONS = {
   en: {
     kpi: {
-      activeAccounts: { title: "Active Accounts", status: "Account system not connected yet" },
-      pendingRequests: { title: "Pending Requests", status: "Request system not connected yet" },
-      ordersReview: { title: "Orders Under Review", status: "Order system not connected yet" },
-      unreadMessages: { title: "Unread Messages", status: "Messaging not connected yet" },
+      activeAccounts: { title: "Active Accounts", status: "Ready — live data" },
+      pendingRequests: { title: "Pending Requests", status: "Ready — live data" },
+      ordersReview: { title: "Orders Under Review", status: "Ready — live data" },
+      unreadMessages: { title: "Unread Messages", status: "Ready — live" },
     },
     secondary: {
       workers: "Workers",
@@ -77,10 +77,10 @@ const TRANSLATIONS = {
   },
   fr: {
     kpi: {
-      activeAccounts: { title: "Comptes actifs", status: "Système de comptes non connecté" },
-      pendingRequests: { title: "Demandes en attente", status: "Système de demandes non connecté" },
-      ordersReview: { title: "Commandes en vérification", status: "Système de commandes non connecté" },
-      unreadMessages: { title: "Messages non lus", status: "Messagerie non connectée" },
+      activeAccounts: { title: "Comptes actifs", status: "Prêt — données en direct" },
+      pendingRequests: { title: "Demandes en attente", status: "Prêt — données en direct" },
+      ordersReview: { title: "Commandes en vérification", status: "Prêt — données en direct" },
+      unreadMessages: { title: "Messages non lus", status: "Prêt — en direct" },
     },
     secondary: {
       workers: "Travailleurs",
@@ -133,10 +133,10 @@ const TRANSLATIONS = {
   },
   ar: {
     kpi: {
-      activeAccounts: { title: "الحسابات النشطة", status: "نظام الحسابات غير متصل بعد" },
-      pendingRequests: { title: "الطلبات المعلقة", status: "نظام الطلبات غير متصل بعد" },
-      ordersReview: { title: "الطلبات قيد المراجعة", status: "نظام الطلبات غير متصل بعد" },
-      unreadMessages: { title: "الرسائل غير المقروءة", status: "نظام المراسلة غير متصل بعد" },
+      activeAccounts: { title: "الحسابات النشطة", status: "جاهز — بيانات مباشرة" },
+      pendingRequests: { title: "الطلبات المعلقة", status: "جاهز — بيانات مباشرة" },
+      ordersReview: { title: "الطلبات قيد المراجعة", status: "جاهز — بيانات مباشرة" },
+      unreadMessages: { title: "الرسائل غير المقروءة", status: "جاهز — مباشر" },
     },
     secondary: {
       workers: "العمال",
@@ -195,6 +195,9 @@ export default function RvbDashboardPage() {
   const [acctCounts, setAcctCounts] = useState<{ total: number; active: number; workersActive: number; workersArchived: number; suppliersActive: number; suppliersArchived: number; customersActive: number; customersArchived: number; managementActive: number; managementArchived: number; supervisors: number } | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number | null>(null);
   const [pendingOrders, setPendingOrders] = useState<number | null>(null);
+  const [unreadTotal, setUnreadTotal] = useState<number | null>(null);
+  const [socketReady, setSocketReady] = useState<boolean>(false);
+  const [notificationsReady, setNotificationsReady] = useState<boolean>(false);
 
   useEffect(() => {
     settingsService.get().then((s) => { if (s) setSettings(s); });
@@ -263,6 +266,75 @@ export default function RvbDashboardPage() {
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { chatService } = await import("../../src/services/chat.service");
+        const counts = await (chatService as any).getUnreadCounts().catch(() => null);
+        if (cancelled) return;
+        if (counts && typeof counts === "object") {
+          const total = Object.values(counts as Record<string, number>).reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
+          setUnreadTotal(total);
+        } else if (typeof counts === "number") {
+          setUnreadTotal(counts);
+        } else {
+          setUnreadTotal(0);
+        }
+      } catch {
+        if (!cancelled) setUnreadTotal(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    (async () => {
+      try {
+        const { connectChatSocket, getChatSocket } = await import("../../src/services/chat-socket.service");
+        const sock = connectChatSocket();
+        if (!sock) {
+          setSocketReady(false);
+          return;
+        }
+        const onConnect = () => setSocketReady(true);
+        const onDisconnect = () => setSocketReady(false);
+        // If already connected, mark ready immediately
+        if ((sock as any).connected) setSocketReady(true);
+        sock.on("connect", onConnect);
+        sock.on("disconnect", onDisconnect);
+        cleanup = () => {
+          try { sock.off("connect", onConnect); sock.off("disconnect", onDisconnect); } catch {}
+        };
+        // Also poll once in case connection succeeds quickly
+        setTimeout(() => {
+          try { if ((getChatSocket() as any)?.connected) setSocketReady(true); } catch {}
+        }, 600);
+      } catch {
+        setSocketReady(false);
+      }
+    })();
+    return () => { if (cleanup) cleanup(); };
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { rvbNotificationService } = await import("../../src/services/rvb-notification.service");
+        await rvbNotificationService.count().catch(async () => {
+          // fallback to list with limit 1
+          await rvbNotificationService.list({ limit: 1 });
+        });
+        if (!cancelled) setNotificationsReady(true);
+      } catch {
+        if (!cancelled) setNotificationsReady(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const t = TRANSLATIONS[settings.language];
 
   // Role-aware: non-management sees portal placeholder
@@ -290,7 +362,7 @@ export default function RvbDashboardPage() {
           <RvbKpiCard icon={UsersRound} title={t.kpi.activeAccounts.title} value={acctCounts ? String(acctCounts.active) : "—"} status={acctCounts ? `${acctCounts.total} total${settings.language === "fr" ? " total" : settings.language === "ar" ? " الإجمالي" : ""}` : t.kpi.activeAccounts.status} />
           <RvbKpiCard icon={Inbox} title={t.kpi.pendingRequests.title} value={pendingRequests !== null ? String(pendingRequests) : "—"} status={pendingRequests !== null ? (pendingRequests === 0 ? (settings.language === "ar" ? "لا توجد طلبات قيد المراجعة" : settings.language === "fr" ? "Aucune demande en examen" : "No requests under review") : settings.language === "ar" ? "الطلبات قيد المراجعة" : settings.language === "fr" ? "Demandes en examen" : "Requests under review") : t.kpi.pendingRequests.status} />
           <RvbKpiCard icon={ShoppingCart} title={t.kpi.ordersReview.title} value={pendingOrders !== null ? String(pendingOrders) : "—"} status={pendingOrders !== null ? (pendingOrders === 0 ? (settings.language === "ar" ? "لا توجد طلبيات قيد المراجعة" : settings.language === "fr" ? "Aucune commande en examen" : "No orders under review") : settings.language === "ar" ? "الطلبيات قيد المراجعة" : settings.language === "fr" ? "Commandes en examen" : "Orders under review") : t.kpi.ordersReview.status} />
-          <RvbKpiCard icon={MessagesSquare} title={t.kpi.unreadMessages.title} value="—" status={t.kpi.unreadMessages.status} />
+          <RvbKpiCard icon={MessagesSquare} title={t.kpi.unreadMessages.title} value={unreadTotal !== null ? String(unreadTotal) : "—"} status={unreadTotal !== null ? (unreadTotal === 0 ? (settings.language === "ar" ? "لا توجد رسائل غير مقروءة" : settings.language === "fr" ? "Aucun message non lu" : "No unread messages") : settings.language === "ar" ? `${unreadTotal} رسائل غير مقروءة` : settings.language === "fr" ? `${unreadTotal} non lus` : `${unreadTotal} unread`) : t.kpi.unreadMessages.status} />
         </div>
 
         {/* Secondary status */}
@@ -352,8 +424,8 @@ export default function RvbDashboardPage() {
             { label: t.system.webWorkspace, status: t.system.ready, ready: true },
             { label: t.system.accounts, status: acctCounts ? t.system.ready : t.system.comingSoon, ready: !!acctCounts },
             { label: t.system.mobile, status: t.system.comingSoon, ready: false },
-            { label: t.system.realtime, status: t.system.comingSoon, ready: false },
-            { label: t.system.notifications, status: t.system.comingSoon, ready: false },
+            { label: t.system.realtime, status: socketReady ? t.system.ready : t.system.comingSoon, ready: socketReady },
+            { label: t.system.notifications, status: notificationsReady ? t.system.ready : t.system.comingSoon, ready: notificationsReady },
           ]}
         />
       </div>

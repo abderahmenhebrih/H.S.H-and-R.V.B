@@ -16,6 +16,40 @@ import {
 } from "../lib/rvb-auth";
 import { requireRvbAuth, type RvbAuthRequest } from "../middleware/rvb-auth";
 
+function safeDisconnectSession(sessionId: string | null | undefined) {
+  if (!sessionId) return;
+  try {
+    const { disconnectRvbSession } = require("../lib/chat-socket");
+    if (typeof disconnectRvbSession === "function") disconnectRvbSession(sessionId);
+  } catch {}
+}
+function safeDisconnectAccount(accountId: string | null | undefined) {
+  if (!accountId) return;
+  try {
+    const { disconnectRvbAccount } = require("../lib/chat-socket");
+    if (typeof disconnectRvbAccount === "function") disconnectRvbAccount(accountId);
+  } catch {}
+}
+function safeDisconnectAccountExcept(accountId: string | null | undefined, exceptSessionId: string | null | undefined) {
+  if (!accountId) return;
+  try {
+    const mod = require("../lib/chat-socket");
+    if (typeof mod.disconnectRvbAccountExcept === "function") mod.disconnectRvbAccountExcept(accountId, exceptSessionId || null);
+    else if (typeof mod.disconnectRvbAccount === "function") {
+      // fallback: manual filter if helper not available
+      const io = mod.getIO ? mod.getIO() : null;
+      if (io) {
+        for (const sock of (io.sockets.sockets as any).values()) {
+          const u = (sock as any).data?.rvbUser;
+          if (u?.accountId === accountId && u?.sessionId !== exceptSessionId) {
+            try { sock.disconnect(true); } catch {}
+          }
+        }
+      }
+    }
+  } catch {}
+}
+
 const router = Router();
 
 function codeError(code: string, status: number) {
@@ -264,6 +298,9 @@ router.post("/refresh", async (req, res) => {
 
     setRefreshCookie(res, newRefreshToken);
 
+    // Immediately disconnect sockets using the old revoked session (not the new one)
+    safeDisconnectSession(session.id || payload.sessionId);
+
     if (isNativeRefresh) {
       res.json({
         success: true,
@@ -287,6 +324,7 @@ router.post("/refresh", async (req, res) => {
 // POST /api/rvb/auth/logout
 router.post("/logout", async (req, res) => {
   try {
+    let revokedSessionId: string | null = null;
     let refreshToken: string | null = null;
     if ((req as any).cookies && (req as any).cookies[RVB_REFRESH_COOKIE_NAME]) refreshToken = (req as any).cookies[RVB_REFRESH_COOKIE_NAME];
     else if (req.body && req.body.refreshToken) refreshToken = String(req.body.refreshToken);
@@ -299,6 +337,9 @@ router.post("/logout", async (req, res) => {
       if (sess && !sess.revokedAt) {
         sess.revokedAt = Date.now();
         await sess.save();
+        revokedSessionId = sess.id;
+      } else if (sess) {
+        revokedSessionId = sess.id;
       }
     } else {
       // Fallback: verify access token with access-token verifier and revoke its session
@@ -312,6 +353,9 @@ router.post("/logout", async (req, res) => {
             if (sess && !sess.revokedAt) {
               sess.revokedAt = Date.now();
               await sess.save();
+              revokedSessionId = payload.sessionId;
+            } else {
+              revokedSessionId = payload.sessionId;
             }
           }
         } catch {
@@ -319,6 +363,8 @@ router.post("/logout", async (req, res) => {
         }
       }
     }
+
+    if (revokedSessionId) safeDisconnectSession(revokedSessionId);
 
     clearRefreshCookie(res);
     res.json({ success: true });
@@ -437,6 +483,7 @@ router.post("/sessions/revoke-others", requireRvbAuth as any, async (req: RvbAut
   try {
     const user = req.rvbUser!;
     await RvbSessionModel.updateMany({ accountId: user.accountId, revokedAt: null, id: { $ne: user.sessionId } } as any, { $set: { revokedAt: Date.now() } } as any);
+    safeDisconnectAccountExcept(user.accountId, user.sessionId);
     res.json({ success: true });
   } catch (e) {
     console.error("revoke others failed", e);
@@ -507,12 +554,16 @@ router.post("/change-password", requireRvbAuth as any, async (req: RvbAuthReques
           rotationFamilyId: familyId,
         });
         setRefreshCookie(res, newRefreshToken);
+        // Disconnect all other sessions except the new rotated one (old current is revoked but new remains)
+        safeDisconnectAccountExcept(account.id, newSessionId);
         // Web: HttpOnly cookie only — never return refreshToken in JSON (even for native, use explicit refresh flow).
         res.json({ success: true, accessToken: newAccessToken, account: toSafeRvbAccount(account) });
         return;
       }
     }
 
+    // No rotation (session missing or already revoked): disconnect others except current
+    safeDisconnectAccountExcept(account.id, currentSessionId);
     res.json({ success: true, account: toSafeRvbAccount(account) });
   } catch (e) {
     console.error("change-password failed", e);

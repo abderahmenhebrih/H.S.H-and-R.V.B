@@ -9,7 +9,6 @@ import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbNotificationService } from "../../../src/services/rvb-notification.service";
 import { rvbActivityService } from "../../../src/services/rvb-activity.service";
-import { notificationService } from "../../../src/services/notification.service";
 import { connectChatSocket, getChatSocket } from "../../../src/services/chat-socket.service";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import { Search, CheckCheck, Archive, ArchiveRestore, Trash2, MoreHorizontal, Bell, Activity as ActivityIcon, Eye, Undo2, Inbox, Filter, Calendar, AlertTriangle, MessageSquare, FileText, ShoppingCart, Users, Truck, ShieldCheck, Settings as SettingsIcon } from "lucide-react";
@@ -302,34 +301,16 @@ function NotificationsInner() {
     setError("");
     const targetPage = reset ? 1 : p;
     try {
-      // Prefer backend RVB endpoint
-      try {
-        const data = await rvbNotificationService.list({ status: status as any, source, priority, date, search: debouncedSearch || undefined, page: targetPage, limit: 20 });
-        if (reset) {
-          setNotifications(data.notifications || []);
-        } else {
-          setNotifications((prev) => targetPage === 1 ? (data.notifications || []) : [...prev, ...(data.notifications || [])]);
-        }
-        setTotal(data.total ?? 0);
-        setTotalPages(data.totalPages ?? 1);
-        setUnreadCount(data.unreadCount ?? 0);
-        setPage(targetPage);
-      } catch (backendErr: any) {
-        // Fallback to Dexie local filtering (offline or 401? still show something)
-        const all = await notificationService.getFilteredAdvanced({ status: status as any, source, priority, date, search: debouncedSearch || undefined });
-        const limit = 20;
-        const start = (targetPage - 1) * limit;
-        const slice = all.slice(start, start + limit);
-        if (reset || targetPage === 1) setNotifications(slice);
-        else setNotifications((prev) => [...prev, ...slice]);
-        setTotal(all.length);
-        setTotalPages(Math.ceil(all.length / limit) || 1);
-        setUnreadCount(all.filter((n: any) => !n.readAt && !(n as any).archivedAt).length);
-        setPage(targetPage);
-        if (all.length === 0 && backendErr?.status !== 404) {
-          // don't show error if just empty via fallback
-        }
+      const data = await rvbNotificationService.list({ status: status as any, source, priority, date, search: debouncedSearch || undefined, page: targetPage, limit: 20 });
+      if (reset) {
+        setNotifications(data.notifications || []);
+      } else {
+        setNotifications((prev) => targetPage === 1 ? (data.notifications || []) : [...prev, ...(data.notifications || [])]);
       }
+      setTotal(data.total ?? 0);
+      setTotalPages(data.totalPages ?? 1);
+      setUnreadCount(data.unreadCount ?? 0);
+      setPage(targetPage);
     } catch (e: any) {
       setError(e?.message || t.loadError);
     } finally { setLoading(false); }
@@ -376,25 +357,19 @@ function NotificationsInner() {
       if (tab === "notifications") void loadNotifications(true, 1);
     };
     sock.on("rvb:notification", onNotif);
-    // also listen custom event from header sync
     const onLocal = () => { if (tab === "notifications") void loadNotifications(true, 1); };
-    window.addEventListener("hebrih-notifications-changed", onLocal);
-    window.addEventListener("hebrih-db-synced", onLocal);
+    window.addEventListener("hebrih-rvb-notifications-changed", onLocal);
     return () => {
       sock.off("rvb:notification", onNotif);
-      window.removeEventListener("hebrih-notifications-changed", onLocal);
-      window.removeEventListener("hebrih-db-synced", onLocal);
+      window.removeEventListener("hebrih-rvb-notifications-changed", onLocal);
     };
   }, [tab, loadNotifications]);
 
   const handleOpen = async (n: any) => {
-    // mark read
     try {
       if (!n.readAt && !n.archivedAt) {
         try { await rvbNotificationService.markRead(n.id); } catch {}
-        // Optimistic local Dexie sync for header
-        try { await notificationService.markAsRead(n.id); } catch {}
-        window.dispatchEvent(new CustomEvent("hebrih-notifications-changed"));
+        window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
         setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, readAt: Date.now() } : x));
       }
     } catch {}
@@ -406,17 +381,11 @@ function NotificationsInner() {
     const isRead = !!n.readAt;
     try {
       await rvbNotificationService.markRead(n.id, isRead);
-    } catch {
-      // fallback dexie
-      if (isRead) await notificationService.markAsUnread(n.id);
-      else await notificationService.markAsRead(n.id);
+    } catch (e: any) {
+      alert(e?.message || "Failed");
+      return;
     }
-    // local fallback
-    try {
-      if (isRead) await notificationService.markAsUnread(n.id);
-      else await notificationService.markAsRead(n.id);
-    } catch {}
-    window.dispatchEvent(new CustomEvent("hebrih-notifications-changed"));
+    window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
     setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, readAt: isRead ? null : Date.now() } : x));
   };
 
@@ -424,11 +393,7 @@ function NotificationsInner() {
     try {
       if (restore) await rvbNotificationService.restore(n.id);
       else await rvbNotificationService.archive(n.id, true);
-      try {
-        if (restore) await notificationService.restore(n.id);
-        else await notificationService.archive(n.id);
-      } catch {}
-      window.dispatchEvent(new CustomEvent("hebrih-notifications-changed"));
+      window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
       // Remove from list if filtering excludes archived, else toggle
       await loadNotifications(true, 1);
     } catch (e: any) { alert(e?.message || "Archive failed"); }
@@ -437,9 +402,11 @@ function NotificationsInner() {
   const handleMarkAllRead = async () => {
     try {
       await rvbNotificationService.markAllRead();
-    } catch {}
-    try { await notificationService.markAllAsRead(); } catch {}
-    window.dispatchEvent(new CustomEvent("hebrih-notifications-changed"));
+    } catch (e: any) {
+      alert(e?.message || "Failed");
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
     await loadNotifications(true, 1);
   };
 
@@ -450,11 +417,11 @@ function NotificationsInner() {
     try {
       await rvbNotificationService.bulk(ids, action);
     } catch (e: any) {
-      // fallback per-item dexie
-      try { await notificationService.bulkAction(ids, action); } catch {}
+      alert(e?.message || "Bulk failed");
+      setBulkLoading(false);
+      return;
     }
-    try { await notificationService.bulkAction(ids, action); } catch {}
-    window.dispatchEvent(new CustomEvent("hebrih-notifications-changed"));
+    window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
     setSelected(new Set());
     await loadNotifications(true, 1);
     setBulkLoading(false);

@@ -6,7 +6,6 @@ const syncChangeSchema = new Schema(
       type: Number,
       required: true,
       unique: true,
-      index: true,
     },
     entity: {
       type: String,
@@ -47,8 +46,6 @@ const syncChangeSchema = new Schema(
     versionKey: false,
   },
 );
-
-syncChangeSchema.index({ revision: 1 });
 
 export type SyncChangeDocument = InferSchemaType<typeof syncChangeSchema>;
 

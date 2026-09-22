@@ -136,14 +136,17 @@ router.get("/:id/messages", async (req: RvbAuthRequest, res) => {
   }
 });
 
-// POST /api/rvb/chats/:id/messages { content, replyTo, reminderAt }
+// POST /api/rvb/chats/:id/messages { content, replyTo, reminderMinutes | reminderAt(legacy) }
 router.post("/:id/messages", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const id = String((req.params as any).id);
-    const { content, replyToMessageId, replyTo, reminderAt } = req.body as any;
+    const { content, replyToMessageId, replyTo, reminderMinutes, reminderAt } = req.body as any;
     const reply = replyToMessageId || replyTo || null;
-    const msg = await chatSvc.sendMessage(id, user.accountId, content, reply, reminderAt ? Number(reminderAt) : null);
+    // Prefer server-trusted reminderMinutes (30|60|120), fallback to legacy reminderAt timestamp
+    const rm = reminderMinutes !== undefined && reminderMinutes !== null ? Number(reminderMinutes) : null;
+    const legacyAt = reminderAt !== undefined && reminderAt !== null ? Number(reminderAt) : null;
+    const msg = await chatSvc.sendMessage(id, user.accountId, content, reply, rm, legacyAt);
     // Emit via socket if available
     try {
       const { getIO } = await import("../lib/chat-socket");

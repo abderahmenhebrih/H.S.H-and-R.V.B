@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyAccessToken, toSafeRvbAccount } from "../lib/rvb-auth";
 import { RvbAccountModel } from "../models/rvb-account.model";
+import { RvbSessionModel } from "../models/rvb-session.model";
 
 export interface RvbAuthRequest extends Request {
   rvbUser?: {
@@ -47,6 +48,18 @@ export async function requireRvbAuth(req: RvbAuthRequest, res: Response, next: N
     if (account.status !== "active") {
       const code = account.status === "archived" ? "RVB_ACCOUNT_ARCHIVED" : "RVB_ACCOUNT_DISABLED";
       res.status(403).json({ success: false, code, message: code });
+      return;
+    }
+
+    // Immediate session revocation check
+    const sessionId = payload.sessionId as string | undefined;
+    if (!sessionId) {
+      res.status(401).json({ success: false, code: "RVB_SESSION_REVOKED", message: "Session revoked" });
+      return;
+    }
+    const session: any = await RvbSessionModel.findOne({ id: sessionId, accountId, revokedAt: null, expiresAt: { $gt: Date.now() } }).lean();
+    if (!session) {
+      res.status(401).json({ success: false, code: "RVB_SESSION_REVOKED", message: "Session revoked or expired" });
       return;
     }
 

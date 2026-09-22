@@ -332,16 +332,14 @@ export default function RvbShell({
     let cancelled = false;
     async function loadNotifCount() {
       try {
-        const { notificationService } = await import("../../services/notification.service");
-        const all: any[] = await notificationService.getAll();
-        const cnt = all.filter((n: any) => !n.readAt && !(n as any).archivedAt).length;
-        if (!cancelled) setNotifUnread(cnt);
+        const { rvbNotificationService } = await import("../../services/rvb-notification.service");
+        const data = await rvbNotificationService.count().catch(() => ({ unreadCount: 0 } as any));
+        if (!cancelled) setNotifUnread(data.unreadCount ?? 0);
       } catch {}
     }
     void loadNotifCount();
     const h = () => void loadNotifCount();
-    window.addEventListener("hebrih-notifications-changed", h);
-    window.addEventListener("hebrih-db-synced", h);
+    window.addEventListener("hebrih-rvb-notifications-changed", h);
     // socket realtime
     let sock: any = null;
     (async () => {
@@ -353,8 +351,7 @@ export default function RvbShell({
     })();
     return () => {
       cancelled = true;
-      window.removeEventListener("hebrih-notifications-changed", h);
-      window.removeEventListener("hebrih-db-synced", h);
+      window.removeEventListener("hebrih-rvb-notifications-changed", h);
       if (sock) try { sock.off("rvb:notification", h); } catch {}
     };
   }, []);

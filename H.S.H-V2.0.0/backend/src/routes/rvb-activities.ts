@@ -21,7 +21,14 @@ router.get("/", async (req: RvbAuthRequest, res) => {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 25,
     });
-    res.json({ success: true, ...result });
+    // Redact historic chat details at serialization layer: for sourceType=chats return details null or "Chat activity"
+    const redactedActivities = (result.activities || []).map((a: any) => {
+      if (a.sourceType === "chats") {
+        return { ...a, details: null };
+      }
+      return a;
+    });
+    res.json({ success: true, ...result, activities: redactedActivities });
   } catch (e: any) {
     res.status(e?.status || 500).json({ success: false, code: e?.code || "INTERNAL_ERROR", message: e?.message });
   }

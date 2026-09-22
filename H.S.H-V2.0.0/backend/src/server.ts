@@ -75,6 +75,13 @@ app.get("/api/health", (_req, res) => {
 async function startServer() {
   try {
     await connectDatabase();
+    // Safe index migration for conversation official private unique bug: ensure old index dropped and new created
+    try {
+      const { ensureConversationIndexes } = await import("./models/conversation.model");
+      await ensureConversationIndexes();
+    } catch (e) {
+      console.warn("ensureConversationIndexes failed", (e as any)?.message);
+    }
   } catch (error) {
     console.warn(
       "Database connection failed, continuing without DB (printing will use fallback):",
@@ -84,6 +91,12 @@ async function startServer() {
 
   const httpServer = createServer(app);
   initChatSocket(httpServer, allowedOrigins);
+  try {
+    const { startRvbChatReminderProcessor } = await import("./services/rvb-chat-reminder.processor");
+    startRvbChatReminderProcessor();
+  } catch (e) {
+    console.warn("reminder processor start failed", (e as any)?.message);
+  }
   httpServer.listen(PORT, () => {
     console.log(`Backend server running on http://localhost:${PORT}`);
   });

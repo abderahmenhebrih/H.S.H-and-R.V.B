@@ -118,11 +118,11 @@ export const chatService = {
     const data = await handleResponse<{ success: boolean; messages: Message[] }>(res);
     return data.messages || [];
   },
-  async sendMessage(conversationId: string, content: string, replyToMessageId?: string | null, reminderAt?: number | null): Promise<Message> {
+  async sendMessage(conversationId: string, content: string, replyToMessageId?: string | null, reminderMinutes?: number | null): Promise<Message> {
     const res = await fetch(`${BASE}/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ content, replyToMessageId, reminderAt }),
+      body: JSON.stringify({ content, replyToMessageId, reminderMinutes }),
       credentials: "include",
     });
     const data = await handleResponse<{ success: boolean; message: Message }>(res);
@@ -189,5 +189,14 @@ export const chatService = {
       credentials: "include",
     });
     return handleResponse(res);
+  },
+  async getUnreadCounts(): Promise<Record<string, number>> {
+    const res = await fetch(`${BASE}/unread/counts`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const data = await handleResponse<{ success: boolean; counts: Record<string, number> }>(res);
+    return data.counts || {};
+  },
+  async getUnreadTotal(): Promise<number> {
+    const counts = await chatService.getUnreadCounts();
+    return Object.values(counts).reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
   },
 };

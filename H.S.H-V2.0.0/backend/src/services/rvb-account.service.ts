@@ -7,6 +7,13 @@ import { isValidRvbRole, isPortalRole } from "../constants/rvb-roles";
 import { normalizeTag, isValidTag } from "../constants/rvb-account";
 import { hashPassword, validatePasswordPolicy } from "../lib/password";
 
+function safeDisconnectAccount(accountId: string) {
+  try {
+    const { disconnectRvbAccount } = require("../lib/chat-socket");
+    if (typeof disconnectRvbAccount === "function") disconnectRvbAccount(accountId);
+  } catch {}
+}
+
 export type CreateRvbAccountInput = {
   tag: string;
   displayName: string;
@@ -219,6 +226,7 @@ export async function archiveRvbAccount(id: string) {
   account.archivedAt = Date.now();
   account.updatedAt = Date.now();
   await account.save();
+  safeDisconnectAccount(account.id);
   return account.toObject ? account.toObject() : account;
 }
 
@@ -229,6 +237,7 @@ export async function reactivateRvbAccount(id: string) {
   account.archivedAt = null;
   account.updatedAt = Date.now();
   await account.save();
+  safeDisconnectAccount(account.id);
   return account.toObject ? account.toObject() : account;
 }
 
@@ -238,6 +247,7 @@ export async function disableRvbAccount(id: string) {
   account.status = "disabled";
   account.updatedAt = Date.now();
   await account.save();
+  safeDisconnectAccount(account.id);
   return account.toObject ? account.toObject() : account;
 }
 
@@ -331,6 +341,7 @@ export async function unlinkRvbAccount(accountId: string) {
   }
   // Supervisor retains management access even without worker link — keep status as is (handled above: supervisor not in list)
   await account.save();
+  if (account.status === "disabled" || account.status === "archived") safeDisconnectAccount(account.id);
   try {
     const { WorkerActivityModel } = await import("../models/worker-activity.model");
     await WorkerActivityModel.create({
@@ -357,6 +368,7 @@ export async function archiveByLinkedEntity(type: string, entityId: string) {
   account.archivedAt = Date.now();
   account.updatedAt = Date.now();
   await account.save();
+  safeDisconnectAccount(account.id);
   try {
     const { WorkerActivityModel } = await import("../models/worker-activity.model");
     await WorkerActivityModel.create({
@@ -381,6 +393,7 @@ export async function reactivateByLinkedEntity(type: string, entityId: string) {
   account.archivedAt = null;
   account.updatedAt = Date.now();
   await account.save();
+  safeDisconnectAccount(account.id);
   try {
     const { WorkerActivityModel } = await import("../models/worker-activity.model");
     await WorkerActivityModel.create({

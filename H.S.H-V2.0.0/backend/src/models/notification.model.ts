@@ -104,14 +104,13 @@ const notificationSchema = new Schema(
     readAt: {
       type: Number,
       required: false,
-      index: true,
+      default: null,
     },
 
     archivedAt: {
       type: Number,
       required: false,
       default: null,
-      index: true,
     },
 
     priority: {
@@ -119,7 +118,19 @@ const notificationSchema = new Schema(
       enum: ["normal", "high", "urgent"],
       required: false,
       default: "normal",
-      index: true,
+    },
+
+    mandatory: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+
+    category: {
+      type: String,
+      enum: ["chats", "mentions", "requests", "orders", "statusUpdates", "reminders", "system"],
+      required: false,
+      default: null,
     },
   },
   {
@@ -129,12 +140,12 @@ const notificationSchema = new Schema(
 );
 
 notificationSchema.index({ createdAt: -1 });
-notificationSchema.index({ readAt: 1 });
-notificationSchema.index({ archivedAt: 1 });
-notificationSchema.index({ priority: 1 });
 notificationSchema.index({ sourceEventId: 1 }, { unique: true, sparse: true });
 notificationSchema.index({ serverRevision: 1 });
 notificationSchema.index({ audienceType: 1, createdAt: -1 });
+notificationSchema.index({ readAt: 1 });
+notificationSchema.index({ archivedAt: 1 });
+notificationSchema.index({ priority: 1 });
 
 export type NotificationDocument = InferSchemaType<typeof notificationSchema>;
 

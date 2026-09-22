@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, X } from "lucide-react";
 import { notificationService } from "../../services/notification.service";
+import { rvbNotificationService } from "../../services/rvb-notification.service";
 import { useDbSync } from "../../hooks/useDbSync";
 import type { Notification } from "../../types/entities/notification";
 import styles from "./NotificationBell.module.css";
@@ -49,9 +50,25 @@ export default function NotificationBell({ language = "en", dark = false }: { la
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
 
+  const isRvb = typeof window !== "undefined" && window.location.pathname.startsWith("/rvb");
+
   const load = async () => {
     try {
-      // Show recent non-archived, unread first for quick preview
+      if (isRvb) {
+        // R.V.B: backend per-recipient source of truth
+        const data = await rvbNotificationService.list({ status: "all", limit: 5 } as any).catch(() => null as any);
+        if (data && Array.isArray(data.notifications)) {
+          const filtered = (data.notifications as any[]).slice(0, 5);
+          setNotifications(filtered as any);
+          setUnreadCount(data.unreadCount ?? filtered.filter((n: any) => !n.readAt).length);
+          return;
+        }
+        // Fallback to count endpoint
+        const countData = await rvbNotificationService.count().catch(() => ({ unreadCount: 0 } as any));
+        setUnreadCount(countData.unreadCount ?? 0);
+        return;
+      }
+      // H.S.H: Dexie local
       const all = await notificationService.getAll();
       const filtered = all.filter((n: any) => !(n as any).archivedAt).sort((a, b) => {
         const aUnread = !a.readAt ? 0 : 1;
@@ -73,15 +90,17 @@ export default function NotificationBell({ language = "en", dark = false }: { la
   }, []);
 
   useDbSync(() => {
-    void load();
+    if (!isRvb) void load();
   }, []);
 
   useEffect(() => {
     const h = () => void load();
     window.addEventListener("hebrih-notifications-changed", h);
+    window.addEventListener("hebrih-rvb-notifications-changed", h);
     window.addEventListener("rvb:notification" as any, h);
     return () => {
       window.removeEventListener("hebrih-notifications-changed", h);
+      window.removeEventListener("hebrih-rvb-notifications-changed", h);
       window.removeEventListener("rvb:notification" as any, h);
     };
   }, []);
@@ -213,15 +232,25 @@ export default function NotificationBell({ language = "en", dark = false }: { la
   };
 
   const handleMarkAllRead = async () => {
-    await notificationService.markAllAsRead();
-    try { window.dispatchEvent(new CustomEvent("hebrih-notifications-changed")); } catch {}
+    if (isRvb) {
+      try { await rvbNotificationService.markAllRead(); } catch {}
+      try { window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed")); } catch {}
+    } else {
+      await notificationService.markAllAsRead();
+      try { window.dispatchEvent(new CustomEvent("hebrih-notifications-changed")); } catch {}
+    }
     await load();
   };
 
   const handleItemClick = async (n: Notification) => {
     if (!n.readAt) {
-      await notificationService.markAsRead(n.id);
-      try { window.dispatchEvent(new CustomEvent("hebrih-notifications-changed")); } catch {}
+      if (isRvb) {
+        try { await rvbNotificationService.markRead(n.id); } catch {}
+        try { window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed")); } catch {}
+      } else {
+        await notificationService.markAsRead(n.id);
+        try { window.dispatchEvent(new CustomEvent("hebrih-notifications-changed")); } catch {}
+      }
     }
     setOpen(false);
     if (n.route) {

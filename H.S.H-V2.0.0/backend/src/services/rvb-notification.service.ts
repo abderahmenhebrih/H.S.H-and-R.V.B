@@ -1,9 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
 import { NotificationModel } from "../models/notification.model";
+import { RvbNotificationRecipientModel } from "../models/rvb-notification-recipient.model";
+import { RvbAccountModel } from "../models/rvb-account.model";
 import { getIO } from "../lib/chat-socket";
 
 export type RvbNotificationPriority = "normal" | "high" | "urgent";
-export type RvbNotificationSource = "chats" | "requests" | "orders" | "accounts" | "workers" | "suppliers" | "customers" | "system";
+export type RvbPreferenceCategory = "chats" | "mentions" | "requests" | "orders" | "statusUpdates" | "reminders" | "system";
 
 function derivePriority(input: {
   type: string;
@@ -13,18 +15,27 @@ function derivePriority(input: {
   priority?: RvbNotificationPriority;
 }): RvbNotificationPriority {
   if (input.priority) return input.priority;
-  // High/urgent examples: payment/loan requests, supply/shipment awaits review, order awaits review, direct mention, reminder, account security
   const urgentKeywords = ["urgent", "security", "disabled", "archived"];
   const highKeywords = ["payment", "loan", "supply", "shipment", "order", "mention", "reminder", "request"];
   const hay = `${input.type} ${input.title || ""} ${input.sourceType || ""}`.toLowerCase();
   if (urgentKeywords.some((k) => hay.includes(k)) && input.severity === "critical") return "urgent";
   if (highKeywords.some((k) => hay.includes(k))) {
     if (input.severity === "critical" || input.severity === "warning") return "high";
-    // default high for request-like types
     if (["worker", "purchase", "customer_order", "payment"].includes(input.type)) return "high";
   }
-  // chat normal, system normal
   return "normal";
+}
+
+function deriveCategory(input: { type: string; title?: string; message?: string; isMention?: boolean; isReply?: boolean; isReminder?: boolean }): RvbPreferenceCategory {
+  if (input.isReminder) return "reminders";
+  if (input.isMention || input.isReply) return "mentions";
+  if (["worker", "purchase"].includes(input.type)) return "requests";
+  if (["customer_order", "sale", "payment"].includes(input.type) && input.title?.toLowerCase().includes("order")) return "orders";
+  if (["customer_order"].includes(input.type)) return "requests";
+  if (input.type === "system" && input.title?.toLowerCase().includes("chat")) return "chats";
+  if (input.type === "system") return "system";
+  if (input.type === "account") return "statusUpdates";
+  return "statusUpdates";
 }
 
 export function getAudienceVisibleFilter(accountId: string, role: string): any {
@@ -33,11 +44,46 @@ export function getAudienceVisibleFilter(accountId: string, role: string): any {
       { audienceType: "all" },
       { audienceType: "role", audienceIds: role },
       { audienceType: "user", audienceIds: accountId },
-      // legacy fallback where audienceType missing = visible
       { audienceType: { $exists: false } },
       { audienceType: null },
     ],
   };
+}
+
+async function resolveRecipients(input: { audienceType: "all" | "role" | "user"; audienceIds?: string[] }): Promise<string[]> {
+  if (input.audienceType === "user" && input.audienceIds?.length) {
+    const docs = await RvbAccountModel.find({ id: { $in: input.audienceIds }, status: "active" }).lean();
+    return docs.map((d: any) => d.id);
+  }
+  if (input.audienceType === "role" && input.audienceIds?.length) {
+    const docs = await RvbAccountModel.find({ role: { $in: input.audienceIds as any }, status: "active" }).lean();
+    return docs.map((d: any) => d.id);
+  }
+  if (input.audienceType === "all") {
+    const docs = await RvbAccountModel.find({ status: "active" }).lean();
+    return docs.map((d: any) => d.id);
+  }
+  return [];
+}
+
+async function shouldDeliverToAccount(accountId: string, category: RvbPreferenceCategory, mandatory: boolean): Promise<boolean> {
+  if (mandatory) return true;
+  const acc: any = await RvbAccountModel.findOne({ id: accountId }).lean();
+  const prefs = acc?.preferences?.notifications;
+  if (!prefs) return true;
+  // Map category to pref key
+  const keyMap: Record<string, string> = {
+    chats: "chats",
+    mentions: "mentions",
+    requests: "requests",
+    orders: "orders",
+    statusUpdates: "statusUpdates",
+    reminders: "reminders",
+    system: "statusUpdates",
+  };
+  const key = keyMap[category] || "statusUpdates";
+  if (prefs[key] === false) return false;
+  return true;
 }
 
 export async function createRvbNotification(input: {
@@ -52,11 +98,18 @@ export async function createRvbNotification(input: {
   audienceType: "all" | "role" | "user";
   audienceIds?: string[];
   priority?: RvbNotificationPriority;
+  category?: RvbPreferenceCategory;
+  mandatory?: boolean;
+  isMention?: boolean;
+  isReply?: boolean;
+  isReminder?: boolean;
 }): Promise<any | null> {
   const existing = await NotificationModel.findOne({ sourceEventId: input.sourceEventId }).lean();
   if (existing) return existing;
   const now = Date.now();
   const priority = derivePriority({ type: input.type, severity: input.severity, title: input.title, priority: input.priority });
+  const category = input.category || deriveCategory({ type: input.type, title: input.title, message: input.message, isMention: input.isMention, isReply: input.isReply, isReminder: input.isReminder });
+  const mandatory = !!input.mandatory;
   try {
     const doc = await NotificationModel.create({
       id: `notif-${uuidv4()}`,
@@ -76,18 +129,70 @@ export async function createRvbNotification(input: {
       readAt: null,
       archivedAt: null,
       priority,
+      category,
+      mandatory,
     } as any);
-    // realtime emit
+
+    // Resolve recipients and create per-recipient state
+    const recipientIds = await resolveRecipients({ audienceType: input.audienceType, audienceIds: input.audienceIds });
+    const delivered: string[] = [];
+    const bulkOps: any[] = [];
+    for (const accountId of recipientIds) {
+      const should = await shouldDeliverToAccount(accountId, category as RvbPreferenceCategory, mandatory);
+      if (!should) {
+        // Create suppressed recipient so we don't re-attempt, but mark suppressed
+        bulkOps.push({
+          updateOne: {
+            filter: { notificationId: doc.id, accountId },
+            update: {
+              $setOnInsert: {
+                id: `rnr-${uuidv4()}`,
+                notificationId: doc.id,
+                accountId,
+                readAt: null,
+                archivedAt: null,
+                deliveredAt: null,
+                suppressedAt: now,
+                suppressionReason: `preference:${category}`,
+                createdAt: now,
+                updatedAt: now,
+              },
+            },
+            upsert: true,
+          },
+        });
+        continue;
+      }
+      bulkOps.push({
+        updateOne: {
+          filter: { notificationId: doc.id, accountId },
+          update: {
+            $setOnInsert: {
+              id: `rnr-${uuidv4()}`,
+              notificationId: doc.id,
+              accountId,
+              readAt: null,
+              archivedAt: null,
+              deliveredAt: now,
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          upsert: true,
+        },
+      });
+      delivered.push(accountId);
+    }
+    if (bulkOps.length) {
+      await RvbNotificationRecipientModel.bulkWrite(bulkOps as any);
+    }
+
+    // Realtime emit only to delivered recipients
     try {
       const io = getIO();
-      if (io) {
-        if (input.audienceType === "user" && input.audienceIds?.length) {
-          for (const uid of input.audienceIds) io.to(`user:${uid}`).emit("rvb:notification", { notification: doc });
-        } else if (input.audienceType === "role" && input.audienceIds?.length) {
-          for (const r of input.audienceIds) io.to(`role:${r}`).emit("rvb:notification", { notification: doc });
-          // also emit to user rooms is not needed if frontend joins role rooms
-        } else {
-          io.emit("rvb:notification", { notification: doc });
+      if (io && delivered.length) {
+        for (const uid of delivered) {
+          io.to(`user:${uid}`).emit("rvb:notification", { notification: doc });
         }
       }
     } catch {}
@@ -99,6 +204,42 @@ export async function createRvbNotification(input: {
     }
     throw e;
   }
+}
+
+// Backfill helper for legacy notifications: ensure recipient exists for current account
+async function ensureRecipientsForAccount(accountId: string, role: string) {
+  const audienceFilter = getAudienceVisibleFilter(accountId, role);
+  const baseNotifications = await NotificationModel.find(audienceFilter as any).lean();
+  const ops: any[] = [];
+  const now = Date.now();
+  for (const n of baseNotifications as any[]) {
+    const exists = await RvbNotificationRecipientModel.findOne({ notificationId: n.id, accountId }).lean();
+    if (exists) continue;
+    // For legacy group notifications with shared readAt, do not seed as read
+    ops.push({
+      updateOne: {
+        filter: { notificationId: n.id, accountId },
+        update: {
+          $setOnInsert: {
+            id: `rnr-${uuidv4()}`,
+            notificationId: n.id,
+            accountId,
+            readAt: null,
+            archivedAt: null,
+            deliveredAt: now,
+            createdAt: n.createdAt,
+            updatedAt: now,
+          },
+        },
+        upsert: true,
+      },
+    });
+    if (ops.length >= 500) {
+      await RvbNotificationRecipientModel.bulkWrite(ops as any);
+      ops.length = 0;
+    }
+  }
+  if (ops.length) await RvbNotificationRecipientModel.bulkWrite(ops as any);
 }
 
 export async function listNotificationsForUser(params: {
@@ -113,22 +254,31 @@ export async function listNotificationsForUser(params: {
   limit?: number;
 }) {
   const { accountId, role, status = "all", source, priority, date, search, page = 1, limit = 25 } = params;
-  const audienceFilter = getAudienceVisibleFilter(accountId, role);
-  const andFilters: any[] = [audienceFilter];
+  // Ensure legacy recipients exist lazily (first page only to limit)
+  await ensureRecipientsForAccount(accountId, role).catch(() => {});
 
-  // status
-  if (status === "archived") {
-    andFilters.push({ archivedAt: { $ne: null } });
-  } else if (status === "unread") {
-    andFilters.push({ readAt: null, $or: [{ archivedAt: null }, { archivedAt: { $exists: false } }] });
+  // Build recipient status filter
+  const recipientFilter: any = { accountId };
+  if (status === "archived") recipientFilter.archivedAt = { $ne: null };
+  else if (status === "unread") {
+    recipientFilter.readAt = null;
+    recipientFilter.archivedAt = null;
   } else if (status === "read") {
-    andFilters.push({ readAt: { $ne: null }, $or: [{ archivedAt: null }, { archivedAt: { $exists: false } }] });
+    recipientFilter.readAt = { $ne: null };
+    recipientFilter.archivedAt = null;
   } else {
-    // all = not archived
-    andFilters.push({ $or: [{ archivedAt: null }, { archivedAt: { $exists: false } }] });
+    recipientFilter.archivedAt = null;
   }
 
-  // source / type mapping
+  // Find recipient notificationIds for this account matching status
+  const recipients = await RvbNotificationRecipientModel.find(recipientFilter as any).lean();
+  const notificationIds = recipients.map((r: any) => r.notificationId);
+  if (notificationIds.length === 0) {
+    return { notifications: [], total: 0, page, limit, totalPages: 0, unreadCount: 0, archivedCount: 0 };
+  }
+
+  const andFilters: any[] = [{ id: { $in: notificationIds } }];
+
   if (source && source !== "all") {
     const sourceMap: Record<string, string[]> = {
       chats: ["system"],
@@ -140,8 +290,6 @@ export async function listNotificationsForUser(params: {
       customers: ["customer_order"],
       system: ["system", "sync"],
     };
-    // For precise source filter we use entityType/route heuristics also
-    // Simplify: match type OR route/entityType contains source
     const types = sourceMap[source];
     if (types) {
       andFilters.push({
@@ -169,7 +317,6 @@ export async function listNotificationsForUser(params: {
 
   if (search && search.trim()) {
     const q = search.trim();
-    // Escape regex
     const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     andFilters.push({
       $or: [
@@ -183,59 +330,142 @@ export async function listNotificationsForUser(params: {
   const filter: any = andFilters.length ? { $and: andFilters } : {};
   const total = await NotificationModel.countDocuments(filter as any);
   const skip = (Math.max(1, page) - 1) * Math.min(100, Math.max(1, limit));
-  const docs = await NotificationModel.find(filter as any).sort({ createdAt: -1 }).skip(skip).limit(Math.min(100, Math.max(1, limit))).lean();
-  const unreadCount = await NotificationModel.countDocuments({ $and: [audienceFilter, { readAt: null }, { $or: [{ archivedAt: null }, { archivedAt: { $exists: false } }] }] } as any);
-  const archivedCount = await NotificationModel.countDocuments({ $and: [audienceFilter, { archivedAt: { $ne: null } }] } as any);
-  return { notifications: docs, total, page, limit, totalPages: Math.ceil(total / Math.min(100, Math.max(1, limit))), unreadCount, archivedCount };
+  const docs = await NotificationModel.find(filter as any)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(Math.min(100, Math.max(1, limit)))
+    .lean();
+
+  // Merge recipient state
+  const recipientMap = new Map(recipients.map((r: any) => [r.notificationId, r]));
+  const merged = docs.map((d: any) => {
+    const rec: any = recipientMap.get(d.id);
+    return {
+      ...d,
+      readAt: rec?.readAt ?? null,
+      archivedAt: rec?.archivedAt ?? null,
+      recipientId: rec?.id,
+      deliveredAt: rec?.deliveredAt,
+    };
+  });
+  // Sort already by createdAt, but ensure
+  merged.sort((a: any, b: any) => b.createdAt - a.createdAt);
+
+  const unreadCount = await RvbNotificationRecipientModel.countDocuments({ accountId, readAt: null, archivedAt: null } as any);
+  const archivedCount = await RvbNotificationRecipientModel.countDocuments({ accountId, archivedAt: { $ne: null } } as any);
+  return { notifications: merged, total, page, limit, totalPages: Math.ceil(total / Math.min(100, Math.max(1, limit))), unreadCount, archivedCount };
 }
 
 export async function markNotificationRead(notificationId: string, accountId: string, role: string, unread: boolean) {
-  const doc: any = await NotificationModel.findOne({ id: notificationId });
-  if (!doc) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND", status: 404 });
-  const isVisible = await NotificationModel.findOne({ id: notificationId, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
-  if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
-  if (doc.archivedAt) throw Object.assign(new Error("ARCHIVED"), { code: "ARCHIVED", status: 400 });
-  if (unread) {
-    doc.readAt = null;
-  } else {
-    doc.readAt = Date.now();
+  // Verify recipient exists and is visible (via audience check if legacy)
+  let recipient: any = await RvbNotificationRecipientModel.findOne({ notificationId, accountId });
+  if (!recipient) {
+    // Try to backfill legacy: check if base notification is visible to this account
+    const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+    if (!base) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND", status: 404 });
+    const isVisible = await NotificationModel.findOne({ id: notificationId, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
+    if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
+    // Create recipient lazily
+    recipient = await RvbNotificationRecipientModel.findOneAndUpdate(
+      { notificationId, accountId },
+      {
+        $setOnInsert: {
+          id: `rnr-${uuidv4()}`,
+          notificationId,
+          accountId,
+          readAt: null,
+          archivedAt: null,
+          deliveredAt: Date.now(),
+          createdAt: base.createdAt,
+          updatedAt: Date.now(),
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
   }
-  doc.updatedAt = Date.now();
-  await doc.save();
-  return doc.toObject();
+  if (recipient.archivedAt) throw Object.assign(new Error("ARCHIVED"), { code: "ARCHIVED", status: 400 });
+  recipient.readAt = unread ? null : Date.now();
+  recipient.updatedAt = Date.now();
+  await recipient.save();
+  const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+  return { ...base, readAt: recipient.readAt, archivedAt: recipient.archivedAt };
 }
 
 export async function archiveNotification(notificationId: string, accountId: string, role: string, arch: boolean) {
-  const doc: any = await NotificationModel.findOne({ id: notificationId });
-  if (!doc) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND", status: 404 });
-  const isVisible = await NotificationModel.findOne({ id: notificationId, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
-  if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
-  doc.archivedAt = arch ? Date.now() : null;
-  doc.updatedAt = Date.now();
-  await doc.save();
-  return doc.toObject();
+  let recipient: any = await RvbNotificationRecipientModel.findOne({ notificationId, accountId });
+  if (!recipient) {
+    const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+    if (!base) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND", status: 404 });
+    const isVisible = await NotificationModel.findOne({ id: notificationId, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
+    if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
+    recipient = await RvbNotificationRecipientModel.findOneAndUpdate(
+      { notificationId, accountId },
+      {
+        $setOnInsert: {
+          id: `rnr-${uuidv4()}`,
+          notificationId,
+          accountId,
+          readAt: null,
+          archivedAt: null,
+          deliveredAt: Date.now(),
+          createdAt: base.createdAt,
+          updatedAt: Date.now(),
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+  }
+  recipient.archivedAt = arch ? Date.now() : null;
+  recipient.updatedAt = Date.now();
+  await recipient.save();
+  const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+  return { ...base, readAt: recipient.readAt, archivedAt: recipient.archivedAt };
 }
 
 export async function markAllRead(accountId: string, role: string) {
-  const filter: any = { $and: [getAudienceVisibleFilter(accountId, role), { readAt: null }, { $or: [{ archivedAt: null }, { archivedAt: { $exists: false } }] }] };
-  const docs = await NotificationModel.find(filter as any).lean();
   const now = Date.now();
-  await NotificationModel.updateMany(filter as any, { $set: { readAt: now, updatedAt: now } } as any);
-  return { modified: docs.length };
+  const res = await RvbNotificationRecipientModel.updateMany(
+    { accountId, readAt: null, archivedAt: null } as any,
+    { $set: { readAt: now, updatedAt: now } } as any,
+  );
+  return { modified: (res as any).modifiedCount ?? 0 };
 }
 
 export async function bulkUpdate(accountId: string, role: string, ids: string[], action: "read" | "unread" | "archive" | "restore") {
   if (!Array.isArray(ids) || ids.length === 0) throw Object.assign(new Error("IDS_REQUIRED"), { code: "IDS_REQUIRED", status: 400 });
   if (ids.length > 100) throw Object.assign(new Error("TOO_MANY"), { code: "TOO_MANY", status: 400 });
-  // Verify ownership
-  const visibleIds = await NotificationModel.find({ id: { $in: ids }, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
-  const visibleSet = new Set(visibleIds.map((d: any) => d.id));
-  const forbidden = ids.filter((id) => !visibleSet.has(id));
-  if (forbidden.length) throw Object.assign(new Error("FORBIDDEN_IDS"), { code: "FORBIDDEN", status: 403, details: forbidden });
+  // Verify each id has a recipient for this account (or is visible legacy)
+  const existingRecipients = await RvbNotificationRecipientModel.find({ notificationId: { $in: ids }, accountId } as any).lean();
+  const existingSet = new Set(existingRecipients.map((r: any) => r.notificationId));
+  // For ids without recipient, check visibility and create if needed, else forbid
+  const missing = ids.filter((id) => !existingSet.has(id));
+  for (const mid of missing) {
+    const base: any = await NotificationModel.findOne({ id: mid }).lean();
+    if (!base) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
+    const isVisible = await NotificationModel.findOne({ id: mid, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
+    if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
+    // Create recipient for missing
+    await RvbNotificationRecipientModel.updateOne(
+      { notificationId: mid, accountId },
+      {
+        $setOnInsert: {
+          id: `rnr-${uuidv4()}`,
+          notificationId: mid,
+          accountId,
+          readAt: null,
+          archivedAt: null,
+          deliveredAt: Date.now(),
+          createdAt: base.createdAt,
+          updatedAt: Date.now(),
+        },
+      },
+      { upsert: true },
+    );
+  }
   const now = Date.now();
-  if (action === "read") await NotificationModel.updateMany({ id: { $in: ids } } as any, { $set: { readAt: now, updatedAt: now } } as any);
-  else if (action === "unread") await NotificationModel.updateMany({ id: { $in: ids } } as any, { $set: { readAt: null, updatedAt: now } } as any);
-  else if (action === "archive") await NotificationModel.updateMany({ id: { $in: ids } } as any, { $set: { archivedAt: now, updatedAt: now } } as any);
-  else if (action === "restore") await NotificationModel.updateMany({ id: { $in: ids } } as any, { $set: { archivedAt: null, updatedAt: now } } as any);
+  if (action === "read") await RvbNotificationRecipientModel.updateMany({ notificationId: { $in: ids }, accountId } as any, { $set: { readAt: now, updatedAt: now } } as any);
+  else if (action === "unread") await RvbNotificationRecipientModel.updateMany({ notificationId: { $in: ids }, accountId } as any, { $set: { readAt: null, updatedAt: now } } as any);
+  else if (action === "archive") await RvbNotificationRecipientModel.updateMany({ notificationId: { $in: ids }, accountId } as any, { $set: { archivedAt: now, updatedAt: now } } as any);
+  else if (action === "restore") await RvbNotificationRecipientModel.updateMany({ notificationId: { $in: ids }, accountId } as any, { $set: { archivedAt: null, updatedAt: now } } as any);
   return { updated: ids.length };
 }

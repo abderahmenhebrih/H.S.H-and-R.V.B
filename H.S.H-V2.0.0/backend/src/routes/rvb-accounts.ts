@@ -7,6 +7,8 @@ import {
   reactivateRvbAccount,
   disableRvbAccount,
   setInitialPassword,
+  linkRvbAccount,
+  unlinkRvbAccount,
 } from "../services/rvb-account.service";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
 import { toSafeRvbAccount } from "../lib/rvb-auth";
@@ -144,6 +146,32 @@ router.post("/:id/set-initial-password", async (req, res) => {
     const { id } = req.params;
     const { password, confirmPassword } = req.body as any;
     const updated: any = await setInitialPassword(id, password, confirmPassword);
+    res.json({ success: true, account: toSafeRvbAccount(updated) });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+});
+
+router.post("/:id/link", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { workerId, supplierId, customerId, entityId } = req.body as any;
+    const raw = workerId || supplierId || customerId || entityId;
+    if (!raw || typeof raw !== "string" || !raw.trim()) {
+      res.status(400).json({ success: false, code: "RVB_LINKED_ENTITY_REQUIRED" });
+      return;
+    }
+    const updated: any = await linkRvbAccount(id, raw.trim());
+    res.json({ success: true, account: toSafeRvbAccount(updated) });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+});
+
+router.post("/:id/unlink", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated: any = await unlinkRvbAccount(id);
     res.json({ success: true, account: toSafeRvbAccount(updated) });
   } catch (err: any) {
     handleError(res, err);

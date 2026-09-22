@@ -16,6 +16,7 @@ export type NotificationType =
   | "system";
 
 export type NotificationSeverity = "info" | "success" | "warning" | "critical";
+export type NotificationPriority = "normal" | "high" | "urgent";
 
 export interface Notification extends SyncedEntity {
   type: NotificationType;
@@ -29,4 +30,6 @@ export interface Notification extends SyncedEntity {
   audienceType?: "all" | "role" | "user";
   audienceIds?: string[];
   readAt?: number;
+  archivedAt?: number | null;
+  priority?: NotificationPriority;
 }

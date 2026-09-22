@@ -99,7 +99,7 @@ const translations = {
       suppliers: { title: "Suppliers", description: "Supplier portal activity, supply submissions and history." },
       customers: { title: "Customers", description: "Customer portal profiles, shipments and account activity." },
       orders: { title: "Orders", description: "Review and manage customer orders." },
-      requests: { title: "Requests", description: "Review payment requests, loans, discrepancies and submitted operations." },
+      requests: { title: "Requests", description: "Review and manage worker, supplier and customer requests." },
       chats: { title: "Chats", description: "Official chats, private conversations and custom groups." },
       notifications: { title: "Notifications & Activity", description: "RVB notifications, statuses and activity history." },
       directory: { title: "Directory", description: "Search people and accounts by name, @tag or role." },
@@ -133,7 +133,7 @@ const translations = {
       suppliers: { title: "Fournisseurs", description: "Activité portail fournisseurs, soumissions et historique." },
       customers: { title: "Clients", description: "Profils clients portail, expéditions et activité des comptes." },
       orders: { title: "Commandes", description: "Consulter et gérer les commandes clients." },
-      requests: { title: "Demandes", description: "Vérifier les demandes de paiement, prêts, écarts et opérations soumises." },
+      requests: { title: "Demandes", description: "Examiner et gérer les demandes travailleurs, fournisseurs et clients." },
       chats: { title: "Discussions", description: "Chats officiels, conversations privées et groupes personnalisés." },
       notifications: { title: "Notifications et activité", description: "Notifications RVB, statuts et historique d'activité." },
       directory: { title: "Annuaire", description: "Rechercher personnes et comptes par nom, @tag ou rôle." },
@@ -147,8 +147,8 @@ const translations = {
       workers: "العمال",
       suppliers: "الموردون",
       customers: "الزبائن",
-      orders: "الطلبات",
-      requests: "الطلبات والمراجعات",
+      orders: "الطلبيات",
+      requests: "الطلبات",
       chats: "المحادثات",
       notifications: "الإشعارات والنشاط",
       directory: "الدليل",
@@ -166,8 +166,8 @@ const translations = {
       workers: { title: "العمال", description: "ملفات العمال، الرواتب، الائتمان، الطلبات والنشاط." },
       suppliers: { title: "الموردون", description: "نشاط بوابة الموردين، التوريدات والسجل." },
       customers: { title: "الزبائن", description: "ملفات الزبائن، الشحنات ونشاط الحسابات." },
-      orders: { title: "الطلبات", description: "مراجعة وإدارة طلبات الزبائن." },
-      requests: { title: "الطلبات والمراجعات", description: "مراجعة طلبات الدفع والقروض والاختلافات والعمليات المرسلة." },
+      orders: { title: "الطلبيات", description: "مراجعة وإدارة طلبيات الزبائن." },
+      requests: { title: "الطلبات", description: "مراجعة وإدارة طلبات العمال والموردين والزبائن." },
       chats: { title: "المحادثات", description: "المحادثات الرسمية والخاصة والمجموعات المخصصة." },
       notifications: { title: "الإشعارات والنشاط", description: "إشعارات RVB والحالات وسجل النشاط." },
       directory: { title: "الدليل", description: "البحث عن الأشخاص والحسابات بالاسم أو @tag أو الدور." },
@@ -327,6 +327,37 @@ export default function RvbShell({
   }
 
   const { user, logout } = useRvbAuth();
+  const [notifUnread, setNotifUnread] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNotifCount() {
+      try {
+        const { notificationService } = await import("../../services/notification.service");
+        const all: any[] = await notificationService.getAll();
+        const cnt = all.filter((n: any) => !n.readAt && !(n as any).archivedAt).length;
+        if (!cancelled) setNotifUnread(cnt);
+      } catch {}
+    }
+    void loadNotifCount();
+    const h = () => void loadNotifCount();
+    window.addEventListener("hebrih-notifications-changed", h);
+    window.addEventListener("hebrih-db-synced", h);
+    // socket realtime
+    let sock: any = null;
+    (async () => {
+      try {
+        const mod = await import("../../services/chat-socket.service");
+        sock = mod.connectChatSocket?.();
+        if (sock) sock.on("rvb:notification", h);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+      window.removeEventListener("hebrih-notifications-changed", h);
+      window.removeEventListener("hebrih-db-synced", h);
+      if (sock) try { sock.off("rvb:notification", h); } catch {}
+    };
+  }, []);
 
   const t = translations[settings.language];
   const hero = t.hero[activePage] ?? t.hero.dashboard;
@@ -429,7 +460,13 @@ export default function RvbShell({
                 <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
                   <Icon size={18} strokeWidth={2} />
                 </span>
-                {!sidebarCollapsed && <span>{navLabels[key]}</span>}
+                {!sidebarCollapsed && <span style={{ flex: 1 }}>{navLabels[key]}</span>}
+                {!sidebarCollapsed && key === "notifications" && notifUnread > 0 && (
+                  <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
+                )}
+                {sidebarCollapsed && key === "notifications" && notifUnread > 0 && (
+                  <span style={{ position: "absolute", top: 4, insetInlineEnd: 6, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#B93A42", color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center", lineHeight: 1 }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
+                )}
               </button>
               {sidebarCollapsed && (
                 <span className={dashboardStyles.tooltip} role="tooltip">

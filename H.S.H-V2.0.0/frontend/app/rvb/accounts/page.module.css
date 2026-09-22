@@ -152,7 +152,7 @@
 
 .table {
   width: 100%;
-  min-width: 860px;
+  min-width: 980px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -205,6 +205,35 @@
 
 .tableBody td:last-child {
   border-inline-end: none;
+}
+
+/* LAST ACTIVITY + ACTIONS reserved widths — fix header overlap at 1920/1536/1366 */
+.tableHead th:nth-child(7),
+.tableBody td:nth-child(7) {
+  min-width: 138px;
+  width: 13%;
+}
+
+.tableHead th:nth-child(8),
+.tableBody td:nth-child(8) {
+  min-width: 112px;
+  width: 11%;
+}
+
+.tableBody td:nth-child(7) {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tableBody td:nth-child(8) {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  padding-inline: 10px;
 }
 
 .accountCell {
@@ -486,7 +515,10 @@
 .modal {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
-  overflow-y: auto;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--panel);
@@ -501,6 +533,7 @@
 }
 
 .modalHeader {
+  flex: 0 0 auto;
   padding: 16px 20px;
   display: flex;
   align-items: center;
@@ -508,8 +541,6 @@
   gap: 12px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  position: sticky;
-  top: 0;
   z-index: 1;
 }
 
@@ -537,10 +568,39 @@
 }
 
 .formBody {
-  padding: 18px 20px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 18px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--border) 80%, transparent) transparent;
+}
+
+.formBody::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.formBody::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.formBody::-webkit-scrollbar-thumb {
+  background: var(--border-strong, var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.formBody::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: content-box;
 }
 
 .field {
@@ -587,22 +647,50 @@
 }
 
 .inputWithPrefix {
-  position: relative;
   display: flex;
   align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+  direction: ltr;
+  min-height: 40px;
+}
+
+.inputWithPrefix:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .inputWithPrefix span {
-  position: absolute;
-  inset-inline-start: 12px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline-start: 12px;
+  padding-inline-end: 4px;
   color: var(--muted);
   font-weight: 700;
   font-size: 14px;
   pointer-events: none;
+  user-select: none;
+  line-height: 1;
 }
 
 .inputWithPrefix input {
-  padding-inline-start: 28px;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  border: 0 !important;
+  outline: 0;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-inline-start: 4px !important;
+  padding-inline-end: 12px !important;
+  direction: ltr;
+  text-align: start;
 }
 
 .hint {
@@ -622,14 +710,15 @@
 }
 
 .modalFooter {
-  padding: 12px 20px;
+  flex: 0 0 auto;
+  padding: 10px 16px;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   border-top: 1px solid var(--border);
   background: var(--panel);
-  position: sticky;
-  bottom: 0;
+  z-index: 1;
 }
 
 /* Details drawer */
@@ -864,12 +953,24 @@ html[dir="rtl"] .drawer {
   .toolbar { flex-direction: column; align-items: stretch; }
   .filterGroup { width: 100%; }
   .filterGroup > * { flex: 1; min-width: 120px; }
-  .table { min-width: 720px; }
+  .table { min-width: 860px; }
 }
 
 @media (max-width: 600px) {
   .headerTitle { font-size: 19px; }
-  .table { min-width: 640px; }
+  .table { min-width: 840px; }
+  .backdrop { padding: 12px; }
+  .modal { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); border-radius: 14px; }
+}
+
+@media (max-width: 480px) {
+  .backdrop { padding: 8px; }
+  .modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .formBody { padding: 14px 14px 16px; }
+  .modalHeader { padding: 12px 14px; }
+  .modalFooter { padding: 10px 14px; }
+  .modalFooter .primaryButton,
+  .modalFooter .secondaryButton { flex: 1 1 0; min-width: 0; }
 }
 
 html[dir="rtl"] .toolbar,

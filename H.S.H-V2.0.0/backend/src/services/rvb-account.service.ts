@@ -50,6 +50,16 @@ function isPortalRoleRole(role: string): boolean {
   return role === "worker" || role === "supplier" || role === "customer";
 }
 
+function isWorkerLinkableRole(role: string): boolean {
+  return role === "worker" || role === "supervisor";
+}
+
+function validateLinkCompatibility(role: string, entityType: string): boolean {
+  if (role === entityType) return true;
+  if (role === "supervisor" && entityType === "worker") return true;
+  return false;
+}
+
 async function assertLinkedEntityExists(type: string, id: string) {
   let model: any = null;
   if (type === "worker") model = WorkerModel;
@@ -73,12 +83,14 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
   const linkedEntityType = input.linkedEntityType ? String(input.linkedEntityType).trim().toLowerCase() : null;
   const linkedEntityId = input.linkedEntityId ? String(input.linkedEntityId).trim() : null;
 
+  const isSupervisor = role === "supervisor";
   const needsLink = isPortalRoleRole(role);
+  // Supervisor may optionally link to a worker entity
   if (needsLink) {
     if (!linkedEntityType || !linkedEntityId) {
       throw codeError("RVB_LINKED_ENTITY_REQUIRED", 400);
     }
-    if (linkedEntityType !== role) {
+    if (!validateLinkCompatibility(role, linkedEntityType)) {
       throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
     }
     await assertLinkedEntityExists(linkedEntityType, linkedEntityId);
@@ -87,10 +99,21 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
       linkedEntityId,
     }).lean();
     if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
-  } else {
-    // management: must not have linkage
+  } else if (isSupervisor) {
+    // Supervisor: linkage optional, but if provided must be worker
     if (linkedEntityType || linkedEntityId) {
-      // If they provided linkage for management, validate mismatch
+      if (!linkedEntityType || !linkedEntityId) throw codeError("RVB_LINKED_ENTITY_REQUIRED", 400);
+      if (!validateLinkCompatibility(role, linkedEntityType)) throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+      await assertLinkedEntityExists(linkedEntityType, linkedEntityId);
+      const existingLink = await (RvbAccountModel as any).findOne({
+        linkedEntityType,
+        linkedEntityId,
+      }).lean();
+      if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
+    }
+  } else {
+    // manager/admin: must not have linkage
+    if (linkedEntityType || linkedEntityId) {
       if (linkedEntityType && linkedEntityId) {
         if (isPortalRoleRole(linkedEntityType)) {
           throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
@@ -222,22 +245,144 @@ export async function setInitialPassword(accountId: string, password: string, co
   return account.toObject ? account.toObject() : account;
 }
 
-// For future sync integration: archive/reactivate by linked entity
+// Worker/Supplier linking helpers
+export async function linkRvbAccount(accountId: string, entityId: string) {
+  const account: any = await RvbAccountModel.findOne({ id: accountId });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+  if (account.linkedEntityType || account.linkedEntityId) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
+  if (account.status !== "active") throw codeError("RVB_ACCOUNT_NOT_FOUND", 400);
+
+  let entityType: string | null = null;
+  let entityExists = false;
+  if (account.role === "worker" || account.role === "supervisor") {
+    if (!isWorkerLinkableRole(account.role)) throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+    const worker = await WorkerModel.findOne({ id: entityId }).lean();
+    entityExists = !!worker;
+    entityType = "worker";
+    if (!worker) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+    const existingLink = await (RvbAccountModel as any).findOne({ linkedEntityType: "worker", linkedEntityId: entityId }).lean();
+    if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
+  } else if (account.role === "supplier") {
+    const supplier = await SupplierModel.findOne({ id: entityId }).lean();
+    entityExists = !!supplier;
+    entityType = "supplier";
+    if (!supplier) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+    const existingLink = await (RvbAccountModel as any).findOne({ linkedEntityType: "supplier", linkedEntityId: entityId }).lean();
+    if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
+  } else if (account.role === "customer") {
+    const customer = await CustomerModel.findOne({ id: entityId }).lean();
+    entityExists = !!customer;
+    entityType = "customer";
+    if (!customer) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+    const existingLink = await (RvbAccountModel as any).findOne({ linkedEntityType: "customer", linkedEntityId: entityId }).lean();
+    if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
+  } else {
+    throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+  }
+
+  if (!entityType || !entityExists) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+  account.linkedEntityType = entityType;
+  account.linkedEntityId = entityId;
+  account.updatedAt = Date.now();
+  await account.save();
+  try {
+    const { WorkerActivityModel } = await import("../models/worker-activity.model");
+    // For supplier, also log as worker activity with workerId = entityId (generic)
+    await WorkerActivityModel.create({
+      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: Date.now(),
+      workerId: entityId,
+      accountId: account.id,
+      action: "account_linked",
+      details: `Linked @${account.tag} (${account.role})`,
+      actorId: null,
+      actorTag: null,
+    } as any);
+  } catch {}
+  return account.toObject ? account.toObject() : account;
+}
+
+export async function unlinkRvbAccount(accountId: string) {
+  const account: any = await RvbAccountModel.findOne({ id: accountId });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+  if (!account.linkedEntityType || !account.linkedEntityId) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+  const previousRole = account.role;
+  const entityId = account.linkedEntityId;
+  const entityType = account.linkedEntityType;
+  // Allow unlink for worker/supplier/customer
+  if (!["worker", "supplier", "customer"].includes(entityType)) throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+  account.linkedEntityType = null;
+  account.linkedEntityId = null;
+  account.updatedAt = Date.now();
+  // Security: orphan portal account must not remain active
+  if (previousRole === "worker" || previousRole === "supplier" || previousRole === "customer") {
+    account.status = "disabled";
+    account.archivedAt = null;
+  }
+  // Supervisor retains management access even without worker link — keep status as is (handled above: supervisor not in list)
+  await account.save();
+  try {
+    const { WorkerActivityModel } = await import("../models/worker-activity.model");
+    await WorkerActivityModel.create({
+      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: Date.now(),
+      workerId: entityId,
+      accountId: account.id,
+      action: "account_unlinked",
+      details: `Unlinked @${account.tag} (${previousRole})`,
+      actorId: null,
+      actorTag: null,
+    } as any);
+  } catch {}
+  return account.toObject ? account.toObject() : account;
+}
+
+// Worker lifecycle: archive/reactivate with state preservation
 export async function archiveByLinkedEntity(type: string, entityId: string) {
   const account: any = await (RvbAccountModel as any).findOne({ linkedEntityType: type, linkedEntityId: entityId });
   if (!account) return null;
+  // Only archive if currently active — preserve already disabled/archived intentional state
+  if (account.status !== "active") return account;
   account.status = "archived";
   account.archivedAt = Date.now();
   account.updatedAt = Date.now();
   await account.save();
+  try {
+    const { WorkerActivityModel } = await import("../models/worker-activity.model");
+    await WorkerActivityModel.create({
+      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: Date.now(),
+      workerId: entityId,
+      accountId: account.id,
+      action: "account_archived_via_worker",
+      details: `Archived via worker archive`,
+      actorId: null,
+      actorTag: null,
+    } as any);
+  } catch {}
   return account;
 }
 export async function reactivateByLinkedEntity(type: string, entityId: string) {
   const account: any = await (RvbAccountModel as any).findOne({ linkedEntityType: type, linkedEntityId: entityId });
   if (!account) return null;
+  // Only reactivate if was archived (not disabled intentionally)
+  if (account.status !== "archived") return account;
   account.status = "active";
   account.archivedAt = null;
   account.updatedAt = Date.now();
   await account.save();
+  try {
+    const { WorkerActivityModel } = await import("../models/worker-activity.model");
+    await WorkerActivityModel.create({
+      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: Date.now(),
+      workerId: entityId,
+      accountId: account.id,
+      action: "account_reactivated_via_worker",
+      details: `Reactivated via worker restore`,
+      actorId: null,
+      actorTag: null,
+    } as any);
+  } catch {}
   return account;
 }

@@ -103,7 +103,14 @@ export default function StyledSelect({ value, onChange, options, placeholder, ar
   useEffect(() => {
     if (!open) return;
     const handleResize = () => computePosition();
-    const handleScroll = () => setOpen(false);
+    const handleScroll = (e: Event) => {
+      const target = e.target as Node | null;
+      // Don't close when scrolling inside the dropdown menu itself (wheel/scrollbar/touchpad)
+      if (target && menuRef.current) {
+        if (target === menuRef.current || (target instanceof Node && menuRef.current.contains(target))) return;
+      }
+      setOpen(false);
+    };
     window.addEventListener("resize", handleResize);
     window.addEventListener("scroll", handleScroll, true);
     document.addEventListener("scroll", handleScroll, true);
@@ -125,23 +132,43 @@ export default function StyledSelect({ value, onChange, options, placeholder, ar
 
   useEffect(() => {
     if (!open) return;
+    function isInsideRef(ref: React.RefObject<HTMLElement | null>, target: Node, path: Node[] | undefined) {
+      if (!ref.current) return false;
+      if (ref.current.contains(target)) return true;
+      if (path && path.includes(ref.current)) return true;
+      if (path && path.some((n) => n instanceof Node && ref.current!.contains(n))) return true;
+      return false;
+    }
     function handleOutside(e: MouseEvent) {
       const target = e.target as Node;
-      if (wrapperRef.current?.contains(target)) return;
-      if (menuRef.current?.contains(target)) return;
-      if (triggerRef.current?.contains(target)) return;
+      const path = (e as unknown as { composedPath?: () => EventTarget[] }).composedPath?.() as Node[] | undefined;
+      if (isInsideRef(wrapperRef, target, path)) return;
+      if (isInsideRef(triggerRef, target, path)) return;
+      if (isInsideRef(menuRef, target, path)) return;
+      // Portal menu is fixed; also check direct contains via path for scrollbar/thumb edge cases
+      if (menuRef.current && path) {
+        for (const node of path) {
+          if (node === menuRef.current) return;
+          if (node instanceof HTMLElement && menuRef.current.contains(node)) return;
+        }
+      }
       setOpen(false);
     }
     function handleEsc(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        // Close dropdown first and prevent modal Escape from also closing the modal
+        e.stopPropagation();
         setOpen(false);
         triggerRef.current?.focus();
       }
     }
+    // Use both mousedown and pointerdown to capture scrollbar thumb interactions reliably across browsers
     document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("pointerdown", handleOutside as unknown as EventListener);
     document.addEventListener("keydown", handleEsc);
     return () => {
       document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("pointerdown", handleOutside as unknown as EventListener);
       document.removeEventListener("keydown", handleEsc);
     };
   }, [open]);

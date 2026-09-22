@@ -534,6 +534,55 @@ function RvbAccountsInner() {
   const needsLinkForRole = (r: string) => r === "worker" || r === "supplier" || r === "customer";
   const isCreateLinkedRole = needsLinkForRole(createRole);
 
+  const createTagNormalized = useMemo(() => normalizeTag(createTag), [createTag]);
+  const isCreateTagValid = useMemo(() => {
+    const t = createTagNormalized;
+    return !!t && isValidTag(t);
+  }, [createTagNormalized]);
+  const isCreatePasswordValid = createPassword.length >= 8 && createPassword.length <= 128;
+  const isCreateConfirmValid = !!createConfirm && createPassword === createConfirm;
+  const isCreateFormValid = useMemo(() => {
+    if (creating) return false;
+    if (!createRole) return false;
+    if (!createDisplayName.trim()) return false;
+    if (!isCreateTagValid) return false;
+    if (!isCreatePasswordValid) return false;
+    if (!isCreateConfirmValid) return false;
+    if (isCreateLinkedRole && !createLinkedId) return false;
+    return true;
+  }, [creating, createRole, createDisplayName, isCreateTagValid, isCreatePasswordValid, isCreateConfirmValid, isCreateLinkedRole, createLinkedId]);
+
+  // Background scroll lock while create modal is open — restore on close/unmount, compensate scrollbar to avoid horizontal jump
+  useEffect(() => {
+    if (!showCreate) return;
+    const body = document.body;
+    const html = document.documentElement;
+    const prevBodyOverflow = body.style.overflow;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - html.clientWidth;
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      html.style.overflow = prevHtmlOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+    };
+  }, [showCreate]);
+
+  // Escape closes modal unless submitting
+  useEffect(() => {
+    if (!showCreate) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !creating) setShowCreate(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showCreate, creating]);
+
   return (
     <RvbShell activePage="accounts">
       <div className={styles.rvbAccountsRoot} dir={isRtl ? "rtl" : "ltr"}>
@@ -633,14 +682,14 @@ function RvbAccountsInner() {
               <table className={styles.table} role="table" aria-label={t.headerTitle}>
                 <thead className={styles.tableHead}>
                   <tr>
-                    <th style={{ width: "22%" }}>{t.table.account}</th>
-                    <th style={{ width: "15%" }}>{t.table.tag}</th>
-                    <th style={{ width: "11%" }}>{t.table.role}</th>
-                    <th style={{ width: "16%" }}>{t.table.linkedEntity}</th>
-                    <th style={{ width: "10%" }}>{t.table.status}</th>
-                    <th style={{ width: "11%" }}>{t.table.onboarding}</th>
-                    <th style={{ width: "10%" }}>{t.table.lastActivity}</th>
-                    <th style={{ width: "10%", textAlign: isRtl ? "start" : "end" }}>{t.table.actions}</th>
+                    <th style={{ width: "20%" }}>{t.table.account}</th>
+                    <th style={{ width: "12%" }}>{t.table.tag}</th>
+                    <th style={{ width: "10%" }}>{t.table.role}</th>
+                    <th style={{ width: "15%" }}>{t.table.linkedEntity}</th>
+                    <th style={{ width: "9%" }}>{t.table.status}</th>
+                    <th style={{ width: "10%" }}>{t.table.onboarding}</th>
+                    <th style={{ width: "13%" }}>{t.table.lastActivity}</th>
+                    <th style={{ width: "11%", textAlign: isRtl ? "start" : "end" }}>{t.table.actions}</th>
                   </tr>
                 </thead>
                 <tbody className={styles.tableBody}>
@@ -680,7 +729,7 @@ function RvbAccountsInner() {
                             {onboardingLabel}
                           </span>
                         </td>
-                        <td style={{ color: "var(--muted)", fontSize: 12 }}>{a.lastLoginAt ? formatDateForDisplay(a.lastLoginAt, lang) : "—"}</td>
+                        <td style={{ color: "var(--muted)", fontSize: 12 }} title={a.lastLoginAt ? formatDateForDisplay(a.lastLoginAt, lang) : undefined}>{a.lastLoginAt ? formatDateForDisplay(a.lastLoginAt, lang) : "—"}</td>
                         <td>
                           <div className={styles.actionsCell}>
                             <button type="button" className={styles.viewButton} onClick={() => setDetailsAccount(a)} aria-label={`${t.view} ${a.displayName}`}>
@@ -705,11 +754,11 @@ function RvbAccountsInner() {
           <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="create-title" onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2 id="create-title">{t.create.title}</h2>
-              <button type="button" className={styles.closeButton} onClick={() => setShowCreate(false)} disabled={creating} aria-label="Close"><X size={16} strokeWidth={2} /></button>
+              <button type="button" className={styles.closeButton} onClick={() => setShowCreate(false)} disabled={creating} aria-label={t.actions.close || "Close"}><X size={16} strokeWidth={2} /></button>
             </div>
             <div className={styles.formBody}>
               <div className={styles.field}>
-                <label>{t.create.role} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
+                <label htmlFor="create-role">{t.create.role} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
                 <StyledSelect
                   value={createRole}
                   onChange={(v) => { setCreateRole(v); setCreateLinkedId(""); if (needsLinkForRole(v)) { /* keep displayName for autofill */ } else { /* management keep editable */ } }}
@@ -721,7 +770,7 @@ function RvbAccountsInner() {
 
               {isCreateLinkedRole && (
                 <div className={styles.field}>
-                  <label>{t.create.linkedEntity} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
+                  <label htmlFor="create-linked">{t.create.linkedEntity} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
                   <StyledSelect
                     value={createLinkedId}
                     onChange={handleSelectEntity}
@@ -734,23 +783,26 @@ function RvbAccountsInner() {
               )}
 
               <div className={styles.field}>
-                <label>{t.create.displayName} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
+                <label htmlFor="create-displayName">{t.create.displayName} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
                 <input
+                  id="create-displayName"
                   value={createDisplayName}
                   onChange={(e) => setCreateDisplayName(e.target.value)}
                   placeholder={isCreateLinkedRole ? t.create.autoFilled : "e.g., Ahmed Manager"}
                   readOnly={isCreateLinkedRole && !!createLinkedId}
                   style={isCreateLinkedRole && !!createLinkedId ? { background: "var(--panel-hover)", cursor: "not-allowed" } : undefined}
                   title={isCreateLinkedRole && !!createLinkedId ? t.create.autoFilled : undefined}
+                  autoComplete="off"
                 />
                 {isCreateLinkedRole && !!createLinkedId && <small className={styles.hint}>{t.create.autoFilled}</small>}
               </div>
 
               <div className={styles.field}>
-                <label>{t.create.tag} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
+                <label htmlFor="create-tag">{t.create.tag} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
                 <div className={styles.inputWithPrefix}>
                   <span aria-hidden="true">@</span>
                   <input
+                    id="create-tag"
                     value={createTag}
                     onChange={(e) => setCreateTag(e.target.value)}
                     placeholder="ahmed.b"
@@ -758,23 +810,27 @@ function RvbAccountsInner() {
                     autoCapitalize="off"
                     autoCorrect="off"
                     spellCheck={false}
+                    autoComplete="off"
+                    inputMode="text"
                   />
                 </div>
                 <small className={styles.hint}>{t.create.tagHint}</small>
               </div>
 
               <div className={styles.field}>
-                <label>{t.create.password} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
+                <label htmlFor="create-password">{t.create.password} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
                 <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                   <input
+                    id="create-password"
                     type={showCreatePwd ? "text" : "password"}
                     value={createPassword}
                     onChange={(e) => setCreatePassword(e.target.value)}
                     placeholder="••••••••"
                     dir="ltr"
+                    autoComplete="new-password"
                     style={{ paddingInlineEnd: 70 }}
                   />
-                  <button type="button" onClick={() => setShowCreatePwd((v) => !v)} style={{ position: "absolute", insetInlineEnd: 6, minHeight: 28, padding: "0 8px", display: "inline-flex", alignItems: "center", gap: 4, border: "1px solid var(--border)", borderRadius: 6, background: "var(--panel)", color: "var(--muted)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                  <button type="button" onClick={() => setShowCreatePwd((v) => !v)} aria-label={showCreatePwd ? t.create.hide : t.create.show} style={{ position: "absolute", insetInlineEnd: 6, minHeight: 28, padding: "0 8px", display: "inline-flex", alignItems: "center", gap: 4, border: "1px solid var(--border)", borderRadius: 6, background: "var(--panel)", color: "var(--muted)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                     {showCreatePwd ? <EyeOff size={14} strokeWidth={2} /> : <Eye size={14} strokeWidth={2} />}
                     {showCreatePwd ? t.create.hide : t.create.show}
                   </button>
@@ -783,28 +839,30 @@ function RvbAccountsInner() {
               </div>
 
               <div className={styles.field}>
-                <label>{t.create.confirmPassword} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
+                <label htmlFor="create-confirm">{t.create.confirmPassword} <small style={{ color: "var(--muted)", fontWeight: 600 }}> *</small></label>
                 <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                   <input
+                    id="create-confirm"
                     type={showCreateConfirm ? "text" : "password"}
                     value={createConfirm}
                     onChange={(e) => setCreateConfirm(e.target.value)}
                     placeholder="••••••••"
                     dir="ltr"
+                    autoComplete="new-password"
                     style={{ paddingInlineEnd: 70 }}
                   />
-                  <button type="button" onClick={() => setShowCreateConfirm((v) => !v)} style={{ position: "absolute", insetInlineEnd: 6, minHeight: 28, padding: "0 8px", display: "inline-flex", alignItems: "center", gap: 4, border: "1px solid var(--border)", borderRadius: 6, background: "var(--panel)", color: "var(--muted)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                  <button type="button" onClick={() => setShowCreateConfirm((v) => !v)} aria-label={showCreateConfirm ? t.create.hide : t.create.show} style={{ position: "absolute", insetInlineEnd: 6, minHeight: 28, padding: "0 8px", display: "inline-flex", alignItems: "center", gap: 4, border: "1px solid var(--border)", borderRadius: 6, background: "var(--panel)", color: "var(--muted)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                     {showCreateConfirm ? <EyeOff size={14} strokeWidth={2} /> : <Eye size={14} strokeWidth={2} />}
                     {showCreateConfirm ? t.create.hide : t.create.show}
                   </button>
                 </div>
               </div>
 
-              {createError && <div className={styles.formError}>{createError}</div>}
+              {createError && <div className={styles.formError} role="alert">{createError}</div>}
             </div>
             <div className={styles.modalFooter}>
               <button type="button" className={styles.secondaryButton} onClick={() => setShowCreate(false)} disabled={creating}>{t.create.cancel}</button>
-              <button type="button" className={styles.primaryButton} onClick={handleCreate} disabled={creating}>{creating ? t.create.creating : t.create.create}</button>
+              <button type="button" className={styles.primaryButton} onClick={handleCreate} disabled={!isCreateFormValid} aria-disabled={!isCreateFormValid} style={!isCreateFormValid ? { cursor: "not-allowed" } : undefined}>{creating ? t.create.creating : t.create.create}</button>
             </div>
           </section>
         </div>

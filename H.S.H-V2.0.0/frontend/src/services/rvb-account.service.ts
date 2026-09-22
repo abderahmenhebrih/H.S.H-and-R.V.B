@@ -102,4 +102,25 @@ export const rvbAccountService = {
     const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
     return data.account;
   },
+
+  async linkToWorker(accountId: string, workerId: string): Promise<RvbAccount> {
+    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(accountId)}/link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify({ workerId }),
+      credentials: "include",
+    });
+    const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
+    return data.account;
+  },
+
+  async unlink(accountId: string): Promise<RvbAccount> {
+    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(accountId)}/unlink`, {
+      method: "POST",
+      headers: { ...getAuthHeaders() },
+      credentials: "include",
+    });
+    const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
+    return data.account;
+  },
 };

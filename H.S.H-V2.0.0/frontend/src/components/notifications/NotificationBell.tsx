@@ -51,9 +51,16 @@ export default function NotificationBell({ language = "en", dark = false }: { la
 
   const load = async () => {
     try {
-      const recent = await notificationService.getRecent(8);
-      setNotifications(recent);
-      const count = await notificationService.getUnreadCount();
+      // Show recent non-archived, unread first for quick preview
+      const all = await notificationService.getAll();
+      const filtered = all.filter((n: any) => !(n as any).archivedAt).sort((a, b) => {
+        const aUnread = !a.readAt ? 0 : 1;
+        const bUnread = !b.readAt ? 0 : 1;
+        if (aUnread !== bUnread) return aUnread - bUnread;
+        return b.createdAt - a.createdAt;
+      }).slice(0, 5);
+      setNotifications(filtered);
+      const count = all.filter((n: any) => !n.readAt && !(n as any).archivedAt).length;
       setUnreadCount(count);
     } catch (err) {
       console.error("[NotificationBell] load failed", err);
@@ -67,6 +74,16 @@ export default function NotificationBell({ language = "en", dark = false }: { la
 
   useDbSync(() => {
     void load();
+  }, []);
+
+  useEffect(() => {
+    const h = () => void load();
+    window.addEventListener("hebrih-notifications-changed", h);
+    window.addEventListener("rvb:notification" as any, h);
+    return () => {
+      window.removeEventListener("hebrih-notifications-changed", h);
+      window.removeEventListener("rvb:notification" as any, h);
+    };
   }, []);
 
   // Position panel via getBoundingClientRect when open (portal)
@@ -177,6 +194,18 @@ export default function NotificationBell({ language = "en", dark = false }: { la
     };
   }, [open]);
 
+  // realtime socket for rvb notifications
+  useEffect(() => {
+    try {
+      const { connectChatSocket } = require("../../services/chat-socket.service") as any;
+      const sock = connectChatSocket?.();
+      if (!sock) return;
+      const onRvbNotif = () => void load();
+      sock.on("rvb:notification", onRvbNotif);
+      return () => sock.off("rvb:notification", onRvbNotif);
+    } catch {}
+  }, []);
+
   const t = (en: string, fr: string, ar: string) => {
     if (language === "fr") return fr;
     if (language === "ar") return ar;
@@ -185,11 +214,15 @@ export default function NotificationBell({ language = "en", dark = false }: { la
 
   const handleMarkAllRead = async () => {
     await notificationService.markAllAsRead();
+    try { window.dispatchEvent(new CustomEvent("hebrih-notifications-changed")); } catch {}
     await load();
   };
 
   const handleItemClick = async (n: Notification) => {
-    if (!n.readAt) await notificationService.markAsRead(n.id);
+    if (!n.readAt) {
+      await notificationService.markAsRead(n.id);
+      try { window.dispatchEvent(new CustomEvent("hebrih-notifications-changed")); } catch {}
+    }
     setOpen(false);
     if (n.route) {
       router.push(n.route);
@@ -252,7 +285,7 @@ export default function NotificationBell({ language = "en", dark = false }: { la
             </div>
 
             <div className={styles.panelFooter}>
-              <button type="button" className={styles.viewAllButton} onClick={() => { setOpen(false); router.push("/notifications"); }}>
+              <button type="button" className={styles.viewAllButton} onClick={() => { setOpen(false); const isRvb = window.location.pathname.startsWith("/rvb"); router.push(isRvb ? "/rvb/notifications" as any : "/notifications" as any); }}>
                 {t("View all notifications", "Voir toutes les notifications", "عرض كل الإشعارات")}
               </button>
             </div>

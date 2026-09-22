@@ -71,3 +71,36 @@ export function RvbAccountsGuard({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
+export function RvbWorkersGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useRvbAuth();
+  const router = useRouter();
+  const isWorkersManager = user?.role === "manager" || user?.role === "admin";
+  useEffect(() => {
+    if (loading) return;
+    if (!user) return;
+    if (!isWorkersManager) router.replace("/rvb");
+  }, [loading, user, isWorkersManager, router]);
+  if (loading) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--accent)" } as any} />
+      </div>
+    );
+  }
+  if (!user) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--accent)" } as any} />
+      </div>
+    );
+  }
+  if (!isWorkersManager) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--accent)" } as any} />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}

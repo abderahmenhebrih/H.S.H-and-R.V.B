@@ -193,6 +193,8 @@ export default function RvbDashboardPage() {
   const { user } = useRvbAuth();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [acctCounts, setAcctCounts] = useState<{ total: number; active: number; workersActive: number; workersArchived: number; suppliersActive: number; suppliersArchived: number; customersActive: number; customersArchived: number; managementActive: number; managementArchived: number; supervisors: number } | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<number | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<number | null>(null);
 
   useEffect(() => {
     settingsService.get().then((s) => { if (s) setSettings(s); });
@@ -238,6 +240,29 @@ export default function RvbDashboardPage() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { rvbRequestService } = await import("../../src/services/rvb-request.service");
+        const res = await rvbRequestService.list({ status: "under_review", limit: 1 }).catch(() => null);
+        if (cancelled) return;
+        if (res && res.kpi) setPendingRequests(res.kpi.underReview);
+        else if (res && typeof res.total === "number") setPendingRequests(res.total);
+        else setPendingRequests(0);
+      } catch { if (!cancelled) setPendingRequests(null); }
+    })();
+    (async () => {
+      try {
+        const { customerOrderService } = await import("../../src/services/customer-order.service");
+        const orders = await customerOrderService.list({ status: "under_review" }).catch(() => [] as any[]);
+        if (cancelled) return;
+        setPendingOrders(Array.isArray(orders) ? orders.length : 0);
+      } catch { if (!cancelled) setPendingOrders(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const t = TRANSLATIONS[settings.language];
 
   // Role-aware: non-management sees portal placeholder
@@ -263,8 +288,8 @@ export default function RvbDashboardPage() {
         {/* B Top KPI */}
         <div className={styles.kpiRow}>
           <RvbKpiCard icon={UsersRound} title={t.kpi.activeAccounts.title} value={acctCounts ? String(acctCounts.active) : "—"} status={acctCounts ? `${acctCounts.total} total${settings.language === "fr" ? " total" : settings.language === "ar" ? " الإجمالي" : ""}` : t.kpi.activeAccounts.status} />
-          <RvbKpiCard icon={Inbox} title={t.kpi.pendingRequests.title} value="—" status={t.kpi.pendingRequests.status} />
-          <RvbKpiCard icon={ShoppingCart} title={t.kpi.ordersReview.title} value="—" status={t.kpi.ordersReview.status} />
+          <RvbKpiCard icon={Inbox} title={t.kpi.pendingRequests.title} value={pendingRequests !== null ? String(pendingRequests) : "—"} status={pendingRequests !== null ? (pendingRequests === 0 ? (settings.language === "ar" ? "لا توجد طلبات قيد المراجعة" : settings.language === "fr" ? "Aucune demande en examen" : "No requests under review") : settings.language === "ar" ? "الطلبات قيد المراجعة" : settings.language === "fr" ? "Demandes en examen" : "Requests under review") : t.kpi.pendingRequests.status} />
+          <RvbKpiCard icon={ShoppingCart} title={t.kpi.ordersReview.title} value={pendingOrders !== null ? String(pendingOrders) : "—"} status={pendingOrders !== null ? (pendingOrders === 0 ? (settings.language === "ar" ? "لا توجد طلبيات قيد المراجعة" : settings.language === "fr" ? "Aucune commande en examen" : "No orders under review") : settings.language === "ar" ? "الطلبيات قيد المراجعة" : settings.language === "fr" ? "Commandes en examen" : "Orders under review") : t.kpi.ordersReview.status} />
           <RvbKpiCard icon={MessagesSquare} title={t.kpi.unreadMessages.title} value="—" status={t.kpi.unreadMessages.status} />
         </div>
 

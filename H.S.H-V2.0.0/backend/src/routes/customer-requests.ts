@@ -1,0 +1,80 @@
+import { Router } from "express";
+import { createCustomerRequest, listCustomerRequests, reviewCustomerRequest } from "../services/customer-request.service";
+import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
+import type { RvbAuthRequest } from "../middleware/rvb-auth";
+
+const router = Router();
+router.use(requireRvbAuth as any);
+
+router.get("/", async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const { customerId } = req.query as any;
+    // Customers can only see own requests
+    if (user.role === "customer") {
+      const linkedId = (user.account as any)?.linkedEntityId;
+      const docs = await listCustomerRequests(linkedId);
+      res.json({ success: true, requests: docs });
+      return;
+    }
+    // Manager/Admin/Supervisor can see all or filtered
+    const cid = customerId && !Array.isArray(customerId) ? customerId : Array.isArray(customerId) ? customerId[0] : undefined;
+    const docs = await listCustomerRequests(cid);
+    res.json({ success: true, requests: docs });
+  } catch (e) {
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/", async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const { customerId, type, items, total, date, description } = req.body as any;
+    let cid = customerId;
+    if (user.role === "customer") {
+      cid = (user.account as any)?.linkedEntityId;
+      if (!cid) {
+        res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+        return;
+      }
+      // Prevent IDOR: body customerId must match linked if provided
+      if (customerId && customerId !== cid) {
+        res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+        return;
+      }
+    }
+    if (!cid) {
+      res.status(400).json({ success: false, code: "RVB_CUSTOMER_REQUIRED" });
+      return;
+    }
+    const created = await createCustomerRequest({
+      customerId: cid,
+      accountId: user.accountId,
+      type,
+      items,
+      total: total !== undefined ? Number(total) : undefined,
+      date: date ? Number(date) : undefined,
+      description,
+    });
+    res.status(201).json({ success: true, request: created });
+  } catch (err: any) {
+    const code = err?.code || "INTERNAL_ERROR";
+    const status = err?.status || 500;
+    res.status(status).json({ success: false, code, message: err?.message || code });
+  }
+});
+
+router.post("/:id/review", requireRvbRole("manager", "admin", "supervisor") as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const rawId = (req.params as any).id;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
+    const { status, notes, items, total, date } = req.body as any;
+    const reviewerId = req.rvbUser!.accountId;
+    const updated = await reviewCustomerRequest(id, status as any, reviewerId, notes, { items, total: total !== undefined ? Number(total) : undefined, date: date ? Number(date) : undefined });
+    res.json({ success: true, request: updated });
+  } catch (err: any) {
+    res.status(err?.status || 500).json({ success: false, code: err?.code || "INTERNAL_ERROR", message: err?.message });
+  }
+});
+
+export default router;

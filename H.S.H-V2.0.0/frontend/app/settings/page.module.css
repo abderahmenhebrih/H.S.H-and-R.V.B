@@ -36,35 +36,37 @@
 
 .settingsPage, .settingsPage *::before, .settingsPage *::after { box-sizing: border-box; }
 
-/* Layout - two columns - must stretch to fill viewport */
+/* Layout - two columns - matches R.V.B Settings */
 .settingsLayout {
-  width: min(1280px, calc(100% - 32px));
+  width: 100%;
+  max-width: 1280px;
 
   min-height: calc(100vh - 36px);
   min-height: calc(100dvh - 36px);
 
-  margin: 20px auto 16px;
+  margin: 0 auto;
+  padding: 4px 0 8px;
 
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 20px;
-  align-items: stretch;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 
-/* LEFT NAV - must stretch to fill grid height */
+/* LEFT NAV - matches R.V.B sidebar */
 .settingsNav {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 18px 14px 14px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
   position: sticky;
-  top: 20px;
-  align-self: stretch;
+  top: 12px;
+  align-self: start;
   height: auto;
-  box-shadow: 0 4px 15px var(--shadow);
+  box-shadow: 0 1px 6px var(--shadow);
 }
 
 .brandBlock {
@@ -155,41 +157,42 @@
   align-items: center;
   gap: 12px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
-  color: var(--text);
+  color: var(--muted);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   text-align: start;
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  transition: all 0.18s;
 }
 
-.navItem:hover { background: var(--panel-hover); border-color: var(--border); }
+.navItem:hover { background: var(--panel-hover); color: var(--text); }
 
 .navIcon {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid var(--accent-ring);
+  color: currentColor;
+  background: transparent;
+  border: 0;
 }
 
 .navItemActive {
-  background: var(--accent-soft);
-  border-color: var(--accent-ring);
-  color: var(--text);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
   font-weight: 700;
+  box-shadow: 0 2px 8px var(--accent-ring);
 }
+.navItemActive:hover { background: var(--accent); color: #fff; }
 
 .navItemActive .navIcon {
-  background: var(--accent);
+  background: transparent;
   color: #fff;
-  border-color: var(--accent);
+  border-color: transparent;
 }
 
 .navLabel { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -308,57 +311,75 @@
 }
 
 .sectionHeading {
-  margin: 0 0 12px;
-  padding-inline: 2px;
-  color: var(--muted);
-  font-size: 10px;
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
   font-weight: 800;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
 }
 
 .rowsStack { display: flex; flex-direction: column; gap: 12px; }
 
-/* Setting row - horizontal */
+/* Setting row - horizontal - matches R.V.B */
 .settingRow {
   width: 100%;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 18px 20px;
+  padding: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  box-shadow: 0 1px 6px var(--shadow);
+  box-shadow: 0 1px 4px var(--shadow);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .settingRow:hover { border-color: var(--border-strong); }
 
 .settingRowNav { flex-direction: column; align-items: stretch; padding: 0; overflow: hidden; }
-.settingRowNav .rowButton { padding: 18px 20px; }
+.settingRowNav .rowButton { padding: 14px; }
 
-.rowMain { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+.rowMain { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
 
 .rowIcon {
-  width: 52px;
-  height: 52px;
-  flex: 0 0 52px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: var(--accent-soft);
+  border-radius: 6px;
+  background: transparent;
   color: var(--accent);
-  border: 1px solid var(--accent-ring);
+  border: 0;
 }
 
 .rowText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.rowText strong { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.2; }
-.rowText span { font-size: 11px; font-weight: 500; color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
+.rowText strong { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.2; display: flex; align-items: center; gap: 8px; }
+.rowText span { font-size: 12px; font-weight: 500; color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
 .rowSectionLabel { font-size: 9px !important; font-weight: 800 !important; letter-spacing: 0.8px !important; text-transform: uppercase; color: var(--accent) !important; }
 
-.rowControl { flex: 0 0 auto; min-width: 260px; max-width: 320px; width: 100%; display: flex; justify-content: flex-end; }
+.rowControl { flex: 0 0 auto; min-width: 180px; max-width: 320px; width: auto; display: flex; justify-content: flex-end; }
+
+/* Shared R.V.B-like card/row primitives for General */
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  justify-content: space-between;
+}
+.divider { height: 1px; background: var(--border); }
 
 .rowButton {
   width: 100%;

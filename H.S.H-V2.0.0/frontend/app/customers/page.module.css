@@ -330,7 +330,7 @@ html[dir="rtl"] .filterOption {
   min-height: 52px;
   padding: 0 16px;
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) 130px 140px 130px 140px;
+  grid-template-columns: minmax(220px, 1.8fr) 120px 150px 150px 160px;
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--border);
@@ -351,7 +351,7 @@ html[dir="rtl"] .filterOption {
   min-height: 68px;
   padding: 12px 16px;
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) 130px 140px 130px 140px;
+  grid-template-columns: minmax(220px, 1.8fr) 120px 150px 150px 160px;
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--border);
@@ -433,6 +433,9 @@ html[dir="rtl"] .filterOption {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  direction: ltr;
+  text-align: start;
 }
 
 .balanceZero,
@@ -444,6 +447,10 @@ html[dir="rtl"] .filterOption {
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
+  min-width: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
   background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
@@ -476,8 +483,12 @@ html[dir="rtl"] .filterOption {
 
 .rowActions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
+}
+
+.tableHeader > span:last-child {
+  text-align: center;
 }
 
 .rowEditButton,
@@ -1026,7 +1037,7 @@ html[dir="rtl"] .customDropdownOption {
 
   .tableHeader,
   .customerRow {
-    grid-template-columns: minmax(200px, 1.8fr) 110px 120px 110px 120px;
+    grid-template-columns: minmax(180px, 1.6fr) 100px 130px 130px 140px;
   }
 }
 
@@ -1050,7 +1061,7 @@ html[dir="rtl"] .customDropdownOption {
 
   .tableHeader,
   .customerRow {
-    min-width: 640px;
+    min-width: 780px;
   }
 
   .formGrid {

@@ -330,7 +330,7 @@ html[dir="rtl"] .filterOption {
   min-height: 52px;
   padding: 0 12px;
   display: grid;
-  grid-template-columns: minmax(180px, 1.8fr) 120px 130px 110px 110px 110px;
+  grid-template-columns: minmax(200px, 1.7fr) 120px 130px 120px 120px 140px;
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--border);
@@ -348,10 +348,10 @@ html[dir="rtl"] .filterOption {
 }
 
 .workerRow {
-  min-height: 68px;
-  padding: 12px 12px;
+  min-height: 64px;
+  padding: 10px 12px;
   display: grid;
-  grid-template-columns: minmax(180px, 1.8fr) 120px 130px 110px 110px 110px;
+  grid-template-columns: minmax(200px, 1.7fr) 120px 130px 120px 120px 140px;
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--border);
@@ -420,7 +420,16 @@ html[dir="rtl"] .filterOption {
   font-weight: 500;
 }
 
-.positionText,
+.positionText {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .phoneText {
   color: var(--text);
   font-size: 13px;
@@ -428,6 +437,9 @@ html[dir="rtl"] .filterOption {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  direction: ltr;
+  text-align: start;
 }
 
 .salaryText {
@@ -435,8 +447,9 @@ html[dir="rtl"] .filterOption {
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 
 .balanceZero,
@@ -448,6 +461,9 @@ html[dir="rtl"] .filterOption {
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
+  min-width: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
   background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
@@ -455,6 +471,7 @@ html[dir="rtl"] .filterOption {
   box-shadow: none !important;
   padding: 0 !important;
   margin: 0 !important;
+  justify-self: end;
 }
 
 .balanceZero {
@@ -480,8 +497,12 @@ html[dir="rtl"] .filterOption {
 
 .rowActions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 6px;
+}
+
+.tableHeader > span:last-child {
+  text-align: center;
 }
 
 .rowEditButton,
@@ -1108,7 +1129,7 @@ html[dir="rtl"] .filterOption {
 
   .tableHeader,
   .workerRow {
-    grid-template-columns: minmax(180px, 1.6fr) 110px 120px 110px 110px 120px;
+    grid-template-columns: minmax(180px, 1.5fr) 110px 130px 120px 120px 130px;
   }
 }
 
@@ -1132,7 +1153,7 @@ html[dir="rtl"] .filterOption {
 
   .tableHeader,
   .workerRow {
-    min-width: 640px;
+    min-width: 880px;
   }
 
   .formGrid {

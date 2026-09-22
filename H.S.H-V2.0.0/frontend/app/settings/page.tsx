@@ -37,6 +37,7 @@ import {
   Mail,
   MapPin,
   Moon,
+  Palette,
   Pencil,
   Phone,
   Plus,
@@ -53,6 +54,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import DateTimeDisplay from "../../src/components/common/DateTimeDisplay";
 import StyledSelect from "../../src/components/common/StyledSelect";
+import ThemeAppearanceSelector from "../../src/components/settings/ThemeAppearanceSelector";
 
 import type {
   Settings as AppSettings,
@@ -71,8 +73,9 @@ const TRANSLATIONS = {
     sectionGeneral: "GENERAL",
     sectionMasterData: "MASTER DATA",
     sectionPurchasing: "PURCHASING",
-  sectionAbout: "ABOUT",
   sectionInvoice: "INVOICE",
+  sectionAppearance: "APPEARANCE",
+  sectionAbout: "ABOUT",
   language: "Language",
   languageDescription: "Choose the application language.",
     english: "English",
@@ -212,8 +215,9 @@ const TRANSLATIONS = {
     sectionGeneral: "GÉNÉRAL",
     sectionMasterData: "DONNÉES DE BASE",
     sectionPurchasing: "ACHATS",
-  sectionAbout: "À PROPOS",
   sectionInvoice: "FACTURATION",
+  sectionAppearance: "APPARENCE",
+  sectionAbout: "À PROPOS",
   language: "Langue",
   languageDescription: "Choisissez la langue de l'application.",
     english: "Anglais",
@@ -352,8 +356,9 @@ const TRANSLATIONS = {
     sectionGeneral: "عام",
     sectionMasterData: "البيانات الرئيسية",
     sectionPurchasing: "المشتريات",
-  sectionAbout: "حول",
   sectionInvoice: "الفوترة",
+  sectionAppearance: "المظهر",
+  sectionAbout: "حول",
   language: "اللغة",
   languageDescription: "اختر لغة التطبيق.",
     english: "الإنجليزية",
@@ -484,7 +489,7 @@ const TRANSLATIONS = {
   },
 } as const;
 
-type SectionId = "general" | "master-data" | "purchasing" | "invoice" | "about";
+type SectionId = "general" | "appearance" | "master-data" | "purchasing" | "invoice" | "about";
 
 function SettingsPageInner() {
   const router = useRouter();
@@ -576,7 +581,7 @@ function SettingsPageInner() {
   // Sync activeSection with URL ?section=
   useEffect(() => {
     const section = searchParams.get("section") as SectionId | null;
-    if (section && ["general", "master-data", "purchasing", "invoice", "about"].includes(section)) {
+    if (section && ["general", "appearance", "master-data", "purchasing", "invoice", "about"].includes(section)) {
       setActiveSection(section);
     } else if (!section) {
       // No param → default to general without pushing
@@ -704,8 +709,10 @@ function SettingsPageInner() {
     return t.dinar;
   }
 
+  const appearanceLabel = settings.language === "fr" ? "Apparence" : settings.language === "ar" ? "المظهر" : "Appearance";
   const sections: { id: SectionId; label: string; icon: LucideIcon; description: string }[] = [
     { id: "general", label: t.sectionGeneral === "GENERAL" ? "General" : t.sectionGeneral === "GÉNÉRAL" ? "Général" : "عام", icon: SettingsIcon, description: "General" },
+    { id: "appearance", label: appearanceLabel, icon: Palette, description: "Appearance" },
     { id: "master-data", label: t.sectionMasterData, icon: Database, description: "Master Data" },
     { id: "purchasing", label: t.sectionPurchasing, icon: ShoppingCart, description: "Purchasing" },
     { id: "invoice", label: t.sectionInvoice, icon: Receipt, description: "Invoice" },
@@ -715,6 +722,7 @@ function SettingsPageInner() {
   // For display, use translated labels
   const navItems = [
     { id: "general" as SectionId, label: settings.language === "fr" ? "Général" : settings.language === "ar" ? "عام" : "General", icon: SettingsIcon },
+    { id: "appearance" as SectionId, label: appearanceLabel, icon: Palette },
     { id: "master-data" as SectionId, label: settings.language === "fr" ? "Données de base" : settings.language === "ar" ? "البيانات الرئيسية" : "Master Data", icon: Database },
     { id: "purchasing" as SectionId, label: settings.language === "fr" ? "Achats" : settings.language === "ar" ? "المشتريات" : "Purchasing", icon: ShoppingCart },
     { id: "invoice" as SectionId, label: settings.language === "fr" ? "Facturation" : settings.language === "ar" ? "الفوترة" : "Invoice", icon: Receipt },
@@ -725,6 +733,7 @@ function SettingsPageInner() {
     return [
       { key: "language", section: "general" as SectionId, title: t.language, description: t.languageDescription, keywords: "language langue اللغة general" },
       { key: "currency", section: "general" as SectionId, title: t.currency, description: t.currencyDescription, keywords: "currency devise عملة general" },
+      { key: "appearance", section: "appearance" as SectionId, title: appearanceLabel, description: "appearance theme thème المظهر", keywords: "appearance theme dark light thème clair sombre المظهر" },
       { key: "customerTypes", section: "master-data" as SectionId, title: t.customerTypes, description: t.customerTypesDescription, keywords: "customer client عميل master data" },
       { key: "workerPositions", section: "master-data" as SectionId, title: t.workerPositions, description: t.workerPositionsDescription, keywords: "worker position poste عامل master data" },
       { key: "vehicleTypes", section: "master-data" as SectionId, title: t.vehicleTypes, description: t.vehicleTypesDescription, keywords: "vehicle voiture مركبة master data" },
@@ -732,7 +741,7 @@ function SettingsPageInner() {
       { key: "purchaseInjury", section: "purchasing" as SectionId, title: t.purchaseInjury, description: t.purchaseInjuryDescription, keywords: "purchase injury achat blessure شراء إصابة purchasing" },
       { key: "about", section: "about" as SectionId, title: t.aboutTitle, description: t.aboutDescription, keywords: "about à propos حول" },
     ];
-  }, [t]);
+  }, [t, appearanceLabel]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -883,6 +892,38 @@ function SettingsPageInner() {
                               />
                             }
                           />
+                        );
+                      }
+                      if (row.key === "appearance") {
+                        return (
+                          <div
+                            key={row.key}
+                            className={styles.settingRow}
+                            onClick={() => navigateSection("appearance")}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                navigateSection("appearance");
+                              }
+                            }}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <div className={styles.rowMain}>
+                              <div className={styles.rowIcon} aria-hidden="true">
+                                <Palette size={22} strokeWidth={2} />
+                              </div>
+                              <div className={styles.rowText}>
+                                <span className={styles.rowSectionLabel}>{sectionLabel}</span>
+                                <strong>{row.title}</strong>
+                                <span>{row.description}</span>
+                              </div>
+                            </div>
+                            <span className={styles.rowChevron} aria-hidden="true">
+                              <ChevronRight size={18} strokeWidth={2} />
+                            </span>
+                          </div>
                         );
                       }
                       if (row.key === "customerTypes") {
@@ -1037,12 +1078,15 @@ function SettingsPageInner() {
             ) : activeSection === "general" ? (
               <>
                 <h2 className={styles.sectionHeading}>{t.sectionGeneral}</h2>
-                <div className={styles.rowsStack}>
-                  <SettingSelectRow
-                    icon={Languages}
-                    title={t.language}
-                    description={t.languageDescription}
-                    control={
+                <div className={styles.card}>
+                  <div className={styles.row}>
+                    <div className={styles.rowText}>
+                      <strong>
+                        <Globe size={16} strokeWidth={2} aria-hidden="true" /> {t.language}
+                      </strong>
+                      <span>{t.languageDescription}</span>
+                    </div>
+                    <div style={{ minWidth: 180 }}>
                       <StyledSelect
                         value={settings.language}
                         onChange={(v) => handleLanguageSelect(v as Language)}
@@ -1053,13 +1097,17 @@ function SettingsPageInner() {
                           { value: "ar", label: "العربية" },
                         ]}
                       />
-                    }
-                  />
-                  <SettingSelectRow
-                    icon={Banknote}
-                    title={t.currency}
-                    description={t.currencyDescription}
-                    control={
+                    </div>
+                  </div>
+                  <div className={styles.divider} />
+                  <div className={styles.row}>
+                    <div className={styles.rowText}>
+                      <strong>
+                        <Banknote size={16} strokeWidth={2} aria-hidden="true" /> {t.currency}
+                      </strong>
+                      <span>{t.currencyDescription}</span>
+                    </div>
+                    <div style={{ minWidth: 180 }}>
                       <StyledSelect
                         value={settings.currency}
                         onChange={(v) => handleCurrencySelect(v as Currency)}
@@ -1070,10 +1118,12 @@ function SettingsPageInner() {
                           { value: "$", label: "$ — US Dollar" },
                         ]}
                       />
-                    }
-                  />
+                    </div>
+                  </div>
                 </div>
               </>
+            ) : activeSection === "appearance" ? (
+              <ThemeAppearanceSelector language={settings.language} dark={dark} onThemeChange={(v) => setDark(v === "dark")} />
             ) : activeSection === "master-data" ? (
               <>
                 <h2 className={styles.sectionHeading}>{t.sectionMasterData}</h2>

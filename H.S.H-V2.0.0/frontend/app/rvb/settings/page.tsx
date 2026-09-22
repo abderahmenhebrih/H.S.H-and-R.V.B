@@ -10,6 +10,7 @@ import type { Settings, Language, Currency } from "../../../src/types/settings/s
 import { getSavedTheme, applyTheme } from "../../../src/lib/theme";
 import { rvbAuthService } from "../../../src/services/rvb-auth.service";
 import StyledSelect from "../../../src/components/common/StyledSelect";
+import ThemeAppearanceSelector from "../../../src/components/settings/ThemeAppearanceSelector";
 import { Settings as SettingsIcon, Globe, Palette, Bell, Shield, Info, Sun, Moon, LogOut, KeyRound, Image as ImageIcon, Check, X, Eye, EyeOff, Monitor } from "lucide-react";
 import styles from "./page.module.css";
 
@@ -480,50 +481,7 @@ function SettingsInner() {
             )}
 
             {active === "appearance" && (
-              <div className={styles.section}>
-                <h2 className={styles.sectionTitle}>{t.appearance.title}</h2>
-                <p className={styles.sectionDesc}>{t.appearance.desc}</p>
-                <div className={styles.themeGrid}>
-                  <button type="button" className={`${styles.themeCard} ${!dark ? styles.themeActive : ""}`} onClick={() => toggleTheme("light")} aria-pressed={!dark}>
-                    <div className={`${styles.previewFrame} ${styles.previewLight}`} aria-hidden="true">
-                      <div className={styles.previewHeader} />
-                      <div className={styles.previewBody}>
-                        <div className={styles.previewSidebar}>
-                          <span className={styles.previewNavItem} />
-                          <span className={`${styles.previewNavItem} ${styles.previewNavActive}`} />
-                          <span className={styles.previewNavItem} />
-                        </div>
-                        <div className={styles.previewMain}>
-                          <span className={styles.previewLine} />
-                          <span className={styles.previewBlock} />
-                        </div>
-                      </div>
-                    </div>
-                    <strong><Sun size={14} /> {t.appearance.light}</strong>
-                    <small>{t.appearance.lightDesc}</small>
-                    {!dark && <span className={styles.checkBadge}><Check size={12} /></span>}
-                  </button>
-                  <button type="button" className={`${styles.themeCard} ${dark ? styles.themeActive : ""}`} onClick={() => toggleTheme("dark")} aria-pressed={dark}>
-                    <div className={`${styles.previewFrame} ${styles.previewDark}`} aria-hidden="true">
-                      <div className={styles.previewHeader} />
-                      <div className={styles.previewBody}>
-                        <div className={styles.previewSidebar}>
-                          <span className={styles.previewNavItem} />
-                          <span className={`${styles.previewNavItem} ${styles.previewNavActive}`} />
-                          <span className={styles.previewNavItem} />
-                        </div>
-                        <div className={styles.previewMain}>
-                          <span className={styles.previewLine} />
-                          <span className={styles.previewBlock} />
-                        </div>
-                      </div>
-                    </div>
-                    <strong><Moon size={14} /> {t.appearance.dark}</strong>
-                    <small>{t.appearance.darkDesc}</small>
-                    {dark && <span className={styles.checkBadge}><Check size={12} /></span>}
-                  </button>
-                </div>
-              </div>
+              <ThemeAppearanceSelector language={lang} dark={dark} onThemeChange={(v) => setDark(v === "dark")} />
             )}
 
             {active === "notifications" && (

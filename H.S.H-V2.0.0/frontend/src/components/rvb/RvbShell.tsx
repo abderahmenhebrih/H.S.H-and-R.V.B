@@ -82,8 +82,12 @@ const translations = {
       orders: "Orders",
       requests: "Requests",
       chats: "Chats",
+      mainChats: "Main Chats",
+      secondaryChats: "Secondary Chats",
+      profile: "Profile & Management",
       notifications: "Notifications & Activity",
       directory: "Directory",
+      search: "Search",
       settings: "Settings",
     },
     brand: "RVB",
@@ -116,8 +120,12 @@ const translations = {
       orders: "Commandes",
       requests: "Demandes",
       chats: "Discussions",
+      mainChats: "Discussions principales",
+      secondaryChats: "Discussions secondaires",
+      profile: "Profil & Gestion",
       notifications: "Notifications et activité",
       directory: "Annuaire",
+      search: "Recherche",
       settings: "Paramètres",
     },
     brand: "RVB",
@@ -150,8 +158,12 @@ const translations = {
       orders: "الطلبيات",
       requests: "الطلبات",
       chats: "المحادثات",
+      mainChats: "المحادثات الرئيسية",
+      secondaryChats: "المحادثات الثانوية",
+      profile: "الملف والإدارة",
       notifications: "الإشعارات والنشاط",
       directory: "الدليل",
+      search: "البحث",
       settings: "الإعدادات",
     },
     brand: "RVB",
@@ -359,26 +371,52 @@ export default function RvbShell({
   const t = translations[settings.language];
   const hero = t.hero[activePage] ?? t.hero.dashboard;
 
-  const navLabels: Record<RvbActivePage, string> = {
-    dashboard: t.nav.dashboard,
-    accounts: t.nav.accounts,
-    workers: t.nav.workers,
-    suppliers: t.nav.suppliers,
-    customers: t.nav.customers,
-    orders: t.nav.orders,
-    requests: t.nav.requests,
-    chats: t.nav.chats,
-    notifications: t.nav.notifications,
-    directory: t.nav.directory,
-    settings: t.nav.settings,
+  const navLabels: Record<string, string> = {
+    dashboard: (t.nav as any).dashboard,
+    accounts: (t.nav as any).accounts,
+    workers: (t.nav as any).workers,
+    suppliers: (t.nav as any).suppliers,
+    customers: (t.nav as any).customers,
+    orders: (t.nav as any).orders,
+    requests: (t.nav as any).requests,
+    chats: (t.nav as any).chats,
+    mainChats: (t.nav as any).mainChats,
+    secondaryChats: (t.nav as any).secondaryChats,
+    profile: (t.nav as any).profile,
+    notifications: (t.nav as any).notifications,
+    directory: (t.nav as any).directory,
+    search: (t.nav as any).search,
+    settings: (t.nav as any).settings,
   };
 
-  // Filter navigation: only manager/admin see Accounts & Access
+  // Role-aware navigation per spec 35
   const isManager = user?.role === "manager" || user?.role === "admin";
-  const visibleNav = RVB_NAVIGATION.filter((item) => {
-    if (item.key === "accounts" && !isManager && user) return false;
-    return true;
-  });
+  const isSupervisor = user?.role === "supervisor";
+  const isSecondary = user && ["worker","supplier","customer","supervisor"].includes(user.role);
+  const portalNav: NavItem[] = [
+    { icon: MessagesSquare, key: "chats" as any, label: (t.nav as any).mainChats, path: "/rvb/chats?category=main" },
+    { icon: Inbox, key: "chats" as any, label: (t.nav as any).secondaryChats, path: "/rvb/chats?category=secondary" },
+    { icon: LayoutDashboard, key: "dashboard" as any, label: (t.nav as any).profile || (t.nav as any).dashboard, path: "/rvb" },
+    { icon: Search, key: "directory" as any, label: (t.nav as any).search || (t.nav as any).directory, path: "/rvb/directory" },
+    { icon: SettingsIcon, key: "settings" as any, label: (t.nav as any).settings, path: "/rvb/settings" },
+  ];
+  const visibleNav = (() => {
+    if (!user) {
+      return RVB_NAVIGATION.filter((item) => {
+        if (item.key === "accounts") return false;
+        return true;
+      });
+    }
+    if (isManager) return RVB_NAVIGATION;
+    if (isSecondary) return portalNav;
+    // fallback: hide accounts for non-manager
+    return RVB_NAVIGATION.filter((item) => {
+      if (item.key === "accounts" && !isManager) return false;
+      if (item.key === "workers" && isSupervisor) return false;
+      if (item.key === "suppliers" && isSupervisor) return false;
+      return true;
+    });
+  })();
 
   return (
     <div
@@ -443,21 +481,43 @@ export default function RvbShell({
         <div className={dashboardStyles.sidebarDivider} />
 
         <nav ref={sidebarNavRef} className={dashboardStyles.sidebarNav}>
-          {visibleNav.map(({ icon: Icon, key, path }) => (
-            <div key={key} className={dashboardStyles.navItemWrap}>
+          {visibleNav.map(({ icon: Icon, key, path, label }) => {
+            const displayLabel = (label as string) || (navLabels as any)[key] || key;
+            // Determine active: for portal chats differentiate by query
+            const isActive = (() => {
+              if (isSecondary) {
+                // portal mode: check path match
+                if (typeof window !== "undefined") {
+                  const cur = window.location.pathname + window.location.search;
+                  if (cur === path) return true;
+                  // fallback to activePage mapping
+                  if (key === "dashboard" && activePage === "dashboard") return path === "/rvb";
+                  if (key === "directory" && activePage === "directory") return path === "/rvb/directory";
+                  if (key === "settings" && activePage === "settings") return path === "/rvb/settings";
+                  if (key === "chats" && activePage === "chats") {
+                    return cur.includes(path.split("?")[0]) && cur.includes(path.split("?")[1] || "");
+                  }
+                }
+                return activePage === key && (path === "/rvb" ? activePage === "dashboard" : true);
+              }
+              return activePage === key;
+            })();
+            const uniqueKey = `${key}-${path}`;
+            return (
+            <div key={uniqueKey} className={dashboardStyles.navItemWrap}>
               <button
                 type="button"
                 className={`${dashboardStyles.sidebarItem} ${
-                  activePage === key ? dashboardStyles.active : ""
+                  isActive ? dashboardStyles.active : ""
                 }`}
                 onClick={() => navigate(path)}
-                aria-label={navLabels[key]}
-                title={sidebarCollapsed ? navLabels[key] : undefined}
+                aria-label={displayLabel}
+                title={sidebarCollapsed ? displayLabel : undefined}
               >
                 <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
                   <Icon size={18} strokeWidth={2} />
                 </span>
-                {!sidebarCollapsed && <span style={{ flex: 1 }}>{navLabels[key]}</span>}
+                {!sidebarCollapsed && <span style={{ flex: 1 }}>{displayLabel}</span>}
                 {!sidebarCollapsed && key === "notifications" && notifUnread > 0 && (
                   <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
                 )}
@@ -467,11 +527,12 @@ export default function RvbShell({
               </button>
               {sidebarCollapsed && (
                 <span className={dashboardStyles.tooltip} role="tooltip">
-                  {navLabels[key]}
+                  {displayLabel}
                 </span>
               )}
             </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Current user area */}

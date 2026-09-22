@@ -9,15 +9,10 @@ import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
-import { workerService } from "../../../src/services/worker.service";
-import { supplierService } from "../../../src/services/supplier.service";
-import { customerService } from "../../../src/services/customer.service";
+import { rvbConfigService } from "../../../src/services/rvb-config.service";
 import type { RvbAccount } from "../../../src/types/rvb/rvb-account";
 import { normalizeTag, isValidTag, TAG_REGEX } from "../../../src/types/rvb/rvb-account";
 import { RVB_ROLES } from "../../../src/types/rvb/roles";
-import type { Worker } from "../../../src/types/entities/worker";
-import type { Supplier } from "../../../src/types/entities/supplier";
-import type { Customer } from "../../../src/types/entities/customer";
 import {
   Search,
   Plus,
@@ -259,10 +254,8 @@ function RvbAccountsInner() {
   const [setPwdError, setSetPwdError] = useState("");
   const [settingPwd, setSettingPwd] = useState(false);
 
-  // Entities
-  const [workers, setWorkers] = useState<Worker[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  // Entities - now fetched via backend linkable endpoint, not Dexie
+  const [linkableEntities, setLinkableEntities] = useState<any[]>([]);
 
   // Details
   const [detailsAccount, setDetailsAccount] = useState<RvbAccount | null>(null);
@@ -281,20 +274,11 @@ function RvbAccountsInner() {
     setLoading(true);
     setError("");
     try {
-      const [accs, w, s, c] = await Promise.all([
-        rvbAccountService.getAll().catch(() => { throw new Error("FETCH_FAIL"); }),
-        workerService.getAll().catch(() => [] as Worker[]),
-        supplierService.getAll().catch(() => [] as Supplier[]),
-        customerService.getAll().catch(() => [] as Customer[]),
-      ]);
+      const accs = await rvbAccountService.getAll().catch(() => { throw new Error("FETCH_FAIL"); });
       setAccounts(Array.isArray(accs) ? accs : []);
-      setWorkers(w as Worker[]);
-      setSuppliers(s as Supplier[]);
-      setCustomers(c as Customer[]);
     } catch (e: any) {
       const msg = e?.message === "FETCH_FAIL" ? t.failedLoad : (e?.message || t.failedLoad);
       setError(msg);
-      // try to keep empty accounts on fail
       setAccounts([]);
     } finally {
       setLoading(false);
@@ -303,6 +287,7 @@ function RvbAccountsInner() {
 
   useEffect(() => {
     settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbConfigService.get().then((c) => { if (c?.currency) setSettings((prev:any)=>({...prev, currency:c.currency})); }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
@@ -323,12 +308,15 @@ function RvbAccountsInner() {
   }, [lang]);
 
   const linkedMap = useMemo(() => {
+    // Now relies on backend enrichment linkedEntityDisplayName rather than local Dexie maps
     const m = new Map<string, { name: string; type: string }>();
-    for (const w of workers) m.set(`worker:${w.id}`, { name: w.name, type: "Worker" });
-    for (const s of suppliers) m.set(`supplier:${s.id}`, { name: s.name, type: "Supplier" });
-    for (const c of customers) m.set(`customer:${c.id}`, { name: c.name, type: "Customer" });
+    for (const a of accounts) {
+      if (a.linkedEntityType && a.linkedEntityId && (a as any).linkedEntityDisplayName) {
+        m.set(`${a.linkedEntityType}:${a.linkedEntityId}`, { name: (a as any).linkedEntityDisplayName, type: a.linkedEntityType });
+      }
+    }
     return m;
-  }, [workers, suppliers, customers]);
+  }, [accounts]);
 
   const linkedIdsUsed = useMemo(() => {
     const set = new Set<string>();
@@ -364,25 +352,34 @@ function RvbAccountsInner() {
     return { total, active, pending, archived };
   }, [accounts]);
 
+  // Fetch linkable entities from backend when role changes
+  useEffect(() => {
+    if (!createRole || !["worker","supplier","customer"].includes(createRole)) { setLinkableEntities([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { rvbAuthService } = await import("../../../src/services/rvb-auth.service");
+        const token = rvbAuthService.getAccessToken();
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+        const res = await fetch(`${API_BASE}/api/rvb/accounts/linkable?type=${encodeURIComponent(createRole)}`, {
+          headers: { ...(token?{Authorization:`Bearer ${token}`}:{}) },
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = await res.json().catch(()=>({}));
+        if (!cancelled && res.ok && Array.isArray(data.entities)) {
+          setLinkableEntities(data.entities);
+        } else if (!cancelled) setLinkableEntities([]);
+      } catch { if (!cancelled) setLinkableEntities([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [createRole]);
+
   const entityOptions = useMemo(() => {
     if (!createRole) return [];
-    if (createRole === "worker") {
-      return workers
-        .filter((w) => !linkedIdsUsed.has(`worker:${w.id}`))
-        .map((w) => ({ value: w.id, label: w.name, sublabel: "Worker" }));
-    }
-    if (createRole === "supplier") {
-      return suppliers
-        .filter((s) => !linkedIdsUsed.has(`supplier:${s.id}`))
-        .map((s) => ({ value: s.id, label: s.name, sublabel: "Supplier" }));
-    }
-    if (createRole === "customer") {
-      return customers
-        .filter((c) => !linkedIdsUsed.has(`customer:${c.id}`))
-        .map((c) => ({ value: c.id, label: c.name, sublabel: "Customer" }));
-    }
-    return [];
-  }, [createRole, workers, suppliers, customers, linkedIdsUsed]);
+    // linkableEntities already filtered to available (not linked) by backend
+    return linkableEntities.map((e:any)=>({ value:e.id, label:e.name, sublabel: e.type || createRole }));
+  }, [createRole, linkableEntities, linkedIdsUsed]);
 
   const roleOptions = useMemo(() => {
     return (RVB_ROLES as readonly string[]).map((r) => ({ value: r, label: (t.roles as any)[r] ?? r }));
@@ -398,12 +395,9 @@ function RvbAccountsInner() {
 
   const handleSelectEntity = (id: string) => {
     setCreateLinkedId(id);
-    // auto-fill displayName from entity
     if (!id) return;
-    let name = "";
-    if (createRole === "worker") name = workers.find((w) => w.id === id)?.name ?? "";
-    else if (createRole === "supplier") name = suppliers.find((s) => s.id === id)?.name ?? "";
-    else if (createRole === "customer") name = customers.find((c) => c.id === id)?.name ?? "";
+    const ent = linkableEntities.find((e:any)=>e.id===id);
+    const name = ent?.name ?? "";
     if (name) setCreateDisplayName(name);
   };
 
@@ -523,10 +517,14 @@ function RvbAccountsInner() {
 
   const getLinkedDisplay = (a: RvbAccount) => {
     if (!a.linkedEntityType || !a.linkedEntityId) return { typeLabel: t.management, name: t.linkedNone };
+    const enriched = (a as any).linkedEntityDisplayName as string | null | undefined;
+    if (enriched) {
+      const typeLabel = a.linkedEntityType.charAt(0).toUpperCase() + a.linkedEntityType.slice(1);
+      return { typeLabel, name: enriched };
+    }
     const key = `${a.linkedEntityType}:${a.linkedEntityId}`;
     const entry = linkedMap.get(key);
     if (entry) return { typeLabel: entry.type, name: entry.name };
-    // fallback: show type + id snippet
     const typeLabel = a.linkedEntityType.charAt(0).toUpperCase() + a.linkedEntityType.slice(1);
     return { typeLabel, name: a.linkedEntityId.slice(0, 8) + "…" };
   };

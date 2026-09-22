@@ -96,9 +96,8 @@ function clearRefreshCookie(res: any) {
 }
 
 function isNativeLoginRequest(req: any): boolean {
-  const h = req.headers["x-rvb-client"] || req.headers["x-client-type"];
+  const h = req.headers["x-rvb-client"];
   if (typeof h === "string" && h.toLowerCase() === "native") return true;
-  if (req.body && (req.body.native === true || req.body.isNative === true)) return true;
   return false;
 }
 
@@ -175,6 +174,8 @@ router.post("/login", async (req, res) => {
     const refreshHash = hashRefreshToken(refreshToken);
     const expiresAt = now + parseExpiryToMs(getRefreshTTL());
 
+    const isNative = isNativeLoginRequest(req);
+    const clientType: "web" | "native" = isNative ? "native" : "web";
     await RvbSessionModel.create({
       id: sessionId,
       accountId: account.id,
@@ -186,13 +187,14 @@ router.post("/login", async (req, res) => {
       userAgent: req.headers["user-agent"] as string | undefined,
       ipAddress: (req.ip || (req.headers["x-forwarded-for"] as string) || undefined) as string | undefined,
       rotationFamilyId: familyId,
-    });
+      clientType,
+    } as any);
 
     setRefreshCookie(res, refreshToken);
 
-    // Web: HttpOnly cookie only. Native: explicit X-RVB-Client header required to receive JSON refreshToken.
+    // Web: HttpOnly cookie only. Native: explicit X-RVB-Client: native header required to receive JSON refreshToken.
     // This prevents JS-readable exposure for web while preserving documented native flow.
-    const isNative = isNativeLoginRequest(req);
+    // clientType is stored in trusted session metadata.
     if (isNative) {
       res.json({
         success: true,
@@ -225,7 +227,6 @@ router.post("/refresh", async (req, res) => {
     const bodyToken = req.body && req.body.refreshToken ? String(req.body.refreshToken) : null;
     const headerToken = req.headers["x-refresh-token"] ? String(req.headers["x-refresh-token"] as string) : null;
     const explicitToken = bodyToken || headerToken;
-    const isNativeRefresh = !!explicitToken;
 
     let rawToken: string | null = null;
     if (explicitToken) rawToken = explicitToken;
@@ -283,6 +284,8 @@ router.post("/refresh", async (req, res) => {
     const newHash = hashRefreshToken(newRefreshToken);
     const expiresAt = now + parseExpiryToMs(getRefreshTTL());
 
+    // Preserve clientType from trusted session metadata (not forged header)
+    const preservedClientType: "web" | "native" = (session as any).clientType === "native" ? "native" : "web";
     await RvbSessionModel.create({
       id: newSessionId,
       accountId: account.id,
@@ -294,14 +297,16 @@ router.post("/refresh", async (req, res) => {
       userAgent: req.headers["user-agent"] as string | undefined,
       ipAddress: (req.ip || (req.headers["x-forwarded-for"] as string) || undefined) as string | undefined,
       rotationFamilyId: familyId,
-    });
+      clientType: preservedClientType,
+    } as any);
 
     setRefreshCookie(res, newRefreshToken);
 
     // Immediately disconnect sockets using the old revoked session (not the new one)
     safeDisconnectSession(session.id || payload.sessionId);
 
-    if (isNativeRefresh) {
+    // Native sessions receive refreshToken in JSON (trusted metadata), web only via HttpOnly cookie
+    if (preservedClientType === "native") {
       res.json({
         success: true,
         accessToken: newAccessToken,
@@ -390,6 +395,50 @@ router.get("/me", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
   }
 });
 
+// GET /api/rvb/auth/onboarding - fetch onboarding status (derived from auth, uses account fields)
+router.get("/onboarding", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const account: any = await RvbAccountModel.findOne({ id: user.accountId }).lean();
+    if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
+    res.json({ success: true, onboardingStatus: account.onboardingStatus, profilePicture: account.profilePicture || null, account: toSafeRvbAccount(account) });
+  } catch (e) {
+    console.error("get onboarding failed", e);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
+// POST /api/rvb/auth/onboarding - self onboarding to set profilePicture and complete status (derives account from auth)
+router.post("/onboarding", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const { profilePicture } = req.body as any;
+    const account: any = await RvbAccountModel.findOne({ id: user.accountId });
+    if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
+    if (!profilePicture || typeof profilePicture !== "string" || !profilePicture.startsWith("data:image/")) {
+      res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_REQUIRED" });
+      return;
+    }
+    // Enforce smaller payload (<200k) and ~512x512 max is handled frontend canvas; backend double checks length
+    if (profilePicture.length > 250000) {
+      res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_TOO_LARGE" });
+      return;
+    }
+    if (profilePicture.length > 2000000) {
+      res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_INVALID" });
+      return;
+    }
+    account.profilePicture = profilePicture;
+    account.onboardingStatus = "complete";
+    account.updatedAt = Date.now();
+    await account.save();
+    res.json({ success: true, account: toSafeRvbAccount(account) });
+  } catch (e) {
+    console.error("onboarding failed", e);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
 // PATCH /api/rvb/auth/profile - self-service profile update (displayName, profilePicture)
 router.patch("/profile", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
   try {
@@ -398,6 +447,7 @@ router.patch("/profile", requireRvbAuth as any, async (req: RvbAuthRequest, res)
     const account: any = await RvbAccountModel.findOne({ id: user.accountId });
     if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
     const updates: any = {};
+    const unset: any = {};
     if (displayName !== undefined) {
       const name = String(displayName).trim();
       if (!name) { res.status(400).json({ success: false, code: "RVB_DISPLAY_NAME_REQUIRED" }); return; }
@@ -406,13 +456,27 @@ router.patch("/profile", requireRvbAuth as any, async (req: RvbAuthRequest, res)
       updates.displayName = name;
     }
     if (profilePicture !== undefined) {
-      if (profilePicture === null || profilePicture === "") updates.profilePicture = undefined;
-      else if (typeof profilePicture === "string" && profilePicture.length < 2000000) updates.profilePicture = profilePicture;
-      else { res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_INVALID" }); return; }
+      if (profilePicture === null || profilePicture === "") {
+        // After onboarding, replace photo allowed but not leave without photo - require replacement
+        if (account.onboardingStatus === "complete") {
+          res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_REQUIRED" });
+          return;
+        }
+        unset.profilePicture = "";
+      } else if (typeof profilePicture === "string" && profilePicture.length < 2000000) {
+        if (!profilePicture.startsWith("data:image/") && !profilePicture.startsWith("http")) {
+          res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_INVALID" });
+          return;
+        }
+        updates.profilePicture = profilePicture;
+      } else { res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_INVALID" }); return; }
     }
-    if (Object.keys(updates).length === 0) { res.json({ success: true, account: toSafeRvbAccount(account) }); return; }
+    if (Object.keys(updates).length === 0 && Object.keys(unset).length === 0) { res.json({ success: true, account: toSafeRvbAccount(account) }); return; }
     updates.updatedAt = Date.now();
-    const updated = await RvbAccountModel.findOneAndUpdate({ id: user.accountId }, { $set: updates }, { new: true, returnDocument: "after" } as any);
+    const updateOps: any = {};
+    if (Object.keys(updates).length) updateOps.$set = updates;
+    if (Object.keys(unset).length) updateOps.$unset = unset;
+    const updated = await RvbAccountModel.findOneAndUpdate({ id: user.accountId }, updateOps, { new: true, returnDocument: "after" } as any);
     res.json({ success: true, account: toSafeRvbAccount(updated) });
   } catch (e) {
     console.error("patch profile failed", e);
@@ -532,6 +596,7 @@ router.post("/change-password", requireRvbAuth as any, async (req: RvbAuthReques
     if (currentSessionId) {
       const sess: any = await RvbSessionModel.findOne({ id: currentSessionId });
       if (sess && !sess.revokedAt) {
+        const sessClientType: "web" | "native" = (sess as any).clientType === "native" ? "native" : "web";
         sess.revokedAt = Date.now();
         await sess.save();
         const now = Date.now();
@@ -552,11 +617,16 @@ router.post("/change-password", requireRvbAuth as any, async (req: RvbAuthReques
           userAgent: req.headers["user-agent"] as string | undefined,
           ipAddress: (req.ip || undefined) as string | undefined,
           rotationFamilyId: familyId,
-        });
+          clientType: sessClientType,
+        } as any);
         setRefreshCookie(res, newRefreshToken);
         // Disconnect all other sessions except the new rotated one (old current is revoked but new remains)
         safeDisconnectAccountExcept(account.id, newSessionId);
-        // Web: HttpOnly cookie only — never return refreshToken in JSON (even for native, use explicit refresh flow).
+        // Determine from trusted session metadata not forged header: if native, return refreshToken in JSON
+        if (sessClientType === "native") {
+          res.json({ success: true, accessToken: newAccessToken, refreshToken: newRefreshToken, account: toSafeRvbAccount(account) });
+          return;
+        }
         res.json({ success: true, accessToken: newAccessToken, account: toSafeRvbAccount(account) });
         return;
       }

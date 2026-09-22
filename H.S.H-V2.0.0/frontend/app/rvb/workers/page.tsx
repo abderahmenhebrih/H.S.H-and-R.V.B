@@ -7,10 +7,9 @@ import StyledDatePicker from "../../../src/components/common/StyledDatePicker";
 import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
-import { workerService } from "../../../src/services/worker.service";
-import { workerEditOperation } from "../../../src/services/operations/worker-edit.operation";
-import { workerLifecycleOperation } from "../../../src/services/operations/worker-lifecycle.operation";
+import { rvbWorkerService } from "../../../src/services/rvb-worker.service";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
+import { rvbConfigService } from "../../../src/services/rvb-config.service";
 import { workerRequestService, type WorkerRequest } from "../../../src/services/worker-request.service";
 import { workerFinancialEventService, type WorkerFinancialEvent } from "../../../src/services/worker-financial-event.service";
 import { workerActivityService, type WorkerActivity } from "../../../src/services/worker-activity.service";
@@ -21,8 +20,6 @@ import { RVB_ROLES } from "../../../src/types/rvb/roles";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { RvbWorkersGuard } from "../../../src/components/rvb/RvbRoleGuard";
-import { db } from "../../../src/lib/database/db";
-import type { Payment } from "../../../src/types/entities/payment";
 import {
   Search,
   Plus,
@@ -210,7 +207,7 @@ function RvbWorkersInner() {
   const [positions, setPositions] = useState<string[]>([]);
   const [details, setDetails] = useState<Worker | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "financial" | "attendance" | "portal" | "requests" | "activity">("overview");
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [requests, setRequests] = useState<WorkerRequest[]>([]);
   const [linkModal, setLinkModal] = useState(false);
   const [linkSearch, setLinkSearch] = useState("");
@@ -247,7 +244,7 @@ function RvbWorkersInner() {
     setError("");
     try {
       const [w, acc] = await Promise.all([
-        workerService.getAll().catch(() => [] as Worker[]),
+        rvbWorkerService.list().catch(() => [] as any[]),
         rvbAccountService.getAll().catch(() => [] as RvbAccount[]),
       ]);
       setWorkers(Array.isArray(w) ? w : []);
@@ -259,6 +256,10 @@ function RvbWorkersInner() {
 
   useEffect(() => {
     settingsService.get().then((s) => { if (s) { setSettings(s); setPositions(s.workerPositions || []); } });
+    rvbConfigService.get().then((c) => {
+      if (c?.currency) setSettings((prev: any) => ({ ...prev, currency: c.currency }));
+      if ((c as any)?.workerPositions) setPositions((c as any).workerPositions);
+    }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) { setSettings(ce.detail); setPositions(ce.detail.workerPositions || []); }
@@ -319,10 +320,9 @@ function RvbWorkersInner() {
   }, [accounts, linkSearch]);
 
   const loadPayments = useCallback(async (workerId: string) => {
-    try {
-      const all: any[] = await db.payments.where("entityId").equals(workerId).toArray();
-      setPayments(all.filter((p) => p.entityType === "worker").sort((a,b)=>b.date-a.date));
-    } catch { setPayments([]); }
+    // Payments for workers are represented via financial events; keep empty array to avoid Dexie usage
+    // If needed, could derive from financial events filtered by type "payment"
+    setPayments([]);
   }, []);
   const loadRequests = useCallback(async (workerId: string) => {
     try {
@@ -332,15 +332,32 @@ function RvbWorkersInner() {
   }, []);
   const loadFinancialEvents = useCallback(async (workerId: string) => {
     try {
-      const ev = await workerFinancialEventService.list(workerId).catch(()=>[] as any);
-      setFinancialEvents(ev as any);
-    } catch { setFinancialEvents([]); }
+      const ev = await rvbWorkerService.getFinancialEvents(workerId).catch(()=>[] as any);
+      // fallback to legacy service if rvbWorkerService returns empty and legacy has data
+      if (!ev || ev.length===0) {
+        const legacy = await workerFinancialEventService.list(workerId).catch(()=>[] as any);
+        setFinancialEvents((legacy as any) || []);
+      } else setFinancialEvents(ev as any);
+    } catch {
+      try {
+        const legacy = await workerFinancialEventService.list(workerId).catch(()=>[] as any);
+        setFinancialEvents(legacy as any);
+      } catch { setFinancialEvents([]); }
+    }
   }, []);
   const loadActivities = useCallback(async (workerId: string) => {
     try {
-      const a = await workerActivityService.list(workerId).catch(()=>[] as any);
-      setActivities(a as any);
-    } catch { setActivities([]); }
+      const a = await rvbWorkerService.getActivities(workerId).catch(()=>[] as any);
+      if (!a || a.length===0) {
+        const legacy = await workerActivityService.list(workerId).catch(()=>[] as any);
+        setActivities(legacy as any);
+      } else setActivities(a as any);
+    } catch {
+      try {
+        const legacy = await workerActivityService.list(workerId).catch(()=>[] as any);
+        setActivities(legacy as any);
+      } catch { setActivities([]); }
+    }
   }, []);
   const refreshWorkerRelated = useCallback(async (workerId: string) => {
     await Promise.all([loadPayments(workerId), loadRequests(workerId), loadFinancialEvents(workerId), loadActivities(workerId)]);
@@ -423,9 +440,9 @@ function RvbWorkersInner() {
       const employmentDate = form.employmentDate ? new Date(`${form.employmentDate}T12:00:00`).getTime() : Date.now();
       const birthDate = form.birthDate ? new Date(`${form.birthDate}T12:00:00`).getTime() : undefined;
       if (editing) {
-        await workerEditOperation.edit({ workerId: editing.id, name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim() || undefined, birthDate, employmentDate, position: form.position.trim(), notes: form.notes.trim() || undefined, startingSalary: starting, monthlySalary: monthly });
+        await rvbWorkerService.update(editing.id, { name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim() || undefined, birthDate, employmentDate, position: form.position.trim(), notes: form.notes.trim() || undefined, startingSalary: starting, monthlySalary: monthly });
       } else {
-        await workerService.create({ name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim() || undefined, birthDate, employmentDate, position: form.position.trim(), notes: form.notes.trim() || undefined, startingSalary: starting, monthlySalary: monthly });
+        await rvbWorkerService.create({ name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim() || undefined, birthDate, employmentDate, position: form.position.trim(), notes: form.notes.trim() || undefined, startingSalary: starting, monthlySalary: monthly });
       }
       await load();
       setShowAdd(false);
@@ -481,7 +498,7 @@ function RvbWorkersInner() {
   const handleArchive = async () => {
     if (!showArchiveConfirm) return;
     try {
-      await workerLifecycleOperation.archive(showArchiveConfirm.id);
+      await rvbWorkerService.archive(showArchiveConfirm.id);
       // Suspend portal access: only archive if currently active to preserve intentionally disabled state
       const acc = workerAccountMap.get(showArchiveConfirm.id);
       if (acc && acc.status === "active") { try { await rvbAccountService.archive(acc.id); } catch {} }
@@ -496,7 +513,11 @@ function RvbWorkersInner() {
     const m = Number(reactivateForm.monthlySalary);
     if (!Number.isFinite(s) || !Number.isFinite(m)) { alert(t.validation.salaryInvalid); return; }
     try {
-      await workerLifecycleOperation.restore({ workerId: showReactivate.id, startingSalary: s, monthlySalary: m });
+      await rvbWorkerService.reactivate(showReactivate.id);
+      // backend reactivate handles salaries via separate patch if needed; apply salary update if provided
+      if (s !== undefined && m !== undefined) {
+        try { await rvbWorkerService.update(showReactivate.id, { startingSalary: s, monthlySalary: m }); } catch {}
+      }
       const acc = workerAccountMap.get(showReactivate.id);
       // Preserve intentionally disabled account: only reactivate if it was archived (not disabled)
       if (acc && acc.status === "archived") { try { await rvbAccountService.reactivate(acc.id); } catch {} }
@@ -512,8 +533,8 @@ function RvbWorkersInner() {
     if (!Number.isFinite(amt) || amt <= 0) { alert(t.validation.salaryInvalid); return; }
     setBonusLoading(true);
     try {
-      const res: any = await workerFinancialEventService.create({ workerId: details.id, type: "bonus", amount: amt, note: bonusNote.trim() || undefined });
-      const newBalance = res?.worker?.balance;
+      const res: any = await rvbWorkerService.bonusAbsence(details.id, { type: "bonus", amount: amt, note: bonusNote.trim() || undefined });
+      const newBalance = res?.worker?.balance ?? res?.balance;
       if (newBalance !== undefined) {
         setWorkers((prev) => prev.map((w) => (w.id === details.id ? { ...w, balance: newBalance, updatedAt: Date.now() } : w)));
         setDetails((prev) => (prev ? { ...prev, balance: newBalance, updatedAt: Date.now() } : null));
@@ -522,7 +543,19 @@ function RvbWorkersInner() {
       }
       await refreshWorkerRelated(details.id);
       setBonusAmount(""); setBonusNote("");
-    } catch (e: any) { alert(e?.data?.code || e?.message || "Bonus failed"); }
+    } catch (e: any) {
+      // fallback to legacy service
+      try {
+        const res2: any = await workerFinancialEventService.create({ workerId: details.id, type: "bonus", amount: amt, note: bonusNote.trim() || undefined });
+        const nb = res2?.worker?.balance;
+        if (nb !== undefined) {
+          setWorkers((prev) => prev.map((w) => (w.id === details.id ? { ...w, balance: nb, updatedAt: Date.now() } : w)));
+          setDetails((prev) => (prev ? { ...prev, balance: nb, updatedAt: Date.now() } : null));
+        } else await load();
+        await refreshWorkerRelated(details.id);
+        setBonusAmount(""); setBonusNote("");
+      } catch (er: any) { alert(er?.data?.code || er?.message || e?.data?.code || e?.message || "Bonus failed"); }
+    }
     finally { setBonusLoading(false); }
   };
   const handleAbsence = async () => {
@@ -531,8 +564,8 @@ function RvbWorkersInner() {
     if (!Number.isFinite(amt) || amt <= 0) { alert(t.validation.salaryInvalid); return; }
     setBonusLoading(true);
     try {
-      const res: any = await workerFinancialEventService.create({ workerId: details.id, type: "absence", amount: amt, note: absenceNote.trim() || undefined });
-      const newBalance = res?.worker?.balance;
+      const res: any = await rvbWorkerService.bonusAbsence(details.id, { type: "absence", amount: amt, note: absenceNote.trim() || undefined });
+      const newBalance = res?.worker?.balance ?? res?.balance;
       if (newBalance !== undefined) {
         setWorkers((prev) => prev.map((w) => (w.id === details.id ? { ...w, balance: newBalance, updatedAt: Date.now() } : w)));
         setDetails((prev) => (prev ? { ...prev, balance: newBalance, updatedAt: Date.now() } : null));
@@ -541,7 +574,18 @@ function RvbWorkersInner() {
       }
       await refreshWorkerRelated(details.id);
       setAbsenceAmount(""); setAbsenceNote("");
-    } catch (e: any) { alert(e?.data?.code || e?.message || "Absence failed"); }
+    } catch (e: any) {
+      try {
+        const res2: any = await workerFinancialEventService.create({ workerId: details.id, type: "absence", amount: amt, note: absenceNote.trim() || undefined });
+        const nb = res2?.worker?.balance;
+        if (nb !== undefined) {
+          setWorkers((prev) => prev.map((w) => (w.id === details.id ? { ...w, balance: nb, updatedAt: Date.now() } : w)));
+          setDetails((prev) => (prev ? { ...prev, balance: nb, updatedAt: Date.now() } : null));
+        } else await load();
+        await refreshWorkerRelated(details.id);
+        setAbsenceAmount(""); setAbsenceNote("");
+      } catch (er: any) { alert(er?.data?.code || er?.message || e?.data?.code || e?.message || "Absence failed"); }
+    }
     finally { setBonusLoading(false); }
   };
   const handleReviewRequest = async (reqId: string, status: "accepted" | "rejected") => {

@@ -6,8 +6,7 @@ import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { customerOrderService, type CustomerOrder } from "../../../src/services/customer-order.service";
-import { customerService } from "../../../src/services/customer.service";
-import type { Customer } from "../../../src/types/entities/customer";
+import { rvbConfigService } from "../../../src/services/rvb-config.service";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { RvbOrdersGuard } from "../../../src/components/rvb/RvbRoleGuard";
@@ -23,12 +22,11 @@ const TR: Record<string, any> = {
 
 function OrdersInner() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("under_review");
-  const [selected, setSelected] = useState<CustomerOrder | null>(null);
+  const [selected, setSelected] = useState<any | null>(null);
 
   const lang = (settings.language as Language) || "en";
   const t = (TR as any)[lang] ?? TR.en;
@@ -36,17 +34,14 @@ function OrdersInner() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [o, c] = await Promise.all([
-        customerOrderService.list(statusFilter ? { status: statusFilter } : {}).catch(() => [] as CustomerOrder[]),
-        customerService.getAll().catch(() => [] as Customer[]),
-      ]);
+      const o = await customerOrderService.list(statusFilter ? { status: statusFilter } : {}).catch(() => [] as any[]);
       setOrders(Array.isArray(o) ? o : []);
-      setCustomers(Array.isArray(c) ? c : []);
     } finally { setLoading(false); }
   }, [statusFilter]);
 
   useEffect(() => {
     settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbConfigService.get().then((c) => { if (c?.currency) setSettings((prev:any)=>({...prev, currency:c.currency})); }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
@@ -57,21 +52,14 @@ function OrdersInner() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const customerMap = useMemo(() => {
-    const m = new Map<string, Customer>();
-    for (const c of customers) m.set(c.id, c);
-    return m;
-  }, [customers]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return orders;
-    return orders.filter((o) => {
-      const c = customerMap.get(o.customerId);
-      const hay = `${o.id} ${c?.name || ""} ${c?.phone || ""}`.toLowerCase();
+    return orders.filter((o: any) => {
+      const hay = `${o.id} ${o.customerName || ""} ${o.customerId || ""}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [orders, search, customerMap]);
+  }, [orders, search]);
 
   const kpi = useMemo(() => {
     const total = orders.length;
@@ -153,13 +141,12 @@ function OrdersInner() {
                   </tr>
                 </thead>
                 <tbody className={styles.tableBody}>
-                  {filtered.map((o) => {
-                    const c = customerMap.get(o.customerId);
+                  {filtered.map((o: any) => {
                     return (
                       <tr key={o.id}>
-                        <td><span style={{ fontWeight: 700, fontSize: 12 }}>{c?.name || o.customerId.slice(0,8)}</span>{c && <small dir="ltr" style={{ display: "block", color: "var(--muted)", fontSize: 11 }}>{c.phone}</small>}</td>
+                        <td><span style={{ fontWeight: 700, fontSize: 12 }}>{o.customerName || o.customerId.slice(0,8)}</span>{o.customerName && <small dir="ltr" style={{ display: "block", color: "var(--muted)", fontSize: 11 }}>{o.customerId.slice(0,8)}</small>}</td>
                         <td><span style={{ fontFamily: "ui-monospace", fontSize: 11, color: "var(--muted)" }}>{o.id.slice(0,12)}…</span></td>
-                        <td style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 12 }}>{formatCurrency(o.total, "DA" as any)}</td>
+                        <td style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 12 }}>{formatCurrency(o.total, settings.currency as any)}</td>
                         <td><span className={`${styles.badge} ${o.status === "under_review" ? styles.badgeOnboardingPending : o.status === "accepted" ? styles.badgeStatusActive : styles.badgeStatusArchived}`}>{o.status}</span></td>
                         <td>
                           <div className={styles.actionsCell} style={{ justifyContent: "center" }}>
@@ -187,8 +174,8 @@ function OrdersInner() {
               <div className={styles.detailSection}>
                 <h3 className={styles.detailSectionTitle}>Details</h3>
                 <div className={styles.detailGrid}>
-                  <div className={styles.detailRow}><span className={styles.detailLabel}>Customer</span><span className={styles.detailValue}>{customerMap.get(selected.customerId)?.name || selected.customerId}</span></div>
-                  <div className={styles.detailRow}><span className={styles.detailLabel}>Total</span><span className={styles.detailValue}>{formatCurrency(selected.total, "DA" as any)}</span></div>
+                  <div className={styles.detailRow}><span className={styles.detailLabel}>Customer</span><span className={styles.detailValue}>{selected.customerName || selected.customerId}</span></div>
+                  <div className={styles.detailRow}><span className={styles.detailLabel}>Total</span><span className={styles.detailValue}>{formatCurrency(selected.total, settings.currency as any)}</span></div>
                   <div className={styles.detailRow}><span className={styles.detailLabel}>Status</span><span className={`${styles.badge} ${selected.status === "under_review" ? styles.badgeOnboardingPending : selected.status === "accepted" ? styles.badgeStatusActive : styles.badgeStatusArchived}`}>{selected.status}</span></div>
                 </div>
               </div>
@@ -197,7 +184,7 @@ function OrdersInner() {
                 {(selected.items || []).map((it: any, idx: number) => (
                   <div key={idx} className={styles.detailRow}>
                     <span className={styles.detailLabel}>{it.productId.slice(0,8)} · {it.quantity} × {it.weightKg}kg</span>
-                    <span className={styles.detailValue}>{formatCurrency(it.total, "DA" as any)}</span>
+                    <span className={styles.detailValue}>{formatCurrency(it.total, settings.currency as any)}</span>
                   </div>
                 ))}
               </div>

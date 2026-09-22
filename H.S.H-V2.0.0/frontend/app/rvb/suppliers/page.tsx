@@ -6,8 +6,8 @@ import StyledSelect from "../../../src/components/common/StyledSelect";
 import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
-import { supplierService } from "../../../src/services/supplier.service";
-import { supplierEditOperation } from "../../../src/services/operations/supplier-edit.operation";
+import { rvbSupplierService } from "../../../src/services/rvb-supplier.service";
+import { rvbConfigService } from "../../../src/services/rvb-config.service";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
 import { supplierRequestService, type SupplierRequest } from "../../../src/services/supplier-request.service";
 import type { Supplier } from "../../../src/types/entities/supplier";
@@ -16,9 +16,6 @@ import { normalizeTag, isValidTag } from "../../../src/types/rvb/rvb-account";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { RvbSuppliersGuard } from "../../../src/components/rvb/RvbRoleGuard";
-import { db } from "../../../src/lib/database/db";
-import type { Payment } from "../../../src/types/entities/payment";
-import type { Purchase } from "../../../src/types/entities/purchase";
 import {
   Search,
   Plus,
@@ -174,8 +171,8 @@ function RvbSuppliersInner() {
   const [formError, setFormError] = useState("");
   const [details, setDetails] = useState<Supplier | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "purchases" | "payments" | "portal" | "requests" | "activity">("overview");
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [supplierRequests, setSupplierRequests] = useState<SupplierRequest[]>([]);
   const [linkModal, setLinkModal] = useState(false);
   const [linkSearch, setLinkSearch] = useState("");
@@ -201,7 +198,7 @@ function RvbSuppliersInner() {
     setError("");
     try {
       const [s, acc] = await Promise.all([
-        supplierService.getAll().catch(() => [] as Supplier[]),
+        rvbSupplierService.list().catch(() => [] as any[]),
         rvbAccountService.getAll().catch(() => [] as RvbAccount[]),
       ]);
       setSuppliers(Array.isArray(s) ? s : []);
@@ -213,6 +210,7 @@ function RvbSuppliersInner() {
 
   useEffect(() => {
     settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbConfigService.get().then((c) => { if (c?.currency) setSettings((prev:any)=>({...prev, currency:c.currency})); }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
@@ -275,14 +273,14 @@ function RvbSuppliersInner() {
 
   const loadPurchases = useCallback(async (supplierId: string) => {
     try {
-      const all: any[] = await db.purchases.where("supplierId").equals(supplierId).toArray();
-      setPurchases(all.sort((a,b)=> (b.date||b.createdAt||0)-(a.date||a.createdAt||0)));
+      const data = await rvbSupplierService.getPurchases(supplierId).catch(()=>[] as any[]);
+      setPurchases(Array.isArray(data) ? data : []);
     } catch { setPurchases([]); }
   }, []);
   const loadPayments = useCallback(async (supplierId: string) => {
     try {
-      const all: any[] = await db.payments.where("entityId").equals(supplierId).toArray();
-      setPayments(all.filter((p)=>p.entityType==="supplier").sort((a:any,b:any)=> (b.date||b.createdAt||0)-(a.date||a.createdAt||0)));
+      const data = await rvbSupplierService.getPayments(supplierId).catch(()=>[] as any[]);
+      setPayments(Array.isArray(data) ? data : []);
     } catch { setPayments([]); }
   }, []);
   const loadSupplierRequests = useCallback(async (supplierId: string) => {
@@ -334,9 +332,9 @@ function RvbSuppliersInner() {
     setSaving(true);
     try {
       if (editing) {
-        await supplierEditOperation.edit({ supplierId: editing.id, name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim()||undefined, identificationNumber: form.identificationNumber.trim()||undefined, email: form.email.trim()||undefined, notes: form.notes.trim()||undefined });
+        await rvbSupplierService.update(editing.id, { name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim()||undefined, identificationNumber: form.identificationNumber.trim()||undefined, email: form.email.trim()||undefined, notes: form.notes.trim()||undefined });
       } else {
-        await supplierService.create({ name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim()||undefined, identificationNumber: form.identificationNumber.trim()||undefined, email: form.email.trim()||undefined, notes: form.notes.trim()||undefined });
+        await rvbSupplierService.create({ name: form.name.trim(), phone: form.phone.trim(), address: form.address.trim()||undefined, identificationNumber: form.identificationNumber.trim()||undefined, email: form.email.trim()||undefined, notes: form.notes.trim()||undefined });
       }
       await load();
       setShowAdd(false);

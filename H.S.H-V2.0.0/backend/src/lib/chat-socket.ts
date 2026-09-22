@@ -76,7 +76,8 @@ export function initChatSocket(httpServer: HttpServer, allowedOrigins: string[])
 
   io.use(async (socket: any, next) => {
     try {
-      const token = (socket.handshake.auth?.token as string) || (socket.handshake.headers?.authorization as string)?.replace("Bearer ", "") || (socket.handshake.query?.token as string);
+      const rawAuth = (socket.handshake.auth?.token as string) || (socket.handshake.headers?.authorization as string);
+      const token = rawAuth ? rawAuth.replace(/^Bearer\s+/i, "").trim() : null;
       if (!token) return next(new Error("RVB_UNAUTHENTICATED"));
       let payload: any;
       try {

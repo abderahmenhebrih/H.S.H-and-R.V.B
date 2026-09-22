@@ -3,7 +3,6 @@ import { ConversationModel } from "../models/conversation.model";
 import { MessageModel } from "../models/message.model";
 import { MessageAuditModel } from "../models/message-audit.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
-import { NotificationModel } from "../models/notification.model";
 import { createRvbNotification } from "./rvb-notification.service";
 import { RvbChatReminderModel } from "../models/rvb-chat-reminder.model";
 

@@ -5,8 +5,9 @@ import { SupplierRequestModel } from "../models/supplier-request.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { PurchaseModel } from "../models/purchase.model";
 import { ProductModel } from "../models/product.model";
-import { NotificationModel } from "../models/notification.model";
+import { createRvbNotification } from "./rvb-notification.service";
 import { allocateRevision, recordSyncChange } from "../sync/rvb-sync-helper";
+import { validateItems, computeTotal, validatePurchaseCalculation, MAX_DESCRIPTION_LENGTH } from "../lib/validate-items";
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;
@@ -25,7 +26,7 @@ export async function createSupplierRequest(input: {
   date?: number;
   description?: string | null;
 }) {
-  const { supplierId, accountId, type, items, total, calculation, date, description } = input;
+  let { supplierId, accountId, type, items, total, calculation, date, description } = input as any;
   if (!supplierId) throw codeError("RVB_SUPPLIER_REQUIRED", 400);
   if (!["new_supply", "discrepancy"].includes(type)) throw codeError("RVB_REQUEST_TYPE_INVALID", 400);
   const supplier: any = await SupplierModel.findOne({ id: supplierId }).lean();
@@ -37,9 +38,42 @@ export async function createSupplierRequest(input: {
   }
   if (type === "new_supply") {
     if (!items || !Array.isArray(items) || items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
-    if (total === undefined || total === null || total < 0) throw codeError("RVB_TOTAL_REQUIRED", 400);
+    // Structured validation per spec 59-61: items array, max 50, product exists, quantity>0, weight>=0, price>=0, etc.
+    const normalized = validateItems(items);
+    // Product existence validation
+    for (const it of normalized) {
+      const product: any = await ProductModel.findOne({ id: it.productId }).lean();
+      if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
+    }
+    // Calculation validation (purchase-calculation semantics)
+    if (calculation !== undefined && calculation !== null) {
+      validatePurchaseCalculation(calculation);
+    }
+    if (description !== undefined && description !== null && typeof description === "string" && description.length > MAX_DESCRIPTION_LENGTH) {
+      throw codeError("RVB_DESCRIPTION_TOO_LONG", 400, `description too long (${description.length} > ${MAX_DESCRIPTION_LENGTH})`);
+    }
+    // Server-side total recomputation (do NOT trust client total)
+    const serverTotal = computeTotal(normalized);
+    // Overwrite client-provided values with server-computed ones
+    (input as any).items = normalized;
+    (input as any).total = serverTotal;
+    // Update local variables for doc creation
+    items = normalized as any;
+    total = serverTotal;
+    // Also ensure each item's total is the server recomputed weight*price
   }
   if (type === "discrepancy" && !description?.trim()) throw codeError("RVB_DESCRIPTION_REQUIRED", 400);
+  if (type === "discrepancy" && description && description.length > MAX_DESCRIPTION_LENGTH) {
+    throw codeError("RVB_DESCRIPTION_TOO_LONG", 400, `description too long (${description.length} > ${MAX_DESCRIPTION_LENGTH})`);
+  }
+  if (description !== undefined && description !== null && typeof description !== "string") {
+    throw codeError("RVB_DESCRIPTION_INVALID", 400, "description must be a string");
+  }
+  if (date !== undefined && date !== null) {
+    const d = Number(date);
+    if (!Number.isFinite(d) || d < 0) throw codeError("RVB_DATE_INVALID", 400, "Invalid date");
+    date = d;
+  }
   const now = Date.now();
   const doc: any = {
     id: `suprq-${uuidv4()}`,
@@ -66,27 +100,20 @@ export async function createSupplierRequest(input: {
   const created = await SupplierRequestModel.create(doc);
   try {
     const sourceEventId = `supplier-request:${doc.id}:submitted`;
-    const exists = await NotificationModel.findOne({ sourceEventId }).lean();
-    if (!exists) {
-      await NotificationModel.create({
-        id: `notif-${uuidv4()}`,
-        createdAt: now,
-        updatedAt: now,
-        syncStatus: "synced",
-        type: "purchase",
-        severity: "info",
-        title: type === "new_supply" ? "New supply request" : "New supplier discrepancy",
-        message: `${supplier.name} submitted ${type === "new_supply" ? "new supply" : "discrepancy"} request`,
-        entityType: "supplier",
-        entityId: doc.id,
-        route: "/rvb/requests",
-        sourceEventId,
-        audienceType: "role",
-        audienceIds: ["manager", "admin"],
-        priority: "high",
-        archivedAt: null,
-      } as any);
-    }
+    await createRvbNotification({
+      type: "purchase",
+      severity: "info",
+      title: type === "new_supply" ? "New supply request" : "New supplier discrepancy",
+      message: `${supplier.name} submitted ${type === "new_supply" ? "new supply" : "discrepancy"} request`,
+      entityType: "supplier",
+      entityId: doc.id,
+      route: "/rvb/requests",
+      sourceEventId,
+      audienceType: "role",
+      audienceIds: ["manager", "admin"],
+      priority: "high",
+      category: "requests",
+    } as any);
   } catch {}
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");
@@ -111,6 +138,8 @@ export async function reviewSupplierRequest(
   edited?: { items?: any[]; total?: number; calculation?: any; date?: number },
 ) {
   if (!["accepted", "rejected"].includes(status)) throw codeError("RVB_STATUS_INVALID", 400);
+  if (notes !== undefined && notes !== null && typeof notes !== "string") throw codeError("RVB_NOTE_INVALID", 400, "notes must be a string");
+  if (notes !== undefined && notes !== null && notes.length > MAX_DESCRIPTION_LENGTH) throw codeError("RVB_NOTE_TOO_LONG", 400, `notes too long (${notes.length} > ${MAX_DESCRIPTION_LENGTH})`);
   const session = await mongoose.startSession();
   let savedReq: any = null;
   try {
@@ -126,15 +155,39 @@ export async function reviewSupplierRequest(
           req.originalCalculation = req.calculation;
         }
         if (edited.items) {
-          if (!Array.isArray(edited.items) || edited.items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
-          req.items = edited.items;
+          const normalized = validateItems(edited.items);
+          // Validate product existence within transaction
+          for (const it of normalized) {
+            const prod: any = await ProductModel.findOne({ id: it.productId }).session(session);
+            if (!prod) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
+          }
+          if (edited.calculation !== undefined && edited.calculation !== null) {
+            validatePurchaseCalculation(edited.calculation);
+          }
+          req.items = normalized as any;
+          // Server recomputes grand total (ignore client total)
+          req.total = computeTotal(normalized);
+        } else if (edited.total !== undefined) {
+          // Client attempted to override total without items - ignore and recompute from existing items
+          const existingNormalized = validateItems(req.items);
+          req.total = computeTotal(existingNormalized);
+          // Also normalize existing items to ensure H.S.H semantics
+          req.items = existingNormalized as any;
         }
-        if (edited.total !== undefined) req.total = Number(edited.total);
-        else if (edited.items) {
-          req.total = (edited.items as any[]).reduce((s: number, it: any) => s + (Number(it.total) || 0), 0);
+        if (edited.calculation !== undefined) {
+          if (edited.calculation !== null) validatePurchaseCalculation(edited.calculation);
+          req.calculation = edited.calculation;
         }
-        if (edited.calculation !== undefined) req.calculation = edited.calculation;
-        if (edited.date !== undefined) req.date = Number(edited.date);
+        if (edited.date !== undefined) {
+          const d = Number(edited.date);
+          if (!Number.isFinite(d) || d < 0) throw codeError("RVB_DATE_INVALID", 400, "Invalid date");
+          req.date = d;
+        }
+        // If items were edited, ensure total is recomputed regardless of client total
+        if (edited.items && edited.total !== undefined) {
+          // Already recomputed above, ensure we ignore client total
+          // no-op, recomputed value already set
+        }
       }
 
       if (status === "accepted" && req.type === "new_supply") {
@@ -143,14 +196,24 @@ export async function reviewSupplierRequest(
         } else {
           const supplier: any = await SupplierModel.findOne({ id: req.supplierId }).session(session);
           if (!supplier) throw codeError("RVB_SUPPLIER_NOT_FOUND", 404);
-          const items = req.items || [];
-          const total = Number(req.total) || 0;
-          for (const item of items) {
+          // Re-validate and recompute server total at acceptance time (covers Edit-then-Accept and legacy records)
+          let items: any[] = req.items || [];
+          if (!Array.isArray(items) || items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
+          // Normalize and server-compute to ensure H.S.H semantics
+          const normalizedAccept = validateItems(items);
+          const total = computeTotal(normalizedAccept);
+          // Validate product existence and stock-relevant fields (quantity>0 already via validateItems)
+          for (const item of normalizedAccept) {
             const product: any = await ProductModel.findOne({ id: item.productId }).session(session);
-            if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404);
+            if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${item.productId}`);
             if (Number(item.quantity) <= 0) throw codeError("RVB_QUANTITY_INVALID", 400);
           }
           if (total < 0) throw codeError("RVB_TOTAL_REQUIRED", 400);
+          // Ensure stored request reflects server recomputed values (for Edit-then-Accept idempotency)
+          req.items = normalizedAccept as any;
+          req.total = total;
+          // Re-assign items for purchase creation below
+          items = normalizedAccept as any;
           // Update inventory with revisions
           for (const item of items) {
             const product: any = await ProductModel.findOne({ id: item.productId }).session(session);
@@ -212,28 +275,21 @@ export async function reviewSupplierRequest(
   // Post-commit side effects
   try {
     const sourceEventId = `supplier-request:${req.id}:${status}`;
-    const exists = await NotificationModel.findOne({ sourceEventId }).lean();
-    if (!exists) {
-      const targetAcc: any = await RvbAccountModel.findOne({ id: req.accountId }).lean() || await RvbAccountModel.findOne({ linkedEntityType: "supplier", linkedEntityId: req.supplierId }).lean();
-      await NotificationModel.create({
-        id: `notif-${uuidv4()}`,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        syncStatus: "synced",
-        type: "purchase",
-        severity: status === "accepted" ? "success" : "warning",
-        title: status === "accepted" ? "Supply request accepted" : "Supply request rejected",
-        message: `Your supply request was ${status}`,
-        entityType: "supplier",
-        entityId: req.id,
-        route: "/rvb/requests",
-        sourceEventId,
-        audienceType: targetAcc ? "user" : "role",
-        audienceIds: targetAcc ? [targetAcc.id] : ["supplier"],
-        priority: "high",
-        archivedAt: null,
-      } as any);
-    }
+    const targetAcc: any = await RvbAccountModel.findOne({ id: req.accountId }).lean() || await RvbAccountModel.findOne({ linkedEntityType: "supplier", linkedEntityId: req.supplierId }).lean();
+    await createRvbNotification({
+      type: "purchase",
+      severity: status === "accepted" ? "success" : "warning",
+      title: status === "accepted" ? "Supply request accepted" : "Supply request rejected",
+      message: `Your supply request was ${status}`,
+      entityType: "supplier",
+      entityId: req.id,
+      route: "/rvb/requests",
+      sourceEventId,
+      audienceType: targetAcc ? "user" : "role",
+      audienceIds: targetAcc ? [targetAcc.id] : ["supplier"],
+      priority: "high",
+      category: "statusUpdates",
+    } as any);
   } catch {}
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");

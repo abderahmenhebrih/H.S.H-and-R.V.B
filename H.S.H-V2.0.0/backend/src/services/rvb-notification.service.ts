@@ -104,7 +104,7 @@ export async function createRvbNotification(input: {
   isReply?: boolean;
   isReminder?: boolean;
 }): Promise<any | null> {
-  const existing = await NotificationModel.findOne({ sourceEventId: input.sourceEventId }).lean();
+  const existing = await NotificationModel.findOne({ channel: "rvb", sourceEventId: input.sourceEventId }).lean();
   if (existing) return existing;
   const now = Date.now();
   const priority = derivePriority({ type: input.type, severity: input.severity, title: input.title, priority: input.priority });
@@ -131,6 +131,7 @@ export async function createRvbNotification(input: {
       priority,
       category,
       mandatory,
+      channel: "rvb",
     } as any);
 
     // Resolve recipients and create per-recipient state
@@ -199,47 +200,48 @@ export async function createRvbNotification(input: {
     return doc;
   } catch (e: any) {
     if (e?.code === 11000) {
-      const dup = await NotificationModel.findOne({ sourceEventId: input.sourceEventId }).lean();
+      const dup = await NotificationModel.findOne({ channel: "rvb", sourceEventId: input.sourceEventId }).lean();
       return dup || null;
     }
     throw e;
   }
 }
 
-// Backfill helper for legacy notifications: ensure recipient exists for current account
+// Backfill helper for legacy notifications: ensure recipient exists for current account - optimized bulk reads
 async function ensureRecipientsForAccount(accountId: string, role: string) {
   const audienceFilter = getAudienceVisibleFilter(accountId, role);
-  const baseNotifications = await NotificationModel.find(audienceFilter as any).lean();
-  const ops: any[] = [];
+  // Bulk read: all rvb base notifications visible to this account
+  const baseNotifications = await NotificationModel.find({ $and: [{ channel: "rvb" }, audienceFilter] } as any).lean();
+  if (baseNotifications.length === 0) return;
   const now = Date.now();
-  for (const n of baseNotifications as any[]) {
-    const exists = await RvbNotificationRecipientModel.findOne({ notificationId: n.id, accountId }).lean();
-    if (exists) continue;
-    // For legacy group notifications with shared readAt, do not seed as read
-    ops.push({
-      updateOne: {
-        filter: { notificationId: n.id, accountId },
-        update: {
-          $setOnInsert: {
-            id: `rnr-${uuidv4()}`,
-            notificationId: n.id,
-            accountId,
-            readAt: null,
-            archivedAt: null,
-            deliveredAt: now,
-            createdAt: n.createdAt,
-            updatedAt: now,
-          },
+  const notificationIds = baseNotifications.map((n: any) => n.id);
+  // Fetch existing recipients for this account in one query
+  const existingRecipients = await RvbNotificationRecipientModel.find({ notificationId: { $in: notificationIds }, accountId } as any).lean();
+  const existingSet = new Set(existingRecipients.map((r: any) => r.notificationId));
+  const missing = baseNotifications.filter((n: any) => !existingSet.has(n.id));
+  if (missing.length === 0) return;
+  const ops: any[] = missing.map((n: any) => ({
+    updateOne: {
+      filter: { notificationId: n.id, accountId },
+      update: {
+        $setOnInsert: {
+          id: `rnr-${uuidv4()}`,
+          notificationId: n.id,
+          accountId,
+          readAt: null,
+          archivedAt: null,
+          deliveredAt: now,
+          createdAt: n.createdAt,
+          updatedAt: now,
         },
-        upsert: true,
       },
-    });
-    if (ops.length >= 500) {
-      await RvbNotificationRecipientModel.bulkWrite(ops as any);
-      ops.length = 0;
-    }
+      upsert: true,
+    },
+  }));
+  // Bulk write in chunks
+  for (let i = 0; i < ops.length; i += 500) {
+    await RvbNotificationRecipientModel.bulkWrite(ops.slice(i, i + 500) as any);
   }
-  if (ops.length) await RvbNotificationRecipientModel.bulkWrite(ops as any);
 }
 
 export async function listNotificationsForUser(params: {
@@ -277,7 +279,7 @@ export async function listNotificationsForUser(params: {
     return { notifications: [], total: 0, page, limit, totalPages: 0, unreadCount: 0, archivedCount: 0 };
   }
 
-  const andFilters: any[] = [{ id: { $in: notificationIds } }];
+  const andFilters: any[] = [{ id: { $in: notificationIds } }, { channel: "rvb" }];
 
   if (source && source !== "all") {
     const sourceMap: Record<string, string[]> = {
@@ -327,7 +329,7 @@ export async function listNotificationsForUser(params: {
     });
   }
 
-  const filter: any = andFilters.length ? { $and: andFilters } : {};
+  const filter: any = andFilters.length ? { $and: andFilters } : { channel: "rvb" };
   const total = await NotificationModel.countDocuments(filter as any);
   const skip = (Math.max(1, page) - 1) * Math.min(100, Math.max(1, limit));
   const docs = await NotificationModel.find(filter as any)
@@ -360,10 +362,10 @@ export async function markNotificationRead(notificationId: string, accountId: st
   // Verify recipient exists and is visible (via audience check if legacy)
   let recipient: any = await RvbNotificationRecipientModel.findOne({ notificationId, accountId });
   if (!recipient) {
-    // Try to backfill legacy: check if base notification is visible to this account
-    const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+    // Try to backfill legacy: check if base notification is visible to this account - must be rvb channel
+    const base: any = await NotificationModel.findOne({ id: notificationId, channel: "rvb" }).lean();
     if (!base) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND", status: 404 });
-    const isVisible = await NotificationModel.findOne({ id: notificationId, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
+    const isVisible = await NotificationModel.findOne({ id: notificationId, channel: "rvb", $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
     if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
     // Create recipient lazily
     recipient = await RvbNotificationRecipientModel.findOneAndUpdate(
@@ -387,16 +389,16 @@ export async function markNotificationRead(notificationId: string, accountId: st
   recipient.readAt = unread ? null : Date.now();
   recipient.updatedAt = Date.now();
   await recipient.save();
-  const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+  const base: any = await NotificationModel.findOne({ id: notificationId, channel: "rvb" }).lean();
   return { ...base, readAt: recipient.readAt, archivedAt: recipient.archivedAt };
 }
 
 export async function archiveNotification(notificationId: string, accountId: string, role: string, arch: boolean) {
   let recipient: any = await RvbNotificationRecipientModel.findOne({ notificationId, accountId });
   if (!recipient) {
-    const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+    const base: any = await NotificationModel.findOne({ id: notificationId, channel: "rvb" }).lean();
     if (!base) throw Object.assign(new Error("NOT_FOUND"), { code: "NOT_FOUND", status: 404 });
-    const isVisible = await NotificationModel.findOne({ id: notificationId, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
+    const isVisible = await NotificationModel.findOne({ id: notificationId, channel: "rvb", $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
     if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
     recipient = await RvbNotificationRecipientModel.findOneAndUpdate(
       { notificationId, accountId },
@@ -418,7 +420,7 @@ export async function archiveNotification(notificationId: string, accountId: str
   recipient.archivedAt = arch ? Date.now() : null;
   recipient.updatedAt = Date.now();
   await recipient.save();
-  const base: any = await NotificationModel.findOne({ id: notificationId }).lean();
+  const base: any = await NotificationModel.findOne({ id: notificationId, channel: "rvb" }).lean();
   return { ...base, readAt: recipient.readAt, archivedAt: recipient.archivedAt };
 }
 
@@ -434,15 +436,15 @@ export async function markAllRead(accountId: string, role: string) {
 export async function bulkUpdate(accountId: string, role: string, ids: string[], action: "read" | "unread" | "archive" | "restore") {
   if (!Array.isArray(ids) || ids.length === 0) throw Object.assign(new Error("IDS_REQUIRED"), { code: "IDS_REQUIRED", status: 400 });
   if (ids.length > 100) throw Object.assign(new Error("TOO_MANY"), { code: "TOO_MANY", status: 400 });
-  // Verify each id has a recipient for this account (or is visible legacy)
+  // Verify each id has a recipient for this account (or is visible legacy) - channel rvb
   const existingRecipients = await RvbNotificationRecipientModel.find({ notificationId: { $in: ids }, accountId } as any).lean();
   const existingSet = new Set(existingRecipients.map((r: any) => r.notificationId));
   // For ids without recipient, check visibility and create if needed, else forbid
   const missing = ids.filter((id) => !existingSet.has(id));
   for (const mid of missing) {
-    const base: any = await NotificationModel.findOne({ id: mid }).lean();
+    const base: any = await NotificationModel.findOne({ id: mid, channel: "rvb" }).lean();
     if (!base) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
-    const isVisible = await NotificationModel.findOne({ id: mid, $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
+    const isVisible = await NotificationModel.findOne({ id: mid, channel: "rvb", $and: [getAudienceVisibleFilter(accountId, role)] } as any).lean();
     if (!isVisible) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN", status: 403 });
     // Create recipient for missing
     await RvbNotificationRecipientModel.updateOne(

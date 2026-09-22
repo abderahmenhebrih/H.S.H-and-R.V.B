@@ -145,8 +145,23 @@ export const rvbAuthService = {
     });
     const data = await handleResponse<{ success: boolean; accessToken?: string; refreshToken?: string; account: RvbSafeUser }>(res);
     if (data.accessToken) setAccessToken(data.accessToken);
-    // Ignore refreshToken for web
+    // Ignore refreshToken for web (native handled via session metadata)
     return { accessToken: data.accessToken, account: data.account };
+  },
+
+  async onboarding(profilePicture: string): Promise<RvbSafeUser> {
+    const token = getAccessToken();
+    const res = await fetch(`${AUTH_BASE}/onboarding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ profilePicture }),
+      credentials: "include",
+    });
+    const data = await handleResponse<{ success: boolean; account: RvbSafeUser }>(res);
+    return data.account;
   },
 
   async updateProfile(payload: { displayName?: string; profilePicture?: string | null }): Promise<RvbSafeUser> {

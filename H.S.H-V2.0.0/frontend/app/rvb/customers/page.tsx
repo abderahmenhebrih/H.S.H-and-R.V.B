@@ -6,8 +6,8 @@ import StyledSelect from "../../../src/components/common/StyledSelect";
 import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
-import { customerService } from "../../../src/services/customer.service";
-import { customerEditOperation } from "../../../src/services/operations/customer-edit.operation";
+import { rvbCustomerService } from "../../../src/services/rvb-customer.service";
+import { rvbConfigService } from "../../../src/services/rvb-config.service";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
 import type { Customer } from "../../../src/types/entities/customer";
 import type { RvbAccount } from "../../../src/types/rvb/rvb-account";
@@ -15,9 +15,6 @@ import { normalizeTag, isValidTag } from "../../../src/types/rvb/rvb-account";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { RvbCustomersGuard } from "../../../src/components/rvb/RvbRoleGuard";
-import { db } from "../../../src/lib/database/db";
-import type { Payment } from "../../../src/types/entities/payment";
-import type { Sale } from "../../../src/types/entities/sale";
 import {
   Search,
   Plus,
@@ -181,8 +178,8 @@ function RvbCustomersInner() {
   const [customerTypes, setCustomerTypes] = useState<string[]>([]);
   const [details, setDetails] = useState<Customer | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "sales" | "payments" | "portal" | "orders" | "requests" | "activity">("overview");
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [sales, setSales] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [linkModal, setLinkModal] = useState(false);
   const [linkSearch, setLinkSearch] = useState("");
   const [selectedLink, setSelectedLink] = useState<RvbAccount | null>(null);
@@ -207,7 +204,7 @@ function RvbCustomersInner() {
     setError("");
     try {
       const [c, acc] = await Promise.all([
-        customerService.getAll().catch(() => [] as Customer[]),
+        rvbCustomerService.list().catch(() => [] as any[]),
         rvbAccountService.getAll().catch(() => [] as RvbAccount[]),
       ]);
       setCustomers(Array.isArray(c) ? c : []);
@@ -219,6 +216,10 @@ function RvbCustomersInner() {
 
   useEffect(() => {
     settingsService.get().then((s) => { if (s) { setSettings(s); setCustomerTypes(s.customerTypes || []); } });
+    rvbConfigService.get().then((c) => {
+      if (c?.currency) setSettings((prev:any)=>({...prev, currency:c.currency}));
+      if ((c as any)?.customerTypes) setCustomerTypes((c as any).customerTypes);
+    }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) { setSettings(ce.detail); setCustomerTypes(ce.detail.customerTypes || []); }
@@ -282,14 +283,14 @@ function RvbCustomersInner() {
 
   const loadSales = useCallback(async (customerId: string) => {
     try {
-      const all: any[] = await db.sales.where("customerId").equals(customerId).toArray();
-      setSales(all.sort((a,b)=> (b.date||b.createdAt||0)-(a.date||a.createdAt||0)));
+      const data = await rvbCustomerService.getSales(customerId).catch(()=>[] as any[]);
+      setSales(Array.isArray(data)?data:[]);
     } catch { setSales([]); }
   }, []);
   const loadPayments = useCallback(async (customerId: string) => {
     try {
-      const all: any[] = await db.payments.where("entityId").equals(customerId).toArray();
-      setPayments(all.filter((p)=>p.entityType==="customer").sort((a:any,b:any)=> (b.date||b.createdAt||0)-(a.date||a.createdAt||0)));
+      const data = await rvbCustomerService.getPayments(customerId).catch(()=>[] as any[]);
+      setPayments(Array.isArray(data)?data:[]);
     } catch { setPayments([]); }
   }, []);
 
@@ -352,9 +353,7 @@ function RvbCustomersInner() {
     setSaving(true);
     try {
       if (editing) {
-        const { customerEditOperation } = await import("../../../src/services/operations/customer-edit.operation");
-        await customerEditOperation.edit({
-          customerId: editing.id,
+        await rvbCustomerService.update(editing.id, {
           name: form.name.trim(),
           phone: form.phone.trim(),
           address: form.address.trim()||undefined,
@@ -373,7 +372,7 @@ function RvbCustomersInner() {
           nis: form.nis.trim()||undefined,
         } as any);
       } else {
-        await customerService.create({
+        await rvbCustomerService.create({
           name: form.name.trim(),
           phone: form.phone.trim(),
           address: form.address.trim()||undefined,

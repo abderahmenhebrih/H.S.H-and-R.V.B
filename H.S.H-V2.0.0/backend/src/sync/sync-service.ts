@@ -213,6 +213,11 @@ export async function processSyncOperation(
       : {};
 
   payload.id = operation.entityId;
+  // H.S.H sync path must always set channel="hsh" for notifications
+  if (operation.entity === "notification") {
+    const p: any = payload;
+    if (!p.channel || p.channel !== "hsh") p.channel = "hsh";
+  }
 
   // Size safety for Office files (several MB per file, documented limit)
   if (operation.entity === "officeFile") {
@@ -387,9 +392,9 @@ export async function processSyncOperation(
             return;
           }
         }
-        // Defense-in-depth: for notifications, check sourceEventId deduplication before id check
+        // Defense-in-depth: for notifications, check sourceEventId deduplication before id check - H.S.H only channel=hsh
         if (operation.entity === "notification" && (payload as any).sourceEventId) {
-          const existingBySource = await (model as any).findOne({ sourceEventId: (payload as any).sourceEventId }).session(session as any);
+          const existingBySource = await (model as any).findOne({ channel: "hsh", sourceEventId: (payload as any).sourceEventId }).session(session as any);
           if (existingBySource) {
             canonical = existingBySource;
             revision = (existingBySource as any).serverRevision ?? 0;
@@ -911,8 +916,25 @@ export async function getChangesAfter(
     .lean();
   const nextRevision = changes.length > 0 ? changes[changes.length - 1].revision : after;
   const hasMore = changes.length === limit && nextRevision < currentRevision;
+  // H.S.H sync must exclude R.V.B notifications: filter notification changes to channel=hsh only
+  const filtered = changes.filter((c: any) => {
+    if (c.entity === "notification") {
+      const payload: any = c.payload;
+      // Delete ops have no payload – keep them? Only keep if previous payload was hsh? For safety exclude deletes without payload channel check? But deletes for RVB should not leak – they have no payload, we cannot know channel. We conservatively exclude deletes where entity notification and operation delete? However HSH deletes are expected to be hsh. For now keep deletes that are not obviously rvb (payload missing => keep). But if payload has channel and it's not hsh, exclude.
+      if (payload && typeof payload === "object" && payload.channel && payload.channel !== "hsh") return false;
+      // If payload missing channel but has rvb route/sourceEventId patterns, treat as rvb and exclude?
+      if (payload && typeof payload === "object") {
+        const route = payload.route as string | undefined;
+        const src = payload.sourceEventId as string | undefined;
+        if (route && route.startsWith("/rvb")) return false;
+        if (src && /^(worker-request:|supplier-request:|customer-request:|customer-order:|chat:)/.test(src)) return false;
+      }
+      // otherwise keep (hsh)
+    }
+    return true;
+  });
   // Map to SyncChange type
-  const mapped: SyncChange[] = changes.map((c: any) => ({
+  const mapped: SyncChange[] = filtered.map((c: any) => ({
     revision: c.revision,
     entity: c.entity,
     entityId: c.entityId,

@@ -20,6 +20,12 @@ import chatsRouter from "./routes/chats";
 import rvbNotificationsRouter from "./routes/rvb-notifications";
 import rvbActivitiesRouter from "./routes/rvb-activities";
 import rvbDirectoryRouter from "./routes/rvb-directory";
+import rvbWorkersRouter from "./routes/rvb-workers";
+import rvbSuppliersRouter from "./routes/rvb-suppliers";
+import rvbCustomersRouter from "./routes/rvb-customers";
+import rvbPortalRouter from "./routes/rvb-portal";
+import rvbCatalogRouter from "./routes/rvb-catalog";
+import rvbConfigRouter from "./routes/rvb-config";
 import { createServer } from "http";
 import { initChatSocket } from "./lib/chat-socket";
 
@@ -27,6 +33,31 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const SERVER_MODE = (process.env.SERVER_MODE || "full").toLowerCase();
+const TRUST_PROXY = process.env.TRUST_PROXY || "0";
+
+if (TRUST_PROXY && TRUST_PROXY !== "0" && TRUST_PROXY !== "false") {
+  const val: any = TRUST_PROXY === "1" || TRUST_PROXY === "true" ? 1 : TRUST_PROXY;
+  (app as any).set("trust proxy", val);
+}
+
+if (process.env.NODE_ENV === "production" && SERVER_MODE === "full" && process.env.ALLOW_FULL_SERVER_IN_PRODUCTION !== "true") {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[security] SERVER_MODE=full in production exposes /api/sync,/api/printing,/api/invoices. Set SERVER_MODE=rvb-public for public/mobile deployment or ALLOW_FULL_SERVER_IN_PRODUCTION=true to suppress.",
+  );
+}
+
+app.disable("x-powered-by");
+// Helmet-like minimal headers without extra dep
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "0");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  next();
+});
 
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
@@ -35,7 +66,6 @@ const allowedOrigins = process.env.CORS_ORIGIN
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow non-browser requests (no origin) and configured origins
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -46,11 +76,49 @@ app.use(
   }),
 );
 app.use(cookieParser());
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use("/api/sync", syncRouter);
-app.use("/api/printing", printingRouter);
-app.use("/api/invoices", invoiceRouter);
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Simple in-process rate limiter (single-instance)
+const rateBuckets = new Map<string, { count: number; reset: number }>();
+function rateLimit(opts: { windowMs: number; max: number; key: (req: any) => string; code?: string }) {
+  return (req: any, res: any, next: any) => {
+    const k = opts.key(req);
+    const now = Date.now();
+    const b = rateBuckets.get(k);
+    if (!b || now > b.reset) {
+      rateBuckets.set(k, { count: 1, reset: now + opts.windowMs });
+      return next();
+    }
+    if (b.count >= opts.max) {
+      res.status(429).json({ success: false, code: opts.code || "RATE_LIMITED", message: "Too many requests" });
+      return;
+    }
+    b.count++;
+    next();
+  };
+}
+const ipKey = (req: any) => req.ip || req.headers["x-forwarded-for"] || "unknown";
+app.use("/api/rvb/auth/login", rateLimit({ windowMs: 60 * 1000, max: 20, key: ipKey, code: "RVB_RATE_LIMIT" }));
+app.use("/api/rvb/auth/refresh", rateLimit({ windowMs: 60 * 1000, max: 60, key: ipKey }));
+app.use("/api/rvb/auth/change-password", rateLimit({ windowMs: 60 * 1000, max: 20, key: (req: any) => (req.headers.authorization || ipKey(req)) as string }));
+app.use("/api/rvb/chats/:id/messages", rateLimit({ windowMs: 10 * 1000, max: 20, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
+// Request/order submission rate limits (per-account)
+app.use("/api/rvb/worker-requests", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
+app.use("/api/rvb/supplier-requests", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
+app.use("/api/rvb/customer-requests", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
+app.use("/api/rvb/customer-orders", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
+
+// Mount H.S.H internal routes only in full mode
+if (SERVER_MODE !== "rvb-public") {
+  app.use("/api/sync", syncRouter);
+  app.use("/api/printing", printingRouter);
+  app.use("/api/invoices", invoiceRouter);
+} else {
+  app.use("/api/sync", (_req, res) => res.status(404).json({ success: false, code: "NOT_FOUND" }));
+  app.use("/api/printing", (_req, res) => res.status(404).json({ success: false, code: "NOT_FOUND" }));
+  app.use("/api/invoices", (_req, res) => res.status(404).json({ success: false, code: "NOT_FOUND" }));
+}
 app.use("/api/rvb/accounts", rvbAccountsRouter);
 app.use("/api/rvb/auth", rvbAuthRouter);
 app.use("/api/rvb/worker-requests", workerRequestsRouter);
@@ -64,6 +132,12 @@ app.use("/api/rvb/chats", chatsRouter);
 app.use("/api/rvb/notifications", rvbNotificationsRouter);
 app.use("/api/rvb/activities", rvbActivitiesRouter);
 app.use("/api/rvb/directory", rvbDirectoryRouter);
+app.use("/api/rvb/workers", rvbWorkersRouter);
+app.use("/api/rvb/suppliers", rvbSuppliersRouter);
+app.use("/api/rvb/customers", rvbCustomersRouter);
+app.use("/api/rvb/portal", rvbPortalRouter);
+app.use("/api/rvb/catalog", rvbCatalogRouter);
+app.use("/api/rvb/config", rvbConfigRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -81,6 +155,14 @@ async function startServer() {
       await ensureConversationIndexes();
     } catch (e) {
       console.warn("ensureConversationIndexes failed", (e as any)?.message);
+    }
+    // Notification channel separation migrations: index + legacy channel classification (safe, non-destructive)
+    try {
+      const { ensureNotificationIndexes, migrateLegacyNotificationChannels } = await import("./models/notification.model");
+      await ensureNotificationIndexes();
+      await migrateLegacyNotificationChannels();
+    } catch (e) {
+      console.warn("notification migration failed", (e as any)?.message);
     }
   } catch (error) {
     console.warn(

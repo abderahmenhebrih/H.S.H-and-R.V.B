@@ -305,20 +305,43 @@ export async function linkRvbAccount(accountId: string, entityId: string) {
   account.linkedEntityId = entityId;
   account.updatedAt = Date.now();
   await account.save();
-  try {
-    const { WorkerActivityModel } = await import("../models/worker-activity.model");
-    // For supplier, also log as worker activity with workerId = entityId (generic)
-    await WorkerActivityModel.create({
-      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      createdAt: Date.now(),
-      workerId: entityId,
-      accountId: account.id,
-      action: "account_linked",
-      details: `Linked @${account.tag} (${account.role})`,
-      actorId: null,
-      actorTag: null,
-    } as any);
-  } catch {}
+  // Only write WorkerActivity when linkedEntityType==="worker" and event genuinely belongs to Worker history.
+  // For other types use RvbActivity/recordActivity.
+  if (entityType === "worker") {
+    try {
+      const { WorkerActivityModel } = await import("../models/worker-activity.model");
+      await WorkerActivityModel.create({
+        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        createdAt: Date.now(),
+        workerId: entityId,
+        accountId: account.id,
+        action: "account_linked",
+        details: `Linked @${account.tag} (${account.role})`,
+        actorId: null,
+        actorTag: null,
+      } as any);
+    } catch {}
+  } else {
+    try {
+      const { RvbActivityModel } = await import("../models/rvb-activity.model");
+      const { v4: uuidv4 } = await import("uuid");
+      const sourceType = entityType === "supplier" ? "suppliers" : entityType === "customer" ? "customers" : "system";
+      await RvbActivityModel.create({
+        id: `rvba-${uuidv4()}`,
+        createdAt: Date.now(),
+        actorAccountId: account.id,
+        actorTag: account.tag,
+        actorRole: account.role,
+        entityType,
+        entityId,
+        action: "account_linked",
+        sourceType: sourceType as any,
+        sourceId: account.id,
+        title: "Account linked",
+        details: `Linked @${account.tag} (${account.role}) to ${entityType} ${entityId}`,
+      } as any);
+    } catch {}
+  }
   return account.toObject ? account.toObject() : account;
 }
 
@@ -342,19 +365,41 @@ export async function unlinkRvbAccount(accountId: string) {
   // Supervisor retains management access even without worker link — keep status as is (handled above: supervisor not in list)
   await account.save();
   if (account.status === "disabled" || account.status === "archived") safeDisconnectAccount(account.id);
-  try {
-    const { WorkerActivityModel } = await import("../models/worker-activity.model");
-    await WorkerActivityModel.create({
-      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      createdAt: Date.now(),
-      workerId: entityId,
-      accountId: account.id,
-      action: "account_unlinked",
-      details: `Unlinked @${account.tag} (${previousRole})`,
-      actorId: null,
-      actorTag: null,
-    } as any);
-  } catch {}
+  if (entityType === "worker") {
+    try {
+      const { WorkerActivityModel } = await import("../models/worker-activity.model");
+      await WorkerActivityModel.create({
+        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        createdAt: Date.now(),
+        workerId: entityId,
+        accountId: account.id,
+        action: "account_unlinked",
+        details: `Unlinked @${account.tag} (${previousRole})`,
+        actorId: null,
+        actorTag: null,
+      } as any);
+    } catch {}
+  } else {
+    try {
+      const { RvbActivityModel } = await import("../models/rvb-activity.model");
+      const { v4: uuidv4 } = await import("uuid");
+      const sourceType = entityType === "supplier" ? "suppliers" : entityType === "customer" ? "customers" : "system";
+      await RvbActivityModel.create({
+        id: `rvba-${uuidv4()}`,
+        createdAt: Date.now(),
+        actorAccountId: account.id,
+        actorTag: account.tag,
+        actorRole: previousRole,
+        entityType,
+        entityId,
+        action: "account_unlinked",
+        sourceType: sourceType as any,
+        sourceId: account.id,
+        title: "Account unlinked",
+        details: `Unlinked @${account.tag} (${previousRole}) from ${entityType} ${entityId}`,
+      } as any);
+    } catch {}
+  }
   return account.toObject ? account.toObject() : account;
 }
 
@@ -369,19 +414,42 @@ export async function archiveByLinkedEntity(type: string, entityId: string) {
   account.updatedAt = Date.now();
   await account.save();
   safeDisconnectAccount(account.id);
-  try {
-    const { WorkerActivityModel } = await import("../models/worker-activity.model");
-    await WorkerActivityModel.create({
-      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      createdAt: Date.now(),
-      workerId: entityId,
-      accountId: account.id,
-      action: "account_archived_via_worker",
-      details: `Archived via worker archive`,
-      actorId: null,
-      actorTag: null,
-    } as any);
-  } catch {}
+  if (type === "worker") {
+    try {
+      const { WorkerActivityModel } = await import("../models/worker-activity.model");
+      await WorkerActivityModel.create({
+        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        createdAt: Date.now(),
+        workerId: entityId,
+        accountId: account.id,
+        action: "account_archived_via_worker",
+        details: `Archived via worker archive`,
+        actorId: null,
+        actorTag: null,
+      } as any);
+    } catch {}
+  } else {
+    try {
+      const { RvbActivityModel } = await import("../models/rvb-activity.model");
+      const { v4: uuidv4 } = await import("uuid");
+      const sourceType = type === "supplier" ? "suppliers" : type === "customer" ? "customers" : "system";
+      const entityTypeForActivity = type as string;
+      await RvbActivityModel.create({
+        id: `rvba-${uuidv4()}`,
+        createdAt: Date.now(),
+        actorAccountId: account.id,
+        actorTag: account.tag,
+        actorRole: account.role,
+        entityType: entityTypeForActivity,
+        entityId,
+        action: "account_archived_via_entity",
+        sourceType: sourceType as any,
+        sourceId: entityId,
+        title: "Account archived via entity",
+        details: `Archived via ${type} archive`,
+      } as any);
+    } catch {}
+  }
   return account;
 }
 export async function reactivateByLinkedEntity(type: string, entityId: string) {
@@ -394,18 +462,41 @@ export async function reactivateByLinkedEntity(type: string, entityId: string) {
   account.updatedAt = Date.now();
   await account.save();
   safeDisconnectAccount(account.id);
-  try {
-    const { WorkerActivityModel } = await import("../models/worker-activity.model");
-    await WorkerActivityModel.create({
-      id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      createdAt: Date.now(),
-      workerId: entityId,
-      accountId: account.id,
-      action: "account_reactivated_via_worker",
-      details: `Reactivated via worker restore`,
-      actorId: null,
-      actorTag: null,
-    } as any);
-  } catch {}
+  if (type === "worker") {
+    try {
+      const { WorkerActivityModel } = await import("../models/worker-activity.model");
+      await WorkerActivityModel.create({
+        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        createdAt: Date.now(),
+        workerId: entityId,
+        accountId: account.id,
+        action: "account_reactivated_via_worker",
+        details: `Reactivated via worker restore`,
+        actorId: null,
+        actorTag: null,
+      } as any);
+    } catch {}
+  } else {
+    try {
+      const { RvbActivityModel } = await import("../models/rvb-activity.model");
+      const { v4: uuidv4 } = await import("uuid");
+      const sourceType = type === "supplier" ? "suppliers" : type === "customer" ? "customers" : "system";
+      const entityTypeForActivity = type as string;
+      await RvbActivityModel.create({
+        id: `rvba-${uuidv4()}`,
+        createdAt: Date.now(),
+        actorAccountId: account.id,
+        actorTag: account.tag,
+        actorRole: account.role,
+        entityType: entityTypeForActivity,
+        entityId,
+        action: "account_reactivated_via_entity",
+        sourceType: sourceType as any,
+        sourceId: entityId,
+        title: "Account reactivated via entity",
+        details: `Reactivated via ${type} restore`,
+      } as any);
+    } catch {}
+  }
   return account;
 }

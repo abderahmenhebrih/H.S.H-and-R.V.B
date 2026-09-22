@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { WorkerModel } from "../models/worker.model";
 import { WorkerRequestModel } from "../models/worker-request.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
-import { NotificationModel } from "../models/notification.model";
+import { createRvbNotification } from "./rvb-notification.service";
 import { PaymentModel } from "../models/payment.model";
 import { WorkerFinancialEventModel } from "../models/worker-financial-event.model";
 import { allocateRevision, recordSyncChange } from "../sync/rvb-sync-helper";
@@ -44,8 +44,10 @@ export async function createWorkerRequest(input: CreateWorkerRequestInput) {
     const credit = Number(worker.balance) || 0;
     if (amount > credit) throw codeError("RVB_PAYMENT_EXCEEDS_CREDIT", 400);
   }
-  if (type === "loan" && amount !== undefined && amount !== null) {
-    if (amount <= 0) throw codeError("RVB_AMOUNT_REQUIRED", 400);
+  if (type === "loan") {
+    if (amount === undefined || amount === null || typeof amount !== "number" || amount <= 0) throw codeError("RVB_AMOUNT_REQUIRED", 400);
+    const credit = Number(worker.balance) || 0;
+    if (amount <= credit) throw codeError("RVB_LOAN_AMOUNT_INVALID", 400);
   }
   if (type === "discrepancy" && !description?.trim()) {
     throw codeError("RVB_DESCRIPTION_REQUIRED", 400);
@@ -70,30 +72,23 @@ export async function createWorkerRequest(input: CreateWorkerRequestInput) {
     financialEventId: null,
   };
   const created = await WorkerRequestModel.create(doc);
-  // Notify management
+  // Notify management via centralized R.V.B channel
   try {
     const sourceEventId = `worker-request:${doc.id}:submitted`;
-    const exists = await NotificationModel.findOne({ sourceEventId }).lean();
-    if (!exists) {
-      await NotificationModel.create({
-        id: `notif-${uuidv4()}`,
-        createdAt: now,
-        updatedAt: now,
-        syncStatus: "synced",
-        type: "worker",
-        severity: "info",
-        title: type === "payment" ? "New payment request" : type === "loan" ? "New loan application" : "New worker discrepancy",
-        message: `${worker.name} submitted ${type} request`,
-        entityType: "worker",
-        entityId: doc.id,
-        route: "/rvb/requests",
-        sourceEventId,
-        audienceType: "role",
-        audienceIds: ["manager", "admin"],
-        priority: type === "payment" || type === "loan" ? "high" : "normal",
-        archivedAt: null,
-      } as any);
-    }
+    await createRvbNotification({
+      type: "worker",
+      severity: "info",
+      title: type === "payment" ? "New payment request" : type === "loan" ? "New loan application" : "New worker discrepancy",
+      message: `${worker.name} submitted ${type} request`,
+      entityType: "worker",
+      entityId: doc.id,
+      route: "/rvb/requests",
+      sourceEventId,
+      audienceType: "role",
+      audienceIds: ["manager", "admin"],
+      priority: type === "payment" || type === "loan" ? "high" : "normal",
+      category: "requests",
+    } as any);
   } catch {}
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");
@@ -184,6 +179,9 @@ export async function reviewWorkerRequest(id: string, status: "accepted" | "reje
           const amount = Number(req.amount) || 0;
           if (amount <= 0) throw codeError("RVB_AMOUNT_REQUIRED", 400);
           if (worker.status !== "active") throw codeError("RVB_WORKER_ARCHIVED", 400);
+          // Revalidate loan > credit at review time where possible
+          const creditAtReview = Number(worker.balance) || 0;
+          if (amount <= creditAtReview) throw codeError("RVB_LOAN_AMOUNT_INVALID", 400);
           if (!req.financialEventId) {
             const before = Number(worker.balance) || 0;
             const after = before + amount;
@@ -250,28 +248,21 @@ export async function reviewWorkerRequest(id: string, status: "accepted" | "reje
   } catch {}
   try {
     const sourceEventId = `worker-request:${req.id}:${status}`;
-    const exists = await NotificationModel.findOne({ sourceEventId }).lean();
-    if (!exists) {
-      const targetAcc: any = (await RvbAccountModel.findOne({ id: req.accountId }).lean()) || (await RvbAccountModel.findOne({ linkedEntityType: "worker", linkedEntityId: req.workerId }).lean());
-      await NotificationModel.create({
-        id: `notif-${uuidv4()}`,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        syncStatus: "synced",
-        type: "worker",
-        severity: status === "accepted" ? "success" : "warning",
-        title: status === "accepted" ? "Request accepted" : "Request rejected",
-        message: `Your ${req.type} request was ${status}`,
-        entityType: "worker",
-        entityId: req.id,
-        route: "/rvb/requests",
-        sourceEventId,
-        audienceType: targetAcc ? "user" : "role",
-        audienceIds: targetAcc ? [targetAcc.id] : ["worker"],
-        priority: "high",
-        archivedAt: null,
-      } as any);
-    }
+    const targetAcc: any = (await RvbAccountModel.findOne({ id: req.accountId }).lean()) || (await RvbAccountModel.findOne({ linkedEntityType: "worker", linkedEntityId: req.workerId }).lean());
+    await createRvbNotification({
+      type: "worker",
+      severity: status === "accepted" ? "success" : "warning",
+      title: status === "accepted" ? "Request accepted" : "Request rejected",
+      message: `Your ${req.type} request was ${status}`,
+      entityType: "worker",
+      entityId: req.id,
+      route: "/rvb/requests",
+      sourceEventId,
+      audienceType: targetAcc ? "user" : "role",
+      audienceIds: targetAcc ? [targetAcc.id] : ["worker"],
+      priority: "high",
+      category: "statusUpdates",
+    } as any);
   } catch {}
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");

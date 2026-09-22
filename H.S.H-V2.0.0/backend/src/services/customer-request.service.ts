@@ -5,8 +5,9 @@ import { CustomerRequestModel } from "../models/customer-request.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { SaleModel } from "../models/sale.model";
 import { ProductModel } from "../models/product.model";
-import { NotificationModel } from "../models/notification.model";
+import { createRvbNotification } from "./rvb-notification.service";
 import { allocateRevision, recordSyncChange } from "../sync/rvb-sync-helper";
+import { validateItems, computeTotal, MAX_DESCRIPTION_LENGTH } from "../lib/validate-items";
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;
@@ -24,7 +25,7 @@ export async function createCustomerRequest(input: {
   date?: number;
   description?: string | null;
 }) {
-  const { customerId, accountId, type, items, total, date, description } = input;
+  let { customerId, accountId, type, items, total, date, description } = input as any;
   if (!customerId) throw codeError("RVB_CUSTOMER_REQUIRED", 400);
   if (!["insert_shipment", "discrepancy"].includes(type)) throw codeError("RVB_REQUEST_TYPE_INVALID", 400);
   const customer: any = await CustomerModel.findOne({ id: customerId }).lean();
@@ -36,15 +37,32 @@ export async function createCustomerRequest(input: {
   }
   if (type === "insert_shipment") {
     if (!items || !Array.isArray(items) || items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
-    if (total === undefined || total === null || total < 0) throw codeError("RVB_TOTAL_REQUIRED", 400);
-    for (const it of items) {
-      if (!it.productId) throw codeError("RVB_PRODUCT_REQUIRED", 400);
-      if (Number(it.quantity) <= 0) throw codeError("RVB_QUANTITY_INVALID", 400);
-      if (Number(it.weightKg) < 0) throw codeError("RVB_WEIGHT_INVALID", 400);
-      if (Number(it.price) < 0) throw codeError("RVB_PRICE_INVALID", 400);
+    const normalized = validateItems(items);
+    for (const it of normalized) {
+      const product: any = await ProductModel.findOne({ id: it.productId }).lean();
+      if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
     }
+    if (description !== undefined && description !== null && typeof description === "string" && description.length > MAX_DESCRIPTION_LENGTH) {
+      throw codeError("RVB_DESCRIPTION_TOO_LONG", 400, `description too long (${description.length} > ${MAX_DESCRIPTION_LENGTH})`);
+    }
+    const serverTotal = computeTotal(normalized);
+    (input as any).items = normalized;
+    (input as any).total = serverTotal;
+    items = normalized as any;
+    total = serverTotal;
   }
   if (type === "discrepancy" && !description?.trim()) throw codeError("RVB_DESCRIPTION_REQUIRED", 400);
+  if (type === "discrepancy" && description && description.length > MAX_DESCRIPTION_LENGTH) {
+    throw codeError("RVB_DESCRIPTION_TOO_LONG", 400, `description too long (${description.length} > ${MAX_DESCRIPTION_LENGTH})`);
+  }
+  if (description !== undefined && description !== null && typeof description !== "string") {
+    throw codeError("RVB_DESCRIPTION_INVALID", 400, "description must be a string");
+  }
+  if (date !== undefined && date !== null) {
+    const d = Number(date);
+    if (!Number.isFinite(d) || d < 0) throw codeError("RVB_DATE_INVALID", 400, "Invalid date");
+    date = d;
+  }
   const now = Date.now();
   const doc: any = {
     id: `custrq-${uuidv4()}`,
@@ -69,27 +87,20 @@ export async function createCustomerRequest(input: {
   const created = await CustomerRequestModel.create(doc);
   try {
     const sourceEventId = `customer-request:${doc.id}:submitted`;
-    const exists = await NotificationModel.findOne({ sourceEventId }).lean();
-    if (!exists) {
-      await NotificationModel.create({
-        id: `notif-${uuidv4()}`,
-        createdAt: now,
-        updatedAt: now,
-        syncStatus: "synced",
-        type: "customer_order",
-        severity: "info",
-        title: "New customer shipment request",
-        message: `${customer.name} submitted ${type === "insert_shipment" ? "shipment" : "discrepancy"} request`,
-        entityType: "customer",
-        entityId: doc.id,
-        route: "/rvb/requests",
-        sourceEventId,
-        audienceType: "role",
-        audienceIds: ["manager", "admin", "supervisor"],
-        priority: "high",
-        archivedAt: null,
-      } as any);
-    }
+    await createRvbNotification({
+      type: "customer_order",
+      severity: "info",
+      title: "New customer shipment request",
+      message: `${customer.name} submitted ${type === "insert_shipment" ? "shipment" : "discrepancy"} request`,
+      entityType: "customer",
+      entityId: doc.id,
+      route: "/rvb/requests",
+      sourceEventId,
+      audienceType: "role",
+      audienceIds: ["manager", "admin", "supervisor"],
+      priority: "high",
+      category: "requests",
+    } as any);
   } catch {}
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");
@@ -114,6 +125,8 @@ export async function reviewCustomerRequest(
   edited?: { items?: any[]; total?: number; date?: number },
 ) {
   if (!["accepted", "rejected"].includes(status)) throw codeError("RVB_STATUS_INVALID", 400);
+  if (notes !== undefined && notes !== null && typeof notes !== "string") throw codeError("RVB_NOTE_INVALID", 400, "notes must be a string");
+  if (notes !== undefined && notes !== null && notes.length > MAX_DESCRIPTION_LENGTH) throw codeError("RVB_NOTE_TOO_LONG", 400, `notes too long (${notes.length} > ${MAX_DESCRIPTION_LENGTH})`);
   const session = await mongoose.startSession();
   let savedReq: any = null;
   try {
@@ -122,24 +135,30 @@ export async function reviewCustomerRequest(
       if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
       if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
 
-      if (edited && req.type === "insert_shipment" && (edited.items || edited.total !== undefined)) {
+      if (edited && req.type === "insert_shipment" && (edited.items || edited.total !== undefined || edited.date !== undefined)) {
         if (!req.originalItems) {
           req.originalItems = req.items;
           req.originalTotal = req.total;
         }
         if (edited.items) {
-          if (!Array.isArray(edited.items) || edited.items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
-          for (const it of edited.items) {
-            if (!it.productId) throw codeError("RVB_PRODUCT_REQUIRED", 400);
-            if (Number(it.quantity) <= 0) throw codeError("RVB_QUANTITY_INVALID", 400);
+          const normalized = validateItems(edited.items);
+          for (const it of normalized) {
+            const prod: any = await ProductModel.findOne({ id: it.productId }).session(session);
+            if (!prod) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
           }
-          req.items = edited.items;
+          req.items = normalized as any;
+          req.total = computeTotal(normalized);
+        } else if (edited.total !== undefined) {
+          const existingNormalized = validateItems(req.items);
+          req.total = computeTotal(existingNormalized);
+          req.items = existingNormalized as any;
         }
-        if (edited.total !== undefined) req.total = Number(edited.total);
-        if (edited.date !== undefined) req.date = Number(edited.date);
-        if (edited.items && edited.total === undefined) {
-          req.total = (edited.items as any[]).reduce((s: number, it: any) => s + (Number(it.total) || Number(it.quantity) * Number(it.price) || 0), 0);
+        if (edited.date !== undefined) {
+          const d = Number(edited.date);
+          if (!Number.isFinite(d) || d < 0) throw codeError("RVB_DATE_INVALID", 400, "Invalid date");
+          req.date = d;
         }
+        // Ignore client total when items were edited; total already recomputed
       }
 
       if (status === "accepted" && req.type === "insert_shipment") {
@@ -148,14 +167,26 @@ export async function reviewCustomerRequest(
         } else {
           const customer: any = await CustomerModel.findOne({ id: req.customerId }).session(session);
           if (!customer) throw codeError("RVB_CUSTOMER_NOT_FOUND", 404);
-          const items = req.items || [];
-          const total = Number(req.total) || 0;
-          for (const item of items) {
+          // Re-validate and recompute server total at acceptance (Edit-then-Accept)
+          let itemsRaw: any[] = req.items || [];
+          if (!Array.isArray(itemsRaw) || itemsRaw.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
+          const normalizedAccept = validateItems(itemsRaw);
+          const total = computeTotal(normalizedAccept);
+          // Stock revalidation (quantity and weight)
+          for (const item of normalizedAccept) {
             const product: any = await ProductModel.findOne({ id: item.productId }).session(session);
-            if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404);
+            if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${item.productId}`);
             const qty = Number(item.quantity) || 0;
+            const weight = Number(item.weightKg) || 0;
             if ((Number(product.quantity) || 0) < qty) throw codeError("RVB_INSUFFICIENT_STOCK", 400, `Insufficient stock for ${product.name}`);
+            if ((Number(product.weightKg) || 0) < weight) throw codeError("RVB_INSUFFICIENT_STOCK", 400, `Insufficient weight for ${product.name}`);
           }
+          // Ensure stored request reflects server recomputed values
+          req.items = normalizedAccept as any;
+          req.total = total;
+          // Use normalized for subsequent inventory/sale creation
+          itemsRaw = normalizedAccept as any;
+          const items = itemsRaw as any[];
           for (const item of items) {
             const product: any = await ProductModel.findOne({ id: item.productId }).session(session);
             if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404);
@@ -217,28 +248,21 @@ export async function reviewCustomerRequest(
   // Post-commit side effects
   try {
     const sourceEventId = `customer-request:${req.id}:${status}`;
-    const exists = await NotificationModel.findOne({ sourceEventId }).lean();
-    if (!exists) {
-      const targetAcc: any = await RvbAccountModel.findOne({ id: req.accountId }).lean() || await RvbAccountModel.findOne({ linkedEntityType: "customer", linkedEntityId: req.customerId }).lean();
-      await NotificationModel.create({
-        id: `notif-${uuidv4()}`,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        syncStatus: "synced",
-        type: "customer_order",
-        severity: status === "accepted" ? "success" : "warning",
-        title: status === "accepted" ? "Shipment request accepted" : "Shipment request rejected",
-        message: `Your shipment request ${req.id.slice(0, 8)} was ${status}`,
-        entityType: "customer",
-        entityId: req.id,
-        route: "/rvb/requests",
-        sourceEventId,
-        audienceType: targetAcc ? "user" : "role",
-        audienceIds: targetAcc ? [targetAcc.id] : ["customer"],
-        priority: "high",
-        archivedAt: null,
-      } as any);
-    }
+    const targetAcc: any = await RvbAccountModel.findOne({ id: req.accountId }).lean() || await RvbAccountModel.findOne({ linkedEntityType: "customer", linkedEntityId: req.customerId }).lean();
+    await createRvbNotification({
+      type: "customer_order",
+      severity: status === "accepted" ? "success" : "warning",
+      title: status === "accepted" ? "Shipment request accepted" : "Shipment request rejected",
+      message: `Your shipment request ${req.id.slice(0, 8)} was ${status}`,
+      entityType: "customer",
+      entityId: req.id,
+      route: "/rvb/requests",
+      sourceEventId,
+      audienceType: targetAcc ? "user" : "role",
+      audienceIds: targetAcc ? [targetAcc.id] : ["customer"],
+      priority: "high",
+      category: "statusUpdates",
+    } as any);
   } catch {}
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");

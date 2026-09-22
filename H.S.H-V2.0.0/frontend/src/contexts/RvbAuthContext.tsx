@@ -11,6 +11,7 @@ type RvbAuthState = {
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   changePassword: (payload: { currentPassword: string; newPassword: string; confirmPassword: string }) => Promise<void>;
+  completeOnboarding: (profilePicture: string) => Promise<RvbSafeUser>;
   setUser: (u: RvbSafeUser | null) => void;
 };
 
@@ -76,6 +77,12 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
     if (data.account) setUser(data.account);
   }, []);
 
+  const completeOnboarding = useCallback(async (profilePicture: string) => {
+    const account = await rvbAuthService.onboarding(profilePicture);
+    setUser(account as RvbSafeUser);
+    return account as RvbSafeUser;
+  }, []);
+
   const value = useMemo<RvbAuthState>(() => ({
     user,
     loading,
@@ -84,8 +91,9 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refresh,
     changePassword,
+    completeOnboarding,
     setUser,
-  }), [user, loading, login, logout, refresh, changePassword]);
+  }), [user, loading, login, logout, refresh, changePassword, completeOnboarding]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

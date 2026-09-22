@@ -274,9 +274,17 @@ function SettingsInner() {
   const [pfpUploading, setPfpUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load shared settings
+  // Load shared settings - route-aware: for RVB use rvbConfigService for business config (currency)
   useEffect(() => {
     settingsService.get().then((s) => { if (s) setSettings(s); });
+    // Business config from backend for RVB
+    import("../../../src/services/rvb-config.service").then(({ rvbConfigService }) => {
+      rvbConfigService.get().then((cfg) => {
+        if (cfg?.currency) setSettings((prev) => ({ ...prev, currency: cfg.currency as any }));
+        // also sync language if backend has it
+        if ((cfg as any)?.language) setSettings((prev) => ({ ...prev, language: (cfg as any).language as any }));
+      }).catch(()=>{});
+    }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
@@ -320,13 +328,32 @@ function SettingsInner() {
     if (!pending || confirmLoading) return;
     setConfirmLoading(true);
     try {
-      const next: Settings = pending.type === "language" ? { ...settings, language: pending.newValue } : { ...settings, currency: pending.newValue };
-      await settingsService.save(next);
-      setSettings(next);
-      document.documentElement.lang = next.language;
-      document.documentElement.dir = getDirection(next.language);
-      window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
-      setPending(null);
+      if (pending.type === "currency") {
+        // Business config via backend for RVB
+        const { rvbConfigService } = await import("../../../src/services/rvb-config.service");
+        try {
+          await rvbConfigService.update({ currency: pending.newValue });
+        } catch (e:any) {
+          // if not manager, fallback to local only (still show change locally)
+          // keep Dexie as fallback for personal view
+        }
+        const next: Settings = { ...settings, currency: pending.newValue };
+        setSettings(next);
+        // still broadcast locally so presentation updates everywhere, but do not rely on Dexie for RVB persistence alone
+        window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
+        // also persist locally for presentation-only fallback
+        try { await settingsService.save(next); } catch {}
+        setPending(null);
+      } else {
+        const next: Settings = { ...settings, language: pending.newValue };
+        // Language is presentation personal preference: keep shared via Dexie/localStorage and account
+        await settingsService.save(next);
+        setSettings(next);
+        document.documentElement.lang = next.language;
+        document.documentElement.dir = getDirection(next.language);
+        window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
+        setPending(null);
+      }
     } finally { setConfirmLoading(false); setPending(null); }
   };
 
@@ -369,23 +396,62 @@ function SettingsInner() {
     if (file.size > 2 * 1024 * 1024) { alert("Image too large (2MB max)"); return; }
     setPfpUploading(true);
     try {
-      const reader = new FileReader();
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
+      // Canvas compress to 512 max similar to onboarding for consistency and <200k guidance
+      const compressed: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const img = new window.Image();
+          img.onerror = () => resolve(dataUrl); // fallback to original if cant process
+          img.onload = () => {
+            try {
+              const w = img.width, h = img.height;
+              const size = Math.min(w, h) || 512;
+              const sx = (w - size) / 2;
+              const sy = (h - size) / 2;
+              const canvasSize = 512;
+              const canvas = document.createElement("canvas");
+              canvas.width = canvasSize;
+              canvas.height = canvasSize;
+              const ctx = canvas.getContext("2d");
+              if (!ctx) { resolve(dataUrl); return; }
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, canvasSize, canvasSize);
+              ctx.drawImage(img, sx, sy, size, size, 0, 0, canvasSize, canvasSize);
+              // try jpeg qualities to keep <200k
+              const qualities = [0.85, 0.7, 0.55];
+              for (const q of qualities) {
+                const out = canvas.toDataURL("image/jpeg", q);
+                if (out.length < 200000) { resolve(out); return; }
+              }
+              const out = canvas.toDataURL("image/jpeg", 0.5);
+              resolve(out);
+            } catch { resolve(dataUrl); }
+          };
+          img.src = dataUrl;
+        };
         reader.readAsDataURL(file);
       });
-      const acc = await rvbAuthService.updateProfile({ profilePicture: dataUrl });
+      const acc = await rvbAuthService.updateProfile({ profilePicture: compressed });
       setUser(acc as any);
     } catch (e: any) {
-      alert(e?.message || "Upload failed");
+      const msg = e?.code === "RVB_PROFILE_PICTURE_REQUIRED" ? "Photo is required — cannot remove. Please choose a replacement." : (e?.message || "Upload failed");
+      alert(msg);
     } finally { setPfpUploading(false); if (fileRef.current) fileRef.current.value = ""; }
   };
   const handleRemovePfp = async () => {
+    // After onboarding, replace photo allowed but not leave without photo - require replacement
+    if ((user as any)?.onboardingStatus === "complete") {
+      alert("Cannot remove profile picture after onboarding — please replace it with a new photo.");
+      return;
+    }
     setPfpUploading(true);
     try {
       const acc = await rvbAuthService.updateProfile({ profilePicture: null as any });
       setUser(acc as any);
+    } catch (e: any) {
+      alert(e?.code || e?.message || "Remove failed");
     } finally { setPfpUploading(false); }
   };
 
@@ -527,7 +593,7 @@ function SettingsInner() {
                     <div style={{ display: "flex", gap: 8 }}>
                       <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePfpChange} />
                       <button type="button" className={styles.secondaryButton} onClick={() => fileRef.current?.click()} disabled={pfpUploading}><ImageIcon size={14} /> {t.account.changePhoto}</button>
-                      {user?.profilePicture && <button type="button" className={styles.secondaryButton} onClick={handleRemovePfp} disabled={pfpUploading}><X size={14} /> {t.account.removePhoto}</button>}
+                      {user?.profilePicture && (user as any).onboardingStatus !== "complete" && <button type="button" className={styles.secondaryButton} onClick={handleRemovePfp} disabled={pfpUploading}><X size={14} /> {t.account.removePhoto}</button>}
                     </div>
                   </div>
                   <div className={styles.divider} />

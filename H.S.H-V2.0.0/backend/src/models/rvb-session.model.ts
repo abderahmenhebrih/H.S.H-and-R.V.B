@@ -12,6 +12,7 @@ const rvbSessionSchema = new Schema(
     userAgent: { type: String, required: false },
     ipAddress: { type: String, required: false },
     rotationFamilyId: { type: String, required: false },
+    clientType: { type: String, enum: ["web", "native"], required: false, default: "web" },
   },
   {
     collection: "rvb_sessions",

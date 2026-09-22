@@ -100,7 +100,13 @@ router.get("/bootstrap", async (req, res) => {
     const currentRevision = await getCurrentRevision();
     const snapshot: Record<string, any[]> = {};
     for (const [entity, model] of Object.entries(modelRegistry)) {
-      const docs = await (model as any).find().lean();
+      let docs: any[];
+      if (entity === "notification") {
+        // H.S.H sync must expose only channel=hsh
+        docs = await (model as any).find({ channel: "hsh" }).lean();
+      } else {
+        docs = await (model as any).find().lean();
+      }
       // Strip Mongo _id/__v and keep id
       snapshot[entity] = docs.map((d: any) => {
         const { _id, __v, ...rest } = d;

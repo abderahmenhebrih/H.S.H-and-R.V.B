@@ -36,6 +36,11 @@ const rvbAccountSchema = new Schema(
       default: "pending",
     },
     profilePicture: { type: String, required: false },
+    preferences: {
+      type: Object,
+      required: false,
+      default: null,
+    },
     archivedAt: { type: Number, required: false, default: null },
     lastLoginAt: { type: Number, required: false, default: null },
     passwordHash: { type: String, required: false, default: null },

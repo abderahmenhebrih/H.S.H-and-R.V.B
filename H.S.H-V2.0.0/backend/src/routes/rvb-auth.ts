@@ -344,6 +344,106 @@ router.get("/me", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
   }
 });
 
+// PATCH /api/rvb/auth/profile - self-service profile update (displayName, profilePicture)
+router.patch("/profile", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const { displayName, profilePicture } = req.body as any;
+    const account: any = await RvbAccountModel.findOne({ id: user.accountId });
+    if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
+    const updates: any = {};
+    if (displayName !== undefined) {
+      const name = String(displayName).trim();
+      if (!name) { res.status(400).json({ success: false, code: "RVB_DISPLAY_NAME_REQUIRED" }); return; }
+      // Allow owner to edit own displayName (personal setting) — restricted length
+      if (name.length > 80) { res.status(400).json({ success: false, code: "RVB_DISPLAY_NAME_TOO_LONG" }); return; }
+      updates.displayName = name;
+    }
+    if (profilePicture !== undefined) {
+      if (profilePicture === null || profilePicture === "") updates.profilePicture = undefined;
+      else if (typeof profilePicture === "string" && profilePicture.length < 2000000) updates.profilePicture = profilePicture;
+      else { res.status(400).json({ success: false, code: "RVB_PROFILE_PICTURE_INVALID" }); return; }
+    }
+    if (Object.keys(updates).length === 0) { res.json({ success: true, account: toSafeRvbAccount(account) }); return; }
+    updates.updatedAt = Date.now();
+    const updated = await RvbAccountModel.findOneAndUpdate({ id: user.accountId }, { $set: updates }, { new: true, returnDocument: "after" } as any);
+    res.json({ success: true, account: toSafeRvbAccount(updated) });
+  } catch (e) {
+    console.error("patch profile failed", e);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
+// PATCH /api/rvb/auth/preferences - personal notification preferences
+router.patch("/preferences", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const { notifications } = req.body as any;
+    const allowedKeys = ["chats", "mentions", "requests", "orders", "statusUpdates", "reminders"];
+    if (!notifications || typeof notifications !== "object") { res.status(400).json({ success: false, code: "RVB_PREFERENCES_INVALID" }); return; }
+    const sanitized: any = {};
+    for (const k of allowedKeys) {
+      if (k in notifications) sanitized[k] = !!notifications[k];
+    }
+    // Ensure booleans
+    const account: any = await RvbAccountModel.findOne({ id: user.accountId });
+    if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
+    const current = account.preferences || {};
+    const next = { ...current, notifications: { ...(current.notifications || {}), ...sanitized } };
+    // Fill defaults for missing keys
+    for (const k of allowedKeys) if (!(k in next.notifications)) next.notifications[k] = true;
+    account.preferences = next;
+    account.updatedAt = Date.now();
+    await account.save();
+    res.json({ success: true, preferences: next });
+  } catch (e) {
+    console.error("patch preferences failed", e);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
+// GET /api/rvb/auth/preferences
+router.get("/preferences", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const account: any = await RvbAccountModel.findOne({ id: user.accountId }).lean();
+    if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
+    const prefs = account.preferences || { notifications: { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true } };
+    // Ensure defaults
+    const defaults = { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true };
+    for (const k of Object.keys(defaults) as any[]) if (!(k in (prefs.notifications || {}))) prefs.notifications[k] = (defaults as any)[k];
+    res.json({ success: true, preferences: prefs });
+  } catch (e) {
+    console.error("get preferences failed", e);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
+// GET /api/rvb/auth/sessions - list sessions for current account
+router.get("/sessions", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const sessions: any[] = await RvbSessionModel.find({ accountId: user.accountId, revokedAt: null, expiresAt: { $gt: Date.now() } }).sort({ lastUsedAt: -1 }).lean();
+    const safe = sessions.map((s: any) => ({ id: s.id, createdAt: s.createdAt, lastUsedAt: s.lastUsedAt, expiresAt: s.expiresAt, userAgent: s.userAgent || null, ipAddress: s.ipAddress || null, isCurrent: s.id === user.sessionId }));
+    res.json({ success: true, sessions: safe, currentSessionId: user.sessionId });
+  } catch (e) {
+    console.error("get sessions failed", e);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
+// POST /api/rvb/auth/sessions/revoke-others
+router.post("/sessions/revoke-others", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    await RvbSessionModel.updateMany({ accountId: user.accountId, revokedAt: null, id: { $ne: user.sessionId } } as any, { $set: { revokedAt: Date.now() } } as any);
+    res.json({ success: true });
+  } catch (e) {
+    console.error("revoke others failed", e);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
+  }
+});
+
 // POST /api/rvb/auth/change-password
 router.post("/change-password", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
   try {

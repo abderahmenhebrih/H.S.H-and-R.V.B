@@ -149,6 +149,70 @@ export const rvbAuthService = {
     return { accessToken: data.accessToken, account: data.account };
   },
 
+  async updateProfile(payload: { displayName?: string; profilePicture?: string | null }): Promise<RvbSafeUser> {
+    const token = getAccessToken();
+    const res = await fetch(`${AUTH_BASE}/profile`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+      credentials: "include",
+    });
+    const data = await handleResponse<{ success: boolean; account: RvbSafeUser }>(res);
+    return data.account;
+  },
+
+  async getPreferences(): Promise<{ notifications: Record<string, boolean> }> {
+    const token = getAccessToken();
+    const res = await fetch(`${AUTH_BASE}/preferences`, {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = await handleResponse<{ success: boolean; preferences: any }>(res);
+    return data.preferences;
+  },
+
+  async updatePreferences(notifications: Record<string, boolean>): Promise<any> {
+    const token = getAccessToken();
+    const res = await fetch(`${AUTH_BASE}/preferences`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ notifications }),
+      credentials: "include",
+    });
+    const data = await handleResponse<{ success: boolean; preferences: any }>(res);
+    return data.preferences;
+  },
+
+  async getSessions(): Promise<{ sessions: any[]; currentSessionId: string }> {
+    const token = getAccessToken();
+    const res = await fetch(`${AUTH_BASE}/sessions`, {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = await handleResponse<{ success: boolean; sessions: any[]; currentSessionId: string }>(res);
+    return data;
+  },
+
+  async revokeOtherSessions(): Promise<void> {
+    const token = getAccessToken();
+    const res = await fetch(`${AUTH_BASE}/sessions/revoke-others`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: "include",
+    });
+    await handleResponse(res);
+  },
+
   async authFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
     const token = getAccessToken();
     const headers: any = { ...(init?.headers as any) };

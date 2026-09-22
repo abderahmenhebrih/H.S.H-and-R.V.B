@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { Moon, Settings, Sun } from "lucide-react";
 import styles from "./CompactHeader.module.css";
 import DateTimeDisplay from "../common/DateTimeDisplay";
-import NotificationBell from "../notifications/NotificationBell";
 
 type Props = {
   title: string;
@@ -12,6 +11,8 @@ type Props = {
   dark: boolean;
   onToggleTheme: () => void;
   language?: "en" | "fr" | "ar";
+  settingsHref?: string;
+  notificationBell?: React.ReactNode;
 };
 
 export default function CompactHeader({
@@ -20,6 +21,8 @@ export default function CompactHeader({
   dark,
   onToggleTheme,
   language = "en",
+  settingsHref = "/settings",
+  notificationBell,
 }: Props) {
   const router = useRouter();
 
@@ -39,7 +42,7 @@ export default function CompactHeader({
       <div className={styles.right}>
         <DateTimeDisplay language={language} />
 
-        <NotificationBell language={language} dark={dark} />
+        {notificationBell ?? null}
 
         <button
           type="button"
@@ -58,7 +61,7 @@ export default function CompactHeader({
         <button
           type="button"
           className={styles.iconButton}
-          onClick={() => router.push("/settings")}
+          onClick={() => router.push(settingsHref)}
           aria-label="Settings"
           title="Settings"
         >

@@ -1,14 +1,27 @@
 # RVB MOBILE CONTRACT — H.S.H and R.V.B
 
 **Version:** 2.0.0 (WEB FREEZE)
-**Base URL:** `NEXT_PUBLIC_API_URL` (web) / `RVB_API_URL` (mobile) — e.g. `https://api.hebrih.example.com` or `http://localhost:5000` for dev. All endpoints prefixed `/api/rvb/*` unless noted. `SERVER_MODE=rvb-public` required for public/mobile deployment (exposes only `/api/rvb/*` and `/api/health`).
+**Base URL:** `NEXT_PUBLIC_API_URL` (web) / `RVB_API_URL` (mobile) — e.g. `https://api.hebrih.example.com` or `http://localhost:5000` for dev. All endpoints prefixed `/api/rvb/*` unless noted. `SERVER_MODE=rvb-public` (backend) and `FRONTEND_MODE=rvb-public` (frontend) required for public/mobile deployment (exposes only `/api/rvb/*` and `/api/health`; frontend only `/rvb/**`).
 
-## SERVER_MODE
+## DEPLOYMENT MODES
+
+- **Backend:** `SERVER_MODE=full` (full) vs `rvb-public` (R.V.B only). See SERVER_MODE section.
+- **Frontend (Web):** `FRONTEND_MODE=full` (full H.S.H + R.V.B) vs `rvb-public` (R.V.B only). In `rvb-public`, frontend `proxy.ts` allows only `/rvb`, `/rvb/**`, `/_next/**`, public assets; root `/` redirects to `/rvb`; all H.S.H routes (`/customers`, `/workers`, `/suppliers`, `/accounts`, `/settings`, `/dashboard` etc.) redirect to `/rvb` / 404. Next static assets remain accessible. Hides navigation alone is not sufficient.
+- **Trusted / combined workspace (local/LAN):** `SERVER_MODE=full` + `FRONTEND_MODE=full`.
+- **Public R.V.B web deployment:** `SERVER_MODE=rvb-public` + `FRONTEND_MODE=rvb-public`.
+- Env examples: `backend/.env.example` (`SERVER_MODE`, `TRUST_PROXY`, `CORS_ORIGIN`) and `frontend/.env.example` (`NEXT_PUBLIC_API_URL`, `FRONTEND_MODE`).
+
+## SERVER_MODE (Backend)
 
 - `full` — local/LAN dev, mounts `/api/sync`, `/api/printing`, `/api/invoices` + R.V.B.
 - `rvb-public` — mounts only `/api/rvb/*` + `/api/health`; `/api/sync|printing|invoices` → `404`. In `production` with `full`, server warns unless `ALLOW_FULL_SERVER_IN_PRODUCTION=true`.
 - `TRUST_PROXY=0|1|n` controls `trust proxy` for rate limiting / IP forwarding.
 - CORS via `CORS_ORIGIN` (comma-separated, credentials true, no wildcard).
+
+## FRONTEND_MODE (Web)
+
+- `full` — normal H.S.H + R.V.B web application (all routes).
+- `rvb-public` — public R.V.B Web frontend: via `frontend/proxy.ts` (Next 16 `proxy`) — allows `/rvb`, `/rvb/**`, `/_next/**`, `favicon.ico`, public assets (`*.jpg`, `*.png`, etc. via dot check); root `/` redirects to `/rvb`; H.S.H routes (`/customers`, `/workers`, `/suppliers`, `/accounts`, `/settings`, `/dashboard`, `/products`, `/purchases`, `/sales`, `/payments`, `/expenses`, `/vehicles`, `/tasks`, `/reports`, `/invoice`, `/office`, `/notifications`, `/about`, `/online`, `/` etc. outside `/rvb`) redirect to `/rvb` (or safe 404). `FRONTEND_MODE=rvb-public` must be set alongside `SERVER_MODE=rvb-public` for public deployment; `full/full` remains for trusted local workspace.
 
 ## AUTH
 
@@ -191,6 +204,8 @@ Canvas crop 512×512 max, JPEG quality ladder → <200k (backend <250k). `POST /
 - No `quantity`/`weightKg`/`taxProfileId` leak via catalog; `available` boolean only. New supply/order `weightKg`/`quantity` are user-entered starting at `0`, not current inventory weight.
 - Portal self-service DTOs (`/api/rvb/portal/*`) return explicit safe DTOs without `syncStatus`/`serverRevision`/`lastSyncedAt` internal metadata (management APIs may retain more).
 - Deep links (`route`) are hints; backend revalidates ownership.
-- R.V.B has **no H.S.H Dexie dependency** (`settingsService`/`settingsRepository`/`lib/database/db`/`H.S.H repositories` forbidden under `/rvb`); settings are via `rvbUiPreferencesService` + `preferences.ui` + `rvbConfigService` (company currency) + lightweight `localStorage` theme (`hebrih-theme`). `triggerSync()` never reachable from `/rvb` settings.
+- R.V.B has **no H.S.H Dexie dependency** (`settingsService`/`settingsRepository`/`lib/database/db`/`H.S.H repositories` forbidden under `/rvb`); settings are via `rvbUiPreferencesService` + `preferences.ui` + `rvbConfigService` (company currency) + lightweight `localStorage` theme (`hebrih-theme`). `triggerSync()` never reachable from `/rvb` settings. Verified via transitive static import graph: no path `frontend/app/rvb/**` → ... → `frontend/src/lib/database/db.ts` (also `RvbShell`, `CompactHeader`, `SyncInitializer`). `RvbNotificationBell` uses only `rvbNotificationService`; `HshNotificationBell` uses `notificationService`/`db`.
+- Frontend public deployment hardening: `FRONTEND_MODE=rvb-public` (via `frontend/proxy.ts`) blocks H.S.H surface at routing layer, not just navigation hiding; paired with `SERVER_MODE=rvb-public`.
 - Rate limiting: unauthenticated (`login`/`refresh`) IP-based; authenticated submissions (`chat send`, `worker/supplier/customer requests`, `customer orders`) per-account via `req.rvbUser.accountId` after `requireRvbAuth`, IP fallback only if auth context unexpectedly missing (prevents NAT penalization).
-- Supervisor: customer CRUD + orders/requests allowed (`manager`/`admin`/`supervisor`); workers/suppliers/accounts remain `403`.
+- Supervisor: customer CRUD + orders/requests allowed (`manager`/`admin`/`supervisor`); workers/suppliers/accounts remain `403`. Portal role boundary also enforces `Access HSH` visible only to `manager`/`admin` (hidden for `supervisor`/`worker`/`supplier`/`customer`).
+- Header boundary: `CompactHeader` supports `settingsHref` (`/settings` vs `/rvb/settings`) and explicit `notificationBell` prop to keep R.V.B header gear inside R.V.B.

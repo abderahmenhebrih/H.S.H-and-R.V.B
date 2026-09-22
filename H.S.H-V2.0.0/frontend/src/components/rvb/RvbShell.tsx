@@ -26,6 +26,7 @@ import type { LucideIcon } from "lucide-react";
 
 import dashboardStyles from "../../../app/page.module.css";
 import CompactHeader from "../layout/CompactHeader";
+import RvbNotificationBell from "../notifications/RvbNotificationBell";
 import WorkspaceTransition from "./WorkspaceTransition";
 import {
   DEFAULT_SETTINGS,
@@ -577,36 +578,38 @@ export default function RvbShell({
           </div>
         )}
 
-        <div className={dashboardStyles.sidebarFooter}>
-          {sidebarCollapsed ? (
-            <div className={dashboardStyles.navItemWrap}>
+        {(user?.role === "manager" || user?.role === "admin") && (
+          <div className={dashboardStyles.sidebarFooter}>
+            {sidebarCollapsed ? (
+              <div className={dashboardStyles.navItemWrap}>
+                <button
+                  type="button"
+                  className={dashboardStyles.onlineButtonCollapsed}
+                  onClick={handleSwitchToHsh}
+                  aria-label={t.switchToHsh}
+                  title={t.switchToHsh}
+                >
+                  <Factory size={18} strokeWidth={2} aria-hidden="true" />
+                </button>
+                <span className={dashboardStyles.tooltip} role="tooltip">
+                  {t.switchToHsh}
+                </span>
+              </div>
+            ) : (
               <button
                 type="button"
-                className={dashboardStyles.onlineButtonCollapsed}
+                className={dashboardStyles.onlineButton}
                 onClick={handleSwitchToHsh}
                 aria-label={t.switchToHsh}
-                title={t.switchToHsh}
               >
-                <Factory size={18} strokeWidth={2} aria-hidden="true" />
+                <span className={dashboardStyles.onlineButtonIcon} aria-hidden="true">
+                  <Factory size={18} strokeWidth={2} />
+                </span>
+                <span>{t.switchToHsh}</span>
               </button>
-              <span className={dashboardStyles.tooltip} role="tooltip">
-                {t.switchToHsh}
-              </span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className={dashboardStyles.onlineButton}
-              onClick={handleSwitchToHsh}
-              aria-label={t.switchToHsh}
-            >
-              <span className={dashboardStyles.onlineButtonIcon} aria-hidden="true">
-                <Factory size={18} strokeWidth={2} />
-              </span>
-              <span>{t.switchToHsh}</span>
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </aside>
 
       <section className={dashboardStyles.mainContent}>
@@ -646,6 +649,8 @@ export default function RvbShell({
             dark={dark}
             onToggleTheme={toggleTheme}
             language={settings.language}
+            settingsHref="/rvb/settings"
+            notificationBell={<RvbNotificationBell language={settings.language} dark={dark} />}
           />
           {children}
         </div>

@@ -16,6 +16,7 @@ import {
 } from "../src/lib/settings";
 import type { Settings } from "../src/types/settings/settings";
 import CompactHeader from "../src/components/layout/CompactHeader";
+import HshNotificationBell from "../src/components/notifications/HshNotificationBell";
 import WorkspaceTransition from "../src/components/rvb/WorkspaceTransition";
 import { getSavedTheme, applyTheme } from "../src/lib/theme";
 import BusinessOverviewChart, {
@@ -658,6 +659,8 @@ export default function Dashboard() {
             dark={dark}
             onToggleTheme={() => setDark((current) => !current)}
             language={settings.language}
+            settingsHref="/settings"
+            notificationBell={<HshNotificationBell language={settings.language} dark={dark} />}
           />
 
           <section className={styles.kpiGrid}>

@@ -30,6 +30,7 @@ import type { LucideIcon } from "lucide-react";
 import dashboardStyles from "../../../app/page.module.css";
 import CompactHeader from "./CompactHeader";
 import WorkspaceTransition from "../rvb/WorkspaceTransition";
+import HshNotificationBell from "../notifications/HshNotificationBell";
 import {
   SETTINGS_EVENT,
   DEFAULT_SETTINGS,
@@ -791,6 +792,8 @@ export default function AppShell({
             dark={dark}
             onToggleTheme={toggleTheme}
             language={settings.language}
+            settingsHref="/settings"
+            notificationBell={<HshNotificationBell language={settings.language} dark={dark} />}
           />
 
           {children}

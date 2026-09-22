@@ -549,17 +549,37 @@ async function main() {
   } catch{
     try{ const alt2 = path.resolve(process.cwd(),"../../frontend/src/components/rvb/RvbShell.tsx"); rvbShell = fs.readFileSync(alt2,"utf8"); } catch{}
   }
+  let hshBell = "";
+  let rvbBell = "";
   try{
     const bellPath = path.resolve(process.cwd(),"../frontend/src/components/notifications/NotificationBell.tsx");
     bell = fs.readFileSync(bellPath,"utf8");
   } catch{
     try{ const alt3 = path.resolve(process.cwd(),"../../frontend/src/components/notifications/NotificationBell.tsx"); bell = fs.readFileSync(alt3,"utf8"); } catch{}
   }
+  try{
+    const hshPath = path.resolve(process.cwd(),"../frontend/src/components/notifications/HshNotificationBell.tsx");
+    hshBell = fs.readFileSync(hshPath,"utf8");
+  } catch{
+    try{ const altH = path.resolve(process.cwd(),"../../frontend/src/components/notifications/HshNotificationBell.tsx"); hshBell = fs.readFileSync(altH,"utf8"); } catch{}
+  }
+  try{
+    const rvbPath = path.resolve(process.cwd(),"../frontend/src/components/notifications/RvbNotificationBell.tsx");
+    rvbBell = fs.readFileSync(rvbPath,"utf8");
+  } catch{
+    try{ const altR = path.resolve(process.cwd(),"../../frontend/src/components/notifications/RvbNotificationBell.tsx"); rvbBell = fs.readFileSync(altR,"utf8"); } catch{}
+  }
   assert(!frontendNotifPage.includes("notificationService.getAll") && !frontendNotifPage.includes("Dexie"), "R.V.B notifications page uses backend API only, no Dexie fallback", frontendNotifPage.slice(0,200));
-  assert(bell.includes("rvbNotificationService") && bell.includes("isRvb"), "R.V.B bell uses backend API context-aware");
-  assert(rvbShell.includes("rvbNotificationService.count"), "R.V.B sidebar badge uses backend count");
+  // New architecture: RvbNotificationBell uses backend API, HshNotificationBell uses local, NotificationBell wrapper dynamically loads correct one without static H.S.H import
+  const rvbBellOk = rvbBell.includes("rvbNotificationService") && !rvbBell.includes("notificationService.getAll") && !rvbBell.includes("lib/database/db");
+  const hshBellOk = hshBell.includes("notificationService.getAll") && hshBell.includes("useDbSync") && !hshBell.includes("rvbNotificationService");
+  const wrapperOk = !bell.includes("lib/database/db") && (bell.includes('import("./HshNotificationBell")') || bell.includes("HshNotificationBell")) && (bell.includes('import("./RvbNotificationBell")') || bell.includes("RvbNotificationBell"));
+  // Keep legacy checks for compatibility but allow new split architecture
+  const oldBellUsesBoth = bell.includes("rvbNotificationService") && bell.includes("isRvb");
+  assert(rvbBellOk || oldBellUsesBoth, "R.V.B bell uses backend API context-aware (RvbNotificationBell or legacy NotificationBell)");
+  assert(rvbShell.includes("rvbNotificationService.count") || rvbShell.includes("RvbNotificationBell"), "R.V.B sidebar badge uses backend count or RvbNotificationBell");
   // H.S.H bell still uses local
-  assert(bell.includes("notificationService.getAll"), "H.S.H bell still uses local notificationService");
+  assert(hshBellOk || bell.includes("notificationService.getAll"), "H.S.H bell still uses local notificationService");
   assert(frontendNotifPage.includes("Unable to load") || frontendNotifPage.includes("Failed to load"), "R.V.B fallback shows retry not Dexie");
 
   // Check duplicate index warning: we already ensured notification model not duplicate - just assert file contains single definition

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { SupplierModel } from "../models/supplier.model";
 import { SupplierRequestModel } from "../models/supplier-request.model";
@@ -5,6 +6,7 @@ import { RvbAccountModel } from "../models/rvb-account.model";
 import { PurchaseModel } from "../models/purchase.model";
 import { ProductModel } from "../models/product.model";
 import { NotificationModel } from "../models/notification.model";
+import { allocateRevision, recordSyncChange } from "../sync/rvb-sync-helper";
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;
@@ -109,125 +111,105 @@ export async function reviewSupplierRequest(
   edited?: { items?: any[]; total?: number; calculation?: any; date?: number },
 ) {
   if (!["accepted", "rejected"].includes(status)) throw codeError("RVB_STATUS_INVALID", 400);
-  const req: any = await SupplierRequestModel.findOne({ id });
-  if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
-  if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
+  const session = await mongoose.startSession();
+  let savedReq: any = null;
+  try {
+    await session.withTransaction(async () => {
+      const req: any = await SupplierRequestModel.findOne({ id }).session(session);
+      if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
+      if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
 
-  // Handle edit-then-accept: preserve original if edited provided
-  if (edited && req.type === "new_supply" && (edited.items || edited.total !== undefined || edited.calculation !== undefined || edited.date !== undefined)) {
-    if (!req.originalItems) {
-      req.originalItems = req.items;
-      req.originalTotal = req.total;
-      req.originalCalculation = req.calculation;
-    }
-    if (edited.items) {
-      if (!Array.isArray(edited.items) || edited.items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
-      req.items = edited.items;
-    }
-    if (edited.total !== undefined) req.total = Number(edited.total);
-    else if (edited.items) {
-      req.total = (edited.items as any[]).reduce((s: number, it: any) => s + (Number(it.total) || 0), 0);
-    }
-    if (edited.calculation !== undefined) req.calculation = edited.calculation;
-    if (edited.date !== undefined) req.date = Number(edited.date);
-  }
+      if (edited && req.type === "new_supply" && (edited.items || edited.total !== undefined || edited.calculation !== undefined || edited.date !== undefined)) {
+        if (!req.originalItems) {
+          req.originalItems = req.items;
+          req.originalTotal = req.total;
+          req.originalCalculation = req.calculation;
+        }
+        if (edited.items) {
+          if (!Array.isArray(edited.items) || edited.items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
+          req.items = edited.items;
+        }
+        if (edited.total !== undefined) req.total = Number(edited.total);
+        else if (edited.items) {
+          req.total = (edited.items as any[]).reduce((s: number, it: any) => s + (Number(it.total) || 0), 0);
+        }
+        if (edited.calculation !== undefined) req.calculation = edited.calculation;
+        if (edited.date !== undefined) req.date = Number(edited.date);
+      }
 
-  if (status === "accepted" && req.type === "new_supply") {
-    if (req.purchaseId) {
+      if (status === "accepted" && req.type === "new_supply") {
+        if (req.purchaseId) {
+          // Already processed idempotently, just update status
+        } else {
+          const supplier: any = await SupplierModel.findOne({ id: req.supplierId }).session(session);
+          if (!supplier) throw codeError("RVB_SUPPLIER_NOT_FOUND", 404);
+          const items = req.items || [];
+          const total = Number(req.total) || 0;
+          for (const item of items) {
+            const product: any = await ProductModel.findOne({ id: item.productId }).session(session);
+            if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404);
+            if (Number(item.quantity) <= 0) throw codeError("RVB_QUANTITY_INVALID", 400);
+          }
+          if (total < 0) throw codeError("RVB_TOTAL_REQUIRED", 400);
+          // Update inventory with revisions
+          for (const item of items) {
+            const product: any = await ProductModel.findOne({ id: item.productId }).session(session);
+            if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404);
+            product.quantity = (Number(product.quantity) || 0) + Number(item.quantity || 0);
+            product.weightKg = (Number(product.weightKg) || 0) + Number(item.weightKg || 0);
+            product.updatedAt = Date.now();
+            const rev = await allocateRevision(session);
+            product.serverRevision = rev;
+            await product.save({ session } as any);
+            await recordSyncChange(session, { entity: "product", entityId: product.id, operation: "update", payload: product.toObject ? product.toObject() : product });
+          }
+          const now = Date.now();
+          const purchaseId = `pur-${uuidv4()}`;
+          const revPurchase = await allocateRevision(session);
+          const purchaseDoc: any = {
+            id: purchaseId,
+            createdAt: now,
+            updatedAt: now,
+            syncStatus: "synced",
+            serverRevision: revPurchase,
+            supplierId: req.supplierId,
+            date: req.date || now,
+            items: items.map((it: any) => ({
+              productId: it.productId,
+              quantity: Number(it.quantity),
+              weightKg: Number(it.weightKg),
+              price: Number(it.price),
+              total: Number(it.total),
+            })),
+            total,
+            calculation: req.calculation || undefined,
+          };
+          await PurchaseModel.create([purchaseDoc], { session } as any);
+          await recordSyncChange(session, { entity: "purchase", entityId: purchaseId, operation: "create", payload: { ...purchaseDoc } });
+          supplier.balance = (Number(supplier.balance) || 0) + total;
+          supplier.updatedAt = now;
+          const revSup = await allocateRevision(session);
+          supplier.serverRevision = revSup;
+          await supplier.save({ session } as any);
+          await recordSyncChange(session, { entity: "supplier", entityId: supplier.id, operation: "update", payload: supplier.toObject ? supplier.toObject() : supplier });
+          req.purchaseId = purchaseId;
+        }
+      }
+
       req.status = status;
       req.reviewedAt = Date.now();
       req.reviewedBy = reviewerId;
       req.notes = notes?.trim() || null;
       req.updatedAt = Date.now();
-      await req.save();
-      return req.toObject ? req.toObject() : req;
-    }
-    const supplier: any = await SupplierModel.findOne({ id: req.supplierId });
-    if (!supplier) throw codeError("RVB_SUPPLIER_NOT_FOUND", 404);
-    const items = req.items || [];
-    const total = Number(req.total) || 0;
-    // Revalidate products exist
-    for (const item of items) {
-      const product: any = await ProductModel.findOne({ id: item.productId });
-      if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404);
-      if (Number(item.quantity) <= 0) throw codeError("RVB_QUANTITY_INVALID", 400);
-    }
-    // Validate total
-    if (total < 0) throw codeError("RVB_TOTAL_REQUIRED", 400);
-
-    // Update inventory
-    for (const item of items) {
-      const product: any = await ProductModel.findOne({ id: item.productId });
-      if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404);
-      product.quantity = (Number(product.quantity) || 0) + Number(item.quantity || 0);
-      product.weightKg = (Number(product.weightKg) || 0) + Number(item.weightKg || 0);
-      product.updatedAt = Date.now();
-      await product.save();
-    }
-    const now = Date.now();
-    const purchase: any = await PurchaseModel.create({
-      id: `pur-${uuidv4()}`,
-      createdAt: now,
-      updatedAt: now,
-      syncStatus: "synced",
-      supplierId: req.supplierId,
-      date: req.date || now,
-      items: items.map((it: any) => ({
-        productId: it.productId,
-        quantity: Number(it.quantity),
-        weightKg: Number(it.weightKg),
-        price: Number(it.price),
-        total: Number(it.total),
-      })),
-      total,
-      calculation: req.calculation || undefined,
+      await req.save({ session } as any);
+      savedReq = req.toObject ? req.toObject() : { ...req };
     });
-    supplier.balance = (Number(supplier.balance) || 0) + total;
-    supplier.updatedAt = now;
-    await supplier.save();
-
-    try {
-      const { WorkerFinancialEventModel } = await import("../models/worker-financial-event.model");
-      await WorkerFinancialEventModel.create({
-        id: `wkfe-${uuidv4()}`,
-        createdAt: now,
-        updatedAt: now,
-        workerId: req.supplierId,
-        type: "purchase",
-        amount: total,
-        balanceBefore: Number(supplier.balance) - total,
-        balanceAfter: Number(supplier.balance),
-        note: `Supply request ${req.id} accepted`,
-        actorId: reviewerId,
-        referenceId: purchase.id,
-      } as any);
-    } catch {}
-
-    req.purchaseId = purchase.id;
+  } finally {
+    await session.endSession();
   }
-
-  req.status = status;
-  req.reviewedAt = Date.now();
-  req.reviewedBy = reviewerId;
-  req.notes = notes?.trim() || null;
-  req.updatedAt = Date.now();
-  await req.save();
-
-  try {
-    const { WorkerActivityModel } = await import("../models/worker-activity.model");
-    const reviewerAcc: any = await RvbAccountModel.findOne({ id: reviewerId }).lean();
-    await WorkerActivityModel.create({
-      id: `wka-${uuidv4()}`,
-      createdAt: Date.now(),
-      workerId: req.supplierId,
-      accountId: reviewerId,
-      action: status === "accepted" ? `supply_accepted:${req.type}` : `supply_rejected:${req.type}`,
-      details: `${req.type} ${status} total=${req.total ?? ""} purchase=${req.purchaseId || ""} ${notes || ""}`.trim(),
-      actorId: reviewerId,
-      actorTag: reviewerAcc?.tag || null,
-    } as any);
-  } catch {}
-
+  const req = savedReq;
+  if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
+  // Post-commit side effects
   try {
     const sourceEventId = `supplier-request:${req.id}:${status}`;
     const exists = await NotificationModel.findOne({ sourceEventId }).lean();
@@ -258,6 +240,5 @@ export async function reviewSupplierRequest(
     const reviewerAcc: any = await RvbAccountModel.findOne({ id: reviewerId }).lean();
     await RvbActivityModel.create({ id: `rvba-${uuidv4()}`, createdAt: Date.now(), actorAccountId: reviewerId, actorTag: reviewerAcc?.tag || null, actorRole: reviewerAcc?.role || null, entityType: "supplier", entityId: req.supplierId, action: status === "accepted" ? `supply_accepted:${req.type}` : `supply_rejected:${req.type}`, sourceType: "requests", sourceId: req.id, title: `Supply request ${status}`, details: `${req.type} ${status} by @${reviewerAcc?.tag || reviewerId}` } as any);
   } catch {}
-
-  return req.toObject ? req.toObject() : req;
+  return req;
 }

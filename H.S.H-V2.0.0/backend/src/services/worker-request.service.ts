@@ -1,8 +1,12 @@
+import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { WorkerModel } from "../models/worker.model";
 import { WorkerRequestModel } from "../models/worker-request.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { NotificationModel } from "../models/notification.model";
+import { PaymentModel } from "../models/payment.model";
+import { WorkerFinancialEventModel } from "../models/worker-financial-event.model";
+import { allocateRevision, recordSyncChange } from "../sync/rvb-sync-helper";
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;
@@ -108,109 +112,128 @@ export async function listWorkerRequests(workerId?: string) {
 
 export async function reviewWorkerRequest(id: string, status: "accepted" | "rejected", reviewerId: string, notes?: string) {
   if (!["accepted", "rejected"].includes(status)) throw codeError("RVB_STATUS_INVALID", 400);
-  // Use atomic check to prevent race: ensure status is under_review
-  const req: any = await WorkerRequestModel.findOne({ id });
-  if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
-  if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
+  const session = await mongoose.startSession();
+  let savedReq: any = null;
+  try {
+    await session.withTransaction(async () => {
+      const req: any = await WorkerRequestModel.findOne({ id }).session(session);
+      if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
+      if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
 
-  // Idempotency: if already has paymentId/financialEventId and is accepted, just update status fields without duplicate mutation
-  // But since we checked under_review, this is first attempt. Still handle stored ids for retry safety.
+      if (status === "accepted") {
+        const worker: any = await WorkerModel.findOne({ id: req.workerId }).session(session);
+        if (!worker) throw codeError("RVB_WORKER_NOT_FOUND", 404);
+        if (req.type === "payment") {
+          const amount = Number(req.amount) || 0;
+          if (amount <= 0) throw codeError("RVB_AMOUNT_REQUIRED", 400);
+          const credit = Number(worker.balance) || 0;
+          if (amount > credit) throw codeError("RVB_PAYMENT_EXCEEDS_CREDIT", 400);
+          if (worker.status !== "active") throw codeError("RVB_WORKER_ARCHIVED", 400);
+          if (!req.paymentId) {
+            const before = credit;
+            const after = before - amount;
+            const now = Date.now();
+            const paymentId = `pay-${uuidv4()}`;
+            // Allocate revision for Payment
+            const payRev = await allocateRevision(session);
+            const paymentDoc: any = {
+              id: paymentId,
+              createdAt: now,
+              updatedAt: now,
+              syncStatus: "synced",
+              serverRevision: payRev,
+              entityType: "worker",
+              entityId: worker.id,
+              accountId: reviewerId as any,
+              amount,
+              date: now,
+              note: `Payment request ${req.id} accepted`,
+            };
+            await PaymentModel.create([paymentDoc], { session } as any);
+            await recordSyncChange(session, { entity: "payment", entityId: paymentId, operation: "create", payload: { ...paymentDoc } });
+            // Worker update with revision
+            worker.balance = after;
+            worker.updatedAt = now;
+            const workerRev = await allocateRevision(session);
+            worker.serverRevision = workerRev;
+            await worker.save({ session } as any);
+            await recordSyncChange(session, { entity: "worker", entityId: worker.id, operation: "update", payload: worker.toObject ? worker.toObject() : worker });
+            const eventId = `wkfe-${uuidv4()}`;
+            await WorkerFinancialEventModel.create(
+              [
+                {
+                  id: eventId,
+                  createdAt: now,
+                  updatedAt: now,
+                  workerId: worker.id,
+                  type: "payment",
+                  amount,
+                  balanceBefore: before,
+                  balanceAfter: after,
+                  note: `Payment request ${req.id}`,
+                  actorId: reviewerId,
+                  referenceId: req.id,
+                },
+              ],
+              { session } as any,
+            );
+            req.paymentId = paymentId;
+            req.financialEventId = eventId;
+          }
+        } else if (req.type === "loan") {
+          const amount = Number(req.amount) || 0;
+          if (amount <= 0) throw codeError("RVB_AMOUNT_REQUIRED", 400);
+          if (worker.status !== "active") throw codeError("RVB_WORKER_ARCHIVED", 400);
+          if (!req.financialEventId) {
+            const before = Number(worker.balance) || 0;
+            const after = before + amount;
+            const now = Date.now();
+            worker.balance = after;
+            worker.updatedAt = now;
+            const workerRev = await allocateRevision(session);
+            worker.serverRevision = workerRev;
+            await worker.save({ session } as any);
+            await recordSyncChange(session, { entity: "worker", entityId: worker.id, operation: "update", payload: worker.toObject ? worker.toObject() : worker });
+            const eventId = `wkfe-${uuidv4()}`;
+            await WorkerFinancialEventModel.create(
+              [
+                {
+                  id: eventId,
+                  createdAt: now,
+                  updatedAt: now,
+                  workerId: worker.id,
+                  type: "loan",
+                  amount,
+                  balanceBefore: before,
+                  balanceAfter: after,
+                  note: `Loan ${req.id} accepted`,
+                  actorId: reviewerId,
+                  referenceId: req.id,
+                },
+              ],
+              { session } as any,
+            );
+            req.financialEventId = eventId;
+          }
+        }
+      }
 
-  if (status === "accepted") {
-    const worker: any = await WorkerModel.findOne({ id: req.workerId });
-    if (!worker) throw codeError("RVB_WORKER_NOT_FOUND", 404);
-    if (req.type === "payment") {
-      // Revalidate at acceptance time
-      const amount = Number(req.amount) || 0;
-      if (amount <= 0) throw codeError("RVB_AMOUNT_REQUIRED", 400);
-      const credit = Number(worker.balance) || 0;
-      if (amount > credit) throw codeError("RVB_PAYMENT_EXCEEDS_CREDIT", 400);
-      if (worker.status !== "active") throw codeError("RVB_WORKER_ARCHIVED", 400);
-      // Idempotency: if paymentId already exists, don't create duplicate
-      if (req.paymentId) {
-        // already processed, just mark accepted
-      } else {
-        const { PaymentModel } = await import("../models/payment.model");
-        const { WorkerFinancialEventModel } = await import("../models/worker-financial-event.model");
-        const before = credit;
-        const after = before - amount;
-        const now = Date.now();
-        const paymentId = `pay-${uuidv4()}`;
-        await PaymentModel.create({
-          id: paymentId,
-          createdAt: now,
-          updatedAt: now,
-          syncStatus: "synced",
-          entityType: "worker",
-          entityId: worker.id,
-          accountId: reviewerId as any,
-          amount,
-          date: now,
-          note: `Payment request ${req.id} accepted`,
-        } as any);
-        worker.balance = after;
-        worker.updatedAt = now;
-        await worker.save();
-        const eventId = `wkfe-${uuidv4()}`;
-        await WorkerFinancialEventModel.create({
-          id: eventId,
-          createdAt: now,
-          updatedAt: now,
-          workerId: worker.id,
-          type: "payment",
-          amount,
-          balanceBefore: before,
-          balanceAfter: after,
-          note: `Payment request ${req.id}`,
-          actorId: reviewerId,
-          referenceId: req.id,
-        } as any);
-        req.paymentId = paymentId;
-        req.financialEventId = eventId;
-        // Save immediately to record ids before final status? We'll save later with status
-      }
-    } else if (req.type === "loan") {
-      const amount = Number(req.amount) || 0;
-      if (amount <= 0) throw codeError("RVB_AMOUNT_REQUIRED", 400);
-      if (worker.status !== "active") throw codeError("RVB_WORKER_ARCHIVED", 400);
-      if (req.financialEventId) {
-        // already processed
-      } else {
-        const before = Number(worker.balance) || 0;
-        const after = before + amount;
-        const now = Date.now();
-        const { WorkerFinancialEventModel } = await import("../models/worker-financial-event.model");
-        worker.balance = after;
-        worker.updatedAt = now;
-        await worker.save();
-        const eventId = `wkfe-${uuidv4()}`;
-        await WorkerFinancialEventModel.create({
-          id: eventId,
-          createdAt: now,
-          updatedAt: now,
-          workerId: worker.id,
-          type: "loan",
-          amount,
-          balanceBefore: before,
-          balanceAfter: after,
-          note: `Loan ${req.id} accepted`,
-          actorId: reviewerId,
-          referenceId: req.id,
-        } as any);
-        req.financialEventId = eventId;
-      }
-    }
-    // discrepancy accepted -> no balance mutation, just status
+      req.status = status;
+      req.reviewedAt = Date.now();
+      req.reviewedBy = reviewerId;
+      req.notes = notes?.trim() || null;
+      req.updatedAt = Date.now();
+      await req.save({ session } as any);
+      savedReq = req.toObject ? req.toObject() : { ...req };
+    });
+  } finally {
+    await session.endSession();
   }
 
-  req.status = status;
-  req.reviewedAt = Date.now();
-  req.reviewedBy = reviewerId;
-  req.notes = notes?.trim() || null;
-  req.updatedAt = Date.now();
-  await req.save();
+  const req = savedReq;
+  if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
 
-  // Activity
+  // Post-commit side effects (must not roll back business transaction)
   try {
     const { WorkerActivityModel } = await import("../models/worker-activity.model");
     const reviewerAcc: any = await RvbAccountModel.findOne({ id: reviewerId }).lean();
@@ -225,13 +248,11 @@ export async function reviewWorkerRequest(id: string, status: "accepted" | "reje
       actorTag: reviewerAcc?.tag || null,
     } as any);
   } catch {}
-
-  // Notify requester
   try {
     const sourceEventId = `worker-request:${req.id}:${status}`;
     const exists = await NotificationModel.findOne({ sourceEventId }).lean();
     if (!exists) {
-      const targetAcc: any = await RvbAccountModel.findOne({ id: req.accountId }).lean() || await RvbAccountModel.findOne({ linkedEntityType: "worker", linkedEntityId: req.workerId }).lean();
+      const targetAcc: any = (await RvbAccountModel.findOne({ id: req.accountId }).lean()) || (await RvbAccountModel.findOne({ linkedEntityType: "worker", linkedEntityId: req.workerId }).lean());
       await NotificationModel.create({
         id: `notif-${uuidv4()}`,
         createdAt: Date.now(),
@@ -255,8 +276,21 @@ export async function reviewWorkerRequest(id: string, status: "accepted" | "reje
   try {
     const { RvbActivityModel } = await import("../models/rvb-activity.model");
     const reviewerAcc: any = await RvbAccountModel.findOne({ id: reviewerId }).lean();
-    await RvbActivityModel.create({ id: `rvba-${uuidv4()}`, createdAt: Date.now(), actorAccountId: reviewerId, actorTag: reviewerAcc?.tag || null, actorRole: reviewerAcc?.role || null, entityType: "worker", entityId: req.workerId, action: status === "accepted" ? `request_accepted:${req.type}` : `request_rejected:${req.type}`, sourceType: "requests", sourceId: req.id, title: `Payment request ${status}`, details: `${req.type} ${status} by @${reviewerAcc?.tag || reviewerId}` } as any);
+    await RvbActivityModel.create({
+      id: `rvba-${uuidv4()}`,
+      createdAt: Date.now(),
+      actorAccountId: reviewerId,
+      actorTag: reviewerAcc?.tag || null,
+      actorRole: reviewerAcc?.role || null,
+      entityType: "worker",
+      entityId: req.workerId,
+      action: status === "accepted" ? `request_accepted:${req.type}` : `request_rejected:${req.type}`,
+      sourceType: "requests",
+      sourceId: req.id,
+      title: `Payment request ${status}`,
+      details: `${req.type} ${status} by @${reviewerAcc?.tag || reviewerId}`,
+    } as any);
   } catch {}
 
-  return req.toObject ? req.toObject() : req;
+  return req;
 }

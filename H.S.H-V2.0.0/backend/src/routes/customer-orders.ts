@@ -9,18 +9,24 @@ router.use(requireRvbAuth as any);
 router.get("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
+    const role = user.role;
+    if (role !== "manager" && role !== "admin" && role !== "supervisor" && role !== "customer") {
+      res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+      return;
+    }
     const { customerId, status } = req.query as any;
-    // Customers can only see own orders
-    if (user.role === "customer") {
+    if (role === "customer") {
+      const linkedType = (user.account as any)?.linkedEntityType;
       const linkedId = (user.account as any)?.linkedEntityId;
+      if (linkedType !== "customer" || !linkedId) {
+        res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+        return;
+      }
       const docs = await listCustomerOrders({ customerId: linkedId, status: status && !Array.isArray(status) ? status : undefined });
       res.json({ success: true, orders: docs });
       return;
     }
     // Manager/Admin/Supervisor can see all or filtered
-    if (user.role === "supervisor" && !["manager", "admin", "supervisor"].includes(user.role)) {
-      // actually supervisor allowed for customers
-    }
     const docs = await listCustomerOrders({
       customerId: customerId && !Array.isArray(customerId) ? customerId : undefined,
       status: status && !Array.isArray(status) ? status : undefined,
@@ -34,20 +40,24 @@ router.get("/", async (req: RvbAuthRequest, res) => {
 router.post("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
-    const { customerId, items, total, notes } = req.body as any;
-    let cid = customerId;
-    if (user.role === "customer") {
-      cid = (user.account as any)?.linkedEntityId;
-      if (!cid) {
-        res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
-        return;
-      }
-    }
-    if (!cid) {
-      res.status(400).json({ success: false, code: "RVB_CUSTOMER_REQUIRED" });
+    if (user.role !== "customer") {
+      res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }
-    const created = await createCustomerOrder({ customerId: cid, accountId: user.accountId, items, total: Number(total), notes });
+    const linkedType = (user.account as any)?.linkedEntityType;
+    const linkedId = (user.account as any)?.linkedEntityId;
+    if (linkedType !== "customer" || !linkedId) {
+      res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+      return;
+    }
+    const { items, total, notes } = req.body as any;
+    // Prevent IDOR: body customerId must match linked if provided
+    const { customerId } = req.body as any;
+    if (customerId && customerId !== linkedId) {
+      res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+      return;
+    }
+    const created = await createCustomerOrder({ customerId: linkedId, accountId: user.accountId, items, total: Number(total), notes });
     res.status(201).json({ success: true, order: created });
   } catch (err: any) {
     res.status(err?.status || 500).json({ success: false, code: err?.code || "INTERNAL_ERROR", message: err?.message });

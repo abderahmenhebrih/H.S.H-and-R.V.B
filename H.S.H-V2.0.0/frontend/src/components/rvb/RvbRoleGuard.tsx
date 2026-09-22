@@ -72,15 +72,15 @@ export function RvbAccountsGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function RvbWorkersGuard({ children }: { children: React.ReactNode }) {
+export function RvbRoleGuard({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) {
   const { user, loading } = useRvbAuth();
   const router = useRouter();
-  const isWorkersManager = user?.role === "manager" || user?.role === "admin";
+  const isAllowed = !!user && allowedRoles.includes(user.role);
   useEffect(() => {
     if (loading) return;
     if (!user) return;
-    if (!isWorkersManager) router.replace("/rvb");
-  }, [loading, user, isWorkersManager, router]);
+    if (!isAllowed) router.replace("/rvb");
+  }, [loading, user, isAllowed, router]);
   if (loading) {
     return (
       <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
@@ -95,7 +95,7 @@ export function RvbWorkersGuard({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!isWorkersManager) {
+  if (!isAllowed) {
     return (
       <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
         <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--accent)" } as any} />
@@ -103,4 +103,20 @@ export function RvbWorkersGuard({ children }: { children: React.ReactNode }) {
     );
   }
   return <>{children}</>;
+}
+
+export function RvbWorkersGuard({ children }: { children: React.ReactNode }) {
+  return <RvbRoleGuard allowedRoles={["manager", "admin"]}>{children}</RvbRoleGuard>;
+}
+
+export function RvbSuppliersGuard({ children }: { children: React.ReactNode }) {
+  return <RvbRoleGuard allowedRoles={["manager", "admin"]}>{children}</RvbRoleGuard>;
+}
+
+export function RvbCustomersGuard({ children }: { children: React.ReactNode }) {
+  return <RvbRoleGuard allowedRoles={["manager", "admin", "supervisor"]}>{children}</RvbRoleGuard>;
+}
+
+export function RvbOrdersGuard({ children }: { children: React.ReactNode }) {
+  return <RvbRoleGuard allowedRoles={["manager", "admin", "supervisor"]}>{children}</RvbRoleGuard>;
 }

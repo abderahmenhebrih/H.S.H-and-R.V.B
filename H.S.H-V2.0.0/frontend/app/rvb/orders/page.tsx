@@ -10,7 +10,7 @@ import { customerService } from "../../../src/services/customer.service";
 import type { Customer } from "../../../src/types/entities/customer";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
-import { RvbWorkersGuard } from "../../../src/components/rvb/RvbRoleGuard";
+import { RvbOrdersGuard } from "../../../src/components/rvb/RvbRoleGuard";
 import { Search, ShoppingCart, Eye, X } from "lucide-react";
 import { formatCurrency } from "../../../src/lib/settings";
 import styles from "./page.module.css";
@@ -218,9 +218,9 @@ function OrdersInner() {
 export default function RvbOrdersPage() {
   return (
     <RvbAuthGuard>
-      <RvbWorkersGuard>
+      <RvbOrdersGuard>
         <OrdersInner />
-      </RvbWorkersGuard>
+      </RvbOrdersGuard>
     </RvbAuthGuard>
   );
 }

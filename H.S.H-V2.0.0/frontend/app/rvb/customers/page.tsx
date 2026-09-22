@@ -14,7 +14,7 @@ import type { RvbAccount } from "../../../src/types/rvb/rvb-account";
 import { normalizeTag, isValidTag } from "../../../src/types/rvb/rvb-account";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
-import { RvbWorkersGuard } from "../../../src/components/rvb/RvbRoleGuard";
+import { RvbCustomersGuard } from "../../../src/components/rvb/RvbRoleGuard";
 import { db } from "../../../src/lib/database/db";
 import type { Payment } from "../../../src/types/entities/payment";
 import type { Sale } from "../../../src/types/entities/sale";
@@ -880,9 +880,9 @@ function RvbCustomersInner() {
 export default function RvbCustomersPage() {
   return (
     <RvbAuthGuard>
-      <RvbWorkersGuard>
+      <RvbCustomersGuard>
         <RvbCustomersInner />
-      </RvbWorkersGuard>
+      </RvbCustomersGuard>
     </RvbAuthGuard>
   );
 }

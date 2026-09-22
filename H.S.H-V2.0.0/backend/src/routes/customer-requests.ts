@@ -9,10 +9,19 @@ router.use(requireRvbAuth as any);
 router.get("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
+    const role = user.role;
+    if (role !== "manager" && role !== "admin" && role !== "supervisor" && role !== "customer") {
+      res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+      return;
+    }
     const { customerId } = req.query as any;
-    // Customers can only see own requests
-    if (user.role === "customer") {
+    if (role === "customer") {
       const linkedId = (user.account as any)?.linkedEntityId;
+      const linkedType = (user.account as any)?.linkedEntityType;
+      if (linkedType !== "customer" || !linkedId) {
+        res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+        return;
+      }
       const docs = await listCustomerRequests(linkedId);
       res.json({ success: true, requests: docs });
       return;
@@ -29,23 +38,30 @@ router.get("/", async (req: RvbAuthRequest, res) => {
 router.post("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
+    const role = user.role;
+    if (role !== "manager" && role !== "admin" && role !== "supervisor" && role !== "customer") {
+      res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+      return;
+    }
     const { customerId, type, items, total, date, description } = req.body as any;
     let cid = customerId;
-    if (user.role === "customer") {
+    if (role === "customer") {
+      const linkedType = (user.account as any)?.linkedEntityType;
       cid = (user.account as any)?.linkedEntityId;
-      if (!cid) {
+      if (linkedType !== "customer" || !cid) {
         res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
         return;
       }
-      // Prevent IDOR: body customerId must match linked if provided
       if (customerId && customerId !== cid) {
         res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
         return;
       }
-    }
-    if (!cid) {
-      res.status(400).json({ success: false, code: "RVB_CUSTOMER_REQUIRED" });
-      return;
+    } else {
+      // manager/admin/supervisor must supply customerId
+      if (!cid) {
+        res.status(400).json({ success: false, code: "RVB_CUSTOMER_REQUIRED" });
+        return;
+      }
     }
     const created = await createCustomerRequest({
       customerId: cid,

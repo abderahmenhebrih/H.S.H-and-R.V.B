@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { CustomerOrderModel } from "../models/customer-order.model";
 import { CustomerModel } from "../models/customer.model";
@@ -69,21 +70,30 @@ export async function getCustomerOrder(id: string) {
 
 export async function reviewCustomerOrder(id: string, status: "accepted" | "rejected", reviewerId: string, editedItems?: any[], notes?: string) {
   if (!["accepted", "rejected"].includes(status)) throw codeError("RVB_STATUS_INVALID", 400);
-  const order: any = await CustomerOrderModel.findOne({ id });
-  if (!order) throw codeError("RVB_ORDER_NOT_FOUND", 404);
-  if (order.status !== "under_review") throw codeError("RVB_ORDER_ALREADY_REVIEWED", 400);
-  if (editedItems && editedItems.length > 0) {
-    order.originalItems = order.items;
-    order.items = editedItems;
-    // recalculate total if needed
-    order.total = editedItems.reduce((s: number, it: any) => s + (Number(it.total) || 0), 0);
+  const session = await mongoose.startSession();
+  let savedOrder: any = null;
+  try {
+    await session.withTransaction(async () => {
+      const order: any = await CustomerOrderModel.findOne({ id }).session(session);
+      if (!order) throw codeError("RVB_ORDER_NOT_FOUND", 404);
+      if (order.status !== "under_review") throw codeError("RVB_ORDER_ALREADY_REVIEWED", 400);
+      if (editedItems && editedItems.length > 0) {
+        order.originalItems = order.items;
+        order.items = editedItems;
+        order.total = editedItems.reduce((s: number, it: any) => s + (Number(it.total) || 0), 0);
+      }
+      order.status = status;
+      order.reviewedAt = Date.now();
+      order.reviewedBy = reviewerId;
+      if (notes) order.notes = notes;
+      order.updatedAt = Date.now();
+      await order.save({ session } as any);
+      savedOrder = order.toObject ? order.toObject() : { ...order };
+    });
+  } finally {
+    await session.endSession();
   }
-  order.status = status;
-  order.reviewedAt = Date.now();
-  order.reviewedBy = reviewerId;
-  if (notes) order.notes = notes;
-  order.updatedAt = Date.now();
-  await order.save();
+  const order: any = savedOrder;
   // For accepted order, do NOT automatically create Sale (business rule: accepted remains controlled, not fulfillment)
   try {
     const { NotificationModel } = await import("../models/notification.model");

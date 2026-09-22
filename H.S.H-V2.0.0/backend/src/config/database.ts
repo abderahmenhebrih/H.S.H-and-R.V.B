@@ -1,14 +1,11 @@
-import dns from "dns";
-try {
-  // SRV lookup for Atlas fails with default 127.0.0.1 on this host; use system DNS that resolves _mongodb._tcp
-  dns.setServers(["192.168.100.1", "8.8.8.8", "1.1.1.1"]);
-} catch {}
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import { configureDatabaseDns } from "./dns";
 
 dotenv.config();
 
 export async function connectDatabase(): Promise<void> {
+  configureDatabaseDns();
   const mongoUri = process.env.MONGODB_URI;
 
   if (!mongoUri) {

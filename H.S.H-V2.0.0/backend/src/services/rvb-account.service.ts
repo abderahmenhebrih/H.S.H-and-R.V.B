@@ -145,6 +145,16 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
   }
 
   const now = Date.now();
+  // Persist supervisor optional worker linkage (needsLink is false for supervisor)
+  let finalLinkedType: string | null = null;
+  let finalLinkedId: string | null = null;
+  if (needsLink) {
+    finalLinkedType = linkedEntityType as string;
+    finalLinkedId = linkedEntityId as string;
+  } else if (isSupervisor && linkedEntityType && linkedEntityId) {
+    finalLinkedType = linkedEntityType as string;
+    finalLinkedId = linkedEntityId as string;
+  }
   const doc: any = {
     id: `rvbacc-${uuidv4()}`,
     createdAt: now,
@@ -153,8 +163,8 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
     tag,
     displayName,
     role,
-    linkedEntityType: needsLink ? linkedEntityType : null,
-    linkedEntityId: needsLink ? linkedEntityId : null,
+    linkedEntityType: finalLinkedType,
+    linkedEntityId: finalLinkedId,
     status: "active",
     onboardingStatus: input.onboardingStatus === "complete" ? "complete" : "pending",
     profilePicture: input.profilePicture || undefined,

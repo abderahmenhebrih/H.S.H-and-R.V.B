@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -28,12 +28,11 @@ import dashboardStyles from "../../../app/page.module.css";
 import CompactHeader from "../layout/CompactHeader";
 import WorkspaceTransition from "./WorkspaceTransition";
 import {
-  SETTINGS_EVENT,
   DEFAULT_SETTINGS,
   getDirection,
 } from "../../lib/settings";
 import type { Settings } from "../../types/settings/settings";
-import { settingsService } from "../../services/settings.service";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
 import { getSavedTheme, applyTheme } from "../../lib/theme";
 import { useRvbAuth } from "../../contexts/RvbAuthContext";
 
@@ -107,7 +106,7 @@ const translations = {
       chats: { title: "Chats", description: "Official chats, private conversations and custom groups." },
       notifications: { title: "Notifications & Activity", description: "RVB notifications, statuses and activity history." },
       directory: { title: "Directory", description: "Search people and accounts by name, @tag or role." },
-      settings: { title: "Settings", description: "Shared HSH / RVB application settings." },
+      settings: { title: "Settings", description: "RVB personal preferences and company business configuration." },
     },
   },
   fr: {
@@ -145,7 +144,7 @@ const translations = {
       chats: { title: "Discussions", description: "Chats officiels, conversations privées et groupes personnalisés." },
       notifications: { title: "Notifications et activité", description: "Notifications RVB, statuts et historique d'activité." },
       directory: { title: "Annuaire", description: "Rechercher personnes et comptes par nom, @tag ou rôle." },
-      settings: { title: "Paramètres", description: "Paramètres d'application partagés HSH / RVB." },
+      settings: { title: "Paramètres", description: "Préférences personnelles R.V.B. et configuration d'entreprise." },
     },
   },
   ar: {
@@ -183,7 +182,7 @@ const translations = {
       chats: { title: "المحادثات", description: "المحادثات الرسمية والخاصة والمجموعات المخصصة." },
       notifications: { title: "الإشعارات والنشاط", description: "إشعارات RVB والحالات وسجل النشاط." },
       directory: { title: "الدليل", description: "البحث عن الأشخاص والحسابات بالاسم أو @tag أو الدور." },
-      settings: { title: "الإعدادات", description: "إعدادات التطبيق المشتركة بين HSH و RVB." },
+      settings: { title: "الإعدادات", description: "تفضيلات شخصية R.V.B. وإعدادات الشركة." },
     },
   },
 } as const;
@@ -224,13 +223,11 @@ export default function RvbShell({
 
   useEffect(() => {
     async function loadSettings() {
-      const stored = await settingsService.get();
+      const stored = await rvbUiPreferencesService.get().catch(() => DEFAULT_SETTINGS);
       if (stored) {
         setSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
-      } else {
-        await settingsService.save(DEFAULT_SETTINGS);
       }
     }
     loadSettings();
@@ -245,17 +242,17 @@ export default function RvbShell({
         document.documentElement.dir = getDirection(customEvent.detail.language);
         return;
       }
-      settingsService.get().then((stored) => {
+      rvbUiPreferencesService.get().then((stored) => {
         if (!stored) return;
         setSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       });
     };
-    window.addEventListener(SETTINGS_EVENT, readSettings);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
     window.addEventListener("storage", readSettings);
     return () => {
-      window.removeEventListener(SETTINGS_EVENT, readSettings);
+      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
       window.removeEventListener("storage", readSettings);
     };
   }, []);
@@ -336,6 +333,8 @@ export default function RvbShell({
     const next = getSavedTheme() === "dark" ? "light" : "dark";
     applyTheme(next);
     setDark(next === "dark");
+    // Persist personal theme preference (lightweight localStorage + account if authenticated)
+    try { void rvbUiPreferencesService.setTheme(next as any); } catch {}
   }
 
   const { user, logout } = useRvbAuth();
@@ -654,3 +653,4 @@ export default function RvbShell({
     </div>
   );
 }
+

@@ -179,7 +179,7 @@ export const rvbAuthService = {
     return data.account;
   },
 
-  async getPreferences(): Promise<{ notifications: Record<string, boolean> }> {
+  async getPreferences(): Promise<{ notifications: Record<string, boolean>; ui?: { language?: string; theme?: string } }> {
     const token = getAccessToken();
     const res = await fetch(`${AUTH_BASE}/preferences`, {
       method: "GET",
@@ -191,15 +191,22 @@ export const rvbAuthService = {
     return data.preferences;
   },
 
-  async updatePreferences(notifications: Record<string, boolean>): Promise<any> {
+  async updatePreferences(prefs: Record<string, boolean> | { notifications?: Record<string, boolean>; ui?: { language?: string; theme?: string } }): Promise<any> {
     const token = getAccessToken();
+    // Backward compat: if plain notifications map passed without wrapper keys
+    let body: any;
+    if (prefs && typeof prefs === "object" && ("notifications" in (prefs as any) || "ui" in (prefs as any))) {
+      body = prefs;
+    } else {
+      body = { notifications: prefs };
+    }
     const res = await fetch(`${AUTH_BASE}/preferences`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ notifications }),
+      body: JSON.stringify(body),
       credentials: "include",
     });
     const data = await handleResponse<{ success: boolean; preferences: any }>(res);

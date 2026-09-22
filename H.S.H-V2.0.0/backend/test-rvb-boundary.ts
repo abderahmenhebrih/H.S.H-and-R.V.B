@@ -2,14 +2,24 @@ import fs from "fs";
 import path from "path";
 
 const frontendRvb = path.resolve(__dirname, "../frontend/app/rvb");
+const frontendRvbComp = path.resolve(__dirname, "../frontend/src/components/rvb");
 const forbiddenPatterns = [
   "src/lib/database/db",
+  "settings.service",
+  "settings.repository",
+  "lib/database/db",
   "src/services/worker.service",
   "src/services/supplier.service",
   "src/services/customer.service",
   "src/services/purchase.service",
   "src/services/sale.service",
   "src/services/payment.service",
+  "src/repositories/worker.repository",
+  "src/repositories/supplier.repository",
+  "src/repositories/customer.repository",
+  "src/repositories/purchase.repository",
+  "src/repositories/sale.repository",
+  "src/repositories/product.repository",
   "services/operations/worker",
   "services/operations/supplier",
   "services/operations/customer",
@@ -18,6 +28,7 @@ const forbiddenPatterns = [
   "services/operations/payment",
   "from \"@/src/lib/database",
   "from '@/src/lib/database",
+  "triggerSync",
 ];
 
 const allowedPresentation = [
@@ -41,7 +52,10 @@ if (!fs.existsSync(frontendRvb)) {
   console.error(`Frontend RVB dir not found: ${frontendRvb}`);
   process.exit(1);
 }
-const files = walk(frontendRvb);
+let files = walk(frontendRvb);
+if (fs.existsSync(frontendRvbComp)) {
+  files = files.concat(walk(frontendRvbComp));
+}
 for (const file of files) {
   const content = fs.readFileSync(file, "utf8");
   for (const pat of forbiddenPatterns) {

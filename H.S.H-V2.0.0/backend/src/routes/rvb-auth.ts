@@ -15,6 +15,7 @@ import {
   toSafeRvbAccount,
 } from "../lib/rvb-auth";
 import { requireRvbAuth, type RvbAuthRequest } from "../middleware/rvb-auth";
+import { rateLimit, ipKey, accountKey } from "../middleware/rateLimiter";
 
 function safeDisconnectSession(sessionId: string | null | undefined) {
   if (!sessionId) return;
@@ -484,24 +485,75 @@ router.patch("/profile", requireRvbAuth as any, async (req: RvbAuthRequest, res)
   }
 });
 
-// PATCH /api/rvb/auth/preferences - personal notification preferences
+// PATCH /api/rvb/auth/preferences - personal preferences: notifications + ui {language, theme}
 router.patch("/preferences", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
-    const { notifications } = req.body as any;
-    const allowedKeys = ["chats", "mentions", "requests", "orders", "statusUpdates", "reminders"];
-    if (!notifications || typeof notifications !== "object") { res.status(400).json({ success: false, code: "RVB_PREFERENCES_INVALID" }); return; }
-    const sanitized: any = {};
-    for (const k of allowedKeys) {
-      if (k in notifications) sanitized[k] = !!notifications[k];
-    }
-    // Ensure booleans
+    const { notifications, ui } = req.body as any;
+    const allowedNotifKeys = ["chats", "mentions", "requests", "orders", "statusUpdates", "reminders"];
+    const hasNotifications = notifications !== undefined;
+    const hasUi = ui !== undefined;
+    if (!hasNotifications && !hasUi) { res.status(400).json({ success: false, code: "RVB_PREFERENCES_INVALID" }); return; }
+    if (hasNotifications && (typeof notifications !== "object" || Array.isArray(notifications))) { res.status(400).json({ success: false, code: "RVB_PREFERENCES_INVALID" }); return; }
+    if (hasUi && (typeof ui !== "object" || Array.isArray(ui))) { res.status(400).json({ success: false, code: "RVB_PREFERENCES_INVALID" }); return; }
+
     const account: any = await RvbAccountModel.findOne({ id: user.accountId });
     if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
     const current = account.preferences || {};
-    const next = { ...current, notifications: { ...(current.notifications || {}), ...sanitized } };
-    // Fill defaults for missing keys
-    for (const k of allowedKeys) if (!(k in next.notifications)) next.notifications[k] = true;
+    const next: any = { ...current };
+
+    if (hasNotifications) {
+      const sanitized: any = {};
+      for (const k of allowedNotifKeys) {
+        if (k in notifications) sanitized[k] = !!notifications[k];
+      }
+      // If client sent empty notifications object, treat as no-op for that group? Keep existing
+      if (Object.keys(sanitized).length === 0 && Object.keys(notifications).length > 0) {
+        // invalid keys only, but not error; preserve existing
+      } else if (Object.keys(sanitized).length > 0) {
+        next.notifications = { ...(current.notifications || {}), ...sanitized };
+      } else if (!current.notifications) {
+        next.notifications = {};
+      }
+      // Fill defaults for missing keys
+      const allDefaults = { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true } as any;
+      if (!next.notifications) next.notifications = { ...allDefaults };
+      for (const k of allowedNotifKeys) if (!(k in next.notifications)) next.notifications[k] = true;
+    } else {
+      // ensure notifications defaults exist even if not being updated
+      if (!next.notifications) next.notifications = { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true };
+      else {
+        const allDefaults = { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true } as any;
+        for (const k of allowedNotifKeys) if (!(k in next.notifications)) next.notifications[k] = true;
+      }
+    }
+
+    if (hasUi) {
+      const sanitizedUi: any = {};
+      if ("language" in ui) {
+        const l = String(ui.language).trim();
+        if (!["en", "fr", "ar"].includes(l)) { res.status(400).json({ success: false, code: "RVB_LANGUAGE_INVALID" }); return; }
+        sanitizedUi.language = l;
+      }
+      if ("theme" in ui) {
+        const th = String(ui.theme).trim();
+        if (!["light", "dark"].includes(th)) { res.status(400).json({ success: false, code: "RVB_THEME_INVALID" }); return; }
+        sanitizedUi.theme = th;
+      }
+      if (Object.keys(sanitizedUi).length === 0) { res.status(400).json({ success: false, code: "RVB_PREFERENCES_INVALID" }); return; }
+      next.ui = { ...(current.ui || {}), ...sanitizedUi };
+      // Fill defaults for missing ui keys if partially present
+      if (!next.ui.language) next.ui.language = "en";
+      if (!next.ui.theme) next.ui.theme = "light";
+    } else {
+      // ensure ui defaults exist for future reads, but do not overwrite if already present
+      if (!next.ui) next.ui = { language: "en", theme: "light" };
+      else {
+        if (!next.ui.language) next.ui.language = "en";
+        if (!next.ui.theme) next.ui.theme = "light";
+      }
+    }
+
     account.preferences = next;
     account.updatedAt = Date.now();
     await account.save();
@@ -518,10 +570,17 @@ router.get("/preferences", requireRvbAuth as any, async (req: RvbAuthRequest, re
     const user = req.rvbUser!;
     const account: any = await RvbAccountModel.findOne({ id: user.accountId }).lean();
     if (!account) { res.status(404).json({ success: false, code: "RVB_ACCOUNT_NOT_FOUND" }); return; }
-    const prefs = account.preferences || { notifications: { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true } };
-    // Ensure defaults
-    const defaults = { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true };
+    const prefs: any = account.preferences || {};
+    // Ensure notifications defaults
+    const defaults = { chats: true, mentions: true, requests: true, orders: true, statusUpdates: true, reminders: true } as any;
+    if (!prefs.notifications || typeof prefs.notifications !== "object") prefs.notifications = { ...defaults };
     for (const k of Object.keys(defaults) as any[]) if (!(k in (prefs.notifications || {}))) prefs.notifications[k] = (defaults as any)[k];
+    // Ensure ui defaults
+    if (!prefs.ui || typeof prefs.ui !== "object") prefs.ui = { language: "en", theme: "light" };
+    else {
+      if (!["en", "fr", "ar"].includes(prefs.ui.language)) prefs.ui.language = "en";
+      if (!["light", "dark"].includes(prefs.ui.theme)) prefs.ui.theme = "light";
+    }
     res.json({ success: true, preferences: prefs });
   } catch (e) {
     console.error("get preferences failed", e);
@@ -555,8 +614,8 @@ router.post("/sessions/revoke-others", requireRvbAuth as any, async (req: RvbAut
   }
 });
 
-// POST /api/rvb/auth/change-password
-router.post("/change-password", requireRvbAuth as any, async (req: RvbAuthRequest, res) => {
+// POST /api/rvb/auth/change-password - per-account rate limit (after auth)
+router.post("/change-password", requireRvbAuth as any, rateLimit({ windowMs: 60 * 1000, max: 20, key: accountKey }) as any, async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const { currentPassword, newPassword, confirmPassword } = req.body as any;

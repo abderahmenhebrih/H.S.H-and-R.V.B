@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import { requireRvbAuth } from "../middleware/rvb-auth";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { RvbAccountModel } from "../models/rvb-account.model";
@@ -19,7 +19,7 @@ router.use(requireRvbAuth as any);
 function sanitize(doc: any) {
   if (!doc) return null;
   const obj = doc.toObject ? doc.toObject() : doc;
-  const { _id, __v, ...rest } = obj;
+  const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = obj;
   return rest;
 }
 
@@ -32,19 +32,19 @@ async function getLinkedEntity(account: any) {
     if (type === "worker") {
       const doc: any = await WorkerModel.findOne({ id }).lean();
       if (!doc) return null;
-      const { _id, __v, ...rest } = doc;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = doc;
       return { type, ...rest };
     }
     if (type === "supplier") {
       const doc: any = await SupplierModel.findOne({ id }).lean();
       if (!doc) return null;
-      const { _id, __v, ...rest } = doc;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = doc;
       return { type, ...rest };
     }
     if (type === "customer") {
       const doc: any = await CustomerModel.findOne({ id }).lean();
       if (!doc) return null;
-      const { _id, __v, ...rest } = doc;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = doc;
       return { type, ...rest };
     }
   } catch {}
@@ -102,7 +102,7 @@ router.get("/worker", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_WORKER_NOT_FOUND" });
       return;
     }
-    const { _id, __v, ...rest } = worker;
+    const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = worker;
     res.json({ success: true, worker: rest });
   } catch (e: any) {
     console.error("portal worker failed", e);
@@ -128,7 +128,7 @@ router.get("/worker/financial-events", async (req: RvbAuthRequest, res) => {
     // Filtered server-side: always by linked workerId, ignore query
     const events = await WorkerFinancialEventModel.find({ workerId: linkedId }).sort({ createdAt: -1 }).lean();
     const cleaned = events.map((d: any) => {
-      const { _id, __v, ...rest } = d;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
     res.json({ success: true, workerId: linkedId, events: cleaned });
@@ -155,7 +155,7 @@ router.get("/worker/activities", async (req: RvbAuthRequest, res) => {
     }
     const activities = await WorkerActivityModel.find({ workerId: linkedId }).sort({ createdAt: -1 }).limit(200).lean();
     const cleaned = activities.map((d: any) => {
-      const { _id, __v, ...rest } = d;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
     res.json({ success: true, workerId: linkedId, activities: cleaned });
@@ -185,7 +185,7 @@ router.get("/supplier", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_SUPPLIER_NOT_FOUND" });
       return;
     }
-    const { _id, __v, ...rest } = supplier;
+    const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = supplier;
     res.json({ success: true, supplier: rest });
   } catch (e: any) {
     console.error("portal supplier failed", e);
@@ -210,7 +210,7 @@ router.get("/supplier/purchases", async (req: RvbAuthRequest, res) => {
     }
     const purchases = await PurchaseModel.find({ supplierId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
     const cleaned = purchases.map((d: any) => {
-      const { _id, __v, ...rest } = d;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
     res.json({ success: true, supplierId: linkedId, purchases: cleaned });
@@ -237,7 +237,7 @@ router.get("/supplier/payments", async (req: RvbAuthRequest, res) => {
     }
     const payments = await PaymentModel.find({ entityType: "supplier", entityId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
     const cleaned = payments.map((d: any) => {
-      const { _id, __v, ...rest } = d;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
     res.json({ success: true, supplierId: linkedId, payments: cleaned });
@@ -267,7 +267,7 @@ router.get("/customer", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_CUSTOMER_NOT_FOUND" });
       return;
     }
-    const { _id, __v, ...rest } = customer;
+    const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = customer;
     res.json({ success: true, customer: rest });
   } catch (e: any) {
     console.error("portal customer failed", e);
@@ -292,7 +292,7 @@ router.get("/customer/sales", async (req: RvbAuthRequest, res) => {
     }
     const sales = await SaleModel.find({ customerId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
     const cleaned = sales.map((d: any) => {
-      const { _id, __v, ...rest } = d;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
     res.json({ success: true, customerId: linkedId, sales: cleaned });
@@ -319,7 +319,7 @@ router.get("/customer/payments", async (req: RvbAuthRequest, res) => {
     }
     const payments = await PaymentModel.find({ entityType: "customer", entityId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
     const cleaned = payments.map((d: any) => {
-      const { _id, __v, ...rest } = d;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
     res.json({ success: true, customerId: linkedId, payments: cleaned });
@@ -346,7 +346,7 @@ router.get("/customer/orders", async (req: RvbAuthRequest, res) => {
     }
     const orders = await CustomerOrderModel.find({ customerId: linkedId }).sort({ submittedAt: -1 }).lean();
     const cleaned = orders.map((d: any) => {
-      const { _id, __v, ...rest } = d;
+      const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
     // Enrich with customerName
@@ -364,3 +364,5 @@ router.get("/customer/orders", async (req: RvbAuthRequest, res) => {
 });
 
 export default router;
+
+

@@ -37,19 +37,26 @@ export async function createCustomerRequest(input: {
   }
   if (type === "insert_shipment") {
     if (!items || !Array.isArray(items) || items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
-    const normalized = validateItems(items);
-    for (const it of normalized) {
+    // Price-authoritative: ignore client price, use Product.price
+    const validated = validateItems(items);
+    const authoritative: any[] = [];
+    for (const it of validated) {
       const product: any = await ProductModel.findOne({ id: it.productId }).lean();
       if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
+      const authPrice = Number(product.price);
+      if (!Number.isFinite(authPrice) || authPrice < 0) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product price invalid: ${it.productId}`);
+      const weightKg = Number(it.weightKg);
+      const totalLine = Math.round(weightKg * authPrice * 100) / 100;
+      authoritative.push({ productId: it.productId, quantity: it.quantity, weightKg, price: authPrice, total: totalLine });
     }
+    const serverTotal = computeTotal(authoritative);
+    (input as any).items = authoritative;
+    (input as any).total = serverTotal;
+    items = authoritative as any;
+    total = serverTotal;
     if (description !== undefined && description !== null && typeof description === "string" && description.length > MAX_DESCRIPTION_LENGTH) {
       throw codeError("RVB_DESCRIPTION_TOO_LONG", 400, `description too long (${description.length} > ${MAX_DESCRIPTION_LENGTH})`);
     }
-    const serverTotal = computeTotal(normalized);
-    (input as any).items = normalized;
-    (input as any).total = serverTotal;
-    items = normalized as any;
-    total = serverTotal;
   }
   if (type === "discrepancy" && !description?.trim()) throw codeError("RVB_DESCRIPTION_REQUIRED", 400);
   if (type === "discrepancy" && description && description.length > MAX_DESCRIPTION_LENGTH) {

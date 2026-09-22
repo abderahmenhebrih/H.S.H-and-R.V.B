@@ -11,7 +11,7 @@ import { allocateRevision } from "../sync/rvb-sync-helper";
 
 const router = Router();
 router.use(requireRvbAuth as any);
-router.use(requireRvbRole("manager", "admin") as any);
+router.use(requireRvbRole("manager", "admin", "supervisor") as any);
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;

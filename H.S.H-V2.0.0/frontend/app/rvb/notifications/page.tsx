@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import RvbShell from "../../../src/components/rvb/RvbShell";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
-import { settingsService } from "../../../src/services/settings.service";
-import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { DEFAULT_SETTINGS } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbNotificationService } from "../../../src/services/rvb-notification.service";
 import { rvbActivityService } from "../../../src/services/rvb-activity.service";
@@ -277,13 +277,13 @@ function NotificationsInner() {
   const [actError, setActError] = useState("");
 
   useEffect(() => {
-    settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
     };
-    window.addEventListener(SETTINGS_EVENT, h as any);
-    return () => window.removeEventListener(SETTINGS_EVENT, h as any);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
+    return () => window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
   }, []);
 
   useEffect(() => {
@@ -645,3 +645,4 @@ export default function RvbNotificationsPage() {
     </RvbAuthGuard>
   );
 }
+

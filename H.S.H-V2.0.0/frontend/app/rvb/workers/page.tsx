@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import RvbShell from "../../../src/components/rvb/RvbShell";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import StyledDatePicker from "../../../src/components/common/StyledDatePicker";
-import { settingsService } from "../../../src/services/settings.service";
-import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { DEFAULT_SETTINGS, formatCurrency } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbWorkerService } from "../../../src/services/rvb-worker.service";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
@@ -255,7 +255,7 @@ function RvbWorkersInner() {
   }, [t.failedLoad]);
 
   useEffect(() => {
-    settingsService.get().then((s) => { if (s) { setSettings(s); setPositions(s.workerPositions || []); } });
+    rvbUiPreferencesService.get().then((s) => { if (s) { setSettings(s); setPositions(s.workerPositions || []); } });
     rvbConfigService.get().then((c) => {
       if (c?.currency) setSettings((prev: any) => ({ ...prev, currency: c.currency }));
       if ((c as any)?.workerPositions) setPositions((c as any).workerPositions);
@@ -263,10 +263,10 @@ function RvbWorkersInner() {
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) { setSettings(ce.detail); setPositions(ce.detail.workerPositions || []); }
-      else settingsService.get().then((s) => { if (s) { setSettings(s); setPositions(s?.workerPositions || []); } });
+      else rvbUiPreferencesService.get().then((s) => { if (s) { setSettings(s); setPositions(s?.workerPositions || []); } });
     };
-    window.addEventListener(SETTINGS_EVENT, h);
-    return () => window.removeEventListener(SETTINGS_EVENT, h);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, h);
+    return () => window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h);
   }, []);
   useEffect(() => { void load(); }, [load]);
 
@@ -1177,3 +1177,4 @@ export default function RvbWorkersPage() {
     </RvbAuthGuard>
   );
 }
+

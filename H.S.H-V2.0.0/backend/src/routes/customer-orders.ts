@@ -2,9 +2,11 @@ import { Router } from "express";
 import { createCustomerOrder, listCustomerOrders, reviewCustomerOrder, cancelCustomerOrder, editCustomerOrder } from "../services/customer-order.service";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 
 const router = Router();
 router.use(requireRvbAuth as any);
+router.use(rateLimit({ windowMs: 60 * 1000, max: 30, key: accountKey }) as any);
 
 router.get("/", async (req: RvbAuthRequest, res) => {
   try {

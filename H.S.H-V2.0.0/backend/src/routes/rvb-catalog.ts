@@ -6,34 +6,51 @@ import { ProductModel } from "../models/product.model";
 const router = Router();
 router.use(requireRvbAuth as any);
 
-// GET /api/rvb/catalog/products?for=supplier|customer -> returns safe fields
+// GET /api/rvb/catalog/products?for=supplier|customer -> returns safe fields without inventory leak
 router.get("/products", async (req: RvbAuthRequest, res) => {
   try {
     const forParamRaw = (req.query as any).for;
     const forParam = Array.isArray(forParamRaw) ? forParamRaw[0] : forParamRaw;
     const scope = typeof forParam === "string" ? forParam.trim().toLowerCase() : null;
-    // Validate for param if provided
-    if (scope && !["supplier", "customer"].includes(scope)) {
+    if (!scope || !["supplier", "customer"].includes(scope)) {
       res.status(400).json({ success: false, code: "RVB_CATALOG_FOR_INVALID", message: "for must be supplier or customer" });
       return;
     }
 
-    // All authenticated can view catalog; no role filtering needed, but we ensure ownership is not leaked
+    const role = req.rvbUser!.role;
+    // Enforce catalog scope against role
+    if (scope === "customer") {
+      if (!["customer", "manager", "admin", "supervisor"].includes(role)) {
+        res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+        return;
+      }
+    } else if (scope === "supplier") {
+      if (!["supplier", "manager", "admin"].includes(role)) {
+        res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
+        return;
+      }
+    }
+
     const products = await ProductModel.find().sort({ name: 1 }).lean();
 
-    // Safe fields: id, name, price, quantity, weightKg, description, taxProfileId
-    // Do not expose internal sync fields beyond light qty? Provide all safe.
-    const safe = products.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      quantity: p.quantity,
-      weightKg: p.weightKg,
-      description: p.description || null,
-      taxProfileId: p.taxProfileId || null,
-    }));
+    // Safe DTOs: never expose exact quantity/weightKg/taxProfileId to portal
+    // Customer: id, name, price, description, available (derived, not exact stock)
+    // Supplier: id, name, price, description (available optional)
+    const safe = products.map((p: any) => {
+      const base: any = {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        description: p.description || null,
+      };
+      // Add available boolean so customer can see if item is orderable without exact inventory
+      const qty = Number(p.quantity) || 0;
+      const w = Number(p.weightKg) || 0;
+      base.available = qty > 0 && w > 0;
+      return base;
+    });
 
-    res.json({ success: true, for: scope || null, products: safe });
+    res.json({ success: true, for: scope, products: safe });
   } catch (e: any) {
     console.error("GET catalog products failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });

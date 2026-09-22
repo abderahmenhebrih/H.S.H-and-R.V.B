@@ -43,8 +43,8 @@ Any request with revoked/expired `sessionId` → `401 { code: "RVB_SESSION_REVOK
 ### Onboarding
 `GET /api/rvb/auth/me` returns `account` with `onboardingStatus: pending|complete`, `mustChangePassword`, `profilePicture`.
 `PATCH /api/rvb/auth/profile` (self, `displayName` ≤80, `profilePicture` data URL <250k)
-`PATCH /api/rvb/auth/preferences` (notifications: chats/mentions/requests/orders/statusUpdates/reminders)
-`GET/PATCH /api/rvb/auth/preferences`
+`PATCH /api/rvb/auth/preferences` body `{ notifications?: { chats, mentions, requests, orders, statusUpdates, reminders }, ui?: { language: "en"|"fr"|"ar", theme: "light"|"dark" } }` — notifications and ui are separate groups; patch preserves other group, fills defaults `ui: { language:"en", theme:"light" }`. Language is personal R.V.B preference (`preferences.ui.language` authoritative for authenticated users; pre-login uses localStorage fallback `rvb-ui-language`, on login account preference syncs and updates presentation without H.S.H Dexie).
+`GET /api/rvb/auth/preferences` → `{ notifications: { chats, mentions, requests, orders, statusUpdates, reminders }, ui: { language, theme } }`
 `POST /api/rvb/auth/onboarding` Body: `{ profilePicture: "data:image/jpeg;base64,..." }` — validates `data:image/` and <250k (frontend compresses 512×512 JPEG <200k via canvas). Sets `profilePicture`, `onboardingStatus=complete`. Derived from `req.rvbUser.accountId` (no `accountId` param).
 
 **Guard order (web, mobile should enforce similar):**
@@ -101,7 +101,7 @@ Body worker request: `{ workerId, type:"payment"|"loan"|"discrepancy", amount?, 
 
 `GET/POST /api/rvb/customer-requests`, `POST .../:id/review` — `insert_shipment` (customer self, `items` validated, `under_review` → `Sale` on accept), `discrepancy`.
 
-`GET/POST /api/rvb/customer-orders`, `PATCH /api/rvb/customer-orders/:id` (edit only `under_review`), `POST /api/rvb/customer-orders/:id/cancel`, `POST /api/rvb/customer-orders/:id/review` (manager/admin/supervisor per role). Structured validation: `items` array 1..50, `productId` exists, `quantity>0`, `weightKg>=0`, `price>=0`, `description<=2000`; server computes `item.total = round(weightKg*price)` and `order.total = sum(item.total)` (H.S.H purchase/sale/invoice semantics, `weight*price - discount`), ignores client total; acceptance revalidates stock `quantity`/`weightKg`.
+`GET/POST /api/rvb/customer-orders`, `PATCH /api/rvb/customer-orders/:id` (edit only `under_review`), `POST /api/rvb/customer-orders/:id/cancel`, `POST /api/rvb/customer-orders/:id/review` (manager/admin/supervisor per role). Structured validation: `items` array 1..50, `productId` exists, `quantity>0`, `weightKg>=0`, `price>=0`, `description<=2000`; server computes `item.total = round(weightKg*price)` and `order.total = sum(item.total)` (H.S.H semantics `weight*price`), ignores client total; **Customer price is server-authoritative**: at creation/edit (customer-originated) `price` is replaced with current `Product.price` (forged `price:0` overwritten), then recomputed. Supplier `new_supply` price is treated as proposal (under_review, no inventory change until accepted via `Purchase`). Manager/Admin/Supervisor during `Edit then Accept` may provide reviewed price (allowed, revalidated); otherwise stored authoritative price retained. Acceptance revalidates stock `quantity`/`weightKg` and weight is user-entered starting at `0`, not current inventory `weightKg`.
 
 Errors: `400 RVB_ITEMS_TOO_MANY|PRODUCT_REQUIRED|QUANTITY_INVALID|WEIGHT_INVALID|PRICE_INVALID|DESCRIPTION_TOO_LONG`, `404 RVB_PRODUCT_NOT_FOUND`, `400 RVB_INSUFFICIENT_STOCK`, `409 RVB_ORDER_NOT_UNDER_REVIEW`.
 
@@ -109,9 +109,10 @@ Errors: `400 RVB_ITEMS_TOO_MANY|PRODUCT_REQUIRED|QUANTITY_INVALID|WEIGHT_INVALID
 
 `GET /api/rvb/directory?search=&role=&limit=` (auth, returns `RvbAccount` identities, no financial fields). For chat creation: `POST /api/rvb/chats/dm`, `POST /api/rvb/chats/group`.
 
-`GET /api/rvb/config` (all auth readable) → `{ currency, language }`; `PATCH /api/rvb/config` (manager/admin only) → `SyncChange settings`.
+`GET /api/rvb/config` (all auth readable) → `{ currency, customerTypes, workerPositions }` — `currency` is company/business setting (manager/admin writable), readable by all authenticated. Language is **personal** via `preferences.ui.language`, not from config.
+`PATCH /api/rvb/config` (manager/admin only, per `requireRvbRole`) → `SyncChange settings` (serverRevision, H.S.H incremental sync). Worker/Supplier/Customer/Supervisor read-only currency.
 
-`GET /api/rvb/catalog/products?for=customer|supplier` → safe product catalog `[{id,name,price,quantity,weightKg,description}]` (no `serverRevision`, no cost). Validate `for` enum.
+`GET /api/rvb/catalog/products?for=customer|supplier` → safe DTO `[{id,name,price,description,available}]` — **no** `quantity`/`weightKg`/`taxProfileId`/`serverRevision` leak. `available` boolean derived without exact stock. `for=customer` allowed for customer/manager/admin/supervisor; `for=supplier` allowed for supplier/manager/admin; worker/supplier mismatch → `403 RVB_FORBIDDEN`. `for` required enum; missing/invalid → `400 RVB_CATALOG_FOR_INVALID`. Manager/Admin internal exact stock via management endpoints if needed.
 
 ## NOTIFICATIONS
 
@@ -131,11 +132,11 @@ Channel: `hsh` (H.S.H sync) vs `rvb` (R.V.B); index `channel+sourceEventId` uniq
 
 ## CHAT REST APIs
 
-`GET /api/rvb/chats?category=main|secondary&search=`
+`GET /api/rvb/chats?category=main|secondary&search=` — **Web deep-link**: `?category=main|secondary` selects initial tab (invalid/missing → `main`); tab change syncs URL via `router.replace` without reload. **Mobile**: use in-memory `Main`/`Secondary` state, not query param.
 `GET /api/rvb/chats/:id`
 `POST /api/rvb/chats/dm { otherAccountId }` / `POST /api/rvb/chats/group { name, memberIds }`
 `GET /api/rvb/chats/:id/messages?before=&limit=&search=` (participant only, soft delete preview)
-`POST /api/rvb/chats/:id/messages { content, replyToMessageId?, reminderMinutes?:30|60|120 }` (server computes `dueAt`, creates per-recipient `RvbChatReminder` only for mentioned/reply recipients, no generic flood)
+`POST /api/rvb/chats/:id/messages { content, replyToMessageId?, reminderMinutes?:30|60|120 }` (per-account rate limit `10s 20`, `req.rvbUser.accountId` fallback IP; server computes `dueAt`, creates per-recipient `RvbChatReminder` only for mentioned/reply recipients, no generic flood)
 `PATCH /api/rvb/chats/messages/:messageId` (edit <15m, own only)
 `DELETE /api/rvb/chats/messages/:messageId` (soft)
 `POST /api/rvb/chats/messages/:messageId/reaction` (toggle 🤝)
@@ -186,5 +187,10 @@ Canvas crop 512×512 max, JPEG quality ladder → <200k (backend <250k). `POST /
 
 - Never commit `.env` or secrets.
 - Do not use `AsyncStorage` for refresh token.
-- Do not trust client `total`; server recomputes.
+- Do not trust client `total` **or customer `price`**; server recomputes from authoritative `Product.price` (customer forged price overwritten, supplier price is proposal).
+- No `quantity`/`weightKg`/`taxProfileId` leak via catalog; `available` boolean only. New supply/order `weightKg`/`quantity` are user-entered starting at `0`, not current inventory weight.
+- Portal self-service DTOs (`/api/rvb/portal/*`) return explicit safe DTOs without `syncStatus`/`serverRevision`/`lastSyncedAt` internal metadata (management APIs may retain more).
 - Deep links (`route`) are hints; backend revalidates ownership.
+- R.V.B has **no H.S.H Dexie dependency** (`settingsService`/`settingsRepository`/`lib/database/db`/`H.S.H repositories` forbidden under `/rvb`); settings are via `rvbUiPreferencesService` + `preferences.ui` + `rvbConfigService` (company currency) + lightweight `localStorage` theme (`hebrih-theme`). `triggerSync()` never reachable from `/rvb` settings.
+- Rate limiting: unauthenticated (`login`/`refresh`) IP-based; authenticated submissions (`chat send`, `worker/supplier/customer requests`, `customer orders`) per-account via `req.rvbUser.accountId` after `requireRvbAuth`, IP fallback only if auth context unexpectedly missing (prevents NAT penalization).
+- Supervisor: customer CRUD + orders/requests allowed (`manager`/`admin`/`supervisor`); workers/suppliers/accounts remain `403`.

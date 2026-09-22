@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import RvbShell from "../../../src/components/rvb/RvbShell";
-import { settingsService } from "../../../src/services/settings.service";
-import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { DEFAULT_SETTINGS } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
@@ -281,6 +282,8 @@ function getConversationDisplayName(conv: Conversation, myId: string, t: any): s
 
 function ChatsInner() {
   const { user } = useRvbAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const lang = (settings.language as Language) || "en";
   const t = (TR as any)[lang] ?? TR.en;
@@ -288,6 +291,25 @@ function ChatsInner() {
   const myId = (user as any)?.accountId || (user as any)?.id || "";
 
   const [category, setCategory] = useState<"main" | "secondary">("main");
+
+  // Deep-link handling: ?category=main|secondary
+  useEffect(() => {
+    const cat = searchParams.get("category");
+    if (cat === "secondary" || cat === "main") {
+      setCategory(cat);
+    } else {
+      setCategory("main");
+    }
+  }, [searchParams]);
+
+  const handleCategoryChange = (cat: "main" | "secondary") => {
+    setCategory(cat);
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("category", cat);
+      router.replace(`/rvb/chats?${params.toString()}`);
+    } catch {}
+  };
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [searchInput, setSearchInput] = useState("");
@@ -325,13 +347,13 @@ function ChatsInner() {
 
   // Settings
   useEffect(() => {
-    settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
     };
-    window.addEventListener(SETTINGS_EVENT, h as any);
-    return () => window.removeEventListener(SETTINGS_EVENT, h as any);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
+    return () => window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
   }, []);
 
   useEffect(() => {
@@ -627,7 +649,7 @@ function ChatsInner() {
     try {
       const conv = await chatService.createDM(otherId);
       setShowNewChat(null);
-      setCategory("secondary");
+      handleCategoryChange("secondary");
       await loadConversations();
       void handleSelect(conv.id);
     } catch (e: any) { alert(e?.data?.code || e?.message || "DM failed"); }
@@ -637,7 +659,7 @@ function ChatsInner() {
     try {
       const conv = await chatService.createGroup({ name: groupName.trim(), avatar: groupAvatar, memberIds: groupMembers });
       setShowNewChat(null); setGroupName(""); setGroupMembers([]); setGroupAvatar(null);
-      setCategory("secondary");
+      handleCategoryChange("secondary");
       await loadConversations();
       void handleSelect(conv.id);
     } catch (e: any) { alert(e?.data?.code || e?.message || "Group failed"); }
@@ -684,8 +706,8 @@ function ChatsInner() {
           {/* Left */}
           <div className={`${styles.leftPanel} ${mobileShowChat ? styles.leftPanelHiddenMobile : ""}`}>
             <div className={styles.leftTabsBar} role="tablist">
-              <button role="tab" aria-selected={category === "main"} className={`${styles.leftTab} ${category === "main" ? styles.leftTabActive : ""}`} onClick={() => setCategory("main")}>{t.main}</button>
-              <button role="tab" aria-selected={category === "secondary"} className={`${styles.leftTab} ${category === "secondary" ? styles.leftTabActive : ""}`} onClick={() => setCategory("secondary")}>{t.secondary}</button>
+              <button role="tab" aria-selected={category === "main"} className={`${styles.leftTab} ${category === "main" ? styles.leftTabActive : ""}`} onClick={() => handleCategoryChange("main")}>{t.main}</button>
+              <button role="tab" aria-selected={category === "secondary"} className={`${styles.leftTab} ${category === "secondary" ? styles.leftTabActive : ""}`} onClick={() => handleCategoryChange("secondary")}>{t.secondary}</button>
             </div>
 
             <div className={styles.conversationList}>
@@ -1099,3 +1121,4 @@ export default function RvbChatsPage() {
     </RvbAuthGuard>
   );
 }
+

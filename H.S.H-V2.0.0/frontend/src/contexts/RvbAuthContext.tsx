@@ -48,6 +48,18 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { void loadMe(); }, [loadMe]);
 
+  // After user is set, sync presentation language from account (authoritative)
+  useEffect(() => {
+    if (user) {
+      (async () => {
+        try {
+          const { rvbUiPreferencesService } = await import("../services/rvb-ui-preferences.service");
+          await rvbUiPreferencesService.syncFromAccount();
+        } catch {}
+      })();
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     const unsub = rvbAuthService.subscribeAuthFailure(() => {
       rvbAuthService.clearLocal();
@@ -59,6 +71,10 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (tag: string, password: string) => {
     const res = await rvbAuthService.login(tag, password);
     setUser(res.account);
+    try {
+      const { rvbUiPreferencesService } = await import("../services/rvb-ui-preferences.service");
+      await rvbUiPreferencesService.syncFromAccount();
+    } catch {}
     return res.account;
   }, []);
 

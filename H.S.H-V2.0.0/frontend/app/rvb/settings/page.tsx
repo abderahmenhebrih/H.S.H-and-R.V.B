@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import RvbShell from "../../../src/components/rvb/RvbShell";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
-import { settingsService } from "../../../src/services/settings.service";
-import { DEFAULT_SETTINGS, SETTINGS_EVENT, getDirection } from "../../../src/lib/settings";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { DEFAULT_SETTINGS, getDirection } from "../../../src/lib/settings";
 import type { Settings, Language, Currency } from "../../../src/types/settings/settings";
 import { getSavedTheme, applyTheme } from "../../../src/lib/theme";
 import { rvbAuthService } from "../../../src/services/rvb-auth.service";
@@ -17,19 +17,20 @@ import styles from "./page.module.css";
 const TR: Record<Language, any> = {
   en: {
     title: "Settings",
-    subtitle: "Manage shared preferences and personal account settings.",
+    subtitle: "Manage currency configuration and personal preferences.",
     nav: { general: "General", appearance: "Appearance", notifications: "Notifications", account: "Account & Security", about: "About" },
     general: {
       title: "General",
       language: "Language",
-      languageDesc: "Choose the application language.",
+      languageDesc: "Personal R.V.B preference — only affects your account.",
       currency: "Currency",
-      currencyDesc: "Currency used throughout the application.",
-      shared: "Shared with H.S.H",
-      confirmLangTitle: "Change application language?",
-      confirmLangDesc: "This change applies to both H.S.H and R.V.B.",
+      currencyDesc: "Company business setting — managed by Manager/Admin.",
+      shared: "Personal",
+      currencyShared: "Company setting",
+      confirmLangTitle: "Change language?",
+      confirmLangDesc: "This will update your personal R.V.B language preference.",
       confirmCurrTitle: "Change currency?",
-      confirmCurrDesc: "Display formatting will update in both H.S.H and R.V.B.",
+      confirmCurrDesc: "This will update company currency for all R.V.B users.",
       cancel: "Cancel", apply: "Apply",
     },
     appearance: { title: "Appearance", desc: "Choose how R.V.B looks.", light: "Light", dark: "Dark", lightDesc: "Bright cream interface", darkDesc: "Dark comfort mode", preview: "Preview" },
@@ -77,26 +78,27 @@ const TR: Record<Language, any> = {
       desc: "R.V.B is the management portal for white meat operations.",
       version: "Version",
       env: "Environment",
-      sharedNote: "H.S.H and R.V.B share application-level preferences such as language, theme and currency. Changes in one workspace appear in the other.",
+      sharedNote: "Language and theme are personal R.V.B preferences. Currency is a company setting managed by Manager/Admin. R.V.B does not use H.S.H offline storage.",
       openHsh: "Open H.S.H workspace",
     },
-    common: { sharedBadge: "Shared with H.S.H", save: "Save", saving: "Saving...", error: "Failed to save", retry: "Retry" },
+    common: { sharedBadge: "Personal", save: "Save", saving: "Saving...", error: "Failed to save", retry: "Retry" },
   },
   fr: {
     title: "Paramètres",
-    subtitle: "Gérez les préférences partagées et les paramètres personnels.",
+    subtitle: "Gérez la devise d'entreprise et vos préférences personnelles.",
     nav: { general: "Général", appearance: "Apparence", notifications: "Notifications", account: "Compte et sécurité", about: "À propos" },
     general: {
       title: "Général",
       language: "Langue",
-      languageDesc: "Choisissez la langue de l'application.",
+      languageDesc: "Préférence personnelle R.V.B — n'affecte que votre compte.",
       currency: "Devise",
-      currencyDesc: "Devise utilisée dans l'application.",
-      shared: "Partagé avec H.S.H",
+      currencyDesc: "Paramètre d'entreprise — géré par Manager/Admin.",
+      shared: "Personnel",
+      currencyShared: "Paramètre d'entreprise",
       confirmLangTitle: "Changer la langue ?",
-      confirmLangDesc: "Ce changement s'applique à H.S.H et R.V.B.",
+      confirmLangDesc: "Cela mettra à jour votre préférence linguistique personnelle.",
       confirmCurrTitle: "Changer la devise ?",
-      confirmCurrDesc: "L'affichage sera mis à jour dans H.S.H et R.V.B.",
+      confirmCurrDesc: "Cela mettra à jour la devise de l'entreprise pour tous les utilisateurs R.V.B.",
       cancel: "Annuler", apply: "Appliquer",
     },
     appearance: { title: "Apparence", desc: "Choisissez l'apparence de R.V.B.", light: "Clair", dark: "Sombre", lightDesc: "Interface claire crème", darkDesc: "Mode sombre", preview: "Aperçu" },
@@ -144,26 +146,27 @@ const TR: Record<Language, any> = {
       desc: "Portail de gestion des opérations viandes blanches.",
       version: "Version",
       env: "Environnement",
-      sharedNote: "H.S.H et R.V.B partagent langue, thème et devise. Les changements apparaissent dans les deux espaces.",
+      sharedNote: "La langue et le thème sont des préférences personnelles R.V.B. La devise est un paramètre d'entreprise géré par le Manager/Admin. R.V.B n'utilise pas le stockage hors ligne H.S.H.",
       openHsh: "Ouvrir H.S.H",
     },
-    common: { sharedBadge: "Partagé avec H.S.H", save: "Enregistrer", saving: "Enregistrement...", error: "Échec", retry: "Réessayer" },
+    common: { sharedBadge: "Personnel", save: "Enregistrer", saving: "Enregistrement...", error: "Échec", retry: "Réessayer" },
   },
   ar: {
     title: "الإعدادات",
-    subtitle: "إدارة التفضيلات المشتركة وإعدادات الحساب الشخصية.",
+    subtitle: "إدارة إعدادات العملة وتفضيلاتك الشخصية.",
     nav: { general: "عام", appearance: "المظهر", notifications: "الإشعارات", account: "الحساب والأمان", about: "حول" },
     general: {
       title: "عام",
       language: "اللغة",
-      languageDesc: "اختر لغة التطبيق.",
+      languageDesc: "تفضيل شخصي لـ R.V.B — يؤثر على حسابك فقط.",
       currency: "العملة",
-      currencyDesc: "العملة المستخدمة في التطبيق.",
-      shared: "مشترك مع H.S.H",
+      currencyDesc: "إعداد شركة — يُدار بواسطة المدير/المسؤول.",
+      shared: "شخصي",
+      currencyShared: "إعداد الشركة",
       confirmLangTitle: "تغيير اللغة؟",
-      confirmLangDesc: "ينطبق هذا على H.S.H و R.V.B.",
+      confirmLangDesc: "سيؤدي هذا إلى تحديث تفضيل اللغة الشخصي الخاص بك.",
       confirmCurrTitle: "تغيير العملة؟",
-      confirmCurrDesc: "سيتم تحديث العرض في H.S.H و R.V.B.",
+      confirmCurrDesc: "سيؤدي هذا إلى تحديث عملة الشركة لجميع مستخدمي R.V.B.",
       cancel: "إلغاء", apply: "تطبيق",
     },
     appearance: { title: "المظهر", desc: "اختر مظهر R.V.B.", light: "فاتح", dark: "داكن", lightDesc: "واجهة فاتحة", darkDesc: "وضع داكن", preview: "معاينة" },
@@ -211,10 +214,10 @@ const TR: Record<Language, any> = {
       desc: "بوابة إدارة عمليات اللحوم البيضاء.",
       version: "الإصدار",
       env: "البيئة",
-      sharedNote: "H.S.H و R.V.B يشتركان في اللغة والمظهر والعملة.",
+      sharedNote: "اللغة والمظهر تفضيلات شخصية لـ R.V.B. العملة إعداد شركة يُدار بواسطة المدير/المسؤول. لا يستخدم R.V.B تخزين H.S.H غير المتصل.",
       openHsh: "فتح H.S.H",
     },
-    common: { sharedBadge: "مشترك مع H.S.H", save: "حفظ", saving: "جارٍ الحفظ...", error: "فشل", retry: "إعادة" },
+    common: { sharedBadge: "شخصي", save: "حفظ", saving: "جارٍ الحفظ...", error: "فشل", retry: "إعادة" },
   },
 };
 
@@ -274,26 +277,24 @@ function SettingsInner() {
   const [pfpUploading, setPfpUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load shared settings - route-aware: for RVB use rvbConfigService for business config (currency)
+  // Load RVB presentation settings: language from account preferences, currency from company config
   useEffect(() => {
-    settingsService.get().then((s) => { if (s) setSettings(s); });
-    // Business config from backend for RVB
-    import("../../../src/services/rvb-config.service").then(({ rvbConfigService }) => {
+    rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); }).catch(()=>{});
+    // Also sync currency explicitly from config for freshness
+    import("@/src/services/rvb-config.service").then(({ rvbConfigService }) => {
       rvbConfigService.get().then((cfg) => {
         if (cfg?.currency) setSettings((prev) => ({ ...prev, currency: cfg.currency as any }));
-        // also sync language if backend has it
-        if ((cfg as any)?.language) setSettings((prev) => ({ ...prev, language: (cfg as any).language as any }));
       }).catch(()=>{});
     }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
     };
-    window.addEventListener(SETTINGS_EVENT, h as any);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
     const themeH = () => setDark(getSavedTheme() === "dark");
     window.addEventListener("hebrih-theme-change", themeH);
     window.addEventListener("storage", themeH);
-    return () => { window.removeEventListener(SETTINGS_EVENT, h as any); window.removeEventListener("hebrih-theme-change", themeH); window.removeEventListener("storage", themeH); };
+    return () => { window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h as any); window.removeEventListener("hebrih-theme-change", themeH); window.removeEventListener("storage", themeH); };
   }, []);
 
   // Load personal prefs
@@ -307,21 +308,13 @@ function SettingsInner() {
 
   useEffect(() => { setDisplayName(user?.displayName || ""); }, [user?.displayName]);
 
-  const updateShared = (next: Settings) => {
-    setSettings(next);
-    document.documentElement.lang = next.language;
-    document.documentElement.dir = getDirection(next.language);
-    settingsService.save(next).then(() => {
-      window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
-    });
-  };
-
   const handleLangSelect = (v: Language) => {
     if (v === settings.language) return;
     setPending({ type: "language", oldValue: settings.language, newValue: v });
   };
   const handleCurrSelect = (v: Currency) => {
     if (v === settings.currency) return;
+    // Only manager/admin may change currency; guard UI will disable for others
     setPending({ type: "currency", oldValue: settings.currency, newValue: v });
   };
   const confirmPending = async () => {
@@ -329,37 +322,32 @@ function SettingsInner() {
     setConfirmLoading(true);
     try {
       if (pending.type === "currency") {
-        // Business config via backend for RVB
-        const { rvbConfigService } = await import("../../../src/services/rvb-config.service");
-        try {
-          await rvbConfigService.update({ currency: pending.newValue });
-        } catch (e:any) {
-          // if not manager, fallback to local only (still show change locally)
-          // keep Dexie as fallback for personal view
-        }
+        const { rvbConfigService } = await import("@/src/services/rvb-config.service");
+        await rvbConfigService.update({ currency: pending.newValue });
         const next: Settings = { ...settings, currency: pending.newValue };
         setSettings(next);
-        // still broadcast locally so presentation updates everywhere, but do not rely on Dexie for RVB persistence alone
-        window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
-        // also persist locally for presentation-only fallback
-        try { await settingsService.save(next); } catch {}
+        window.dispatchEvent(new CustomEvent(RVB_UI_PREFERENCES_EVENT, { detail: next }));
         setPending(null);
       } else {
+        // Language: personal RVB preference via account ui preferences
+        await rvbUiPreferencesService.setLanguage(pending.newValue);
         const next: Settings = { ...settings, language: pending.newValue };
-        // Language is presentation personal preference: keep shared via Dexie/localStorage and account
-        await settingsService.save(next);
         setSettings(next);
         document.documentElement.lang = next.language;
         document.documentElement.dir = getDirection(next.language);
-        window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
+        // rvbUiPreferencesService already dispatched event, but ensure
+        window.dispatchEvent(new CustomEvent(RVB_UI_PREFERENCES_EVENT, { detail: next }));
         setPending(null);
       }
-    } finally { setConfirmLoading(false); setPending(null); }
+    } catch (e: any) {
+      alert(e?.code || e?.message || "Failed to save");
+    } finally { setConfirmLoading(false); if (pending && !confirmLoading) setPending(null); }
   };
 
-  const toggleTheme = (val: "light" | "dark") => {
+  const toggleTheme = async (val: "light" | "dark") => {
     applyTheme(val);
     setDark(val === "dark");
+    try { await rvbUiPreferencesService.setTheme(val); } catch {}
   };
 
   const handleNotifToggle = async (key: string, val: boolean) => {
@@ -536,12 +524,19 @@ function SettingsInner() {
                     <div className={styles.rowText}>
                       <strong>¤ {t.general.currency}</strong>
                       <span>{t.general.currencyDesc}</span>
-                      <small className={styles.sharedBadge}>{t.general.shared}</small>
+                      <small className={styles.sharedBadge}>{(t.general as any).currencyShared || t.general.shared}</small>
                     </div>
                     <div style={{ minWidth: 180 }}>
-                      <StyledSelect value={settings.currency} onChange={(v) => handleCurrSelect(v as Currency)} ariaLabel={t.general.currency} options={[{ value: "DA", label: "DA — Algerian Dinar" }, { value: "€", label: "€ — Euro" }, { value: "$", label: "$ — US Dollar" }]} />
+                      {user && (user.role === "manager" || user.role === "admin") ? (
+                        <StyledSelect value={settings.currency} onChange={(v) => handleCurrSelect(v as Currency)} ariaLabel={t.general.currency} options={[{ value: "DA", label: "DA — Algerian Dinar" }, { value: "€", label: "€ — Euro" }, { value: "$", label: "$ — US Dollar" }]} />
+                      ) : (
+                        <div style={{ minHeight: 38, display: "grid", placeItems: "center", padding: "0 12px", border: "1px solid var(--border)", borderRadius: 9, background: "var(--panel-hover)", color: "var(--muted)", fontSize: 13, fontWeight: 700 }}>{settings.currency} — read-only</div>
+                      )}
                     </div>
                   </div>
+                  {user && !(user.role === "manager" || user.role === "admin") && (
+                    <small style={{ color: "var(--muted)", fontSize: 11, marginTop: 6, display: "block" }}>Currency is a company setting — only Manager/Admin can change it.</small>
+                  )}
                 </div>
               </div>
             )}
@@ -688,3 +683,4 @@ export default function RvbSettingsPageWrapper() {
     </RvbAuthGuard>
   );
 }
+

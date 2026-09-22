@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck, Loader2, Lock } from "lucide-react";
 import { useRvbAuth } from "../../../../src/contexts/RvbAuthContext";
-import { settingsService } from "../../../../src/services/settings.service";
-import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../../src/lib/settings";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { DEFAULT_SETTINGS } from "../../../../src/lib/settings";
 import type { Settings, Language } from "../../../../src/types/settings/settings";
 import styles from "./page.module.css";
 
@@ -100,14 +100,14 @@ export default function ChangePasswordPage() {
   const isRtl = lang === "ar";
 
   useEffect(() => {
-    settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
-      else settingsService.get().then((s) => { if (s) setSettings(s); });
+      else rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     };
-    window.addEventListener(SETTINGS_EVENT, h);
-    return () => window.removeEventListener(SETTINGS_EVENT, h);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, h);
+    return () => window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h);
   }, []);
 
   useEffect(() => {
@@ -196,3 +196,4 @@ export default function ChangePasswordPage() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import RvbShell from "../../src/components/rvb/RvbShell";
@@ -9,8 +9,8 @@ import RvbActivityFeed from "../../src/components/rvb/dashboard/RvbActivityFeed"
 import RvbQuickAction from "../../src/components/rvb/dashboard/RvbQuickAction";
 import RvbSystemStatus from "../../src/components/rvb/dashboard/RvbSystemStatus";
 import styles from "./page.module.css";
-import { settingsService } from "../../src/services/settings.service";
-import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../src/lib/settings";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { DEFAULT_SETTINGS, formatCurrency } from "../../src/lib/settings";
 import type { Settings, Language } from "../../src/types/settings/settings";
 import { UsersRound, Inbox, ShoppingCart, MessagesSquare, Users, Truck, UserRound, ShieldCheck, Search, Wallet, FileText, Plus, Eye, X, Download, Briefcase, Phone, Calendar, CreditCard, Package } from "lucide-react";
 import { ShieldCheck as ShieldCheckIcon } from "lucide-react";
@@ -517,12 +517,13 @@ function SupplierPortal({ settings }: { settings: Settings }) {
       const sel = selectedProducts[p.id];
       if (!sel) continue;
       const qty = Number(sel.quantity||0);
-      const w = Number(sel.weightKg|| p.weightKg || 0);
+      const w = Number(sel.weightKg ?? 0);
       if (!Number.isFinite(qty) || qty<=0) continue;
+      if (!Number.isFinite(w) || w < 0) continue;
       const price = Number(p.price||0);
-      const itTotal = qty * w * price;
+      const itTotal = Math.round(w * price * 100) / 100;
       items.push({ productId: p.id, quantity: qty, weightKg: w, price, total: itTotal });
-      total += itTotal;
+      total = Math.round((total + itTotal)*100)/100;
     }
     if (items.length===0) { alert("Select at least one product with quantity"); return; }
     setSubmitting(true);
@@ -590,7 +591,7 @@ function SupplierPortal({ settings }: { settings: Settings }) {
             {catalog.slice(0, 20).map((p:any)=>(
               <div key={p.id} style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", padding:"8px 10px", border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)" }}>
                 <span style={{ flex:"1 1 160px", fontSize:12, fontWeight:600 }}>{p.name} <small style={{ color:"var(--muted)" }}>{formatCurrency(Number(p.price||0), currency)}/kg</small></span>
-                <input placeholder={t.quantity} type="number" min="0" step="1" value={selectedProducts[p.id]?.quantity || ""} onChange={(e)=>setSelectedProducts(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:String(p.weightKg||"")}), quantity:e.target.value, weightKg: prev[p.id]?.weightKg || String(p.weightKg||"") }}))} style={{ width:90, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
+                <input placeholder={t.quantity} type="number" min="0" step="1" value={selectedProducts[p.id]?.quantity || ""} onChange={(e)=>setSelectedProducts(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:""}), quantity:e.target.value, weightKg: prev[p.id]?.weightKg || "" }}))} style={{ width:90, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
                 <input placeholder="kg" type="number" min="0" step="0.01" value={selectedProducts[p.id]?.weightKg || ""} onChange={(e)=>setSelectedProducts(prev=>({...prev, [p.id]: {...(prev[p.id]||{quantity:""}), weightKg:e.target.value, quantity: prev[p.id]?.quantity || "" }}))} style={{ width:80, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
               </div>
             ))}
@@ -669,11 +670,12 @@ function CustomerPortal({ settings }: { settings: Settings }) {
       if (!v) continue;
       const qty = Number(v.quantity||0);
       if (!Number.isFinite(qty) || qty<=0) continue;
-      const w = Number(v.weightKg|| p.weightKg||0);
+      const w = Number(v.weightKg ?? 0);
+      if (!Number.isFinite(w) || w < 0) continue;
       const price = Number(p.price||0);
-      const itTotal = qty * w * price;
+      const itTotal = Math.round(w * price * 100) / 100;
       items.push({ productId: p.id, quantity: qty, weightKg: w, price, total: itTotal });
-      total+=itTotal;
+      total = Math.round((total + itTotal)*100)/100;
     }
     return { items, total };
   };
@@ -771,7 +773,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
             {catalog.slice(0,15).map((p:any)=>(
               <div key={p.id} style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", padding:"8px 10px", border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)" }}>
                 <span style={{ flex:"1 1 160px", fontSize:12, fontWeight:600 }}>{p.name} <small style={{ color:"var(--muted)" }}>{formatCurrency(Number(p.price||0), currency)}/kg</small></span>
-                <input placeholder={t.quantity} type="number" min="0" step="1" value={orderItems[p.id]?.quantity || ""} onChange={(e)=>setOrderItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:String(p.weightKg||"")}), quantity:e.target.value }}))} style={{ width:90, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
+                <input placeholder={t.quantity} type="number" min="0" step="1" value={orderItems[p.id]?.quantity || ""} onChange={(e)=>setOrderItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:""}), quantity:e.target.value }}))} style={{ width:90, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
                 <input placeholder="kg" type="number" min="0" step="0.01" value={orderItems[p.id]?.weightKg || ""} onChange={(e)=>setOrderItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{quantity:""}), weightKg:e.target.value }}))} style={{ width:80, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
               </div>
             ))}
@@ -789,7 +791,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
             {catalog.slice(0,10).map((p:any)=>(
               <div key={"ship-"+p.id} style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", padding:"6px 8px", border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)", marginBottom:6 }}>
                 <span style={{ flex:"1 1 140px", fontSize:11, fontWeight:600 }}>{p.name}</span>
-                <input placeholder={t.quantity} type="number" min="0" step="1" value={shipmentItems[p.id]?.quantity||""} onChange={(e)=>setShipmentItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:String(p.weightKg||"")}), quantity:e.target.value}}))} style={{ width:80, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
+                <input placeholder={t.quantity} type="number" min="0" step="1" value={shipmentItems[p.id]?.quantity||""} onChange={(e)=>setShipmentItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:""}), quantity:e.target.value}}))} style={{ width:80, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
                 <input placeholder="kg" type="number" min="0" step="0.01" value={shipmentItems[p.id]?.weightKg||""} onChange={(e)=>setShipmentItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{quantity:""}), weightKg:e.target.value}}))} style={{ width:70, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
               </div>
             ))}
@@ -833,7 +835,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
             {catalog.slice(0,10).map((p:any)=>(
               <div key={"edit-"+p.id} style={{ display:"flex", gap:6, alignItems:"center", marginBottom:6 }}>
                 <span style={{ flex:"1 1 120px", fontSize:11 }}>{p.name}</span>
-                <input type="number" placeholder={t.quantity} value={editItems[p.id]?.quantity||""} onChange={(e)=>setEditItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:String(p.weightKg||"")}), quantity:e.target.value}}))} style={{ width:70, minHeight:32, padding:"0 6px", border:"1px solid var(--border)", borderRadius:8 }} />
+                <input type="number" placeholder={t.quantity} value={editItems[p.id]?.quantity||""} onChange={(e)=>setEditItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{weightKg:""}), quantity:e.target.value}}))} style={{ width:70, minHeight:32, padding:"0 6px", border:"1px solid var(--border)", borderRadius:8 }} />
                 <input type="number" placeholder="kg" value={editItems[p.id]?.weightKg||""} onChange={(e)=>setEditItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{quantity:""}), weightKg:e.target.value}}))} style={{ width:60, minHeight:32, padding:"0 6px", border:"1px solid var(--border)", borderRadius:8 }} />
               </div>
             ))}
@@ -873,6 +875,8 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
   const [customers, setCustomers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [customerError, setCustomerError] = useState("");
+  const [orderError, setOrderError] = useState("");
   const [reqType, setReqType] = useState<"payment"|"loan"|"discrepancy">("payment");
   const [reqAmount, setReqAmount] = useState("");
   const [reqDesc, setReqDesc] = useState("");
@@ -880,16 +884,31 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setCustomerError("");
+    setOrderError("");
     try {
-      const [w, fin, acts, reqs, custs, ords] = await Promise.all([
+      const [w, fin, acts, reqs] = await Promise.all([
         rvbPortalService.getWorker().catch(()=>null),
         rvbPortalService.getWorkerFinancial().catch(()=>[]),
         rvbPortalService.getWorkerActivities().catch(()=>[]),
         workerRequestService.list().catch(()=>[]),
-        rvbCustomerService.list().catch(()=>[]),
-        customerOrderService.list({ status: "under_review" }).catch(()=>[]),
       ]);
-      setWorker(w); setFinancial(Array.isArray(fin)?fin:[]); setActivities(Array.isArray(acts)?acts:[]); setRequests(Array.isArray(reqs)?reqs:[]); setCustomers(Array.isArray(custs)?custs:[]); setOrders(Array.isArray(ords)?ords:[]);
+      setWorker(w); setFinancial(Array.isArray(fin)?fin:[]); setActivities(Array.isArray(acts)?acts:[]); setRequests(Array.isArray(reqs)?reqs:[]);
+      // Customer management: do not swallow 403, surface error
+      try {
+        const custs = await rvbCustomerService.list();
+        setCustomers(Array.isArray(custs)?custs:[]);
+      } catch (e:any) {
+        setCustomerError(e?.code || e?.message || "Failed to load customers");
+        setCustomers([]);
+      }
+      try {
+        const ords = await customerOrderService.list({ status: "under_review" });
+        setOrders(Array.isArray(ords)?ords:[]);
+      } catch (e:any) {
+        setOrderError(e?.code || e?.message || "Failed to load orders");
+        setOrders([]);
+      }
     } finally { setLoading(false); }
   }, []);
   useEffect(()=>{void load();},[load]);
@@ -956,10 +975,17 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
       <div style={{ padding:16, border:"1px solid var(--border)", borderRadius:12, background:"var(--panel)" }}>
         <h3 style={{ margin:"0 0 10px", fontSize:14, fontWeight:800 }}>{t.customerManagement}</h3>
         <p style={{ margin:"0 0 10px", color:"var(--muted)", fontSize:12 }}>{t.supervisorNote}</p>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:12 }}>
+          <a href="/rvb/customers" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--accent)", background:"var(--accent)", color:"#fff", fontSize:12, fontWeight:800, textDecoration:"none" }}>Open Customer Management</a>
+          <a href="/rvb/orders" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", color:"var(--text)", fontSize:12, fontWeight:700, textDecoration:"none" }}>Review Customer Orders</a>
+          <a href="/rvb/requests" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", color:"var(--text)", fontSize:12, fontWeight:700, textDecoration:"none" }}>Review Customer Requests</a>
+        </div>
+        {customerError && <div style={{ padding:8, marginBottom:8, border:"1px solid var(--danger)", background:"rgba(185,58,66,0.08)", borderRadius:8, color:"var(--danger)", fontSize:11, fontWeight:700 }}>{customerError}</div>}
+        {orderError && <div style={{ padding:8, marginBottom:8, border:"1px solid var(--danger)", background:"rgba(185,58,66,0.08)", borderRadius:8, color:"var(--danger)", fontSize:11, fontWeight:700 }}>{orderError}</div>}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
           <div>
             <h4 style={{ margin:"0 0 6px", fontSize:13, fontWeight:700 }}>Customers ({customers.length})</h4>
-            {customers.length===0 ? <div style={{ padding:8, color:"var(--muted)", fontSize:11, border:"1px dashed var(--border)", borderRadius:8, textAlign:"center" }}>{t.noData}</div> : (
+            {customerError ? <div style={{ padding:8, color:"var(--danger)", fontSize:11, border:"1px solid var(--danger)", borderRadius:8, textAlign:"center" }}>{customerError}</div> : customers.length===0 ? <div style={{ padding:8, color:"var(--muted)", fontSize:11, border:"1px dashed var(--border)", borderRadius:8, textAlign:"center" }}>{t.noData}</div> : (
               <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:240, overflowY:"auto" }}>
                 {customers.slice(0,15).map((c:any)=>(
                   <div key={c.id} style={{ display:"flex", justifyContent:"space-between", gap:8, padding:"6px 8px", border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)", fontSize:11 }}>
@@ -971,7 +997,7 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
           </div>
           <div>
             <h4 style={{ margin:"0 0 6px", fontSize:13, fontWeight:700 }}>{t.orders} ({orders.length})</h4>
-            {orders.length===0 ? <div style={{ padding:8, color:"var(--muted)", fontSize:11, border:"1px dashed var(--border)", borderRadius:8, textAlign:"center" }}>{t.noData}</div> : (
+            {orderError ? <div style={{ padding:8, color:"var(--danger)", fontSize:11, border:"1px solid var(--danger)", borderRadius:8, textAlign:"center" }}>{orderError}</div> : orders.length===0 ? <div style={{ padding:8, color:"var(--muted)", fontSize:11, border:"1px dashed var(--border)", borderRadius:8, textAlign:"center" }}>{t.noData}</div> : (
               <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:240, overflowY:"auto" }}>
                 {orders.slice(0,10).map((o:any)=>(
                   <div key={o.id} style={{ display:"flex", justifyContent:"space-between", gap:8, padding:"6px 8px", border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)", fontSize:11 }}>
@@ -1011,17 +1037,17 @@ export default function RvbDashboardPage() {
   const [notificationsReady, setNotificationsReady] = useState<boolean>(false);
 
   useEffect(() => {
-    settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     rvbConfigService.get().then((c) => { if (c?.currency) setSettings((prev:any)=>({...prev, currency: c.currency })); }).catch(()=>{});
     const handler = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
-      else settingsService.get().then((s) => { if (s) setSettings(s); });
+      else rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     };
-    window.addEventListener(SETTINGS_EVENT, handler);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, handler);
     window.addEventListener("storage", handler);
     return () => {
-      window.removeEventListener(SETTINGS_EVENT, handler);
+      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, handler);
       window.removeEventListener("storage", handler);
     };
   }, []);
@@ -1236,3 +1262,5 @@ export default function RvbDashboardPage() {
     </RvbShell>
   );
 }
+
+

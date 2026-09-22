@@ -79,35 +79,12 @@ app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-// Simple in-process rate limiter (single-instance)
-const rateBuckets = new Map<string, { count: number; reset: number }>();
-function rateLimit(opts: { windowMs: number; max: number; key: (req: any) => string; code?: string }) {
-  return (req: any, res: any, next: any) => {
-    const k = opts.key(req);
-    const now = Date.now();
-    const b = rateBuckets.get(k);
-    if (!b || now > b.reset) {
-      rateBuckets.set(k, { count: 1, reset: now + opts.windowMs });
-      return next();
-    }
-    if (b.count >= opts.max) {
-      res.status(429).json({ success: false, code: opts.code || "RATE_LIMITED", message: "Too many requests" });
-      return;
-    }
-    b.count++;
-    next();
-  };
-}
-const ipKey = (req: any) => req.ip || req.headers["x-forwarded-for"] || "unknown";
+import { rateLimit, ipKey } from "./middleware/rateLimiter";
+// Unauthenticated: IP-based is correct
 app.use("/api/rvb/auth/login", rateLimit({ windowMs: 60 * 1000, max: 20, key: ipKey, code: "RVB_RATE_LIMIT" }));
 app.use("/api/rvb/auth/refresh", rateLimit({ windowMs: 60 * 1000, max: 60, key: ipKey }));
-app.use("/api/rvb/auth/change-password", rateLimit({ windowMs: 60 * 1000, max: 20, key: (req: any) => (req.headers.authorization || ipKey(req)) as string }));
-app.use("/api/rvb/chats/:id/messages", rateLimit({ windowMs: 10 * 1000, max: 20, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
-// Request/order submission rate limits (per-account)
-app.use("/api/rvb/worker-requests", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
-app.use("/api/rvb/supplier-requests", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
-app.use("/api/rvb/customer-requests", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
-app.use("/api/rvb/customer-orders", rateLimit({ windowMs: 60 * 1000, max: 30, key: (req: any) => (req as any).rvbUser?.accountId || ipKey(req) }));
+// Authenticated routes rate limiters are applied AFTER requireRvbAuth inside their routers
+// to ensure req.rvbUser.accountId is available (per-account, with IP fallback)
 
 // Mount H.S.H internal routes only in full mode
 if (SERVER_MODE !== "rvb-public") {

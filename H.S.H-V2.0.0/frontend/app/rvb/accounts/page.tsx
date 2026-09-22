@@ -1,12 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import RvbShell from "../../../src/components/rvb/RvbShell";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import ProtectedDeleteModal from "../../../src/components/common/ProtectedDeleteModal";
 import { useCircularDeleteCountdown } from "../../../src/hooks/useCircularDeleteCountdown";
-import { settingsService } from "../../../src/services/settings.service";
-import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { DEFAULT_SETTINGS } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
 import { rvbConfigService } from "../../../src/services/rvb-config.service";
@@ -286,16 +286,16 @@ function RvbAccountsInner() {
   }, [t.failedLoad]);
 
   useEffect(() => {
-    settingsService.get().then((s) => { if (s) setSettings(s); });
+    rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     rvbConfigService.get().then((c) => { if (c?.currency) setSettings((prev:any)=>({...prev, currency:c.currency})); }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
       if (ce?.detail) setSettings(ce.detail);
-      else settingsService.get().then((s) => { if (s) setSettings(s); });
+      else rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); });
     };
-    window.addEventListener(SETTINGS_EVENT, h);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, h);
     window.addEventListener("storage", h);
-    return () => { window.removeEventListener(SETTINGS_EVENT, h); window.removeEventListener("storage", h); };
+    return () => { window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h); window.removeEventListener("storage", h); };
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -1059,3 +1059,4 @@ export default function RvbAccountsPage() {
     </RvbAuthGuard>
   );
 }
+

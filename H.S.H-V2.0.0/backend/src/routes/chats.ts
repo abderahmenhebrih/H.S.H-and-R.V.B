@@ -6,6 +6,7 @@ import { RvbAccountModel } from "../models/rvb-account.model";
 import { ConversationModel } from "../models/conversation.model";
 import { MessageModel } from "../models/message.model";
 
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 const router = Router();
 router.use(requireRvbAuth as any);
 
@@ -136,8 +137,8 @@ router.get("/:id/messages", async (req: RvbAuthRequest, res) => {
   }
 });
 
-// POST /api/rvb/chats/:id/messages { content, replyTo, reminderMinutes | reminderAt(legacy) }
-router.post("/:id/messages", async (req: RvbAuthRequest, res) => {
+// POST /api/rvb/chats/:id/messages { content, replyTo, reminderMinutes | reminderAt(legacy) } - per-account rate limit
+router.post("/:id/messages", rateLimit({ windowMs: 10 * 1000, max: 20, key: accountKey }) as any, async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const id = String((req.params as any).id);

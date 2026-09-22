@@ -14,16 +14,27 @@ function codeError(code: string, status: number, message?: string) {
   return err;
 }
 
+async function enforceCustomerPrice(items: any[]): Promise<ReturnType<typeof validateItems>> {
+  const normalized = validateItems(items);
+  const authoritative: any[] = [];
+  for (const it of normalized) {
+    const product: any = await ProductModel.findOne({ id: it.productId }).lean();
+    if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
+    const authPrice = Number(product.price);
+    if (!Number.isFinite(authPrice) || authPrice < 0) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product price invalid: ${it.productId}`);
+    const weightKg = Number(it.weightKg);
+    const total = Math.round(weightKg * authPrice * 100) / 100;
+    authoritative.push({ productId: it.productId, quantity: it.quantity, weightKg, price: authPrice, total });
+  }
+  return authoritative as any;
+}
+
 export async function createCustomerOrder(input: { customerId: string; accountId?: string | null; items: any[]; total: number; notes?: string }) {
   let { customerId, accountId, items, total, notes } = input as any;
   if (!customerId) throw codeError("RVB_CUSTOMER_REQUIRED", 400);
   if (!items || !Array.isArray(items) || items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
-  // Validate structure per spec 59-61
-  const normalized = validateItems(items);
-  for (const it of normalized) {
-    const product: any = await ProductModel.findOne({ id: it.productId }).lean();
-    if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
-  }
+  // For CUSTOMER-originated orders, server is authoritative for price: ignore client price, use Product.price
+  const normalized = await enforceCustomerPrice(items);
   if (notes !== undefined && notes !== null) {
     if (typeof notes !== "string") throw codeError("RVB_NOTE_INVALID", 400, "notes must be a string");
     if (notes.length > MAX_DESCRIPTION_LENGTH) throw codeError("RVB_NOTE_TOO_LONG", 400, `notes too long (${notes.length} > ${MAX_DESCRIPTION_LENGTH})`);
@@ -205,11 +216,8 @@ export async function editCustomerOrder(id: string, accountId: string, items: an
   if (!order) throw codeError("RVB_ORDER_NOT_FOUND", 404);
   if (order.accountId !== accountId) throw codeError("RVB_FORBIDDEN", 403);
   if (order.status !== "under_review") throw codeError("RVB_ORDER_ALREADY_REVIEWED", 400);
-  const normalized = validateItems(items);
-  for (const it of normalized) {
-    const product: any = await ProductModel.findOne({ id: it.productId }).lean();
-    if (!product) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
-  }
+  // Customer edit must also be price-authoritative
+  const normalized = await enforceCustomerPrice(items);
   if (notes !== undefined && notes !== null) {
     if (typeof notes !== "string") throw codeError("RVB_NOTE_INVALID", 400, "notes must be a string");
     if (notes.length > MAX_DESCRIPTION_LENGTH) throw codeError("RVB_NOTE_TOO_LONG", 400, `notes too long (${notes.length} > ${MAX_DESCRIPTION_LENGTH})`);

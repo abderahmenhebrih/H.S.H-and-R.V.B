@@ -1,0 +1,296 @@
+.dashboardIntro {
+  padding: 16px 0;
+}
+
+.heroCard {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0,0,0,.055));
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.rvbBadge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-ring);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.heroCard h2 {
+  margin: 12px 0 8px;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.heroCard p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.miniCard {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 1px 6px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.miniCard strong {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.miniCard span {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.miniCard em {
+  font-style: normal;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--subtle);
+}
+
+/* Placeholder shared */
+.placeholderWrap {
+  padding: 24px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.placeholderCard {
+  width: min(100%, 560px);
+  padding: 32px 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0,0,0,.055));
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.placeholderIcon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--panel-hover);
+  border: 1px solid var(--border);
+  color: var(--accent);
+}
+
+.placeholderTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.placeholderDesc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 460px;
+}
+
+.comingSoon {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-ring);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+:global(.themeDark) .heroCard,
+:global(.themeDark) .miniCard,
+:global(.themeDark) .placeholderCard {
+  background: #1e1f24;
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .placeholderIcon {
+  background: #25272f;
+  border-color: #2c2e36;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .heroCard {
+    padding: 20px;
+  }
+  .placeholderCard {
+    padding: 24px 16px;
+  }
+}
+
+/* =========================
+   RVB CONTROL CENTER — Dashboard
+========================= */
+
+.dashboardRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 0 12px;
+  min-width: 0;
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.secondaryRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.twoColEqual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.sectionPanel {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 1px 6px var(--shadow);
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sectionHeader h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sectionHeader p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.roleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.pendingStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quickStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+:global(.themeDark) .sectionPanel {
+  background: #1e1f24;
+  border-color: #2c2e36;
+}
+
+@media (max-width: 1100px) {
+  .kpiRow,
+  .secondaryRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .twoCol,
+  .twoColEqual {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .kpiRow,
+  .secondaryRow {
+    grid-template-columns: 1fr;
+  }
+  .roleGrid {
+    grid-template-columns: 1fr;
+  }
+  .sectionPanel {
+    padding: 14px;
+  }
+}

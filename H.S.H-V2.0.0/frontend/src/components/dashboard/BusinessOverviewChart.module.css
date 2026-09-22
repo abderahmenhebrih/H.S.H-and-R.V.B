@@ -1,0 +1,221 @@
+.chartWrap {
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.chartSvg {
+  width: 100%;
+  height: 260px;
+  display: block;
+  overflow: visible;
+}
+
+.gridLine {
+  stroke: var(--border);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.axisLabel {
+  font-size: 10px;
+  fill: var(--muted);
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.axisLabelY {
+  font-size: 10px;
+  fill: var(--muted);
+  font-weight: 600;
+  text-anchor: end;
+}
+
+.lineSales {
+  fill: none;
+  stroke: var(--sales);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.linePurchases {
+  fill: none;
+  stroke: var(--purchase);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+:global([class*="themeDark"]) .lineSales {
+  stroke: var(--sales);
+}
+
+:global([class*="themeDark"]) .linePurchases {
+  stroke: var(--purchase);
+}
+
+.guideLine {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.6;
+}
+
+.pointSales {
+  fill: var(--sales);
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.pointPurchases {
+  fill: var(--purchase);
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+:global([class*="themeDark"]) .pointSales,
+:global([class*="themeDark"]) .pointPurchases {
+  stroke: var(--panel);
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  min-width: 160px;
+  max-width: 220px;
+  z-index: 10;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
+}
+
+:global([class*="themeDark"]) .tooltip {
+  background: var(--panel-elevated);
+  border-color: var(--border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+}
+
+.tooltipDate {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  text-transform: capitalize;
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.tooltipLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tooltipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 8px;
+}
+
+.dotSales { background: var(--sales); }
+.dotPurchases { background: var(--purchase); }
+
+.tooltipValue {
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.summaryItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.summaryValue {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.skeleton {
+  width: 100%;
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0;
+}
+
+.skeletonLine {
+  height: 1px;
+  background: var(--border);
+  opacity: 0.4;
+  border-radius: 1px;
+}
+
+.skeletonBar {
+  height: 12px;
+  background: var(--panel-hover);
+  border-radius: 6px;
+  opacity: 0.6;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+  100% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBar {
+    animation: none;
+  }
+}

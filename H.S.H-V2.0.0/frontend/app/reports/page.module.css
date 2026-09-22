@@ -1,0 +1,660 @@
+﻿.reportsPage {
+  min-height: 100%;
+  padding: 0 0 40px;
+  color: var(--text);
+  margin-top: 24px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3,8,13,.70);
+}
+
+.dateModal {
+  width: min(480px,100%);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 25px 70px rgba(0,0,0,.25);
+  text-align: center;
+}
+
+.dateModal h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.dateModal p {
+  margin: 6px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dateForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  text-align: left;
+  margin-bottom: 18px;
+}
+
+.dateForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dateForm label span {
+  color: var(--muted,var(--muted));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dateForm input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-hover);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.primaryButton {
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 9px;
+  border: 1px solid var(--accent);
+  background: var(--yellow,var(--accent));
+  color: #17191b;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondaryButton {
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel-hover);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelButton {
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel-hover);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.topBar {
+  display: none;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.7fr);
+  gap: 20px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.historySection {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: 0 4px 15px var(--shadow,rgba(0,0,0,.055));
+}
+
+.historyTitle {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-hover);
+  min-height: 52px;
+}
+
+.periodControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.periodControl:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.periodControl:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.historyTitle h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.historyTitle span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.historyTable {
+  overflow-x: auto;
+}
+
+.historyHeader, .historyRow {
+  display: grid;
+  grid-template-columns: .9fr .9fr 1.1fr .65fr .8fr .9fr .9fr;
+  gap: 10px;
+  align-items: center;
+  min-width: 760px;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+
+.historyHeader {
+  background: var(--panel-hover);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+.historyRow {
+  border-bottom: 1px solid var(--border);
+}
+
+.paymentRow {
+  background: rgba(107, 58, 38, 0.08);
+  font-weight: 700;
+}
+
+.summaryRow {
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  background: var(--panel-hover);
+  font-weight: 800;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.simpleList {
+  display: flex;
+  flex-direction: column;
+}
+
+.simpleRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.simpleRow span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navSection {
+  position: sticky;
+  top: 22px;
+}
+
+.categorySelector {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 4px 15px var(--shadow,rgba(0,0,0,.055));
+}
+
+.categorySelector label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.categorySelector label span {
+  color: var(--muted,var(--muted));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.categorySelector select {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-hover);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.printActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.printActions button {
+  width: 100%;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.statePanel {
+  padding: 40px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+:global(.themeDark) .historySection,
+:global(.themeDark) .categorySelector,
+:global(.themeDark) .dateModal,
+:global(.themeDark) .statePanel {
+  background: #1e1f24;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .periodControl {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:global(.themeDark) .periodControl:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+:global(.themeDark) .historyHeader,
+:global(.themeDark) .historyTitle,
+:global(.themeDark) .summaryRow {
+  background: #25272f;
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .dateForm input,
+:global(.themeDark) .categorySelector select {
+  background: #25272f;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+/* Dark mode — modals — dark elevation uses black shadow, no light glow */
+:global([class*="themeDark"]) .modal,
+:global([class*="themeDark"]) .deleteModal,
+:global([class*="themeDark"]) .largeModal,
+:global([class*="themeDark"]) .deleteModalCompact,
+:global([class*="themeDark"]) .selectorModal,
+:global([class*="themeDark"]) .confirmModal,
+:global([class*="themeDark"]) .completeModal,
+:global([class*="themeDark"]) .dateModal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal-dark, 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30));
+}
+
+:global([class*="themeDark"]) .modalHeader,
+:global([class*="themeDark"]) .modalFooter {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+:global([class*="themeDark"]) .modalBackdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .navSection {
+    position: static;
+  }
+  .dateForm {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Print-only report document */
+.screenOnly {
+  display: block;
+}
+
+.printOnly {
+  display: none;
+}
+
+.printHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border);
+}
+
+.printLogo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-elevated);
+}
+
+.printLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.printBrand h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #2F261F;
+  line-height: 1.2;
+}
+
+.printBrand span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.printTitleBlock {
+  text-align: center;
+  margin: 16px 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.printTitleBlock h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #2F261F;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.printMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 24px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.printMeta span {
+  white-space: nowrap;
+}
+
+.printBody {
+  margin-top: 16px;
+}
+
+.printTableWrapper {
+  overflow: visible !important;
+  width: 100%;
+}
+
+.printTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  color: #1a1a1a;
+}
+
+.printTable thead {
+  display: table-header-group;
+}
+
+.printTable th {
+  background: #F8F0E7;
+  color: #2F261F;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 8px 6px;
+  border: 1px solid #E2D4C5;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.printTable td {
+  padding: 6px 6px;
+  border: 1px solid #E8DDD0;
+  font-size: 11px;
+  color: #1a1a1a;
+}
+
+.printTable tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.printSummary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #FDF8F3;
+  border: 1px solid #E2D4C5;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2F261F;
+  flex-wrap: wrap;
+}
+
+.printEmpty {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.printEntitySection {
+  margin-bottom: 24px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.printEntitySection:not(:first-child) {
+  break-before: page;
+  page-break-before: always;
+  padding-top: 12px;
+}
+
+.printEntityTitle {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2F261F;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #E2D4C5;
+}
+
+.printFooter {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid #E2D4C5;
+  text-align: center;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .screenOnly {
+    display: none !important;
+  }
+
+  .printOnly {
+    display: block !important;
+  }
+
+  /* Hide global app chrome - use attribute selectors for CSS modules */
+  :global([class*="sidebar"]),
+  :global([class*="mainContent"]) > div > header,
+  :global([class*="mobileHeader"]),
+  :global([class*="overlay"]) {
+    display: none !important;
+  }
+
+  :global([class*="dashboard"]) {
+    display: block !important;
+    background: #fff !important;
+    min-height: auto !important;
+  }
+
+  :global([class*="mainContent"]) {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  :global([class*="content"]) {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .reportsPage {
+    margin-top: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .printOnly {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .printTableWrapper,
+  .printBody {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+}
+
+
+
+@media print {
+  .navSection, .topBar {
+    display: none !important;
+  }
+  .layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Hooks for conditional print controls (used by print-preview route) */
+.noHeaderFooter {}
+.noRepeatHeader {}
+
+
+
+
+

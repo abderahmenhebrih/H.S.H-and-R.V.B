@@ -1,0 +1,600 @@
+﻿.accountsPage {
+  min-height: 100%;
+  padding: 0 0 40px;
+  color: var(--text);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.searchBox {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(107, 58, 38, 0.13);
+}
+
+.searchIcon {
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.searchBox input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.countBadge {
+  min-height: 48px;
+  padding: 0 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--muted, var(--muted));
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.primaryButton,
+.secondaryButton,
+.cancelButton,
+.deleteConfirmButton {
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, background-color .2s ease, border-color .2s ease;
+}
+
+.primaryButton {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--text);
+}
+
+.primaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 18px rgba(107, 58, 38, .18);
+}
+
+.secondaryButton,
+.cancelButton {
+  border: 1px solid var(--border);
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.secondaryButton:hover:not(:disabled),
+.cancelButton:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+
+.errorBanner,
+.formError {
+  padding: 12px 14px;
+  border: 1px solid rgba(239, 51, 64, .30);
+  border-radius: 9px;
+  background: rgba(239, 51, 64, .08);
+  color: var(--sales);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.errorBanner {
+  margin-bottom: 16px;
+}
+
+.statePanel {
+  min-height: 300px;
+  padding: 50px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0,0,0,.055));
+}
+
+.stateIcon {
+  margin-bottom: 14px;
+  color: var(--yellow, var(--accent));
+  font-size: 30px;
+}
+
+.statePanel h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+}
+
+.statePanel p {
+  margin: 10px 0 20px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0,0,0,.055));
+  cursor: default;
+  transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+
+.card:hover {
+  border-color: rgba(255,220,75,.6);
+  transform: translateY(-1px);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.typeBadge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.badgeCash {
+  background: rgba(255,220,75,.18);
+  color: var(--purchase-border);
+  border: 1px solid rgba(213,185,0,.35);
+}
+
+.badgeBank {
+  background: rgba(61, 106, 165,.12);
+  color: var(--info);
+  border: 1px solid rgba(61, 106, 165,.25);
+}
+
+.cardActions {
+  display: flex;
+  gap: 6px;
+}
+
+.editButton,
+.deleteIconButton {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--muted, var(--muted));
+  cursor: pointer;
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.editButton:hover {
+  border-color: var(--accent);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.deleteIconButton {
+  color: var(--subtle);
+}
+
+.deleteIconButton:hover {
+  background: rgba(239,51,64,.08);
+  border-color: rgba(239,51,64,.35);
+  color: var(--sales);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balance {
+  margin-top: 14px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 10px;
+  background: var(--panel-hover);
+  border: 1px solid var(--border);
+}
+
+.balance span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.balance strong {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3,8,13,.70);
+  overflow-y: auto;
+}
+
+.modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 25px 70px rgba(0,0,0,.25);
+}
+
+.modalHeader {
+  min-height: 76px;
+  padding: 17px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.modalBadge {
+  display: inline-block;
+  margin-bottom: 5px;
+  color: var(--yellow-dark, var(--purchase-border));
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.closeButton {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-hover);
+  color: var(--muted, var(--muted));
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.form {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form label > span {
+  color: var(--muted, var(--muted));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.form label small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: 0;
+  background: var(--panel-hover);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.form textarea {
+  min-height: 80px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.form input:focus,
+.form select:focus,
+.form textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(107, 58, 38, 0.13);
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 6px;
+}
+
+.deleteModal {
+  width: min(520px, 100%);
+  padding: 28px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 28px 80px rgba(0,0,0,.3);
+}
+
+.deleteIcon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255,61,70,.12);
+  color: var(--danger);
+  font-size: 27px;
+  font-weight: 900;
+}
+
+.deleteModal h2 {
+  margin: 16px 0 8px;
+  font-size: 22px;
+  font-weight: 850;
+}
+
+.deleteModal > p {
+  margin: 0 0 18px;
+  font-size: 16px;
+}
+
+.deleteWarning {
+  padding: 14px;
+  border: 1px solid rgba(255,61,70,.2);
+  border-radius: 11px;
+  background: rgba(255,61,70,.07);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.countdown {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.deleteConfirmButton {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: var(--danger);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+  border: 1px solid var(--danger-border);
+  cursor: pointer;
+}
+
+.deleteConfirmButton:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+:global(.themeDark) .searchBox,
+:global(.themeDark) .countBadge,
+:global(.themeDark) .card,
+:global(.themeDark) .statePanel,
+:global(.themeDark) .modal,
+:global(.themeDark) .deleteModal {
+  background: #1e1f24;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .balance {
+  background: #25272f;
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .form input,
+:global(.themeDark) .form select,
+:global(.themeDark) .form textarea {
+  background: #25272f;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .modalHeader {
+  background: #1e1f24;
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .modalBadge {
+  color: var(--accent);
+}
+
+/* Dark mode — modals — dark elevation uses black shadow, no light glow */
+:global([class*="themeDark"]) .modal,
+:global([class*="themeDark"]) .deleteModal,
+:global([class*="themeDark"]) .largeModal,
+:global([class*="themeDark"]) .deleteModalCompact,
+:global([class*="themeDark"]) .selectorModal,
+:global([class*="themeDark"]) .confirmModal,
+:global([class*="themeDark"]) .completeModal,
+:global([class*="themeDark"]) .dateModal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal-dark, 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30));
+}
+
+:global([class*="themeDark"]) .modalHeader,
+:global([class*="themeDark"]) .modalFooter {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+:global([class*="themeDark"]) .modalBackdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .countBadge {
+    width: 100%;
+  }
+
+  .headerActions {
+    flex-direction: column;
+  }
+
+  .headerActions button {
+    width: 100%;
+  }
+
+  .modalBackdrop {
+    padding: 12px;
+  }
+
+  .modal {
+    width: 100%;
+  }
+}
+
+.expensesPage { min-height: 100%; padding: 0 0 40px; }
+.repeatButton { min-height: 32px; padding: 0 10px; border-radius: 8px; background: var(--panel-hover); border: 1px solid var(--border); color: var(--text); font-size: 12px; font-weight: 700; cursor:pointer; }
+.repeatButton:hover{ border-color: var(--brown,var(--accent)); background: var(--panel);} 
+.note{ margin:6px 0 0; color: var(--muted); font-size:13px; line-height:1.4; }
+.metaRow{ display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; color: var(--muted); font-size:12px; }
+.metaRow strong{ color: var(--text); }
+.amount{ margin-top:12px; padding:12px; display:flex; align-items:center; justify-content:space-between; border-radius:10px; background: var(--panel-hover); border:1px solid var(--border);} 
+.amount span{ color:var(--muted); font-size:12px; font-weight:700; }
+.amount strong{ font-size:16px; font-weight:800; }
+.fieldHint{ color: var(--sales); font-size:11px; margin-top:4px; display:block; }
+
+
+
+
+
+
+

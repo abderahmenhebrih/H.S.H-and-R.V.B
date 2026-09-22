@@ -1,0 +1,45 @@
+# dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env files — keep .env.example tracked
+.env
+.env.*
+!.env.example
+
+# build
+dist
+build
+
+# coverage
+coverage
+
+# logs
+*.log
+
+# OS
+.DS_Store
+
+# typescript
+*.tsbuildinfo
+
+# misc
+*.pem
+
+# editor / OS (merged from root)
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# backups — HEBRIH manual backups must not ship
+*.before-*
+*.before_*
+*.bak
+*.old
+*.tmp

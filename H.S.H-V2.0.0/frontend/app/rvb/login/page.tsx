@@ -1,0 +1,224 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, ShieldCheck, Loader2 } from "lucide-react";
+import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
+import { settingsService } from "../../../src/services/settings.service";
+import { DEFAULT_SETTINGS, getDirection, SETTINGS_EVENT } from "../../../src/lib/settings";
+import type { Settings, Language } from "../../../src/types/settings/settings";
+import { getSavedTheme, applyTheme } from "../../../src/lib/theme";
+import styles from "./page.module.css";
+
+const TR: Record<Language, any> = {
+  en: {
+    brandName: "The Kingdom of White Meat",
+    abbr: "RVB",
+    title: "Sign in to RVB",
+    subtitle: "Enter your @tag and password to access the RVB workspace",
+    tag: "@Tag",
+    tagPlaceholder: "ahmed.b",
+    password: "Password",
+    show: "Show",
+    hide: "Hide",
+    signIn: "Sign In",
+    signingIn: "Signing in...",
+    errors: {
+      RVB_TAG_REQUIRED: "Tag is required",
+      RVB_PASSWORD_REQUIRED: "Password is required",
+      RVB_AUTH_INVALID_CREDENTIALS: "Invalid @tag or password",
+      RVB_ACCOUNT_ARCHIVED: "Account is archived",
+      RVB_ACCOUNT_DISABLED: "Account is disabled",
+      RVB_PASSWORD_NOT_SET: "Password not set — contact manager",
+      RVB_AUTH_TEMPORARILY_LOCKED: "Too many attempts — try again in 15 minutes",
+      generic: "Sign in failed — please try again",
+    },
+  },
+  fr: {
+    brandName: "Le royaume des viandes blanches",
+    abbr: "RVB",
+    title: "Connexion à RVB",
+    subtitle: "Entrez votre @tag et mot de passe pour accéder à l’espace RVB",
+    tag: "@Tag",
+    tagPlaceholder: "ahmed.b",
+    password: "Mot de passe",
+    show: "Afficher",
+    hide: "Masquer",
+    signIn: "Se connecter",
+    signingIn: "Connexion...",
+    errors: {
+      RVB_TAG_REQUIRED: "Tag requis",
+      RVB_PASSWORD_REQUIRED: "Mot de passe requis",
+      RVB_AUTH_INVALID_CREDENTIALS: "@tag ou mot de passe invalide",
+      RVB_ACCOUNT_ARCHIVED: "Compte archivé",
+      RVB_ACCOUNT_DISABLED: "Compte désactivé",
+      RVB_PASSWORD_NOT_SET: "Mot de passe non configuré — contactez le manager",
+      RVB_AUTH_TEMPORARILY_LOCKED: "Trop de tentatives — réessayez dans 15 minutes",
+      generic: "Échec de connexion — réessayez",
+    },
+  },
+  ar: {
+    brandName: "مملكة اللحوم البيضاء",
+    abbr: "RVB",
+    title: "تسجيل الدخول إلى RVB",
+    subtitle: "أدخل @tag وكلمة المرور للوصول إلى مساحة RVB",
+    tag: "@Tag",
+    tagPlaceholder: "ahmed.b",
+    password: "كلمة المرور",
+    show: "إظهار",
+    hide: "إخفاء",
+    signIn: "تسجيل الدخول",
+    signingIn: "جارٍ تسجيل الدخول...",
+    errors: {
+      RVB_TAG_REQUIRED: "المعرّف مطلوب",
+      RVB_PASSWORD_REQUIRED: "كلمة المرور مطلوبة",
+      RVB_AUTH_INVALID_CREDENTIALS: "@tag أو كلمة المرور غير صحيحة",
+      RVB_ACCOUNT_ARCHIVED: "الحساب مؤرشف",
+      RVB_ACCOUNT_DISABLED: "الحساب معطّل",
+      RVB_PASSWORD_NOT_SET: "كلمة المرور غير مضبوطة — تواصل مع المدير",
+      RVB_AUTH_TEMPORARILY_LOCKED: "محاولات كثيرة — حاول بعد 15 دقيقة",
+      generic: "فشل تسجيل الدخول — حاول مجدداً",
+    },
+  },
+};
+
+export default function RvbLoginPage() {
+  const router = useRouter();
+  const { user, loading: authLoading, login } = useRvbAuth();
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [tag, setTag] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const lang = (settings.language as Language) || "en";
+  const t = (TR as any)[lang] ?? TR.en;
+  const isRtl = lang === "ar";
+
+  useEffect(() => {
+    settingsService.get().then((s) => { if (s) setSettings(s); });
+    const h = (e: Event) => {
+      const ce = e as CustomEvent<Settings>;
+      if (ce?.detail) setSettings(ce.detail);
+      else settingsService.get().then((s) => { if (s) setSettings(s); });
+    };
+    window.addEventListener(SETTINGS_EVENT, h);
+    window.addEventListener("storage", h);
+    return () => { window.removeEventListener(SETTINGS_EVENT, h); window.removeEventListener("storage", h); };
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if ((user as any).mustChangePassword) router.replace("/rvb/auth/change-password");
+      else router.replace("/rvb");
+    }
+  }, [authLoading, user, router]);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!tag.trim()) { setError(t.errors.RVB_TAG_REQUIRED); return; }
+    if (!password) { setError(t.errors.RVB_PASSWORD_REQUIRED); return; }
+    setSubmitting(true);
+    try {
+      const account = await login(tag.trim(), password);
+      if ((account as any).mustChangePassword) router.replace("/rvb/auth/change-password");
+      else router.replace("/rvb");
+    } catch (err: any) {
+      const code = err?.code || err?.data?.code || "";
+      const msg = (t.errors as any)[code] || t.errors.generic;
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className={styles.loadingWrap}>
+        <Loader2 size={24} className={styles.spinner} />
+      </div>
+    );
+  }
+
+  // Don't flash login if already authenticated (will redirect)
+  if (user) {
+    return (
+      <div className={styles.loadingWrap}>
+        <Loader2 size={24} className={styles.spinner} />
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.page} dir={isRtl ? "rtl" : "ltr"}>
+      <div className={styles.card}>
+        <div className={styles.brand}>
+          <div className={styles.logo} aria-hidden="true">
+            <img src="/chicken.jpg" alt="" />
+          </div>
+          <div className={styles.brandText}>
+            <strong className={styles.brandName}>{t.brandName}</strong>
+            <span className={styles.brandAbbr}>{t.abbr}</span>
+          </div>
+        </div>
+
+        <div className={styles.header}>
+          <h1 className={styles.title}>{t.title}</h1>
+          <p className={styles.subtitle}>{t.subtitle}</p>
+        </div>
+
+        <form onSubmit={onSubmit} className={styles.form} noValidate>
+          <label className={styles.field}>
+            <span className={styles.label}>{t.tag}</span>
+            <div className={styles.tagField} dir="ltr">
+              <span className={styles.tagPrefix} aria-hidden="true">@</span>
+              <input
+                value={tag}
+                onChange={(e) => setTag(e.target.value)}
+                placeholder={t.tagPlaceholder}
+                dir="ltr"
+                autoComplete="username"
+                autoCapitalize="off"
+                spellCheck={false}
+                className={styles.tagInput}
+              />
+            </div>
+          </label>
+
+          <label className={styles.field}>
+            <span className={styles.label}>{t.password}</span>
+            <div className={styles.passwordWrap}>
+              <input
+                type={showPwd ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className={styles.input}
+                dir="ltr"
+              />
+              <button
+                type="button"
+                className={styles.showButton}
+                onClick={() => setShowPwd((v) => !v)}
+                aria-label={showPwd ? t.hide : t.show}
+                tabIndex={0}
+              >
+                {showPwd ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
+                <span>{showPwd ? t.hide : t.show}</span>
+              </button>
+            </div>
+          </label>
+
+          {error && <div className={styles.error} role="alert">{error}</div>}
+
+          <button type="submit" className={styles.submit} disabled={submitting}>
+            {submitting ? <Loader2 size={16} className={styles.spinner} /> : <ShieldCheck size={16} strokeWidth={2} />}
+            {submitting ? t.signingIn : t.signIn}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

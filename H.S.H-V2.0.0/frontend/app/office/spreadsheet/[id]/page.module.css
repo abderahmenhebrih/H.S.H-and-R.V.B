@@ -1,0 +1,136 @@
+.sheetPage {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 72px);
+  background: var(--page);
+  color: var(--text);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.sheetTitleInput {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+.sheetTitleInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); background: var(--panel); }
+
+.sheetStatus { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+
+.sheetToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.toolBtn {
+  min-height: 32px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-hover);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toolBtn:hover { background: var(--panel); border-color: var(--border-strong); }
+.toolBtnPrimary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 2px 8px var(--accent-ring);
+}
+
+.univerContainer {
+  flex: 1;
+  min-height: 520px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.univerHost {
+  flex: 1;
+  min-height: 520px;
+  width: 100%;
+}
+
+.fallbackGrid {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+.fallbackTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  color: #1a1a1a;
+}
+.fallbackTable th, .fallbackTable td {
+  border: 1px solid #d1d5db;
+  padding: 4px;
+  min-width: 100px;
+  height: 24px;
+}
+.fallbackTable th { background: #f3f4f6; font-weight: 700; font-size: 11px; }
+.fallbackTable td input {
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: transparent;
+  color: inherit;
+}
+
+.insertModal {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(3,8,13,0.5);
+  padding: 16px;
+}
+.insertCard {
+  width: min(520px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.insertCard h3 { margin: 0; font-size: 14px; font-weight: 800; color: var(--text); }
+
+@media print {
+  .sheetHeader, .sheetToolbar { display: none !important; }
+  .univerContainer { border: none; box-shadow: none; }
+}

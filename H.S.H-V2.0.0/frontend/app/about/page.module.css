@@ -1,0 +1,155 @@
+﻿.aboutPage {
+  min-height: 100%;
+  padding: 0 0 40px;
+  color: var(--text);
+}
+
+.hero {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0,0,0,.055));
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255,220,75,.18);
+  border: 1px solid rgba(213,185,0,.35);
+  color: var(--purchase-border);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+.hero h1 {
+  margin: 12px 0 8px;
+  font-size: 28px;
+  font-weight: 850;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.hero small {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0,0,0,.055));
+}
+
+.card h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.card h3 {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.card ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.moduleGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.moduleBadge {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+:global(.themeDark) .hero,
+:global(.themeDark) .card {
+  background: #1e1f24;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .moduleBadge {
+  background: #25272f;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+/* Dark mode — modals — dark elevation uses black shadow, no light glow */
+:global([class*="themeDark"]) .modal,
+:global([class*="themeDark"]) .deleteModal,
+:global([class*="themeDark"]) .largeModal,
+:global([class*="themeDark"]) .deleteModalCompact,
+:global([class*="themeDark"]) .selectorModal,
+:global([class*="themeDark"]) .confirmModal,
+:global([class*="themeDark"]) .completeModal,
+:global([class*="themeDark"]) .dateModal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal-dark, 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30));
+}
+
+:global([class*="themeDark"]) .modalHeader,
+:global([class*="themeDark"]) .modalFooter {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+:global([class*="themeDark"]) .modalBackdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+
+
+

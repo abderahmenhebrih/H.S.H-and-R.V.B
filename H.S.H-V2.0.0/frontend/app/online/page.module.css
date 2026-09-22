@@ -1,0 +1,51 @@
+.placeholderWrap {
+  padding: 16px 0;
+}
+
+.placeholderCard {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0,0,0,.055));
+  text-align: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-ring);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.title {
+  margin: 14px 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.hint {
+  display: block;
+  margin-top: 10px;
+  color: var(--subtle);
+  font-size: 12px;
+}
+
+:global(.themeDark) .placeholderCard {
+  background: #1e1f24;
+  border-color: #2c2e36;
+}

@@ -1,0 +1,394 @@
+/* =========================================================
+   COMPACT HEADER — clean professional top bar
+   Replaces the old large hero. Shared by AppShell & Dashboard.
+   Uses existing design tokens only. No new palette.
+   ========================================================= */
+
+.compactHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  /* compact bar: 90–120px desktop */
+  min-height: 96px;
+  padding: 12px 18px;
+
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px var(--shadow);
+
+  overflow: hidden;
+}
+
+/* ---------- left ---------- */
+.left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.logo {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 12px;
+  overflow: hidden;
+
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+}
+
+.logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.textBlock {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.title {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 560px;
+}
+
+/* ---------- right ---------- */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.iconButton {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid var(--border);
+  border-radius: 11px;
+
+  background: var(--panel);
+  color: var(--text);
+
+  font-size: 17px;
+  line-height: 1;
+
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.iconButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+:global([class*="themeDark"]) .iconButton {
+  background: var(--panel-hover);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:global([class*="themeDark"]) .iconButton:hover {
+  background: var(--panel-elevated);
+  border-color: var(--accent);
+}
+
+.divider {
+  width: 1px;
+  height: 28px;
+  flex: 0 0 1px;
+  background: var(--border);
+  border-radius: 1px;
+}
+
+.dateBlock {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.dateIcon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid var(--border);
+  border-radius: 9px;
+
+  background: var(--panel-hover);
+  color: var(--muted);
+}
+
+.dateIcon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.dateText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: end;
+}
+
+.dateLine {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.timeLine {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* RTL: logical text alignment */
+:global(html[dir="rtl"]) .dateText {
+  text-align: start;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1100px) {
+  .description {
+    max-width: 420px;
+  }
+  .title {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 900px) {
+  .compactHeader {
+    padding: 11px 14px;
+    min-height: 92px;
+    gap: 12px;
+  }
+
+  .logo {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+    border-radius: 10px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .description {
+    font-size: 11px;
+    max-width: 300px;
+  }
+
+  .iconButton {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+    border-radius: 9px;
+    font-size: 16px;
+  }
+
+  .dateIcon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+
+  .dateLine {
+    font-size: 11px;
+  }
+
+  .timeLine {
+    font-size: 10px;
+  }
+
+  .divider {
+    height: 24px;
+  }
+}
+
+@media (max-width: 700px) {
+  .compactHeader {
+    min-height: 84px;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .left {
+    gap: 10px;
+  }
+
+  .logo {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+    border-radius: 9px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .description {
+    font-size: 10px;
+    max-width: 200px;
+  }
+
+  .right {
+    gap: 7px;
+  }
+
+  .iconButton {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    font-size: 15px;
+  }
+
+  .dateBlock {
+    gap: 7px;
+  }
+
+  .dateIcon {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    border-radius: 7px;
+  }
+
+  .dateLine {
+    font-size: 10px;
+  }
+
+  .timeLine {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 520px) {
+  .compactHeader {
+    padding: 9px 10px;
+    border-radius: 13px;
+  }
+
+  .logo {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+
+  .title {
+    font-size: 15px;
+  }
+
+  /* hide description on very small to avoid overflow, keep title */
+  .description {
+    display: none;
+  }
+
+  .iconButton {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 8px;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .dateIcon {
+    display: none;
+  }
+
+  .dateText {
+    gap: 1px;
+  }
+
+  .dateLine {
+    font-size: 10px;
+  }
+
+  .timeLine {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 380px) {
+  .title {
+    font-size: 13px;
+  }
+
+  .iconButton {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+    font-size: 14px;
+  }
+
+  /* compress date to single line on ultra small */
+  .dateBlock {
+    display: none;
+  }
+}
+
+/* ensure no horizontal overflow */
+.compactHeader,
+.left,
+.right,
+.textBlock,
+.dateBlock,
+.dateText {
+  min-width: 0;
+}

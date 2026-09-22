@@ -1,0 +1,1640 @@
+﻿.salesPage {
+  width: 100%;
+  color: var(--text);
+}
+
+.salesShell {
+  width: 100%;
+}
+
+/* Summary KPI — exact Purchases language: 84px height, 16px padding, 44px icon, gap14 */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.summaryCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  min-height: 84px;
+  height: 84px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 1px 6px var(--shadow);
+  box-sizing: border-box;
+}
+
+.summaryIcon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 0;
+}
+
+.iconSales {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.iconValue {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.iconWeight {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.iconCustomers {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+:global([class*="themeDark"]) .iconSales,
+:global([class*="themeDark"]) .iconWeight {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+:global([class*="themeDark"]) .iconValue,
+:global([class*="themeDark"]) .iconCustomers {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.summaryContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryLabel {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.summaryValue {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.summarySub {
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  text-wrap: balance;
+}
+
+/* Toolbar — [ Search | Date | + Add Sale ] — mirrored from Purchases */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  margin-bottom: 15px;
+}
+
+.toolbarDate {
+  width: auto;
+  min-width: 190px;
+  flex: 0 0 auto;
+}
+
+.searchBox {
+  min-width: 0;
+  flex: 1;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.035);
+}
+
+.searchBox span {
+  color: var(--subtle);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.searchBox input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.searchBox input::placeholder {
+  color: var(--subtle);
+}
+
+/* Date Selector — custom dropdown matching app's warm cream/dark style (same as Purchases) */
+.dateSelector {
+  position: relative;
+  min-width: 198px;
+  flex: 0 0 auto;
+}
+
+.dateTrigger {
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.035);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.dateTrigger:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.dateTriggerOpen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.dateTriggerIcon {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.dateTriggerLabel {
+  flex: 1;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.dateChevron {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+  flex: 0 0 auto;
+}
+
+.dateChevronOpen {
+  transform: rotate(180deg);
+  color: var(--text);
+}
+
+.hiddenDateInput {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  left: -9999px;
+}
+
+.dateMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 300px;
+  min-width: 288px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(62, 44, 28, 0.14), 0 4px 12px rgba(62, 44, 28, 0.08);
+  z-index: 30;
+}
+
+:global([class*="themeDark"]) .dateMenu {
+  border-color: var(--border);
+  background: var(--panel-elevated);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.dateMenuHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dateNavButton {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.dateNavButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.dateMonthLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.dateWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.dateWeekday {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.dateDay {
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.dateDay:hover {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.dateDayOutside {
+  color: var(--subtle);
+  opacity: 0.7;
+}
+
+.dateDayToday {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.dateDaySelected {
+  background: var(--accent);
+  color: var(--panel-elevated);
+  border-color: var(--accent);
+  font-weight: 800;
+}
+
+.dateDaySelected:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--panel-elevated);
+}
+
+:global([class*="themeDark"]) .dateDaySelected {
+  color: #fff;
+}
+
+.dateMenuFooter {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+.dateTodayButton {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.dateTodayButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease;
+  white-space: nowrap;
+}
+
+.primaryButton {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--panel-elevated);
+  box-shadow: 0 5px 16px var(--accent-ring);
+}
+
+.primaryButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 24px rgba(62, 44, 28, 0.18);
+}
+
+.secondaryButton {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.secondaryButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.09);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Table — 6 cols CUSTOMER | PRODUCT | WEIGHT | PRICE/KG | TOTAL | ACTIONS */
+.tableCard {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--panel);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0, 0, 0, 0.055));
+  color: var(--text);
+}
+
+.tableHeader {
+  min-height: 52px;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: minmax(130px, 1.4fr) minmax(120px, 1.2fr) 90px 110px 125px 140px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-hover);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.saleRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.saleRow {
+  min-height: 68px;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: minmax(130px, 1.4fr) minmax(120px, 1.2fr) 90px 110px 125px 140px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  transition: background 0.2s ease;
+}
+
+/* Vertical dividers — subtle, between internal columns only */
+.tableHeader > span:not(:last-child),
+.saleRow > *:not(:last-child) {
+  border-inline-end: 1px solid var(--border);
+  padding-inline-end: 12px;
+}
+
+.saleRow:last-child {
+  border-bottom: 0;
+}
+
+.saleRow:hover {
+  background: var(--panel-hover);
+}
+
+.customerText {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.productCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.productIcon {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.weightText {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.priceText {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.totalValue {
+  color: var(--sales);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rowEditButton,
+.rowDeleteButton {
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.rowEditButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.rowDeleteButton {
+  color: var(--danger);
+  border-color: var(--danger-ring);
+  background: var(--panel);
+}
+
+.rowDeleteButton:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+:global([class*="themeDark"]) .rowEditButton {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:global([class*="themeDark"]) .rowEditButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+:global([class*="themeDark"]) .rowDeleteButton {
+  background: var(--panel);
+  border-color: var(--danger-ring);
+  color: var(--danger);
+}
+
+:global([class*="themeDark"]) .rowDeleteButton:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.errorBanner,
+.formError {
+  margin-top: 14px;
+  padding: 12px 15px;
+  border: 1px solid var(--danger-border);
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.emptyState {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 24px;
+}
+
+.emptyIcon,
+.warningIcon {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.emptyState strong {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.emptyState p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.loadingPulse {
+  width: 35px;
+  height: 35px;
+  margin-bottom: 10px;
+  border: 3px solid var(--border);
+  border-top-color: var(--sales);
+  border-radius: 50%;
+  animation: pageSpin 0.8s linear infinite;
+}
+
+@keyframes pageSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Modal — compact system: header 16px 20px h2 18px, close 40px, formGrid 16px 20px gap12, inputs 40px, textarea 72px, footer 12px 20px */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(8, 11, 14, 0.57);
+  backdrop-filter: blur(7px);
+  animation: backdropIn 0.25s ease both;
+}
+
+.modal,
+.largeModal,
+.deleteModal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  animation: modalIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.largeModal {
+  width: min(860px, calc(100vw - 32px));
+}
+
+.deleteModal {
+  width: min(480px, calc(100vw - 32px));
+  padding: 20px;
+  text-align: center;
+}
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.modalHeader {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.modalHeader h2,
+.deleteModal h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.closeButton {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.closeButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.closeButton:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* Form grid — compact */
+.formGrid {
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGrid label > span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.formGrid label small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.formGrid input,
+.formGrid select,
+.formGrid textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.formGrid input[type="number"]::-webkit-outer-spin-button,
+.formGrid input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.formGrid input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.formGrid textarea {
+  padding-top: 10px;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.formGrid input:focus,
+.formGrid select:focus,
+.formGrid textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.formError {
+  margin: 0 20px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.modalFooter {
+  padding: 12px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.deleteModal .modalFooter {
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+}
+
+.deleteModalCompact {
+  width: min(440px, calc(100vw - 32px));
+  padding: 20px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  animation: modalIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.warningIconSmall {
+  margin: 0 auto 10px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-ring);
+}
+
+.deleteModalCompact h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.deleteDescription {
+  margin: 8px auto 0;
+  max-width: 340px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.deleteContext {
+  margin: 10px auto 0;
+  max-width: 340px;
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdownCompact {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.countdownTrack {
+  width: 100%;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.countdownProgress {
+  height: 100%;
+  background: var(--danger);
+  border-radius: 99px;
+  transition: width 1s linear;
+}
+
+.circularCountdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.circleWrapper {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+}
+
+.circleWrapper svg {
+  position: absolute;
+  inset: 0;
+  width: 64px;
+  height: 64px;
+  transform: rotate(-90deg);
+}
+
+.circleTrack {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 4;
+}
+
+.circleProgress {
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.circleText {
+  position: relative;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+
+.circleLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+
+:global([class*="themeDark"]) .circleTrack {
+  stroke: var(--border);
+}
+
+:global([class*="themeDark"]) .circleProgress {
+  stroke: var(--danger);
+}
+
+:global([class*="themeDark"]) .circleText {
+  color: var(--text);
+}
+
+:global([class*="themeDark"]) .circleLabel {
+  color: var(--muted);
+}
+
+.modalFooterCompact {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.modalFooterCompact .secondaryButton,
+.modalFooterCompact .dangerButton {
+  min-height: 40px;
+  flex: 1;
+  max-width: 160px;
+}
+
+:global([class*="themeDark"]) .deleteModalCompact {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global([class*="themeDark"]) .countdownCompact {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.warningIcon {
+  margin: 0 auto 12px;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.deleteModal p {
+  margin: 12px auto 0;
+  max-width: 410px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.countdown {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dangerButton {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dangerButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px var(--danger-ring);
+}
+
+.dangerButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.modalEyebrow {
+  display: block;
+  color: var(--sales);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* Selector lists (product/customer picker) */
+.selectorList {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.selectorItem {
+  min-height: 56px;
+  padding: 10px 13px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.selectorItem:hover {
+  border-color: var(--accent);
+  background: var(--panel-hover);
+}
+
+.selectorItem input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.selectorItem span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.selectorItem strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.selectorItem small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Select Products — polished selectable cards */
+.selectorModal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100vh - 32px);
+}
+
+.selectorModal .selectorList {
+  flex: 1;
+  overflow-y: auto;
+  max-height: none;
+  min-height: 0;
+}
+
+.productSelectCard {
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  text-align: start;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.productSelectCard:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.productSelectCard:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.productSelectCardSelected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+:global([class*="themeDark"]) .productSelectCardSelected {
+  background: rgba(29, 76, 84, 0.12);
+  border-color: var(--accent);
+}
+
+.customCheckbox {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: transparent;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.customCheckboxSelected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+:global([class*="themeDark"]) .customCheckboxSelected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.productSelectIcon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.productSelectCardSelected .productSelectIcon {
+  background: var(--panel);
+  color: var(--accent);
+  border-color: var(--accent-soft);
+}
+
+.productSelectText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.productSelectText strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productSelectCardSelected .productSelectText strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.productSelectText small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.selectionCount {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: auto;
+}
+
+html[dir="rtl"] .selectionCount {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.modalFooterActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+html[dir="rtl"] .modalFooterActions {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* Sale form inner sections */
+.formContent {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dateField {
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dateField span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dateField input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.dateField input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.rowsTable {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rowHeader,
+.editRow {
+  display: grid;
+  grid-template-columns: 1.15fr 1.15fr 0.7fr 0.85fr 0.9fr 1fr;
+  gap: 10px;
+  align-items: center;
+  min-width: 720px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+.rowHeader {
+  min-height: 46px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.editRow {
+  min-height: 56px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.editRow:last-child {
+  border-bottom: 0;
+}
+
+.editRow > strong {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editRow input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 9px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.editRow input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.summaryBar {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.summaryBar span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summaryBar strong {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--sales);
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Dark mode — table */
+:global(.themeDark) .tableCard {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global(.themeDark) .tableHeader {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+:global(.themeDark) .saleRow {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global(.themeDark) .saleRow:hover {
+  background: var(--panel-hover);
+}
+
+/* Dark mode — modals & inputs */
+:global([class*="themeDark"]) .modal,
+:global([class*="themeDark"]) .largeModal,
+:global([class*="themeDark"]) .deleteModal {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global([class*="themeDark"]) .modalHeader {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global([class*="themeDark"]) .selectorItem,
+:global([class*="themeDark"]) .dateField input,
+:global([class*="themeDark"]) .editRow input,
+:global([class*="themeDark"]) .formGrid input,
+:global([class*="themeDark"]) .formGrid textarea {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:global([class*="themeDark"]) .rowHeader,
+:global([class*="themeDark"]) .summaryBar {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+:global([class*="themeDark"]) .countdown {
+  background: var(--panel-hover);
+}
+
+/* Dark mode — modals — dark elevation uses black shadow, no light glow */
+:global([class*="themeDark"]) .modal,
+:global([class*="themeDark"]) .deleteModal,
+:global([class*="themeDark"]) .largeModal,
+:global([class*="themeDark"]) .deleteModalCompact,
+:global([class*="themeDark"]) .selectorModal,
+:global([class*="themeDark"]) .confirmModal,
+:global([class*="themeDark"]) .completeModal,
+:global([class*="themeDark"]) .dateModal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal-dark, 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30));
+}
+
+:global([class*="themeDark"]) .modalHeader,
+:global([class*="themeDark"]) .modalFooter {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+:global([class*="themeDark"]) .modalBackdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+/* Responsive */
+@media (max-width: 900px) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tableHeader,
+  .saleRow {
+    grid-template-columns: 140px 130px 90px 110px 125px 130px;
+  }
+}
+
+@media (max-width: 600px) {
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dateSelector {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dateMenu {
+    left: 0;
+    right: 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  html[dir="rtl"] .dateMenu {
+    left: 0;
+    right: 0;
+  }
+
+  .tableCard {
+    overflow-x: auto;
+  }
+
+  .tableHeader,
+  .saleRow {
+    min-width: 640px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .fullWidth {
+    grid-column: auto;
+  }
+
+  .modalBackdrop {
+    padding: 10px;
+  }
+
+  .modal,
+  .largeModal {
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+  }
+
+  .rowHeader,
+  .editRow {
+    min-width: 680px;
+  }
+}
+
+html[dir="rtl"] .toolbar {
+  direction: rtl;
+}
+
+html[dir="rtl"] .tableHeader,
+html[dir="rtl"] .saleRow {
+  direction: rtl;
+}
+
+html[dir="rtl"] .rowHeader,
+html[dir="rtl"] .editRow {
+  direction: rtl;
+}
+
+html[dir="rtl"] .dateMenu {
+  left: auto;
+  right: 0;
+}
+
+html[dir="rtl"] .dateTriggerLabel {
+  text-align: right;
+}
+

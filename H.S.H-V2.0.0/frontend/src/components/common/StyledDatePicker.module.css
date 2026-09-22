@@ -1,0 +1,397 @@
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.trigger {
+  width: 100%;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  text-align: start;
+  justify-content: space-between;
+  font-family: inherit;
+}
+
+.trigger:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.triggerOpen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: start;
+  font-family: inherit;
+}
+
+.placeholder {
+  flex: 1;
+  color: var(--subtle);
+  text-align: start;
+  font-family: inherit;
+}
+
+.hiddenInput {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  left: -9999px;
+}
+
+.menu {
+  position: fixed;
+  width: 300px;
+  min-width: 288px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(62, 44, 28, 0.14), 0 4px 12px rgba(62, 44, 28, 0.08);
+  z-index: 1300;
+  font-family: Arial, Helvetica, "Noto Sans Arabic", sans-serif;
+  animation: menuIn 0.16s ease both;
+}
+
+@media (max-width: 380px) {
+  .menu {
+    width: calc(100vw - 32px) !important;
+    min-width: 0;
+  }
+}
+
+:global([class*="themeDark"]) .menu {
+  border-color: var(--border);
+  background: var(--panel-elevated);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.navButton {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  font-family: inherit;
+}
+
+.navButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.monthLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: capitalize;
+  font-family: inherit;
+}
+
+.monthLabelButton {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: capitalize;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.monthLabelButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.monthLabelButton:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.monthCell {
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+
+.monthCell:hover {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.monthCellCurrent {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.monthCellViewing {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.monthCellSelected {
+  background: var(--accent);
+  color: var(--panel-elevated);
+  border-color: var(--accent);
+  font-weight: 800;
+}
+
+.monthCellSelected:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--panel-elevated);
+}
+
+:global([class*="themeDark"]) .monthCellSelected {
+  color: #fff;
+}
+
+.yearGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.yearGrid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.yearGrid::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+
+.yearGrid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.yearCell {
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+
+.yearCell:hover {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.yearCellCurrent {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.yearCellViewing {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.yearCellSelected {
+  background: var(--accent);
+  color: var(--panel-elevated);
+  border-color: var(--accent);
+  font-weight: 800;
+}
+
+.yearCellSelected:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--panel-elevated);
+}
+
+:global([class*="themeDark"]) .yearCellSelected {
+  color: #fff;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.weekday {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 4px 0;
+  font-family: inherit;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.day {
+  height: 34px;
+  width: 34px;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+
+.day:hover {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.dayOutside {
+  color: var(--subtle);
+  opacity: 0.7;
+}
+
+.dayToday {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.daySelected {
+  background: var(--accent);
+  color: var(--panel-elevated);
+  border-color: var(--accent);
+  font-weight: 800;
+}
+
+.daySelected:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--panel-elevated);
+}
+
+:global([class*="themeDark"]) .daySelected {
+  color: #fff;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+.footerButton {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  font-family: inherit;
+}
+
+.footerButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.clearButton {
+  color: var(--muted);
+}

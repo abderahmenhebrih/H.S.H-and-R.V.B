@@ -1,0 +1,151 @@
+.docPage {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 72px);
+  background: var(--page);
+  color: var(--text);
+}
+
+.docHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.docTitleInput {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+.docTitleInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); background: var(--panel); }
+
+.docStatus {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.toolGroup {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding-inline: 6px;
+  border-inline-end: 1px solid var(--border);
+}
+.toolGroup:last-child { border-inline-end: none; }
+
+.toolBtn {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.toolBtn:hover { background: var(--panel-hover); border-color: var(--border); }
+.toolBtnActive { background: var(--accent-soft); border-color: var(--accent-ring); color: var(--accent); }
+
+.colorInput {
+  width: 28px; height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--panel);
+}
+
+.workspace {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: var(--page);
+}
+
+.paper {
+  width: 100%;
+  max-width: 800px;
+  min-height: 1100px;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+  border-radius: 4px;
+  padding: 56px 64px;
+  outline: none;
+}
+
+:global(.themeDark) .workspace { background: #1a1d23; }
+:global(.themeDark) .paper { background: #1e1f24; color: #eaf0f2; box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
+
+.paper :global(.ProseMirror) {
+  outline: none;
+  min-height: 900px;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.paper :global(.ProseMirror) h1 { font-size: 24px; font-weight: 800; margin: 16px 0 8px; }
+.paper :global(.ProseMirror) h2 { font-size: 20px; font-weight: 700; margin: 14px 0 8px; }
+.paper :global(.ProseMirror) h3 { font-size: 16px; font-weight: 700; margin: 12px 0 6px; }
+.paper :global(.ProseMirror) blockquote { border-inline-start: 3px solid var(--border); margin: 12px 0; padding: 8px 12px; background: #f8f0e7; }
+:global(.themeDark) .paper :global(.ProseMirror) blockquote { background: #25272f; border-color: #343640; }
+.paper :global(.ProseMirror) table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+.paper :global(.ProseMirror) th, .paper :global(.ProseMirror) td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 13px; }
+.paper :global(.ProseMirror) hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.paper :global(.ProseMirror) a { color: var(--accent); text-decoration: underline; }
+
+.insertModal {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(3,8,13,0.5);
+  padding: 16px;
+}
+.insertCard {
+  width: min(520px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.insertCard h3 { margin: 0; font-size: 14px; font-weight: 800; color: var(--text); }
+
+@media (max-width: 860px) {
+  .paper { padding: 28px 20px; }
+  .toolbar { gap: 4px; }
+  .toolGroup { padding-inline: 4px; }
+}
+
+@media print {
+  .docHeader, .toolbar { display: none !important; }
+  .workspace { padding: 0; background: #fff !important; }
+  .paper { box-shadow: none; border: none; max-width: none; width: 100%; padding: 40px; }
+}

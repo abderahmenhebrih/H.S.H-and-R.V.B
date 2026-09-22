@@ -1,0 +1,242 @@
+/* =========================================================
+   HEBRIH SLAUGHTER HOUSE — CENTRALIZED DESIGN TOKENS
+   Approved visual system — calm accountant/management UI
+   Source of truth for both themes. Do not duplicate.
+   ========================================================= */
+
+:root {
+  /* Sales — muted dusty rose (light, secondary semantic) */
+  --sales: #A95A60;
+  --sales-hover: #B5676D;
+  --sales-soft: rgba(169, 90, 96, 0.10);
+  --sales-ring: rgba(169, 90, 96, 0.14);
+  --sales-icon-bg: rgba(169, 90, 96, 0.09);
+  --sales-icon-border: rgba(169, 90, 96, 0.15);
+
+  /* Purchase — muted warm gold / mustard (light, secondary) */
+  --purchase: #AF954B;
+  --purchase-border: #9D843E;
+  --purchase-hover: #BDA45E;
+  --purchase-soft: rgba(175, 149, 75, 0.11);
+  --purchase-ring: rgba(175, 149, 75, 0.14);
+  --purchase-icon-bg: rgba(175, 149, 75, 0.10);
+  --purchase-icon-border: rgba(175, 149, 75, 0.15);
+
+  /* Danger / Error — stronger than muted sales, for destructive confirmation */
+  --danger: #B93A42;
+  --danger-hover: #C84A52;
+  --danger-soft: rgba(185, 58, 66, 0.09);
+  --danger-ring: rgba(185, 58, 66, 0.16);
+  --danger-border: #A02F37;
+
+  /* Success / Info — muted semantic, not neon */
+  --success: #3A7D52;
+  --success-hover: #45935D;
+  --success-soft: rgba(58, 125, 82, 0.10);
+  --success-ring: rgba(58, 125, 82, 0.14);
+  --success-border: rgba(58, 125, 82, 0.18);
+
+  --info: #3D6AA5;
+  --info-hover: #4A7AB8;
+  --info-soft: rgba(61, 106, 165, 0.10);
+  --info-ring: rgba(61, 106, 165, 0.14);
+  --info-border: rgba(61, 106, 165, 0.18);
+
+  /* Generic */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 15px;
+  --radius-2xl: 16px;
+
+  --shadow-xs: 0 1px 4px rgba(62, 44, 28, 0.04);
+  --shadow-sm: 0 1px 6px rgba(62, 44, 28, 0.06);
+  --shadow: 0 4px 15px rgba(62, 44, 28, 0.055);
+  --shadow-md: 0 4px 12px rgba(62, 44, 28, 0.06);
+  --shadow-lg: 0 12px 32px rgba(62, 44, 28, 0.08);
+  --shadow-dark: 0 4px 12px rgba(0, 0, 0, 0.24);
+  --shadow-dark-lg: 0 16px 40px rgba(0, 0, 0, 0.32);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.28);
+  --shadow-modal-dark: 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30);
+
+  /* Scrollbar — main page */
+  --scrollbar-track: #F0E5DA;
+  --scrollbar-thumb: #6B3A26;
+  --scrollbar-thumb-hover: #7B4931;
+
+  /* Spacing — 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Typography — enterprise scale */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-3xl: 26px;
+  --leading-tight: 1.15;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.6;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+
+  /* Layout */
+  --content-max: 1280px;
+  --sidebar-width: 300px;
+  --header-height: 96px;
+  --control-height: 44px;
+  --control-height-sm: 36px;
+
+  /* Legacy aliases — kept for backwards compat, map to semantic */
+  --red: var(--sales);
+  --yellow: var(--purchase);
+  --red-soft: var(--sales-soft);
+  --yellow-soft: var(--purchase-soft);
+  --red-muted: var(--sales);
+  --yellow-muted: var(--purchase);
+
+  /* Summary / KPI icon — unified theme (My Office reference) */
+  --summary-icon-bg: var(--accent-soft);
+  --summary-icon-color: var(--accent);
+  --summary-icon-border: var(--accent-ring);
+}
+
+/* Root background — ensures first paint already has correct theme (pre-hydration) */
+html[data-theme="light"], html[data-theme="light"] body {
+  background: #F0E5DA;
+  color-scheme: light;
+}
+html[data-theme="dark"], html[data-theme="dark"] body {
+  background: #202126;
+  color-scheme: dark;
+}
+
+/* Light — warm ivory / cream + coffee brown (warm ivory with subtle coffee undertone) */
+html[data-theme="light"], html[data-theme="light"] body,
+.themeLight, [class*="themeLight"] {
+  --page: #F0E5DA;
+  --panel: #F8F0E7;
+  --panel-hover: #EFE3D7;
+  --panel-elevated: #FCF6EF;
+  --border: #E2D4C5;
+  --border-strong: #D3C2B1;
+
+  --text: #2F261F;
+  --muted: #81756C;
+  --subtle: #A89D94;
+
+  --input: #FCF6EF;
+  --input-hover: #EFE3D7;
+  --input-focus: #6B3A26;
+
+  --accent: #6B3A26;
+  --accent-hover: #7B4931;
+  --accent-active: #4F2E1F;
+  --accent-soft: rgba(107, 58, 38, 0.08);
+  --accent-ring: rgba(107, 58, 38, 0.13);
+  --accent-surface: #EFE3D7;
+
+  --sidebar: #F8F0E7;
+  --sidebar-hover: #EFE3D7;
+  --sidebar-text: #6B5A51;
+  --sidebar-border: #E2D4C5;
+
+  --brown: #6B3A26;
+  --brown-hover: #7B4931;
+  --brown-active: #4F2E1F;
+  --brown-soft: rgba(107, 58, 38, 0.08);
+  --brown-ring: rgba(107, 58, 38, 0.13);
+
+  --scrollbar-track: #F0E5DA;
+  --scrollbar-thumb: #6B3A26;
+  --scrollbar-thumb-hover: #7B4931;
+}
+
+/* Dark — charcoal + blue-charcoal sidebar + muted teal (red/yellow desaturated for secondary accent) */
+html[data-theme="dark"], html[data-theme="dark"] body,
+.themeDark, [class*="themeDark"] {
+  --page: #202126;
+  --panel: #1E1F24;
+  --panel-hover: #25272F;
+  --panel-elevated: #262831;
+  --border: #2C2E36;
+  --border-strong: #343640;
+
+  --text: #EAF0F2;
+  --muted: #9AA3A8;
+  --subtle: #7E868B;
+
+  --input: #25272F;
+  --input-hover: #262831;
+  --input-focus: #1D4C54;
+
+  --accent: #1D4C54;
+  --accent-hover: #24565F;
+  --accent-active: #133E45;
+  --accent-soft: rgba(29, 76, 84, 0.16);
+  --accent-ring: rgba(29, 76, 84, 0.28);
+  --accent-surface: #133E45;
+
+  --sidebar: #111924;
+  --sidebar-hover: #1B2A36;
+  --sidebar-text: #BFC9D1;
+  --sidebar-border: #1E2F3E;
+
+  --brown: #1D4C54;
+  --brown-hover: #24565F;
+  --brown-active: #133E45;
+  --brown-soft: rgba(29, 76, 84, 0.16);
+  --brown-ring: rgba(29, 76, 84, 0.28);
+
+  --scrollbar-track: #202126;
+  --scrollbar-thumb: #1D4C54;
+  --scrollbar-thumb-hover: #24565F;
+
+  /* Dark muted semantic — restrained secondary accents per spec */
+  --sales: #BA6A70;
+  --sales-hover: #C77A80;
+  --sales-soft: rgba(186, 106, 112, 0.11);
+  --sales-ring: rgba(186, 106, 112, 0.15);
+  --sales-icon-bg: rgba(186, 106, 112, 0.10);
+  --sales-icon-border: rgba(186, 106, 112, 0.16);
+
+  --purchase: #B9A260;
+  --purchase-border: #A28C4F;
+  --purchase-hover: #C6B16E;
+  --purchase-soft: rgba(185, 162, 96, 0.11);
+  --purchase-ring: rgba(185, 162, 96, 0.15);
+  --purchase-icon-bg: rgba(185, 162, 96, 0.10);
+  --purchase-icon-border: rgba(185, 162, 96, 0.16);
+
+  --danger: #CF4A54;
+  --danger-hover: #DB5A64;
+  --danger-soft: rgba(207, 74, 84, 0.12);
+  --danger-ring: rgba(207, 74, 84, 0.18);
+  --danger-border: #B93A42;
+
+  --success: #4AA06A;
+  --success-soft: rgba(74, 160, 106, 0.13);
+  --info: #5D8AC5;
+  --info-soft: rgba(93, 138, 197, 0.14);
+
+  /* Legacy aliases map to semantic */
+  --red: var(--sales);
+  --yellow: var(--purchase);
+  --red-soft: var(--sales-soft);
+  --yellow-soft: var(--purchase-soft);
+  --red-muted: var(--sales);
+  --yellow-muted: var(--purchase);
+}

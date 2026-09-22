@@ -1,0 +1,1577 @@
+﻿.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Summary cards — compact, matched to app tokens */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.summaryCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  min-height: 84px;
+  height: 84px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 1px 6px var(--shadow);
+  box-sizing: border-box;
+}
+
+.summaryIcon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 0;
+}
+
+.iconProducts {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.iconStock {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.iconPrice {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.iconLow {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+:global([class*="themeDark"]) .iconProducts,
+:global([class*="themeDark"]) .iconPrice {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+:global([class*="themeDark"]) .iconStock,
+:global([class*="themeDark"]) .iconLow {
+  background: var(--summary-icon-bg, var(--accent-soft));
+  color: var(--summary-icon-color, var(--accent));
+  border-color: var(--summary-icon-border, var(--accent-ring));
+}
+
+.summaryContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryLabel {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.summaryValue {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.summarySub {
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  text-wrap: balance;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  margin-bottom: 15px;
+}
+
+.countBadge {
+  min-width: 126px;
+  min-height: 48px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.searchBox {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.035);
+}
+
+.searchIcon {
+  flex: 0 0 auto;
+  color: var(--subtle);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.searchBox input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.searchBox input::placeholder {
+  color: var(--subtle);
+}
+
+.errorBanner,
+.formError {
+  padding: 13px 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.productsSection {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+}
+
+.sectionHeader {
+  min-height: 78px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 21px;
+  font-weight: 850;
+}
+
+.primaryButton,
+.secondaryButton,
+.deleteButton,
+.cancelButton,
+.deleteConfirmButton,
+.closeButton {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.primaryButton {
+  min-height: 44px;
+  padding: 0 17px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--panel-elevated);
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(107, 58, 38, 0.18);
+}
+
+.primaryButton:disabled,
+.deleteConfirmButton:disabled,
+.cancelButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Toolbar — search + sort + add */
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.sortDropdown {
+  position: relative;
+  min-width: 148px;
+}
+
+.sortTrigger {
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.sortTrigger:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.sortTriggerOpen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.sortChevron {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+  flex: 0 0 auto;
+}
+
+.sortChevronOpen {
+  transform: rotate(180deg);
+  color: var(--text);
+}
+
+.sortMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(62, 44, 28, 0.14), 0 4px 12px rgba(62, 44, 28, 0.08);
+  z-index: 20;
+}
+
+:global([class*="themeDark"]) .sortMenu {
+  border-color: var(--border);
+  background: var(--panel-elevated);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.sortOption {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: start;
+  transition: background 0.15s ease;
+}
+
+.sortOption:hover {
+  background: var(--panel-hover);
+}
+
+.sortOptionActive {
+  background: var(--panel-hover);
+  font-weight: 700;
+}
+
+:global([class*="themeDark"]) .sortOption:hover {
+  background: var(--panel-hover);
+}
+
+html[dir="rtl"] .sortOption {
+  text-align: right;
+}
+
+/* Table — professional management table */
+.tableContainer {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tableHeader,
+.tableRow {
+  display: grid;
+  grid-template-columns: minmax(260px, 2.4fr) 110px 110px 110px 140px;
+  align-items: center;
+  gap: 12px;
+  min-width: 680px;
+}
+
+.tableHeader {
+  min-height: 52px;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: minmax(260px, 2.4fr) 110px 110px 110px 140px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-hover);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tableBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.tableRow {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  transition: background 0.2s ease;
+}
+
+/* Vertical column dividers — subtle, between internal columns only */
+.tableHeader > span:not(:last-child),
+.tableRow > *:not(:last-child) {
+  border-inline-end: 1px solid var(--border);
+}
+
+.tableRow:last-child {
+  border-bottom: 0;
+}
+
+.tableRow:hover {
+  background: var(--panel-hover);
+}
+
+.tdProduct {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.productIcon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.productInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.productInfo strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productInfo small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tdPrice,
+.tdQuantity,
+.tdWeight {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tdActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.rowEditButton,
+.rowDeleteButton {
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.rowEditButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.rowDeleteButton {
+  color: var(--danger);
+  border-color: var(--danger-ring);
+  background: var(--panel);
+}
+
+.rowDeleteButton:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+
+
+/* Responsive — summary + table */
+/* Dark mode — modals — dark elevation uses black shadow, no light glow */
+:global([class*="themeDark"]) .modal,
+:global([class*="themeDark"]) .deleteModal,
+:global([class*="themeDark"]) .largeModal,
+:global([class*="themeDark"]) .deleteModalCompact,
+:global([class*="themeDark"]) .selectorModal,
+:global([class*="themeDark"]) .confirmModal,
+:global([class*="themeDark"]) .completeModal,
+:global([class*="themeDark"]) .dateModal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal-dark, 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30));
+}
+
+:global([class*="themeDark"]) .modalHeader,
+:global([class*="themeDark"]) .modalFooter {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+:global([class*="themeDark"]) .modalBackdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+@media (max-width: 900px) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tableHeader,
+  .tableRow {
+    grid-template-columns: minmax(200px, 2fr) 100px 100px 100px 130px;
+  }
+}
+
+@media (max-width: 600px) {
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbarActions {
+    width: 100%;
+  }
+
+  .toolbarActions .primaryButton {
+    flex: 1;
+  }
+
+  .tableHeader,
+  .tableRow {
+    grid-template-columns: 1fr 90px 80px 80px 100px;
+    min-width: 520px;
+  }
+
+  .tableFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Dark mode — table */
+:global(.themeDark) .summaryCard {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global(.themeDark) .tableHeader {
+  background: var(--panel-hover);
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+:global(.themeDark) .tableRow {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global(.themeDark) .tableRow:hover {
+  background: var(--panel-hover);
+}
+
+:global(.themeDark) .tableFooter {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+/* RTL */
+html[dir="rtl"] .tableHeader,
+html[dir="rtl"] .tableRow {
+  direction: rtl;
+}
+
+.statePanel {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  text-align: center;
+}
+
+.stateIcon {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--panel-hover);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* When empty/loading state is inside the table container, it should
+   appear as the table body — not as a nested card. Matches Customers. */
+.tableContainer .statePanel {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  min-height: 320px;
+  padding: 24px;
+}
+
+.statePanel h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.statePanel p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 11, 14, 0.68);
+  backdrop-filter: blur(5px);
+}
+
+.modal,
+.deleteModal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+}
+
+.modalHeader {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.closeButton {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.closeButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.closeButton:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form label > span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.form label small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.form input,
+.form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+}
+
+.form input {
+  min-height: 40px;
+}
+
+.form input[type="number"]::-webkit-outer-spin-button,
+.form input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.form input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.form textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.form input:focus,
+.form textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inputWithSuffix {
+  position: relative;
+}
+
+.inputWithSuffix input {
+  padding-inline-end: 44px;
+}
+
+.inputWithSuffix span {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.modalActions .primaryButton,
+.modalActions .cancelButton,
+.modalActions .deleteConfirmButton {
+  min-height: 40px;
+}
+
+.cancelButton {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.cancelButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.cancelButton:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.deleteModal {
+  width: min(480px, calc(100vw - 32px));
+  padding: 20px;
+  text-align: center;
+}
+
+.deleteIcon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.deleteModal h2 {
+  margin: 12px 0 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.deleteModal > p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.deleteWarning {
+  padding: 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.deleteConfirmButton {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: var(--danger);
+  border: 1px solid var(--danger-border);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Dark mode */
+:global(.themeDark) .countBadge,
+:global(.themeDark) .searchBox,
+:global(.themeDark) .productsSection,
+:global(.themeDark) .statePanel,
+:global(.themeDark) .modal,
+:global(.themeDark) .deleteModal {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+:global(.themeDark) .sectionHeader {
+  border-color: var(--border);
+}
+
+:global(.themeDark) .sectionHeader h2,
+:global(.themeDark) .statePanel h2,
+:global(.themeDark) .modalHeader h2,
+:global(.themeDark) .deleteModal h2,
+:global(.themeDark) .deleteModal > p,
+:global(.themeDark) .form label > span {
+  color: var(--text);
+}
+
+:global(.themeDark) .secondaryButton,
+:global(.themeDark) .cancelButton,
+:global(.themeDark) .closeButton {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+:global(.themeDark) .deleteButton {
+  background: var(--panel-hover);
+  color: var(--danger);
+  border-color: var(--danger-ring);
+}
+
+:global(.themeDark) .searchBox input,
+:global(.themeDark) .form input,
+:global(.themeDark) .form textarea {
+  color: var(--text);
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+:global(.themeDark) .searchBox input::placeholder {
+  color: var(--subtle);
+}
+
+:global(.themeDark) .modalBadge {
+  color: var(--purchase);
+}
+
+@media (max-width: 760px) {
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .countBadge {
+    min-height: 52px;
+    justify-content: flex-start;
+  }
+
+  .sectionHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .sectionHeader .primaryButton {
+    width: 100%;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modalBackdrop {
+    padding: 12px;
+  }
+
+  .modalHeader,
+  .form {
+    padding: 18px;
+  }
+
+  .deleteModal {
+    padding: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modalActions {
+    flex-direction: column-reverse;
+  }
+
+  .modalActions button {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   PRODUCTS - SPACING + THEME FIX
+   ========================================================= */
+
+/* Keep clear separation between toolbar and content */
+.statePanel,
+.productsSection {
+  margin-top: 18px;
+}
+
+/* Light mode */
+.productsSection,
+.statePanel {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* Dark mode - support the theme selectors used by the app */
+:global(.themeDark) .productsSection,
+:global(.themeDark) .statePanel,
+:global(.dark) .productsSection,
+:global(.dark) .statePanel,
+:global(html.themeDark) .productsSection,
+:global(html.themeDark) .statePanel,
+:global(html.dark) .productsSection,
+:global(html.dark) .statePanel,
+:global([data-theme="dark"]) .productsSection,
+:global([data-theme="dark"]) .statePanel {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* Dark mode text inside the empty/loading state */
+:global(.themeDark) .statePanel h2,
+:global(.dark) .statePanel h2,
+:global(html.themeDark) .statePanel h2,
+:global(html.dark) .statePanel h2,
+:global([data-theme="dark"]) .statePanel h2 {
+  color: var(--text);
+}
+
+:global(.themeDark) .statePanel p,
+:global(.dark) .statePanel p,
+:global(html.themeDark) .statePanel p,
+:global(html.dark) .statePanel p,
+:global([data-theme="dark"]) .statePanel p {
+  color: var(--muted);
+}
+
+/* =========================================================
+   PRODUCTS - CUSTOMER DESIGN SYNC
+   Customers/Suppliers are the locked visual reference.
+   ========================================================= */
+
+.productsPage {
+  width: 100%;
+  color: var(--text);
+}
+
+/* Same toolbar geometry as Customers */
+.productsPage .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.productsPage .searchBox {
+  min-width: 0;
+  flex: 1;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, .035);
+}
+
+.productsPage .countBadge {
+  height: 48px;
+  min-height: 48px;
+  min-width: auto;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  color: var(--muted, var(--muted));
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Main Products surface follows the global theme */
+.productsPage .productsSection,
+.productsPage .statePanel {
+  margin-top: 0;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 4px 15px var(--shadow, rgba(0, 0, 0, .055));
+  transition:
+    background-color .35s ease,
+    border-color .35s ease,
+    color .35s ease;
+}
+
+/* Empty state follows Customers exactly */
+.productsPage .statePanel {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  text-align: center;
+}
+
+.productsPage .statePanel h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.productsPage .statePanel p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Product section */
+.productsPage .sectionHeader {
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-hover);
+  color: var(--muted);
+}
+
+/* Product cards use the active theme rather than fixed white */
+.productsPage .productCard {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.productsPage .dataItem {
+  background: var(--panel-hover);
+}
+
+.productsPage .cardIdentity h3,
+.productsPage .dataItem strong {
+  color: var(--text);
+}
+
+.productsPage .cardIdentity p,
+.productsPage .dataItem span,
+.productsPage .cardHint {
+  color: var(--muted);
+}
+
+/* Keep RTL/LTR behavior identical to Customers */
+@media (max-width: 600px) {
+  .productsPage .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .productsPage .countBadge {
+    justify-content: center;
+  }
+}
+/* =========================================================
+   PRODUCTS - FINAL SPACING + MODAL THEME FIX
+   ========================================================= */
+
+/* Match the locked Customers spacing */
+.productsPage .toolbar {
+  margin-top: 18px;
+  margin-bottom: 15px;
+}
+
+/* =========================================================
+   LIGHT MODE - MODAL
+   ========================================================= */
+
+.productsPage .modal,
+.productsPage .deleteModal {
+  background: var(--panel);
+  color: #2F261F;
+  border-color: var(--border);
+}
+
+.productsPage .modalHeader {
+  background: var(--panel);
+  border-bottom-color: var(--border);
+}
+
+.productsPage .modalHeader h2,
+.productsPage .deleteModal h2,
+.productsPage .form label > span {
+  color: #2F261F;
+}
+
+.productsPage .form input,
+.productsPage .form textarea {
+  background: var(--panel);
+  border-color: var(--border);
+  color: #2F261F;
+}
+
+.productsPage .closeButton {
+  background: var(--panel);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.productsPage .cancelButton {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* =========================================================
+   DARK MODE - MODAL
+   Uses the global AppShell theme class.
+   ========================================================= */
+
+:global(.themeDark) .productsPage .modal,
+:global(.themeDark) .productsPage .deleteModal {
+  background: #1e1f24;
+  color: var(--text);
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .productsPage .modalHeader {
+  background: #1e1f24;
+  border-bottom-color: #2c2e36;
+}
+
+:global(.themeDark) .productsPage .modalHeader h2,
+:global(.themeDark) .productsPage .deleteModal h2,
+:global(.themeDark) .productsPage .form label > span {
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .form label small {
+  color: var(--subtle);
+}
+
+:global(.themeDark) .productsPage .form input,
+:global(.themeDark) .productsPage .form textarea {
+  background: #25272f;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .form input::placeholder,
+:global(.themeDark) .productsPage .form textarea::placeholder {
+  color: var(--subtle);
+}
+
+:global(.themeDark) .productsPage .form input:focus,
+:global(.themeDark) .productsPage .form textarea:focus {
+  background: #262831;
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgba(107, 58, 38, 0.13);
+}
+
+:global(.themeDark) .productsPage .inputWithSuffix span {
+  color: var(--muted);
+}
+
+:global(.themeDark) .productsPage .closeButton {
+  background: #25272f;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .closeButton:hover {
+  background: #293945;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .cancelButton {
+  background: #25272f;
+  color: var(--text);
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .productsPage .cancelButton:hover {
+  background: #293945;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .modalBadge {
+  color: var(--purchase);
+  border-color: rgba(255, 220, 75, .55);
+  background: rgba(255, 220, 75, .08);
+}
+
+:global(.themeDark) .productsPage .deleteWarning {
+  background: rgba(255, 61, 70, .09);
+  border-color: rgba(255, 61, 70, .25);
+  color: var(--muted);
+}
+
+:global(.themeDark) .productsPage .deleteModal > p {
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .modalBackdrop {
+  background: rgba(3, 8, 13, .78);
+}
+/* =========================================================
+   PRODUCTS - FINAL SPACING + MODAL THEME FIX
+   ========================================================= */
+
+/* Match the locked Customers spacing */
+.productsPage .toolbar {
+  margin-top: 18px;
+  margin-bottom: 15px;
+}
+
+/* =========================================================
+   LIGHT MODE - MODAL
+   ========================================================= */
+
+.productsPage .modal,
+.productsPage .deleteModal {
+  background: var(--panel);
+  color: #2F261F;
+  border-color: var(--border);
+}
+
+.productsPage .modalHeader {
+  background: var(--panel);
+  border-bottom-color: var(--border);
+}
+
+.productsPage .modalHeader h2,
+.productsPage .deleteModal h2,
+.productsPage .form label > span {
+  color: #2F261F;
+}
+
+.productsPage .form input,
+.productsPage .form textarea {
+  background: var(--panel);
+  border-color: var(--border);
+  color: #2F261F;
+}
+
+.productsPage .closeButton {
+  background: var(--panel);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.productsPage .cancelButton {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* =========================================================
+   DARK MODE - MODAL
+   Uses the global AppShell theme class.
+   ========================================================= */
+
+:global(.themeDark) .productsPage .modal,
+:global(.themeDark) .productsPage .deleteModal {
+  background: #1e1f24;
+  color: var(--text);
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .productsPage .modalHeader {
+  background: #1e1f24;
+  border-bottom-color: #2c2e36;
+}
+
+:global(.themeDark) .productsPage .modalHeader h2,
+:global(.themeDark) .productsPage .deleteModal h2,
+:global(.themeDark) .productsPage .form label > span {
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .form label small {
+  color: var(--subtle);
+}
+
+:global(.themeDark) .productsPage .form input,
+:global(.themeDark) .productsPage .form textarea {
+  background: #25272f;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .form input::placeholder,
+:global(.themeDark) .productsPage .form textarea::placeholder {
+  color: var(--subtle);
+}
+
+:global(.themeDark) .productsPage .form input:focus,
+:global(.themeDark) .productsPage .form textarea:focus {
+  background: #262831;
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgba(107, 58, 38, 0.13);
+}
+
+:global(.themeDark) .productsPage .inputWithSuffix span {
+  color: var(--muted);
+}
+
+:global(.themeDark) .productsPage .closeButton {
+  background: #25272f;
+  border-color: #2c2e36;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .closeButton:hover {
+  background: #293945;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .cancelButton {
+  background: #25272f;
+  color: var(--text);
+  border-color: #2c2e36;
+}
+
+:global(.themeDark) .productsPage .cancelButton:hover {
+  background: #293945;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .modalBadge {
+  color: var(--purchase);
+  border-color: rgba(255, 220, 75, .55);
+  background: rgba(255, 220, 75, .08);
+}
+
+:global(.themeDark) .productsPage .deleteWarning {
+  background: rgba(255, 61, 70, .09);
+  border-color: rgba(255, 61, 70, .25);
+  color: var(--muted);
+}
+
+:global(.themeDark) .productsPage .deleteModal > p {
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .modalBackdrop {
+  background: rgba(3, 8, 13, .78);
+}
+/* =========================================================
+   PRODUCTS - MODAL THEME FIX
+   AppShell themeDark is a CSS-module class, so target
+   the generated class by its stable class-name fragment.
+   ========================================================= */
+
+/* DARK MODE — dark elevation uses black shadow, no light glow */
+:global([class*="themeDark"]) .productsPage .modal,
+:global([class*="themeDark"]) .productsPage .deleteModal {
+  background: #1e1f24 !important;
+  color: var(--text) !important;
+  border: 1px solid #2c2e36 !important;
+  box-shadow: var(--shadow-modal-dark, 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30)) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .modalHeader,
+:global([class*="themeDark"]) .productsPage .modalFooter {
+  background: #1e1f24 !important;
+  border-color: #2c2e36 !important;
+  box-shadow: none !important;
+}
+
+:global([class*="themeDark"]) .productsPage .modalHeader h2,
+:global([class*="themeDark"]) .productsPage .deleteModal h2,
+:global([class*="themeDark"]) .productsPage .form label > span {
+  color: var(--text) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .form label small {
+  color: var(--subtle) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .form input,
+:global([class*="themeDark"]) .productsPage .form textarea {
+  background: #25272f !important;
+  border-color: #2c2e36 !important;
+  color: var(--text) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .form input:focus,
+:global([class*="themeDark"]) .productsPage .form textarea:focus {
+  background: #262831 !important;
+  border-color: var(--accent) !important;
+  color: var(--text) !important;
+  box-shadow: 0 0 0 3px rgba(107, 58, 38, 0.13) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .inputWithSuffix span {
+  color: var(--muted) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .closeButton {
+  background: #25272f !important;
+  color: var(--text) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .closeButton:hover {
+  background: #293945 !important;
+  color: var(--text) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .cancelButton {
+  background: #25272f !important;
+  color: var(--text) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .cancelButton:hover {
+  background: #293945 !important;
+  color: var(--text) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .modalBadge {
+  color: var(--purchase) !important;
+  border-color: rgba(255, 220, 75, .55) !important;
+  background: rgba(255, 220, 75, .08) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .deleteWarning {
+  background: rgba(255, 61, 70, .09) !important;
+  border-color: rgba(255, 61, 70, .25) !important;
+  color: var(--muted) !important;
+}
+
+:global([class*="themeDark"]) .productsPage .deleteModal > p {
+  color: var(--text) !important;
+}
+
+
+
+
+
+
+

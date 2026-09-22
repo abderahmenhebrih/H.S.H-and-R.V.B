@@ -1,0 +1,255 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(8, 11, 14, 0.57);
+  backdrop-filter: blur(7px);
+  animation: backdropIn 0.25s ease both;
+}
+
+.modal {
+  width: min(440px, calc(100vw - 32px));
+  padding: 20px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  animation: modalIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.warningIcon {
+  margin: 0 auto 10px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-ring);
+}
+
+.eyebrow {
+  display: block;
+  color: var(--sales);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.entityName {
+  margin: 10px auto 0;
+  max-width: 340px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.description {
+  margin: 8px auto 0;
+  max-width: 340px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.warningBox {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.circularCountdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.circleWrapper {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+}
+
+.circleWrapper svg {
+  position: absolute;
+  inset: 0;
+  width: 64px;
+  height: 64px;
+  transform: rotate(-90deg);
+}
+
+.circleTrack {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 4;
+}
+
+.circleProgress {
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.circleText {
+  position: relative;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+
+.circleLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+
+.actions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cancelButton,
+.deleteButton {
+  min-height: 40px;
+  flex: 1;
+  max-width: 160px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cancelButton {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.cancelButton:disabled,
+.deleteButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.deleteButton {
+  border: 1px solid var(--danger-border);
+  background: var(--danger);
+  color: #fff;
+}
+
+.deleteButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px var(--danger-ring);
+}
+
+/* Dark mode — uses same var system, panel already dark */
+:global([class*="themeDark"]) .modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.30);
+}
+
+:global([class*="themeDark"]) .backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+:global([class*="themeDark"]) .circleTrack {
+  stroke: var(--border);
+}
+
+:global([class*="themeDark"]) .circleProgress {
+  stroke: var(--danger);
+}
+
+:global([class*="themeDark"]) .circleText {
+  color: var(--text);
+}
+
+:global([class*="themeDark"]) .circleLabel {
+  color: var(--muted);
+}
+
+/* RTL — circle remains centered, text alignment preserved */
+html[dir="rtl"] .modal {
+  direction: rtl;
+}
+
+html[dir="rtl"] .circularCountdown {
+  direction: ltr;
+}
+
+html[dir="rtl"] .actions {
+  direction: rtl;
+}

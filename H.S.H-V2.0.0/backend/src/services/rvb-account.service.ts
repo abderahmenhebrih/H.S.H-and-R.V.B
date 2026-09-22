@@ -1,0 +1,243 @@
+import { v4 as uuidv4 } from "uuid";
+import { RvbAccountModel } from "../models/rvb-account.model";
+import { WorkerModel } from "../models/worker.model";
+import { SupplierModel } from "../models/supplier.model";
+import { CustomerModel } from "../models/customer.model";
+import { isValidRvbRole, isPortalRole } from "../constants/rvb-roles";
+import { normalizeTag, isValidTag } from "../constants/rvb-account";
+import { hashPassword, validatePasswordPolicy } from "../lib/password";
+
+export type CreateRvbAccountInput = {
+  tag: string;
+  displayName: string;
+  role: string;
+  linkedEntityType?: string | null;
+  linkedEntityId?: string | null;
+  onboardingStatus?: string;
+  profilePicture?: string;
+  password?: string;
+  confirmPassword?: string;
+};
+
+export type UpdateRvbAccountInput = {
+  displayName?: string;
+  profilePicture?: string;
+};
+
+const PATCH_ALLOWLIST = new Set(["displayName", "profilePicture"]);
+
+function codeError(code: string, status: number, message?: string) {
+  const err = new Error(message || code) as any;
+  err.code = code;
+  err.status = status;
+  return err;
+}
+
+function validateRole(role: string) {
+  if (!isValidRvbRole(role)) {
+    throw codeError("RVB_ROLE_INVALID", 400);
+  }
+}
+
+function validateTag(raw: string): string {
+  const tag = normalizeTag(raw);
+  if (!tag) throw codeError("RVB_TAG_REQUIRED", 400);
+  if (!isValidTag(tag)) throw codeError("RVB_TAG_INVALID", 400);
+  return tag;
+}
+
+function isPortalRoleRole(role: string): boolean {
+  return role === "worker" || role === "supplier" || role === "customer";
+}
+
+async function assertLinkedEntityExists(type: string, id: string) {
+  let model: any = null;
+  if (type === "worker") model = WorkerModel;
+  else if (type === "supplier") model = SupplierModel;
+  else if (type === "customer") model = CustomerModel;
+  else throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+  const doc = await (model as any).findOne({ id }).lean();
+  if (!doc) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+  return doc;
+}
+
+export async function createRvbAccount(input: CreateRvbAccountInput) {
+  const rawTag = input.tag;
+  const tag = validateTag(rawTag || "");
+  validateRole(input.role);
+  const role = input.role;
+
+  const displayName = (input.displayName || "").trim();
+  if (!displayName) throw codeError("RVB_DISPLAY_NAME_REQUIRED", 400);
+
+  const linkedEntityType = input.linkedEntityType ? String(input.linkedEntityType).trim().toLowerCase() : null;
+  const linkedEntityId = input.linkedEntityId ? String(input.linkedEntityId).trim() : null;
+
+  const needsLink = isPortalRoleRole(role);
+  if (needsLink) {
+    if (!linkedEntityType || !linkedEntityId) {
+      throw codeError("RVB_LINKED_ENTITY_REQUIRED", 400);
+    }
+    if (linkedEntityType !== role) {
+      throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+    }
+    await assertLinkedEntityExists(linkedEntityType, linkedEntityId);
+    const existingLink = await (RvbAccountModel as any).findOne({
+      linkedEntityType,
+      linkedEntityId,
+    }).lean();
+    if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
+  } else {
+    // management: must not have linkage
+    if (linkedEntityType || linkedEntityId) {
+      // If they provided linkage for management, validate mismatch
+      if (linkedEntityType && linkedEntityId) {
+        if (isPortalRoleRole(linkedEntityType)) {
+          throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+        }
+      }
+      throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
+    }
+  }
+
+  const existingTag = await RvbAccountModel.findOne({ tag }).lean();
+  if (existingTag) throw codeError("RVB_TAG_ALREADY_EXISTS", 409);
+
+  // Password handling
+  let passwordHash: string | null = null;
+  let mustChangePassword = false;
+  if (input.password !== undefined || input.confirmPassword !== undefined) {
+    const pwd = input.password || "";
+    const confirm = input.confirmPassword;
+    const policyError = validatePasswordPolicy(pwd, confirm);
+    if (policyError) throw codeError(policyError, 400);
+    passwordHash = await hashPassword(pwd);
+    mustChangePassword = true;
+  } else {
+    // Allow creation without password (legacy phase accounts) — but new auth expects password
+    // For new creates via protected route, we will require password at route level for clarity
+    // Keep null for now if not provided
+    passwordHash = null;
+    mustChangePassword = false;
+  }
+
+  const now = Date.now();
+  const doc: any = {
+    id: `rvbacc-${uuidv4()}`,
+    createdAt: now,
+    updatedAt: now,
+    syncStatus: "synced",
+    tag,
+    displayName,
+    role,
+    linkedEntityType: needsLink ? linkedEntityType : null,
+    linkedEntityId: needsLink ? linkedEntityId : null,
+    status: "active",
+    onboardingStatus: input.onboardingStatus === "complete" ? "complete" : "pending",
+    profilePicture: input.profilePicture || undefined,
+    archivedAt: null,
+    lastLoginAt: null,
+    passwordHash,
+    mustChangePassword,
+    passwordChangedAt: null,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+  };
+  const created = await RvbAccountModel.create(doc);
+  return created.toObject ? created.toObject() : created;
+}
+
+export async function updateRvbAccount(id: string, input: any) {
+  // Tag immutability check — must reject if tag present at all
+  if (input && typeof input === "object" && "tag" in input) {
+    throw codeError("RVB_TAG_IMMUTABLE", 400);
+  }
+  // Allowlist enforcement
+  const forbiddenKeys = Object.keys(input || {}).filter((k) => !PATCH_ALLOWLIST.has(k));
+  if (forbiddenKeys.length > 0) {
+    // Provide specific error for known protected fields, generic otherwise
+    const hasProtected = forbiddenKeys.some((k) =>
+      ["id","linkedEntityType","linkedEntityId","status","onboardingStatus","passwordHash","archivedAt","createdAt","updatedAt","lastLoginAt","failedLoginAttempts","lockedUntil","mustChangePassword","passwordChangedAt","refresh","session"].includes(k)
+    );
+    if (hasProtected) throw codeError("RVB_FIELD_NOT_ALLOWED", 400);
+    throw codeError("RVB_FIELD_NOT_ALLOWED", 400);
+  }
+
+  const account: any = await RvbAccountModel.findOne({ id });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+
+  if (input.displayName !== undefined) {
+    const name = String(input.displayName).trim();
+    if (!name) throw codeError("RVB_DISPLAY_NAME_REQUIRED", 400);
+    account.displayName = name;
+  }
+  if (input.profilePicture !== undefined) {
+    account.profilePicture = input.profilePicture ? String(input.profilePicture) : undefined;
+  }
+  account.updatedAt = Date.now();
+  await account.save();
+  return account.toObject ? account.toObject() : account;
+}
+
+export async function archiveRvbAccount(id: string) {
+  const account: any = await RvbAccountModel.findOne({ id });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+  account.status = "archived";
+  account.archivedAt = Date.now();
+  account.updatedAt = Date.now();
+  await account.save();
+  return account.toObject ? account.toObject() : account;
+}
+
+export async function reactivateRvbAccount(id: string) {
+  const account: any = await RvbAccountModel.findOne({ id });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+  account.status = "active";
+  account.archivedAt = null;
+  account.updatedAt = Date.now();
+  await account.save();
+  return account.toObject ? account.toObject() : account;
+}
+
+export async function disableRvbAccount(id: string) {
+  const account: any = await RvbAccountModel.findOne({ id });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+  account.status = "disabled";
+  account.updatedAt = Date.now();
+  await account.save();
+  return account.toObject ? account.toObject() : account;
+}
+
+export async function setInitialPassword(accountId: string, password: string, confirmPassword: string) {
+  const account: any = await RvbAccountModel.findOne({ id: accountId });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+  if (account.passwordHash) throw codeError("RVB_PASSWORD_ALREADY_SET", 400);
+  const policyError = validatePasswordPolicy(password, confirmPassword);
+  if (policyError) throw codeError(policyError, 400);
+  account.passwordHash = await hashPassword(password);
+  account.mustChangePassword = true;
+  account.passwordChangedAt = Date.now();
+  account.updatedAt = Date.now();
+  await account.save();
+  return account.toObject ? account.toObject() : account;
+}
+
+// For future sync integration: archive/reactivate by linked entity
+export async function archiveByLinkedEntity(type: string, entityId: string) {
+  const account: any = await (RvbAccountModel as any).findOne({ linkedEntityType: type, linkedEntityId: entityId });
+  if (!account) return null;
+  account.status = "archived";
+  account.archivedAt = Date.now();
+  account.updatedAt = Date.now();
+  await account.save();
+  return account;
+}
+export async function reactivateByLinkedEntity(type: string, entityId: string) {
+  const account: any = await (RvbAccountModel as any).findOne({ linkedEntityType: type, linkedEntityId: entityId });
+  if (!account) return null;
+  account.status = "active";
+  account.archivedAt = null;
+  account.updatedAt = Date.now();
+  await account.save();
+  return account;
+}

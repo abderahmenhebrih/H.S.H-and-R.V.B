@@ -60,26 +60,38 @@ async function main() {
   const tag = `sec.mgr.${Date.now().toString().slice(-6)}`;
   const manager: any = await svc.createRvbAccount({ tag, displayName: "Sec Manager", role: "manager", password: "SecPass123", confirmPassword: "SecPass123" } as any);
 
-  // 1. web login establishes session
+   // 1. web login establishes session — HttpOnly cookie present, JSON refreshToken absent (web)
   const agent = request.agent(app);
   let loginRes = await agent.post("/api/rvb/auth/login").send({ tag, password: "SecPass123" });
   // Check Set-Cookie contains rvb_refresh_token with HttpOnly
   let setCookie: string[] = loginRes.headers["set-cookie"] || [];
   let hasRefreshCookie = setCookie.some((c: string) => c.includes("rvb_refresh_token") && c.toLowerCase().includes("httponly"));
   record("1. web login establishes session (HttpOnly cookie)", loginRes.status === 200 && hasRefreshCookie, `status=${loginRes.status} hasCookie=${hasRefreshCookie} cookies=${setCookie.join("; ")}`);
+  record("1b. web login does NOT expose refreshToken in JSON", loginRes.status === 200 && !loginRes.body.refreshToken, `hasRefreshToken=${!!loginRes.body.refreshToken}`);
+
+  // 1c. native login explicitly requests JSON refreshToken via X-RVB-Client header
+  let nativeLoginRes = await request(app).post("/api/rvb/auth/login").set("X-RVB-Client", "native").send({ tag, password: "SecPass123" });
+  record("1c. native login returns refreshToken in JSON", nativeLoginRes.status === 200 && !!nativeLoginRes.body.refreshToken, `hasRefreshToken=${!!nativeLoginRes.body.refreshToken}`);
 
   let accessToken = loginRes.body.accessToken;
   record("2. access token held in memory (returned, not cookie)", !!accessToken, `hasAccess=${!!accessToken}`);
 
-  // 3. refresh succeeds using cookie only (no JSON body)
+  // 3. refresh succeeds using cookie only (no JSON body) — web should NOT get JSON refreshToken
   let refreshRes = await agent.post("/api/rvb/auth/refresh").send({}); // empty body, cookie present
   let hasNewCookie = (refreshRes.headers["set-cookie"] || []).some((c: string) => c.includes("rvb_refresh_token"));
   record("3. refresh succeeds using cookie only", refreshRes.status === 200 && !!refreshRes.body.accessToken && hasNewCookie, `status=${refreshRes.status} hasNewCookie=${hasNewCookie}`);
+  record("3b. web refresh does NOT expose refreshToken in JSON", refreshRes.status === 200 && !refreshRes.body.refreshToken, `hasRefreshToken=${!!refreshRes.body.refreshToken}`);
 
-  // Update accessToken to new one
+  // 3c. native refresh with explicit token returns JSON refreshToken
+  // Use native login's refresh token as explicit proof
+  const nativeRefreshTokenForTest = nativeLoginRes.body.refreshToken;
+  let nativeRefreshRes = await request(app).post("/api/rvb/auth/refresh").send({ refreshToken: nativeRefreshTokenForTest });
+  record("3c. native refresh with explicit token returns refreshToken in JSON", nativeRefreshRes.status === 200 && !!nativeRefreshRes.body.refreshToken, `hasRefreshToken=${!!nativeRefreshRes.body.refreshToken}`);
+
+  // Update accessToken to new one (web)
   accessToken = refreshRes.body.accessToken;
-  let refreshTokenFromCookieRefresh = refreshRes.body.refreshToken; // should exist for mobile but web ignores; check that backend still returns it
-  record("4. refresh returns refreshToken for mobile compat (but web ignores)", refreshRes.status === 200 && !!refreshTokenFromCookieRefresh, `hasRefreshTokenInBody=${!!refreshTokenFromCookieRefresh}`);
+  let refreshTokenFromCookieRefresh = refreshRes.body.refreshToken; // web should NOT have it
+  record("4. web refresh does NOT return refreshToken (cookie-only)", refreshRes.status === 200 && !refreshTokenFromCookieRefresh, `hasRefreshTokenInBody=${!!refreshTokenFromCookieRefresh}`);
 
   // 5. page-session restoration through refresh endpoint works (simulate page refresh: new agent without memory but with cookie)
   // Use same agent (which holds cookie) to simulate page refresh: access token lost, call refresh
@@ -88,16 +100,36 @@ async function main() {
   record("5. page-session restoration through refresh works", restorationRes.status === 200 && !!restorationRes.body.accessToken, `status=${restorationRes.status}`);
   accessToken = restorationRes.body.accessToken;
 
+  // 6b. forged native flag with only cookie must NOT expose JSON refreshToken (must be done BEFORE logout while cookie valid)
+  let forgedRefresh = await agent.post("/api/rvb/auth/refresh").set("X-RVB-Client", "native").send({});
+  record("6b. cookie-only refresh with forged native flag does NOT expose token", forgedRefresh.status === 200 && !forgedRefresh.body.refreshToken, `status=${forgedRefresh.status} hasToken=${!!forgedRefresh.body.refreshToken}`);
+
   // 6. logout invalidates cookie session
   let logoutRes = await agent.post("/api/rvb/auth/logout").send({});
   let afterLogoutRefresh = await agent.post("/api/rvb/auth/refresh").send({});
   record("6. logout invalidates cookie session", logoutRes.status === 200 && afterLogoutRefresh.status === 401, `logout=${logoutRes.status} afterRefresh=${afterLogoutRefresh.status} code=${afterLogoutRefresh.body.code}`);
+
+  // 6d. access-token-only with forged native flag cannot obtain refreshToken
+  let fakeAccess = accessToken; // from last valid refresh
+  let accessOnlyNative = await request(app).post("/api/rvb/auth/refresh").set("Authorization", `Bearer ${fakeAccess}`).set("X-RVB-Client", "native").send({});
+  record("6d. access-token-only with native flag cannot obtain refreshToken", accessOnlyNative.status === 401 && !accessOnlyNative.body.refreshToken, `status=${accessOnlyNative.status} hasToken=${!!accessOnlyNative.body.refreshToken}`);
 
   // Need fresh login for remaining tests
   agent.jar?.setCookie?.("", "/"); // not needed, create new agent
   const agent2 = request.agent(app);
   let login2 = await agent2.post("/api/rvb/auth/login").send({ tag, password: "SecPass123" });
   let freshAccess = login2.body.accessToken;
+  record("6c. web login after logout still has no JSON token", login2.status === 200 && !login2.body.refreshToken, `hasToken=${!!login2.body.refreshToken}`);
+
+  // 6e. web change-password does NOT expose refreshToken (isolated account)
+  const chgTag = `chg.mgr.${Date.now().toString().slice(-6)}`;
+  const chgAcc:any = await svc.createRvbAccount({ tag: chgTag, displayName:"Chg Manager", role:"manager", password:"ChgPass123", confirmPassword:"ChgPass123"} as any);
+  const chgLogin = await request(app).post("/api/rvb/auth/login").send({ tag: chgTag, password:"ChgPass123" });
+  const chgAccess = chgLogin.body.accessToken;
+  let webChg = await request(app).post("/api/rvb/auth/change-password").set("Authorization", `Bearer ${chgAccess}`).send({ currentPassword:"ChgPass123", newPassword:"ChgNew123", confirmPassword:"ChgNew123" });
+  record("6e. web change-password does NOT expose refreshToken", webChg.status===200 && !webChg.body.refreshToken && !!webChg.headers["set-cookie"]?.some((c:string)=>c.includes("rvb_refresh_token")), `status=${webChg.status} hasToken=${!!webChg.body.refreshToken} hasCookie=${!!webChg.headers["set-cookie"]?.some((c:string)=>c.includes("rvb_refresh_token"))}`);
+  // Verify rotation still works: new access token present and old refresh via cookie rotates
+  record("6f. web change-password rotates cookie", webChg.status===200 && !!webChg.body.accessToken, `hasNewAccess=${!!webChg.body.accessToken}`);
   // 7. expired access token triggers one refresh (simulate by using expired token)
   // Create an expired token manually (short TTL) or just use invalid token to trigger 401 then refresh
   // We will test the frontend logic: 5 parallel authFetch that get 401 should cause ONE refresh
@@ -112,15 +144,17 @@ async function main() {
     if (m) oldRefreshTokenValue = decodeURIComponent(m[1]);
   }
   // Also try via body (mobile) for concurrency test: create 5 parallel refresh with same token via body (not cookie)
-  // First, get a fresh refresh token via login2 body
-  let freshRefreshBody = login2.body.refreshToken;
+  // First, get a fresh refresh token via native login (explicit header) for concurrency test
+  let freshRefreshBody: string | null = null;
+  const nativeLoginForBody = await request(app).post("/api/rvb/auth/login").set("X-RVB-Client", "native").send({ tag, password: "SecPass123" });
+  if (nativeLoginForBody.body.refreshToken) freshRefreshBody = nativeLoginForBody.body.refreshToken;
   if (!freshRefreshBody && oldRefreshTokenValue) freshRefreshBody = oldRefreshTokenValue;
 
   // Use agent2's cookie already set; we need a new token to test concurrent rotation
   // Do one refresh to get new token, then try to reuse old token
   let concurrentAgent = request.agent(app);
-  // Need to login again to get a stable refresh token to share
-  const concurrentLogin = await concurrentAgent.post("/api/rvb/auth/login").send({ tag, password: "SecPass123" });
+  // Need to login again to get a stable refresh token to share — use native to get JSON token
+  const concurrentLogin = await concurrentAgent.post("/api/rvb/auth/login").set("X-RVB-Client", "native").send({ tag, password: "SecPass123" });
   let concurrentRefreshToken = concurrentLogin.body.refreshToken;
   // Also ensure cookie is set on agent
   // Now fire 5 parallel refresh requests using the SAME refresh token via body (simulate 5 401s all trying refresh at once if no dedup)

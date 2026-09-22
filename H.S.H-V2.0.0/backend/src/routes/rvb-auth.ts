@@ -2,11 +2,12 @@ import { Router } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { RvbSessionModel } from "../models/rvb-session.model";
-import { normalizeTag } from "../constants/rvb-account";
+import { normalizeTag, isValidTag } from "../constants/rvb-account";
 import { verifyPassword, hashPassword, validatePasswordPolicy } from "../lib/password";
 import {
   signAccessToken,
   signRefreshToken,
+  verifyAccessToken,
   verifyRefreshToken,
   hashRefreshToken,
   parseExpiryToMs,
@@ -24,23 +25,47 @@ function codeError(code: string, status: number) {
   return err;
 }
 
-function setRefreshCookie(res: any, token: string) {
+const RVB_REFRESH_COOKIE_NAME = "rvb_refresh_token";
+
+function getRefreshCookieOptions() {
   const isProd = process.env.NODE_ENV === "production";
-  const maxAge = parseExpiryToMs(getRefreshTTL());
-  res.cookie("rvb_refresh_token", token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProd ? true : false,
-    maxAge,
+  return {
+    httpOnly: true as const,
+    sameSite: "lax" as const,
+    secure: isProd,
     path: "/",
-  });
-  // Also set access token cookie for convenience (optional)
-  // We keep access token in body for JS memory, but also set short-lived cookie if needed
+    maxAge: parseExpiryToMs(getRefreshTTL()),
+    ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+  };
+}
+
+function getClearRefreshCookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true as const,
+    sameSite: "lax" as const,
+    secure: isProd,
+    path: "/",
+    ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+  };
+}
+
+function setRefreshCookie(res: any, token: string) {
+  res.cookie(RVB_REFRESH_COOKIE_NAME, token, getRefreshCookieOptions());
 }
 
 function clearRefreshCookie(res: any) {
-  res.clearCookie("rvb_refresh_token", { path: "/" });
-  res.clearCookie("rvb_access_token", { path: "/" });
+  const opts = getClearRefreshCookieOptions();
+  res.clearCookie(RVB_REFRESH_COOKIE_NAME, opts);
+  // Clear legacy access cookie if ever set, using same clearing semantics
+  res.clearCookie("rvb_access_token", opts);
+}
+
+function isNativeLoginRequest(req: any): boolean {
+  const h = req.headers["x-rvb-client"] || req.headers["x-client-type"];
+  if (typeof h === "string" && h.toLowerCase() === "native") return true;
+  if (req.body && (req.body.native === true || req.body.isNative === true)) return true;
+  return false;
 }
 
 // POST /api/rvb/auth/login
@@ -50,6 +75,11 @@ router.post("/login", async (req, res) => {
     const normalizedTag = normalizeTag(String(tag || ""));
     if (!normalizedTag) {
       res.status(400).json({ success: false, code: "RVB_TAG_REQUIRED" });
+      return;
+    }
+    // Validate tag format before DB work: avoid bcrypt/DB for malformed tags
+    if (!isValidTag(normalizedTag)) {
+      res.status(401).json({ success: false, code: "RVB_AUTH_INVALID_CREDENTIALS", message: "Invalid credentials" });
       return;
     }
     if (!password) {
@@ -62,7 +92,7 @@ router.post("/login", async (req, res) => {
       return;
     }
 
-    // Check lockout
+    // Check lockout (preserve 5 attempts / 15m)
     const now = Date.now();
     if (account.lockedUntil && account.lockedUntil > now) {
       res.status(423).json({ success: false, code: "RVB_AUTH_TEMPORARILY_LOCKED", message: "Account temporarily locked" });
@@ -74,16 +104,9 @@ router.post("/login", async (req, res) => {
       account.lockedUntil = null;
     }
 
-    if (account.status === "archived") {
-      res.status(403).json({ success: false, code: "RVB_ACCOUNT_ARCHIVED" });
-      return;
-    }
-    if (account.status === "disabled") {
-      res.status(403).json({ success: false, code: "RVB_ACCOUNT_DISABLED" });
-      return;
-    }
-    if (!account.passwordHash) {
-      res.status(401).json({ success: false, code: "RVB_PASSWORD_NOT_SET", message: "Password not set" });
+    // For unauthenticated login, do not reveal archived/disabled/password-not-set state; return generic invalid credentials
+    if (account.status === "archived" || account.status === "disabled" || !account.passwordHash) {
+      res.status(401).json({ success: false, code: "RVB_AUTH_INVALID_CREDENTIALS", message: "Invalid credentials" });
       return;
     }
 
@@ -133,13 +156,25 @@ router.post("/login", async (req, res) => {
 
     setRefreshCookie(res, refreshToken);
 
-    res.json({
-      success: true,
-      accessToken,
-      refreshToken, // also return for mobile secure storage
-      account: toSafeRvbAccount(account),
-      mustChangePassword: !!account.mustChangePassword,
-    });
+    // Web: HttpOnly cookie only. Native: explicit X-RVB-Client header required to receive JSON refreshToken.
+    // This prevents JS-readable exposure for web while preserving documented native flow.
+    const isNative = isNativeLoginRequest(req);
+    if (isNative) {
+      res.json({
+        success: true,
+        accessToken,
+        refreshToken,
+        account: toSafeRvbAccount(account),
+        mustChangePassword: !!account.mustChangePassword,
+      });
+    } else {
+      res.json({
+        success: true,
+        accessToken,
+        account: toSafeRvbAccount(account),
+        mustChangePassword: !!account.mustChangePassword,
+      });
+    }
   } catch (e: any) {
     console.error("login failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
@@ -147,12 +182,20 @@ router.post("/login", async (req, res) => {
 });
 
 // POST /api/rvb/auth/refresh
+// Web: cookie-only, never returns JSON refreshToken.
+// Native: must supply refreshToken explicitly in body or X-Refresh-Token header; returns JSON refreshToken.
+// A header flag alone (e.g. X-RVB-Client) without explicit token is NOT sufficient — prevents cookie+forged-flag leak.
 router.post("/refresh", async (req, res) => {
   try {
+    const cookieToken = (req as any).cookies && (req as any).cookies[RVB_REFRESH_COOKIE_NAME] ? String((req as any).cookies[RVB_REFRESH_COOKIE_NAME]) : null;
+    const bodyToken = req.body && req.body.refreshToken ? String(req.body.refreshToken) : null;
+    const headerToken = req.headers["x-refresh-token"] ? String(req.headers["x-refresh-token"] as string) : null;
+    const explicitToken = bodyToken || headerToken;
+    const isNativeRefresh = !!explicitToken;
+
     let rawToken: string | null = null;
-    if ((req as any).cookies && (req as any).cookies["rvb_refresh_token"]) rawToken = (req as any).cookies["rvb_refresh_token"];
-    else if (req.body && req.body.refreshToken) rawToken = String(req.body.refreshToken);
-    else if (req.headers["x-refresh-token"]) rawToken = String(req.headers["x-refresh-token"]);
+    if (explicitToken) rawToken = explicitToken;
+    else if (cookieToken) rawToken = cookieToken;
 
     if (!rawToken) {
       res.status(401).json({ success: false, code: "RVB_REFRESH_REQUIRED" });
@@ -221,12 +264,20 @@ router.post("/refresh", async (req, res) => {
 
     setRefreshCookie(res, newRefreshToken);
 
-    res.json({
-      success: true,
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-      account: toSafeRvbAccount(account),
-    });
+    if (isNativeRefresh) {
+      res.json({
+        success: true,
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        account: toSafeRvbAccount(account),
+      });
+    } else {
+      res.json({
+        success: true,
+        accessToken: newAccessToken,
+        account: toSafeRvbAccount(account),
+      });
+    }
   } catch (e) {
     console.error("refresh failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
@@ -236,38 +287,36 @@ router.post("/refresh", async (req, res) => {
 // POST /api/rvb/auth/logout
 router.post("/logout", async (req, res) => {
   try {
-    let rawToken: string | null = null;
-    if ((req as any).cookies && (req as any).cookies["rvb_refresh_token"]) rawToken = (req as any).cookies["rvb_refresh_token"];
-    else if (req.body && req.body.refreshToken) rawToken = String(req.body.refreshToken);
-    else if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
-      // logout via access token? revoke all? For now revoke by refresh if present, else try to find session by access payload
-      try {
-        const access = req.headers.authorization.slice(7);
-        const payload: any = await import("../lib/rvb-auth").then((m) => { try { return m.verifyAccessToken(access); } catch { return null; } });
-        if (payload && payload.sessionId) {
-          const sess: any = await RvbSessionModel.findOne({ id: payload.sessionId });
-          if (sess && !sess.revokedAt) {
-            sess.revokedAt = Date.now();
-            await sess.save();
-          }
-        }
-      } catch {}
-    }
+    let refreshToken: string | null = null;
+    if ((req as any).cookies && (req as any).cookies[RVB_REFRESH_COOKIE_NAME]) refreshToken = (req as any).cookies[RVB_REFRESH_COOKIE_NAME];
+    else if (req.body && req.body.refreshToken) refreshToken = String(req.body.refreshToken);
+    else if (req.headers["x-refresh-token"]) refreshToken = String(req.headers["x-refresh-token"] as string);
 
-    if (rawToken) {
-      const hash = hashRefreshToken(rawToken);
+    if (refreshToken) {
+      // Valid refresh cookie exists: revoke the correct refresh session by hash (no token verification needed for revocation)
+      const hash = hashRefreshToken(refreshToken);
       const sess: any = await RvbSessionModel.findOne({ refreshTokenHash: hash });
       if (sess && !sess.revokedAt) {
         sess.revokedAt = Date.now();
         await sess.save();
       }
     } else {
-      // If no token supplied, try to revoke current session from access token
+      // Fallback: verify access token with access-token verifier and revoke its session
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith("Bearer ")) {
+        const access = authHeader.slice(7).trim();
         try {
-          const payload: any = verifyRefreshToken(rawToken || "") as any;
-        } catch {}
+          const payload: any = verifyAccessToken(access);
+          if (payload && payload.sessionId) {
+            const sess: any = await RvbSessionModel.findOne({ id: payload.sessionId });
+            if (sess && !sess.revokedAt) {
+              sess.revokedAt = Date.now();
+              await sess.save();
+            }
+          }
+        } catch {
+          // Invalid/expired access token: still clear cookie and succeed
+        }
       }
     }
 
@@ -358,7 +407,8 @@ router.post("/change-password", requireRvbAuth as any, async (req: RvbAuthReques
           rotationFamilyId: familyId,
         });
         setRefreshCookie(res, newRefreshToken);
-        res.json({ success: true, accessToken: newAccessToken, refreshToken: newRefreshToken, account: toSafeRvbAccount(account) });
+        // Web: HttpOnly cookie only — never return refreshToken in JSON (even for native, use explicit refresh flow).
+        res.json({ success: true, accessToken: newAccessToken, account: toSafeRvbAccount(account) });
         return;
       }
     }

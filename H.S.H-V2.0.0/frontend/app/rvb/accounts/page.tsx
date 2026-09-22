@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
-import { RvbPortalPlaceholder } from "../../../src/components/rvb/RvbRoleGuard";
+import { RvbAccountsGuard } from "../../../src/components/rvb/RvbRoleGuard";
 import styles from "./page.module.css";
 
 // ---- Translations ----
@@ -995,21 +995,11 @@ function RvbAccountsInner() {
 }
 
 export default function RvbAccountsPage() {
-  const { user, loading } = useRvbAuth();
-  if (loading) return <div style={{ minHeight: "40vh", display: "grid", placeItems: "center", color: "var(--muted)" }}>Loading...</div>;
-  if (!user) return <RvbAuthGuard><div /></RvbAuthGuard>;
-  if (user.role !== "manager" && user.role !== "admin") {
-    return (
-      <RvbShell activePage="accounts">
-        <RvbAuthGuard>
-          <RvbPortalPlaceholder role={user.role} />
-        </RvbAuthGuard>
-      </RvbShell>
-    );
-  }
   return (
     <RvbAuthGuard>
-      <RvbAccountsInner />
+      <RvbAccountsGuard>
+        <RvbAccountsInner />
+      </RvbAccountsGuard>
     </RvbAuthGuard>
   );
 }

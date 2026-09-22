@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck, Loader2 } from "lucide-react";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
@@ -8,6 +8,7 @@ import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, getDirection, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { getSavedTheme, applyTheme } from "../../../src/lib/theme";
+import { normalizeTag, isValidTag } from "../../../src/types/rvb/rvb-account";
 import styles from "./page.module.css";
 
 const TR: Record<Language, any> = {
@@ -92,6 +93,11 @@ export default function RvbLoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const pwdInputRef = useRef<HTMLInputElement>(null);
+  const submitLockRef = useRef(false);
+  const errorId = "rvb-login-error";
+
   const lang = (settings.language as Language) || "en";
   const t = (TR as any)[lang] ?? TR.en;
   const isRtl = lang === "ar";
@@ -117,20 +123,39 @@ export default function RvbLoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current) return;
     setError("");
-    if (!tag.trim()) { setError(t.errors.RVB_TAG_REQUIRED); return; }
-    if (!password) { setError(t.errors.RVB_PASSWORD_REQUIRED); return; }
+    const normalizedTag = normalizeTag(tag);
+    if (!normalizedTag) {
+      setError(t.errors.RVB_TAG_REQUIRED);
+      tagInputRef.current?.focus();
+      return;
+    }
+    if (!isValidTag(normalizedTag)) {
+      setError(t.errors.RVB_TAG_REQUIRED);
+      tagInputRef.current?.focus();
+      return;
+    }
+    if (!password) {
+      setError(t.errors.RVB_PASSWORD_REQUIRED);
+      pwdInputRef.current?.focus();
+      return;
+    }
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
-      const account = await login(tag.trim(), password);
+      const account = await login(normalizedTag, password);
       if ((account as any).mustChangePassword) router.replace("/rvb/auth/change-password");
       else router.replace("/rvb");
     } catch (err: any) {
       const code = err?.code || err?.data?.code || "";
-      const msg = (t.errors as any)[code] || t.errors.generic;
-      setError(msg);
+      // Do not expose archived/disabled/password-not-set via login UI; map those to generic
+      const enumeratedCodes = new Set(["RVB_ACCOUNT_ARCHIVED", "RVB_ACCOUNT_DISABLED", "RVB_PASSWORD_NOT_SET"]);
+      const mapped = enumeratedCodes.has(code) ? t.errors.generic : ((t.errors as any)[code] || t.errors.generic);
+      setError(mapped);
     } finally {
       setSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -169,51 +194,66 @@ export default function RvbLoginPage() {
           <p className={styles.subtitle}>{t.subtitle}</p>
         </div>
 
-        <form onSubmit={onSubmit} className={styles.form} noValidate>
-          <label className={styles.field}>
-            <span className={styles.label}>{t.tag}</span>
+        <form onSubmit={onSubmit} className={styles.form} noValidate aria-busy={submitting}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="rvb-tag-input">{t.tag}</label>
             <div className={styles.tagField} dir="ltr">
               <span className={styles.tagPrefix} aria-hidden="true">@</span>
               <input
+                id="rvb-tag-input"
+                name="username"
                 value={tag}
-                onChange={(e) => setTag(e.target.value)}
+                onChange={(e) => { if (error) setError(""); setTag(e.target.value); }}
                 placeholder={t.tagPlaceholder}
                 dir="ltr"
                 autoComplete="username"
                 autoCapitalize="off"
+                autoCorrect="off"
                 spellCheck={false}
                 className={styles.tagInput}
+                aria-invalid={!!error}
+                aria-describedby={error ? errorId : undefined}
+                ref={tagInputRef}
               />
             </div>
-          </label>
+          </div>
 
-          <label className={styles.field}>
-            <span className={styles.label}>{t.password}</span>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="rvb-password-input">{t.password}</label>
             <div className={styles.passwordWrap}>
               <input
+                id="rvb-password-input"
+                name="password"
                 type={showPwd ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { if (error) setError(""); setPassword(e.target.value); }}
                 autoComplete="current-password"
                 className={styles.input}
                 dir="ltr"
+                aria-invalid={!!error}
+                aria-describedby={error ? errorId : undefined}
+                ref={pwdInputRef}
               />
               <button
                 type="button"
                 className={styles.showButton}
-                onClick={() => setShowPwd((v) => !v)}
+                onClick={() => {
+                  setShowPwd((v) => !v);
+                  // Retain focus on password input after toggle
+                  requestAnimationFrame(() => pwdInputRef.current?.focus());
+                }}
                 aria-label={showPwd ? t.hide : t.show}
-                tabIndex={0}
+                aria-pressed={showPwd}
               >
                 {showPwd ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
                 <span>{showPwd ? t.hide : t.show}</span>
               </button>
             </div>
-          </label>
+          </div>
 
-          {error && <div className={styles.error} role="alert">{error}</div>}
+          {error && <div id={errorId} className={styles.error} role="alert" aria-live="assertive">{error}</div>}
 
-          <button type="submit" className={styles.submit} disabled={submitting}>
+          <button type="submit" className={styles.submit} disabled={submitting} aria-busy={submitting}>
             {submitting ? <Loader2 size={16} className={styles.spinner} /> : <ShieldCheck size={16} strokeWidth={2} />}
             {submitting ? t.signingIn : t.signIn}
           </button>

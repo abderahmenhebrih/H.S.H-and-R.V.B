@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck, Loader2, Lock } from "lucide-react";
 import { useRvbAuth } from "../../../../src/contexts/RvbAuthContext";
@@ -89,6 +89,12 @@ export default function ChangePasswordPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  const currentRef = useRef<HTMLInputElement>(null);
+  const newPwdRef = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLInputElement>(null);
+  const submitLockRef = useRef(false);
+  const errorId = "rvb-change-pwd-error";
+
   const lang = (settings.language as Language) || "en";
   const t = (TR as any)[lang] ?? TR.en;
   const isRtl = lang === "ar";
@@ -117,11 +123,13 @@ export default function ChangePasswordPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current) return;
     setError("");
-    if (!current) { setError(t.errors.RVB_PASSWORD_REQUIRED); return; }
-    if (newPwd.length < 8) { setError(t.errors.RVB_PASSWORD_TOO_SHORT); return; }
-    if (newPwd.length > 128) { setError(t.errors.RVB_PASSWORD_TOO_LONG); return; }
-    if (newPwd !== confirm) { setError(t.errors.RVB_PASSWORD_CONFIRM_MISMATCH); return; }
+    if (!current) { setError(t.errors.RVB_PASSWORD_REQUIRED); currentRef.current?.focus(); return; }
+    if (newPwd.length < 8) { setError(t.errors.RVB_PASSWORD_TOO_SHORT); newPwdRef.current?.focus(); return; }
+    if (newPwd.length > 128) { setError(t.errors.RVB_PASSWORD_TOO_LONG); newPwdRef.current?.focus(); return; }
+    if (newPwd !== confirm) { setError(t.errors.RVB_PASSWORD_CONFIRM_MISMATCH); confirmRef.current?.focus(); return; }
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
       await changePassword({ currentPassword: current, newPassword: newPwd, confirmPassword: confirm });
@@ -133,6 +141,7 @@ export default function ChangePasswordPage() {
       setError(msg);
     } finally {
       setSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -150,35 +159,35 @@ export default function ChangePasswordPage() {
         <h1 className={styles.title}>{t.title}</h1>
         <p className={styles.subtitle}>{t.subtitle}</p>
 
-        <form onSubmit={onSubmit} className={styles.form} noValidate>
-          <label className={styles.field}>
-            <span className={styles.label}>{t.current}</span>
+        <form onSubmit={onSubmit} className={styles.form} noValidate aria-busy={submitting}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="rvb-current-pwd">{t.current}</label>
             <div className={styles.pwdWrap}>
-              <input type={showCurrent ? "text" : "password"} value={current} onChange={(e) => setCurrent(e.target.value)} className={styles.input} dir="ltr" autoComplete="current-password" />
-              <button type="button" className={styles.showButton} onClick={() => setShowCurrent((v) => !v)}>{showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}<span>{showCurrent ? t.hide : t.show}</span></button>
+              <input id="rvb-current-pwd" name="current-password" type={showCurrent ? "text" : "password"} value={current} onChange={(e) => { if (error) setError(""); setCurrent(e.target.value); }} className={styles.input} dir="ltr" autoComplete="current-password" aria-invalid={!!error} aria-describedby={error ? errorId : undefined} ref={currentRef} />
+              <button type="button" className={styles.showButton} onClick={() => { setShowCurrent((v) => !v); requestAnimationFrame(() => currentRef.current?.focus()); }} aria-label={showCurrent ? t.hide : t.show} aria-pressed={showCurrent}>{showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}<span>{showCurrent ? t.hide : t.show}</span></button>
             </div>
-          </label>
+          </div>
 
-          <label className={styles.field}>
-            <span className={styles.label}>{t.newPwd} <small className={styles.hint}>({t.hint})</small></span>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="rvb-new-pwd">{t.newPwd} <small className={styles.hint}>({t.hint})</small></label>
             <div className={styles.pwdWrap}>
-              <input type={showNew ? "text" : "password"} value={newPwd} onChange={(e) => setNewPwd(e.target.value)} className={styles.input} dir="ltr" autoComplete="new-password" />
-              <button type="button" className={styles.showButton} onClick={() => setShowNew((v) => !v)}>{showNew ? <EyeOff size={16} /> : <Eye size={16} />}<span>{showNew ? t.hide : t.show}</span></button>
+              <input id="rvb-new-pwd" name="new-password" type={showNew ? "text" : "password"} value={newPwd} onChange={(e) => { if (error) setError(""); setNewPwd(e.target.value); }} className={styles.input} dir="ltr" autoComplete="new-password" aria-invalid={!!error} aria-describedby={error ? errorId : undefined} ref={newPwdRef} />
+              <button type="button" className={styles.showButton} onClick={() => { setShowNew((v) => !v); requestAnimationFrame(() => newPwdRef.current?.focus()); }} aria-label={showNew ? t.hide : t.show} aria-pressed={showNew}>{showNew ? <EyeOff size={16} /> : <Eye size={16} />}<span>{showNew ? t.hide : t.show}</span></button>
             </div>
-          </label>
+          </div>
 
-          <label className={styles.field}>
-            <span className={styles.label}>{t.confirm}</span>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="rvb-confirm-pwd">{t.confirm}</label>
             <div className={styles.pwdWrap}>
-              <input type={showConfirm ? "text" : "password"} value={confirm} onChange={(e) => setConfirm(e.target.value)} className={styles.input} dir="ltr" autoComplete="new-password" />
-              <button type="button" className={styles.showButton} onClick={() => setShowConfirm((v) => !v)}>{showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}<span>{showConfirm ? t.hide : t.show}</span></button>
+              <input id="rvb-confirm-pwd" name="new-password-confirm" type={showConfirm ? "text" : "password"} value={confirm} onChange={(e) => { if (error) setError(""); setConfirm(e.target.value); }} className={styles.input} dir="ltr" autoComplete="new-password" aria-invalid={!!error} aria-describedby={error ? errorId : undefined} ref={confirmRef} />
+              <button type="button" className={styles.showButton} onClick={() => { setShowConfirm((v) => !v); requestAnimationFrame(() => confirmRef.current?.focus()); }} aria-label={showConfirm ? t.hide : t.show} aria-pressed={showConfirm}>{showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}<span>{showConfirm ? t.hide : t.show}</span></button>
             </div>
-          </label>
+          </div>
 
-          {error && <div className={styles.error} role="alert">{error}</div>}
-          {success && <div className={styles.success} role="status">{t.success}</div>}
+          {error && <div id={errorId} className={styles.error} role="alert" aria-live="assertive">{error}</div>}
+          {success && <div className={styles.success} role="status" aria-live="polite">{t.success}</div>}
 
-          <button type="submit" className={styles.submit} disabled={submitting || success}>
+          <button type="submit" className={styles.submit} disabled={submitting || success} aria-busy={submitting}>
             {submitting ? <Loader2 size={16} className={styles.spinner} /> : <ShieldCheck size={16} strokeWidth={2} />}
             {submitting ? t.submitting : t.submit}
           </button>

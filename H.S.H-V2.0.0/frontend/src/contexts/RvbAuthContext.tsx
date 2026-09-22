@@ -47,6 +47,14 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { void loadMe(); }, [loadMe]);
 
+  useEffect(() => {
+    const unsub = rvbAuthService.subscribeAuthFailure(() => {
+      rvbAuthService.clearLocal();
+      setUser(null);
+    });
+    return unsub;
+  }, []);
+
   const login = useCallback(async (tag: string, password: string) => {
     const res = await rvbAuthService.login(tag, password);
     setUser(res.account);

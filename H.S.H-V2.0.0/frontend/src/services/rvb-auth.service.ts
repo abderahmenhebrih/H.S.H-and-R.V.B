@@ -11,6 +11,16 @@ const AUTH_BASE = `${API_BASE}/api/rvb/auth`;
 let memoryAccessToken: string | null = null;
 let pendingRefresh: Promise<{ accessToken: string; account: RvbSafeUser }> | null = null;
 
+// Small subscription to allow authFetch to notify context when refresh fails
+type AuthFailureListener = () => void;
+const authFailureListeners = new Set<AuthFailureListener>();
+
+function notifyAuthFailure() {
+  authFailureListeners.forEach((cb) => {
+    try { cb(); } catch {}
+  });
+}
+
 function getAccessToken(): string | null {
   return memoryAccessToken;
 }
@@ -63,6 +73,11 @@ export const rvbAuthService = {
   getAccessToken,
   // Exposed for services that need Authorization header; no setter for refresh
   _setAccessToken: setAccessToken,
+
+  subscribeAuthFailure(listener: AuthFailureListener): () => void {
+    authFailureListeners.add(listener);
+    return () => authFailureListeners.delete(listener);
+  },
 
   async login(tag: string, password: string): Promise<{ accessToken: string; account: RvbSafeUser; mustChangePassword?: boolean }> {
     const res = await fetch(`${AUTH_BASE}/login`, {
@@ -147,6 +162,7 @@ export const rvbAuthService = {
       return fetch(input, { ...init, headers: retryHeaders, credentials: "include" as any });
     } catch {
       clearAccessToken();
+      notifyAuthFailure();
       return res;
     }
   },
@@ -154,5 +170,9 @@ export const rvbAuthService = {
   clearLocal() {
     clearAccessToken();
     pendingRefresh = null;
+  },
+
+  _notifyAuthFailureForTest() {
+    notifyAuthFailure();
   },
 };

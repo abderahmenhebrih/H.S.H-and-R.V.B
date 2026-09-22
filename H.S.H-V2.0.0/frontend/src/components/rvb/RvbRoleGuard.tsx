@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useRvbAuth } from "../../contexts/RvbAuthContext";
 
 export function useIsRvbManager(): boolean {
@@ -28,4 +31,43 @@ export function RvbPortalPlaceholder({ role }: { role: string }) {
       <p style={{ margin: "8px auto 0", maxWidth: 520, color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>{m.desc}</p>
     </div>
   );
+}
+
+export function RvbAccountsGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useRvbAuth();
+  const router = useRouter();
+
+  const isManager = user?.role === "manager" || user?.role === "admin";
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) return; // RvbAuthGuard will redirect to /rvb/login
+    if (!isManager) router.replace("/rvb");
+  }, [loading, user, isManager, router]);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--accent)" } as any} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--accent)" } as any} />
+      </div>
+    );
+  }
+
+  if (!isManager) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--accent)" } as any} />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }

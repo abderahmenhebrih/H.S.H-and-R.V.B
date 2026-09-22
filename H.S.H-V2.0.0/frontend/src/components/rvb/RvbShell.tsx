@@ -326,9 +326,7 @@ export default function RvbShell({
     setDark(next === "dark");
   }
 
-  const { user, logout } = (() => {
-    try { return useRvbAuth(); } catch { return { user: null, logout: async () => {} } as any; }
-  })();
+  const { user, logout } = useRvbAuth();
 
   const t = translations[settings.language];
   const hero = t.hero[activePage] ?? t.hero.dashboard;

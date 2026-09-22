@@ -268,10 +268,7 @@
   border-color: var(--border);
 }
 
-html[dir="rtl"] .form {
-  direction: rtl;
-}
-html[dir="rtl"] .input {
-  direction: ltr;
-  text-align: right;
+.error {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }

@@ -200,17 +200,22 @@ async function runIntegrationTests() {
     return;
   }
 
-  // Login tests
+  // Login tests — web should NOT expose refreshToken, native should
   let loginRes: any = null;
   let accessToken: string = "";
   let refreshToken: string = "";
   try {
-    const res = await request(app).post("/api/rvb/auth/login").send({ tag: manager.tag, password: "TempPass123" });
+    // Web login (no native header) — should have HttpOnly cookie but no JSON refreshToken
+    const webRes = await request(app).post("/api/rvb/auth/login").send({ tag: manager.tag, password: "TempPass123" });
+    record("Web login does NOT expose refreshToken", webRes.status === 200 && !webRes.body.refreshToken && !!webRes.headers["set-cookie"]?.some((c:string)=>c.includes("rvb_refresh_token")), `status=${webRes.status} hasToken=${!!webRes.body.refreshToken}`);
+    // Native login — explicit header, should return JSON refreshToken
+    const res = await request(app).post("/api/rvb/auth/login").set("X-RVB-Client", "native").send({ tag: manager.tag, password: "TempPass123" });
     if (res.body.success) {
       accessToken = res.body.accessToken;
       refreshToken = res.body.refreshToken;
       loginRes = res.body;
-      record("Login correct password", true, `status ${res.status}`);
+      record("Login correct password (native)", true, `status ${res.status}`);
+      record("Native login returns refreshToken", !!refreshToken, `hasToken=${!!refreshToken}`);
       record("10. unknown tag rejected (tested separately)", true, "");
       record("17. lastLoginAt updates", !!res.body.account.lastLoginAt, `lastLoginAt=${res.body.account.lastLoginAt}`);
     } else {
@@ -236,22 +241,22 @@ async function runIntegrationTests() {
     record("11. @tag normalization works (login with @)", res.status === 200 && res.body.success, `status=${res.status}`);
   } catch (e: any) { record("11 @tag", false, e.message); }
 
-  // Archived account cannot login
+  // Archived account cannot login — must not reveal archived state, generic invalid credentials
   let archivedTag = "";
   try {
     const archivedAcc: any = await svc.createRvbAccount({ tag: `arch.int.${Date.now().toString().slice(-6)}`, displayName: "Archived Test", role: "manager", password: "ArchPass123", confirmPassword: "ArchPass123" } as any);
     archivedTag = archivedAcc.tag;
     await svc.archiveRvbAccount(archivedAcc.id);
     const res = await request(app).post("/api/rvb/auth/login").send({ tag: archivedTag, password: "ArchPass123" });
-    record("12. archived account cannot login", res.status === 403 && res.body.code === "RVB_ACCOUNT_ARCHIVED", `status=${res.status} code=${res.body.code}`);
+    record("12. archived account cannot login", res.status === 401 && res.body.code === "RVB_AUTH_INVALID_CREDENTIALS", `status=${res.status} code=${res.body.code}`);
   } catch (e: any) { record("12 archived", false, e.message); }
 
-  // Disabled account cannot login
+  // Disabled account cannot login — generic
   try {
     const disAcc: any = await svc.createRvbAccount({ tag: `dis.int.${Date.now().toString().slice(-6)}`, displayName: "Disabled Test", role: "manager", password: "DisPass123", confirmPassword: "DisPass123" } as any);
     await svc.disableRvbAccount(disAcc.id);
     const res = await request(app).post("/api/rvb/auth/login").send({ tag: disAcc.tag, password: "DisPass123" });
-    record("13. disabled account cannot login", res.status === 403 && res.body.code === "RVB_ACCOUNT_DISABLED", `status=${res.status} code=${res.body.code}`);
+    record("13. disabled account cannot login", res.status === 401 && res.body.code === "RVB_AUTH_INVALID_CREDENTIALS", `status=${res.status} code=${res.body.code}`);
   } catch (e: any) { record("13 disabled", false, e.message); }
 
   // Brute force lockout
@@ -316,14 +321,14 @@ async function runIntegrationTests() {
     record("22b refresh after logout rejected", afterLogoutRefresh.status === 401, `status=${afterLogoutRefresh.status}`);
   } catch (e: any) { record("22 logout", false, e.message); }
 
-  // Change password
+  // Change password — need native logins to obtain refreshTokens for revocation check
   try {
-    // Login again to get fresh tokens for manager
-    const login2 = await request(app).post("/api/rvb/auth/login").send({ tag: manager.tag, password: "TempPass123" });
+    // Login again to get fresh tokens for manager (native to get refreshToken)
+    const login2 = await request(app).post("/api/rvb/auth/login").set("X-RVB-Client", "native").send({ tag: manager.tag, password: "TempPass123" });
     const token2 = login2.body.accessToken;
     const refresh2 = login2.body.refreshToken;
     // Create another session for manager to test other sessions revoked
-    const login3 = await request(app).post("/api/rvb/auth/login").send({ tag: manager.tag, password: "TempPass123" });
+    const login3 = await request(app).post("/api/rvb/auth/login").set("X-RVB-Client", "native").send({ tag: manager.tag, password: "TempPass123" });
     const otherRefresh = login3.body.refreshToken;
 
     // Wrong current password

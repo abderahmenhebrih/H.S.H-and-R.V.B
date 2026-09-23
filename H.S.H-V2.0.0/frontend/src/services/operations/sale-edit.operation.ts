@@ -116,7 +116,7 @@ export class SaleEditOperation {
       await customerRepository.update(sale.customerId, {
         balance: restoredOldCustomerBalance,
         updatedAt: now,
-      } as any);
+      } as any, { queueSync: false } as any);
 
       // Restore old inventory.
       for (const item of sale.items) {
@@ -130,7 +130,7 @@ export class SaleEditOperation {
           quantity: product.quantity + item.quantity,
           weightKg: product.weightKg + item.weightKg,
           updatedAt: now,
-        } as any);
+        } as any, { queueSync: false } as any);
       }
 
       // Apply new inventory.
@@ -157,7 +157,7 @@ export class SaleEditOperation {
           quantity: product.quantity - item.quantity,
           weightKg: product.weightKg - item.weightKg,
           updatedAt: now,
-        } as any);
+        } as any, { queueSync: false } as any);
       }
 
       // Read the current balance after old-customer reversal.
@@ -173,7 +173,7 @@ export class SaleEditOperation {
       await customerRepository.update(input.customerId, {
         balance: currentNewCustomer.balance + input.total,
         updatedAt: now,
-      } as any);
+      } as any, { queueSync: false } as any);
 
       // Persist edited sale.
       await saleRepository.update(input.saleId, {

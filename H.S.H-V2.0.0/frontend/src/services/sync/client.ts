@@ -114,6 +114,33 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
             });
           } catch {}
         }
+        // P0: Rejected optimistic business transaction reconciliation
+        // For server-authoritative sale/purchase/payment/transfer CREATE that is terminally rejected,
+        // remove the optimistic ghost doc and let canonical state be restored via pull/bootstrap
+        const businessEntities = new Set(["sale","purchase","payment","transfer"]);
+        if (isTerminal && businessEntities.has(r.entity) && r.operation === "create") {
+          try {
+            const table = getTableForEntity(r.entity);
+            if (table) {
+              const { runAsRemote } = await import("@/src/lib/database/sync-hooks");
+              await runAsRemote(async () => {
+                try { await (table as any).delete(r.entityId); } catch {}
+              });
+            }
+            // Also delete the terminal sync operation itself so it doesn't remain as ghost pending
+            if (match?.id !== undefined) {
+              try { await db.syncOperations.delete(match.id); } catch {}
+            }
+          } catch {}
+        }
+        // For update/delete terminal, we rely on pull to overwrite with canonical; also remove terminal op
+        if (isTerminal && businessEntities.has(r.entity) && (r.operation === "update" || r.operation === "delete")) {
+          try {
+            if (match?.id !== undefined) {
+              try { await db.syncOperations.delete(match.id); } catch {}
+            }
+          } catch {}
+        }
         continue;
       }
       // Success: mark synced, update local entity metadata, delete queue entry

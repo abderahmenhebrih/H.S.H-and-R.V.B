@@ -32,12 +32,12 @@ export class PaymentReversalOperation {
           await supplierRepository.update(payment.entityId, {
             balance: supplier.balance + payment.amount,
             updatedAt: Date.now(),
-            });
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(payment.accountId, {
             balance: account.balance + payment.amount,
             updatedAt: Date.now(),
-            });
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -52,12 +52,12 @@ export class PaymentReversalOperation {
           await customerRepository.update(payment.entityId, {
             balance: customer.balance + payment.amount,
             updatedAt: Date.now(),
-            });
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(payment.accountId, {
             balance: account.balance - payment.amount,
             updatedAt: Date.now(),
-            });
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -72,12 +72,12 @@ export class PaymentReversalOperation {
           await workerRepository.update(payment.entityId, {
             balance: worker.balance + payment.amount,
             updatedAt: Date.now(),
-            });
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(payment.accountId, {
             balance: account.balance + payment.amount,
             updatedAt: Date.now(),
-            });
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -92,7 +92,7 @@ export class PaymentReversalOperation {
           await bankAccountRepository.update(payment.accountId, {
             balance: account.balance + payment.amount,
             updatedAt: Date.now(),
-            });
+          } as any, { queueSync: false } as any);
 
           break;
         }

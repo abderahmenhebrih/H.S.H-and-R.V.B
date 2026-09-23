@@ -114,27 +114,44 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
             });
           } catch {}
         }
-        // P0: Rejected optimistic business transaction reconciliation
-        // For server-authoritative sale/purchase/payment/transfer CREATE that is terminally rejected,
-        // remove the optimistic ghost doc and let canonical state be restored via pull/bootstrap
+        // P0: Rejected reconciliation — extend to UPDATE/DELETE with snapshot preservation
         const businessEntities = new Set(["sale","purchase","payment","transfer"]);
-        if (isTerminal && businessEntities.has(r.entity) && r.operation === "create") {
+        const isBusiness = businessEntities.has(r.entity);
+        const isTerminalBusiness = isTerminal && isBusiness;
+        const isTerminalUpdateDelete = isTerminal && (r.operation === "update" || r.operation === "delete" || (r as any).operation === "upsert");
+        // Terminal CREATE for any entity (especially business) — remove ghost; for business also restore canonical via snapshot.
+        // Terminal UPDATE/DELETE for any entity or business — optimistic local remains wrong, must fetch canonical snapshot and apply without deleting unrelated pending locals.
+        if (isTerminal && (isTerminalBusiness || isTerminalUpdateDelete || r.operation === "create")) {
           try {
-            const table = getTableForEntity(r.entity);
-            if (table) {
-              const { runAsRemote } = await import("@/src/lib/database/sync-hooks");
-              await runAsRemote(async () => {
-                try { await (table as any).delete(r.entityId); } catch {}
-              });
+            if (r.operation === "create") {
+              // Remove optimistic ghost doc (business saleB etc and also generic product/customer ghosts)
+              const table = getTableForEntity(r.entity);
+              if (table) {
+                const { runAsRemote } = await import("@/src/lib/database/sync-hooks");
+                await runAsRemote(async () => {
+                  try { await (table as any).delete(r.entityId); } catch {}
+                });
+              }
             }
-            // Also delete the terminal sync operation itself so it doesn't remain as ghost pending
+            // For business terminal (any op) or any terminal update/delete, fetch canonical snapshot and apply preserving pending locals.
+            // Current applySnapshot preserves pending locals via pendingSet (terminal excluded), so rejected entity will be overwritten.
+            const shouldFetchSnapshot = isTerminalBusiness || isTerminalUpdateDelete;
+            if (shouldFetchSnapshot) {
+              try {
+                const bootstrap = await fetchBootstrap();
+                const { applySnapshot } = await import("./apply");
+                await applySnapshot(bootstrap.snapshot, bootstrap.currentRevision);
+              } catch (reconcileErr) {
+                console.warn(`[sync] reconcile after terminal ${r.entity} ${r.operation} failed`, reconcileErr);
+              }
+            }
+            // Delete terminal sync operation so it doesn't remain as ghost pending (after snapshot applied)
             if (match?.id !== undefined) {
               try { await db.syncOperations.delete(match.id); } catch {}
             }
           } catch {}
-        }
-        // For update/delete terminal, we rely on pull to overwrite with canonical; also remove terminal op
-        if (isTerminal && businessEntities.has(r.entity) && (r.operation === "update" || r.operation === "delete")) {
+        } else if (isTerminal && isBusiness) {
+          // Fallback delete terminal business op if not covered above
           try {
             if (match?.id !== undefined) {
               try { await db.syncOperations.delete(match.id); } catch {}

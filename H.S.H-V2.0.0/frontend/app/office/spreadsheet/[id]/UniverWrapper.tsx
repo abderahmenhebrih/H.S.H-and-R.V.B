@@ -9,18 +9,19 @@ import styles from "./page.module.css";
 
 type Props = {
   file: OfficeFile;
-  onSave: (snapshot: any) => void;
+  onSave: (snapshot: any) => void | Promise<void>;
   language: Language;
   defaultSheetName?: string;
 };
 
 export type UniverHandle = {
-  insertValue: (value: string) => { success: boolean; error?: string };
-  insertTable: (entityType: string, rows: any[]) => { success: boolean; sheetId?: string; error?: string };
+  insertValue: (value: string) => Promise<{ success: boolean; error?: string }>;
+  insertTable: (entityType: string, rows: any[]) => Promise<{ success: boolean; sheetId?: string; error?: string }>;
   exportCSV: () => Promise<string | null>;
   exportXLSX: () => Promise<Blob | null>;
   getSnapshot: () => any | null;
   flushSave: () => void;
+  getMode: () => "univer" | "simple-fallback" | "complex-fallback";
 };
 
 export function isComplexWorkbook(content: any): boolean {
@@ -80,7 +81,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
       const str = JSON.stringify(snap);
       if (str === lastSnapshotRef.current) return;
       lastSnapshotRef.current = str;
-      onSave(snap);
+      void onSave(snap);
     }, 900);
   };
 
@@ -94,34 +95,101 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
     const str = JSON.stringify(snap);
     if (str === lastSnapshotRef.current) return;
     lastSnapshotRef.current = str;
-    onSave(snap);
+    void onSave(snap);
+  };
+
+  const getMode = (): "univer" | "simple-fallback" | "complex-fallback" => {
+    try {
+      const api = apiRef.current;
+      const wb = api?.getActiveWorkbook?.();
+      const hasUniver = !!wb && !fallback;
+      if (hasUniver) return "univer";
+    } catch {}
+    if (isComplexWorkbook(file.content)) return "complex-fallback";
+    return "simple-fallback";
   };
 
   useImperativeHandle(ref, () => ({
-    insertValue: (value: string): { success: boolean; error?: string } => {
+    getMode: () => getMode(),
+    insertValue: async (value: string): Promise<{ success: boolean; error?: string }> => {
+      const mode = getMode();
+      if (mode === "complex-fallback") {
+        return { success: false, error: "READ_ONLY_COMPLEX" };
+      }
+      if (mode === "simple-fallback") {
+        try {
+          const content: any = file.content;
+          let nextContent: any;
+          if (Array.isArray(content?.sheets)) {
+            const sheet = content.sheets[0] as any;
+            const data = sheet?.data || {};
+            let found: string | null = null;
+            for (let r = 0; r < 40; r++) { for (let c = 0; c < 10; c++) { const k = `${r},${c}`; if (!data[k]) { found = k; break; } } if (found) break; }
+            const key = found || "0,0";
+            const nextData = { ...data, [key]: { v: value } };
+            const nextSheet = { ...sheet, data: nextData };
+            nextContent = { ...content, sheets: [nextSheet, ...content.sheets.slice(1)] };
+          } else if (content?.sheets && typeof content.sheets === "object" && !Array.isArray(content.sheets)) {
+            const sheetsObj = content.sheets as any;
+            const firstId = content.sheetOrder?.[0] || Object.keys(sheetsObj)[0];
+            if (!firstId || !sheetsObj[firstId]) return { success: false, error: "No sheet" };
+            const sh = sheetsObj[firstId];
+            const cellData = sh.cellData || {};
+            let found: string | null = null;
+            for (let r = 0; r < 40; r++) {
+              if (!cellData[r]) { found = `${r},0`; break; }
+              const row = cellData[r];
+              let emptyCol = -1;
+              for (let c = 0; c < 10; c++) { if (!row[c]) { emptyCol = c; break; } }
+              if (emptyCol !== -1) { found = `${r},${emptyCol}`; break; }
+              if (Object.keys(row).length < 10) { found = `${r},${Object.keys(row).length}`; break; }
+            }
+            const key = found || "0,0";
+            const [rr, cc] = key.split(",").map(Number);
+            const nextCellData = { ...cellData, [rr]: { ...(cellData[rr] || {}), [cc]: { v: value, m: String(value) } } };
+            const nextSheets = { ...sheetsObj, [firstId]: { ...sh, cellData: nextCellData } };
+            nextContent = { ...content, sheets: nextSheets };
+          } else {
+            const data = { "0,0": { v: value } };
+            nextContent = { sheets: [{ id: "sheet-1", name: getLocalizedFallbackSheetName(language, defaultSheetName), data, rowCount: 100, colCount: 20 }], activeSheetId: "sheet-1" };
+          }
+          try { lastSnapshotRef.current = JSON.stringify(nextContent); } catch {}
+          await onSave(nextContent);
+          return { success: true };
+        } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertValue fallback failed", e); return { success: false, error: msg }; }
+      }
+      // univer mode
       try {
         const api = apiRef.current;
         const wb = api?.getActiveWorkbook?.();
-        const sheet = wb?.getActiveSheet?.() || wb?.getActiveWorksheet?.();
+        if (!wb) return { success: false, error: "Workbook not available" };
+        const sheet = (wb as any)?.getActiveSheet?.() || (wb as any)?.getActiveWorksheet?.();
         let mutated = false;
         if (sheet) {
-          const range = sheet.getActiveRange?.() || sheet.getSelection?.();
+          const range = (sheet as any).getActiveRange?.() || (sheet as any).getSelection?.();
           if (range?.setValue) {
             range.setValue(value);
             mutated = true;
-          } else if (sheet.setCellValue) {
-            const sel = sheet.getActiveRange?.();
+          } else if ((sheet as any).setCellValue) {
+            const sel = (sheet as any).getActiveRange?.();
             const row = sel?.getRow?.() ?? 0;
             const col = sel?.getColumn?.() ?? 0;
-            sheet.setCellValue(row, col, value);
+            (sheet as any).setCellValue(row, col, value);
             mutated = true;
           }
         }
-        if (!mutated && api?.insertValue) {
-          try { api.insertValue(value); mutated = true; } catch {}
+        if (!mutated && (api as any)?.insertValue) {
+          try { (api as any).insertValue(value); mutated = true; } catch {}
         }
         if (mutated) {
-          scheduleSave();
+          const snap = getSnapshot();
+          if (snap) {
+            const str = JSON.stringify(snap);
+            lastSnapshotRef.current = str;
+            await onSave(snap);
+          } else {
+            scheduleSave();
+          }
           return { success: true };
         }
         return { success: false, error: "No active workbook/sheet" };
@@ -129,21 +197,64 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
     },
     getSnapshot: () => getSnapshot(),
     flushSave: () => flushSave(),
-    insertTable: (entityType: string, rows: any[]): { success: boolean; sheetId?: string; error?: string } => {
+    insertTable: async (entityType: string, rows: any[]): Promise<{ success: boolean; sheetId?: string; error?: string }> => {
+      const mode = getMode();
+      if (mode === "complex-fallback") {
+        return { success: false, error: "READ_ONLY_COMPLEX" };
+      }
+      if (mode === "simple-fallback") {
+        try {
+          const content: any = file.content;
+          const header = Object.keys(rows[0] || {});
+          const data: any = {};
+          header.forEach((h, c) => data[`0,${c}`] = { v: h });
+          rows.forEach((row: any, rIdx: number) => {
+            header.forEach((h, c) => {
+              const val = row[h];
+              data[`${rIdx + 1},${c}`] = { v: String(val ?? "") };
+            });
+          });
+          const newSheetId = `sheet-${Date.now()}`;
+          const newSheet = { id: newSheetId, name: entityType.slice(0, 12), data, rowCount: rows.length + 5, colCount: header.length };
+          let nextContent: any;
+          if (content && content.sheets && Array.isArray(content.sheets)) {
+            nextContent = { ...content, sheets: [...content.sheets, newSheet], activeSheetId: newSheetId };
+          } else if (content && content.sheets && typeof content.sheets === "object" && !Array.isArray(content.sheets)) {
+            const sheetMap = content.sheets || {};
+            nextContent = { ...content, sheets: { ...sheetMap, [newSheetId]: { id: newSheetId, name: entityType, cellData: data, rowCount: rows.length + 5, columnCount: header.length } }, sheetOrder: [...(content.sheetOrder || Object.keys(sheetMap)), newSheetId] };
+          } else {
+            nextContent = { sheets: [newSheet], activeSheetId: newSheetId };
+          }
+          try { lastSnapshotRef.current = JSON.stringify(nextContent); } catch {}
+          await onSave(nextContent);
+          return { success: true, sheetId: newSheetId };
+        } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertTable fallback failed", e); return { success: false, error: msg }; }
+      }
+      // univer mode with rollback
+      let newSheet: any = null;
+      let newSheetId: string | undefined = undefined;
+      let preSnapshot: any = null;
+      let preStr: string | null = null;
       try {
         const api = apiRef.current;
         const wb = api?.getActiveWorkbook?.();
         if (!wb) return { success: false, error: "Workbook not available" };
+        // capture preSnapshot before insertion
+        try { preSnapshot = getSnapshot(); preStr = preSnapshot ? JSON.stringify(preSnapshot) : null; } catch {}
         const header = Object.keys(rows[0] || {});
         // Insert Table is NEW-SHEET operation — must not fallback to active sheet
-        let newSheet: any = null;
-        let newSheetId: string | undefined = undefined;
         try {
-          if (wb.createSheet) {
-            newSheet = wb.createSheet(entityType.slice(0, 20));
+          if ((wb as any).insertSheet) {
+            newSheet = (wb as any).insertSheet(entityType.slice(0, 20));
             newSheetId = newSheet?.getSheetId?.() || newSheet?.getId?.() || newSheet?.id || undefined;
-          } else if (wb.addSheet) {
-            newSheet = wb.addSheet(entityType);
+          } else if ((wb as any).create) {
+            newSheet = (wb as any).create(entityType.slice(0, 20), rows.length + 5, header.length);
+            newSheetId = newSheet?.getSheetId?.() || newSheet?.getId?.() || newSheet?.id || undefined;
+          } else if ((wb as any).createSheet) {
+            newSheet = (wb as any).createSheet(entityType.slice(0, 20));
+            newSheetId = newSheet?.getSheetId?.() || newSheet?.getId?.() || newSheet?.id || undefined;
+          } else if ((wb as any).addSheet) {
+            newSheet = (wb as any).addSheet(entityType);
             newSheetId = newSheet?.getSheetId?.() || newSheet?.getId?.() || newSheet?.id || undefined;
           } else {
             return { success: false, error: "New sheet creation not available" };
@@ -170,10 +281,61 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
             if (!ok) writeErrors++;
           });
         });
-        if (writeErrors > 0) return { success: false, error: `Failed to write ${writeErrors} cells` };
-        scheduleSave();
+        if (writeErrors > 0) {
+          // rollback: remove newSheet, restore lastSnapshotRef, do not scheduleSave
+          try {
+            const sheetIdToDelete = newSheetId || newSheet?.getSheetId?.() || newSheet?.id;
+            if (sheetIdToDelete) {
+              if (typeof (wb as any).deleteSheet === "function") {
+                try { (wb as any).deleteSheet(sheetIdToDelete); } catch {}
+                try { (wb as any).deleteSheet(newSheet); } catch {}
+              } else if (typeof (wb as any).removeSheet === "function") {
+                try { (wb as any).removeSheet(sheetIdToDelete); } catch {}
+              } else if (typeof (api as any).deleteSheet === "function") {
+                try { (api as any).deleteSheet(sheetIdToDelete); } catch {}
+              } else if (preSnapshot && typeof (api as any).loadSnapshot === "function") {
+                try { (api as any).loadSnapshot(preSnapshot); } catch {}
+              } else if (preSnapshot && (wb as any).getSnapshot && preStr) {
+                // best effort: no direct restore, rely on deleteSheet above
+              }
+            }
+          } catch {}
+          if (preStr !== null) lastSnapshotRef.current = preStr;
+          return { success: false, error: `Failed to write ${writeErrors} cells` };
+        }
+        const snap = getSnapshot();
+        if (snap) {
+          const str = JSON.stringify(snap);
+          lastSnapshotRef.current = str;
+          await onSave(snap);
+        } else {
+          scheduleSave();
+        }
         return { success: true, sheetId: newSheetId };
-      } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertTable failed", e); return { success: false, error: msg }; }
+      } catch (e) {
+        // any throw: rollback newly created sheet if exists
+        try {
+          const api = apiRef.current;
+          const wb = api?.getActiveWorkbook?.();
+          if (newSheet) {
+            const sheetIdToDelete = newSheetId || newSheet?.getSheetId?.() || newSheet?.id;
+            if (sheetIdToDelete) {
+              if (wb && typeof (wb as any).deleteSheet === "function") {
+                try { (wb as any).deleteSheet(sheetIdToDelete); } catch {}
+                try { (wb as any).deleteSheet(newSheet); } catch {}
+              } else if (wb && typeof (wb as any).removeSheet === "function") {
+                try { (wb as any).removeSheet(sheetIdToDelete); } catch {}
+              } else if (api && typeof (api as any).deleteSheet === "function") {
+                try { (api as any).deleteSheet(sheetIdToDelete); } catch {}
+              } else if (preSnapshot && api && typeof (api as any).loadSnapshot === "function") {
+                try { (api as any).loadSnapshot(preSnapshot); } catch {}
+              }
+            }
+          }
+        } catch {}
+        if (preStr !== null) lastSnapshotRef.current = preStr;
+        const msg = e instanceof Error ? e.message : String(e); console.error("insertTable failed", e); return { success: false, error: msg };
+      }
     },
     exportCSV: async () => {
       try {
@@ -357,7 +519,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
               const str = JSON.stringify(snap);
               if (str !== lastSnapshotRef.current) {
                 lastSnapshotRef.current = str;
-                try { onSave(snap); } catch {}
+                try { void onSave(snap); } catch {}
               }
             }
           } catch {}
@@ -393,7 +555,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
 });
 
 // Simple fallback grid for when Univer fails (offline or not compatible)
-function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: OfficeFile; onSave: (snap:any)=>void; language: Language; defaultSheetName: string }) {
+function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: OfficeFile; onSave: (snap:any)=>void | Promise<void>; language: Language; defaultSheetName: string }) {
   const content: any = file.content;
   const isComplex = isComplexWorkbook(content);
   const initialSheet = Array.isArray(content?.sheets) ? content.sheets[0] : null;
@@ -475,7 +637,7 @@ function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: Offi
       const data: any={};
       Object.entries(next).forEach(([k, val])=> { if(val) data[k]={ v: val }; });
       const snapshot = { sheets: [{ id:"sheet-1", name: defaultSheetName, data, rowCount: rows, colCount: cols }], activeSheetId:"sheet-1" };
-      onSave(snapshot);
+      void onSave(snapshot);
     }, 800);
   };
 

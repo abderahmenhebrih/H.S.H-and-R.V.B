@@ -77,20 +77,21 @@ export class PurchaseEditOperation {
       }
 
       for (const item of input.items) {
-        if (item.quantity < 0) {
-          throw new Error("Purchase quantity cannot be negative.");
+        if (!Number.isFinite(item.quantity) || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+          throw new Error(`Invalid item quantity: ${item.productId}`);
         }
-
-        if (item.weightKg < 0) {
-          throw new Error("Purchase weight cannot be negative.");
+        if (!Number.isFinite(item.weightKg) || item.weightKg < 0) {
+          throw new Error(`Invalid item weightKg: ${item.productId}`);
         }
-
-        if (item.price < 0) {
-          throw new Error("Purchase price cannot be negative.");
+        if (!Number.isFinite(item.price) || item.price < 0) {
+          throw new Error(`Invalid item price: ${item.productId}`);
         }
-
-        if (item.total < 0) {
-          throw new Error("Purchase item total cannot be negative.");
+        if (!Number.isFinite(item.total) || item.total < 0) {
+          throw new Error(`Invalid item total: ${item.productId}`);
+        }
+        const expected = Math.round(item.weightKg * item.price * 100) / 100;
+        if (Math.abs(item.total - expected) > 0.005) {
+          throw new Error(`Item total mismatch for ${item.productId}: expected ${expected}, got ${item.total}`);
         }
 
         const product = await db.products.get(item.productId);
@@ -109,7 +110,7 @@ export class PurchaseEditOperation {
       await supplierRepository.update(purchase.supplierId, {
         balance: restoredOldSupplierBalance,
         updatedAt: now,
-      } as any);
+      } as any, { queueSync: false } as any);
 
       // Reverse original inventory.
       for (const item of purchase.items) {
@@ -123,7 +124,7 @@ export class PurchaseEditOperation {
           quantity: product.quantity - item.quantity,
           weightKg: product.weightKg - item.weightKg,
           updatedAt: now,
-        } as any);
+        } as any, { queueSync: false } as any);
       }
 
       // Apply new inventory.
@@ -138,7 +139,7 @@ export class PurchaseEditOperation {
           quantity: product.quantity + item.quantity,
           weightKg: product.weightKg + item.weightKg,
           updatedAt: now,
-        } as any);
+        } as any, { queueSync: false } as any);
       }
 
       // Apply new supplier balance.
@@ -151,7 +152,7 @@ export class PurchaseEditOperation {
       await supplierRepository.update(input.supplierId, {
         balance: currentNewSupplier.balance + input.total,
         updatedAt: now,
-      } as any);
+      } as any, { queueSync: false } as any);
 
       await purchaseRepository.update(input.purchaseId, {
         supplierId: input.supplierId,

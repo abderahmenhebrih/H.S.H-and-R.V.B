@@ -125,6 +125,44 @@ async function pullPhase(): Promise<void> {
   if (totalPulled > 0) console.log(`[sync] pull completed, total ${totalPulled}, now at ${after}`);
 }
 
+async function withCrossTabLock(task: () => Promise<void>): Promise<boolean> {
+  // Prefer navigator.locks if available (automatically released on crash/tab close)
+  const nav: any = typeof navigator !== "undefined" ? (navigator as any) : undefined;
+  if (nav?.locks?.request) {
+    await nav.locks.request("hebrih-hsh-sync", async () => {
+      await task();
+    });
+    return true;
+  }
+  // Fallback: IndexedDB lease via syncMeta (crash-safe via TTL expiry)
+  const leaseKey = "syncLease";
+  const ttl = 30000;
+  const now = Date.now();
+  let acquired = false;
+  try {
+    await db.transaction("rw", db.syncMeta, async () => {
+      const rec = await db.syncMeta.get(leaseKey);
+      const expiry = rec?.value as number | undefined;
+      if (!expiry || expiry < now) {
+        await db.syncMeta.put({ key: leaseKey, value: now + ttl });
+        acquired = true;
+      }
+    });
+  } catch {}
+  if (!acquired) {
+    console.log("[sync] cross-tab lease held, skipping sync");
+    return false;
+  }
+  try {
+    await task();
+    return true;
+  } finally {
+    try {
+      await db.syncMeta.delete(leaseKey);
+    } catch {}
+  }
+}
+
 export async function syncCycle(): Promise<void> {
   if (syncInProgress && syncPromise) return syncPromise;
   if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -136,20 +174,31 @@ export async function syncCycle(): Promise<void> {
   setState("syncing");
   const promise = (async () => {
     try {
-      // One-time legacy backfill for pre-sync data
-      try {
-        await runLegacyBackfill();
-      } catch (e) {
-        console.warn("[sync] legacy backfill failed", e);
+      const doSync = async () => {
+        // One-time legacy backfill for pre-sync data
+        try {
+          await runLegacyBackfill();
+        } catch (e) {
+          console.warn("[sync] legacy backfill failed", e);
+        }
+        // Push first
+        await pushPhase();
+        // Then pull
+        await pullPhase();
+        lastSyncAt = Date.now();
+        await db.syncMeta.put({ key: "lastSuccessfulSyncAt", value: lastSyncAt });
+        setState("synced");
+        console.log(`[sync] completed at revision ${await getServerRevision()}`);
+      };
+      const executed = await withCrossTabLock(doSync);
+      if (!executed) {
+        // Fallback lease was held by another tab — skip without error
+        if (currentState === "syncing") {
+          const last = await db.syncMeta.get("lastSuccessfulSyncAt");
+          if (last) setState("synced");
+          else setState("idle");
+        }
       }
-      // Push first
-      await pushPhase();
-      // Then pull
-      await pullPhase();
-      lastSyncAt = Date.now();
-      await db.syncMeta.put({ key: "lastSuccessfulSyncAt", value: lastSyncAt });
-      setState("synced");
-      console.log(`[sync] completed at revision ${await getServerRevision()}`);
     } catch (e) {
       setState("error");
       console.warn(`[sync] cycle failed`, e);

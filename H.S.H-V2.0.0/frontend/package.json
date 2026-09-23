@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:hsh-client": "tsx test-hsh-sync-client-integrity.ts"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.20",

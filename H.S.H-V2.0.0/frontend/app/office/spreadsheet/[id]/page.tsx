@@ -119,102 +119,32 @@ export default function SpreadsheetEditorPage() {
   const [officeFeedback, setOfficeFeedback] = useState<string | null>(null);
   useEffect(()=>{ if(!officeFeedback) return; const t=setTimeout(()=>setOfficeFeedback(null), 2800); return ()=>clearTimeout(t); }, [officeFeedback]);
 
-  const isComplexForInsert = (content:any): boolean => {
-    if (!content || typeof content !== "object") return false;
-    const sheets = content.sheets;
-    if (!sheets) return false;
-    if (!Array.isArray(sheets)) return true;
-    if (sheets.length > 1) return true;
-    if ((content as any).sheetOrder && (content as any).sheetOrder.length>1) return true;
-    const first = sheets[0];
-    if (first?.mergeData && Object.keys(first.mergeData).length>0) return true;
-    if (first?.data) {
-      for (const v of Object.values(first.data) as any[]) if(v && typeof v==="object" && (v.f!==undefined||v.si!==undefined||v.s!==undefined)) return true;
-    }
-    return false;
-  };
+  const TT = SHEET_T[language];
+
   const handleHebrihInsert = useCallback(async (entityType:string, entityId:string, field:string) => {
     try {
       const mod = await getSnapshotForInsert(entityType, entityId, field);
       const value = mod.value;
-      let inserted = false;
-      let insertError: string | null = null;
-      // Try Univer API if available — respect new contract {success,error}
-      if (univerRef.current?.insertValue) {
-        try {
-          const res: any = (univerRef.current as any).insertValue(value);
-          if (res && typeof res === "object" && "success" in res) {
-            if (res.success) inserted = true;
-            else insertError = res.error || "Insert failed";
-          } else {
-            // void return (old) — assume success if no throw
-            inserted = true;
-          }
-        } catch(e:any){ console.error(e); insertError = e?.message || String(e); }
-      } else if ((univerRef.current as any)?.insertAtSelection) {
-        try { (univerRef.current as any).insertAtSelection(value); inserted = true; } catch(e:any){ console.error(e); insertError = e?.message || String(e); }
-      }
-      if (insertError) {
-        setOfficeFeedback(insertError);
+      if (!univerRef.current?.insertValue) {
+        setOfficeFeedback("Workbook not available");
         setShowHebrih(false);
         return;
       }
-      if (!inserted) {
-        // Block fallback insert for complex workbook (read-only)
-        const current = file?.content as any;
-        if (isComplexForInsert(current)) {
+      const res: any = await univerRef.current.insertValue(value);
+      if (!res || res.success !== true) {
+        const err = res?.error || "Insert failed";
+        if (err === "READ_ONLY_COMPLEX") {
           setOfficeFeedback(language==="fr" ? "Classeur complexe — insertion bloquée en mode secours" : language==="ar" ? "مصنف معقد — الإدراج محظور" : "Complex workbook — insert blocked in fallback");
-          setShowHebrih(false);
-          return;
+        } else {
+          setOfficeFeedback(err);
         }
-        // Fallback: insert via fallback grid content (active sheet 0,0 or next empty cell)
-        if (current && Array.isArray(current.sheets)) {
-          const sheet = current.sheets[0] as any;
-          const data = sheet?.data || {};
-          let found: string | null = null;
-          for(let r=0;r<40;r++){ for(let c=0;c<10;c++){ const k=`${r},${c}`; if(!data[k]){ found=k; break; } } if(found) break; }
-          const key = found || "0,0";
-          const nextData = { ...data, [key]: { v: value } };
-          const nextSheet = { ...sheet, data: nextData };
-          const nextContent = { ...current, sheets: [nextSheet, ...current.sheets.slice(1)] };
-          await officeFileService.update(id, { content: nextContent });
-          const updated = await officeFileService.getById(id);
-          if (updated) setFile(updated);
-          setOfficeFeedback(`${TT.valueInserted} (${value})`);
-          inserted = true;
-        } else if (current && current.sheets && typeof current.sheets==="object") {
-          // For Univer map in fallback (should be blocked above, but handle simple single-sheet map)
-          if (isComplexForInsert(current)) {
-            setOfficeFeedback(language==="fr" ? "Classeur complexe — insertion bloquée" : "Complex workbook — insert blocked");
-            setShowHebrih(false);
-            return;
-          }
-          const sheetsObj = current.sheets as any;
-          const firstId = current.sheetOrder?.[0] || Object.keys(sheetsObj)[0];
-          if (firstId && sheetsObj[firstId]) {
-            const sh = sheetsObj[firstId];
-            const cellData = sh.cellData || {};
-            let found: string | null = null;
-            for(let r=0;r<40;r++){ if(!cellData[r]){ found=`${r},0`; break; } const row=cellData[r]; let emptyCol=-1; for(let c=0;c<10;c++){ if(!row[c]){ emptyCol=c; break; } } if(emptyCol!==-1){ found=`${r},${emptyCol}`; break; } if(Object.keys(row).length<10) {found=`${r},${Object.keys(row).length}`; break;} }
-            const key = found || "0,0";
-            const [rr,cc] = key.split(",").map(Number);
-            const nextCellData = { ...cellData, [rr]: { ...(cellData[rr]||{}), [cc]: { v: value, m: String(value) } } };
-            const nextSheets = { ...sheetsObj, [firstId]: { ...sh, cellData: nextCellData } };
-            const nextContent = { ...current, sheets: nextSheets };
-            await officeFileService.update(id, { content: nextContent });
-            const updated = await officeFileService.getById(id);
-            if (updated) setFile(updated);
-            setOfficeFeedback(TT.valueInserted);
-            inserted = true;
-          }
-        }
-      }
-      if (!inserted) {
-        setOfficeFeedback(insertError || `${TT.valueInserted} (${value})`);
-        // Do not link entity if not inserted
         setShowHebrih(false);
         return;
       }
+      // wrapper already awaited persistence via onSave; refresh local file state
+      const updated = await officeFileService.getById(id);
+      if (updated) setFile(updated);
+      setOfficeFeedback(`${TT.valueInserted} (${value})`);
       // link entity only after successful persistence
       if (file) {
         const linked = file.linkedEntities || [];
@@ -233,50 +163,27 @@ export default function SpreadsheetEditorPage() {
     try {
       const rows = await getTableSnapshot(entityType, language);
       if (!rows || rows.length===0) { setOfficeFeedback(TT.noData); return; }
-      let apiResult: any = null;
-      if (univerRef.current?.insertTable) {
-        try { apiResult = univerRef.current.insertTable(entityType, rows); } catch(e){ console.error(e); apiResult = { success: false, error: String(e) }; }
+      if (!univerRef.current?.insertTable) {
+        setOfficeFeedback("Workbook not available");
+        setShowTableInsert(false);
+        return;
       }
-      if (apiResult) {
-        if (!apiResult.success) {
-          setOfficeFeedback(apiResult.error || "Failed to create new sheet");
-          return;
-        }
-        // Persist API-inserted snapshot by saving current Univer snapshot after short delay
-        setTimeout(async()=>{
-          try { const snap = (univerRef.current as any)?.getSnapshot?.() || (univerRef.current as any)?.save?.(); if(snap) await officeFileService.update(id, { content: snap }); const updated = await officeFileService.getById(id); if(updated) setFile(updated); } catch(e){ console.error(e); setOfficeFeedback(String(e)); }
-        }, 400);
-        setOfficeFeedback(TT.tableInserted);
-      } else {
-        // fallback: create new sheet snapshot via content update and render immediately — only for simple flat workbooks or when Univer not available
-        const current = file?.content as any;
-        const header = Object.keys(rows[0] || {});
-        const data: any = {};
-        header.forEach((h, c)=> data[`0,${c}`] = { v: h });
-        rows.forEach((row:any, rIdx:number)=> {
-          header.forEach((h,c)=> {
-            const val = row[h];
-            data[`${rIdx+1},${c}`] = { v: String(val ?? "") };
-          });
-        });
-        const newSheetId = `sheet-${Date.now()}`;
-        const newSheet = { id: newSheetId, name: entityType.slice(0,12), data, rowCount: rows.length+5, colCount: header.length };
-        let nextContent: any;
-        if (current && current.sheets && Array.isArray(current.sheets)) {
-          nextContent = { ...current, sheets: [...current.sheets, newSheet], activeSheetId: newSheetId };
-        } else if (current && current.sheets && typeof current.sheets==="object" && !Array.isArray(current.sheets)) {
-          const sheetMap = current.sheets || {};
-          nextContent = { ...current, sheets: { ...sheetMap, [newSheetId]: { id: newSheetId, name: entityType, cellData: data, rowCount: rows.length+5, columnCount: header.length } }, sheetOrder: [...(current.sheetOrder|| Object.keys(sheetMap)), newSheetId] };
+      const res: any = await univerRef.current.insertTable(entityType, rows);
+      if (!res || res.success !== true) {
+        const err = res?.error || "Failed to create new sheet";
+        if (err === "READ_ONLY_COMPLEX") {
+          setOfficeFeedback(language==="fr" ? "Classeur complexe — insertion bloquée en mode secours" : language==="ar" ? "مصنف معقد — الإدراج محظور" : "Complex workbook — insert blocked in fallback");
         } else {
-          nextContent = { sheets: [newSheet], activeSheetId: newSheetId };
+          setOfficeFeedback(err);
         }
-        await officeFileService.update(id, { content: nextContent });
-        const updated = await officeFileService.getById(id);
-        if (updated) setFile(updated);
-        setOfficeFeedback(TT.tableInserted);
+        setShowTableInsert(false);
+        return;
       }
+      const updated = await officeFileService.getById(id);
+      if (updated) setFile(updated);
+      setOfficeFeedback(TT.tableInserted);
       setShowTableInsert(false);
-    } catch(e){ console.error(e); setOfficeFeedback(String(e)); }
+    } catch(e){ console.error(e); setOfficeFeedback(String(e)); setShowTableInsert(false); }
   }, [file, id, language]);
 
   const handleExportCSV = async () => {
@@ -367,7 +274,6 @@ export default function SpreadsheetEditorPage() {
 
   const handlePrint = () => window.print();
 
-  const TT = SHEET_T[language];
   if (!file) return <AppShell activePage="office"><div style={{ padding:20 }}>{TT.loading}</div></AppShell>;
 
   return (

@@ -14,6 +14,7 @@ import { SaleModel } from "../models/sale.model";
 import { PurchaseModel } from "../models/purchase.model";
 import { PaymentModel } from "../models/payment.model";
 import { TransferModel } from "../models/transfer.model";
+import { ExpenseModel } from "../models/expense.model";
 
 type SyncModel = {
   findOne: (filter: { id: string }) => Promise<any>;
@@ -430,6 +431,434 @@ async function handleTransferCreate(session: any, payload: Record<string, unknow
   await BankAccountModel.updateOne({ id: toId }, { $set: { serverRevision: rev2 } }, { session });
   await SyncChangeModel.create([{ revision: rev2, entity: "bankAccount", entityId: toId, operation: "update", payload: toAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Server-authoritative handlers for Sale/Purchase/Payment update/delete
+// Pass 6 spec P0 — must use session, getNextRevision, SyncChangeModel, validate via validatePurchaseSalePayload
+// ---------------------------------------------------------------------------
+
+function aggregateItems(items: any[]): Map<string, { qty: number; weight: number }> {
+  const agg = new Map<string, { qty: number; weight: number }>();
+  for (const it of items) {
+    const pid = String((it as any).productId);
+    const cur = agg.get(pid) || { qty: 0, weight: 0 };
+    cur.qty += Number((it as any).quantity);
+    cur.weight += Number((it as any).weightKg ?? (it as any).weight ?? 0);
+    agg.set(pid, cur);
+  }
+  return agg;
+}
+
+async function handleSaleUpdate(session: any, existingSale: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
+  const old: any = (existingSale as any).toObject ? (existingSale as any).toObject() : { ...(existingSale as any) };
+  const candidate: any = { ...old, ...payload };
+  candidate.id = old.id;
+  const vErr = validatePurchaseSalePayload(candidate, "create", "sale");
+  if (vErr) return vErr;
+  const oldAgg = aggregateItems((old.items as any[]) || []);
+  const newAgg = aggregateItems((candidate.items as any[]) || []);
+  const oldTotal = roundMoney(Number(old.total));
+  const newTotal = roundMoney(Number(candidate.total));
+  const oldCustomerId = String(old.customerId);
+  const newCustomerId = String(candidate.customerId);
+  const oldCust: any = await CustomerModel.findOne({ id: oldCustomerId }).session(session);
+  if (!oldCust) return "CUSTOMER_NOT_FOUND";
+  if (!Number.isFinite(oldCust.balance) || oldCust.balance < oldTotal) return "INSUFFICIENT_CUSTOMER_BALANCE";
+  let newCust: any = null;
+  if (newCustomerId === oldCustomerId) newCust = oldCust;
+  else {
+    newCust = await CustomerModel.findOne({ id: newCustomerId }).session(session);
+    if (!newCust) return "CUSTOMER_NOT_FOUND";
+    if (!Number.isFinite(newCust.balance)) return "CUSTOMER_BALANCE_INVALID";
+  }
+  const allPids = new Set<string>([...oldAgg.keys(), ...newAgg.keys()]);
+  const productCache = new Map<string, any>();
+  for (const pid of allPids) {
+    const prod: any = await ProductModel.findOne({ id: pid }).session(session);
+    if (!prod) return `PRODUCT_NOT_FOUND:${pid}`;
+    if (!Number.isFinite(prod.quantity) || !Number.isFinite(prod.weightKg)) return `PRODUCT_NOT_FOUND:${pid}`;
+    productCache.set(pid, prod);
+  }
+  for (const [pid, need] of newAgg.entries()) {
+    const prod: any = productCache.get(pid);
+    const oldNeed = oldAgg.get(pid);
+    const restoredQty = prod.quantity + (oldNeed?.qty ?? 0);
+    const restoredWeight = prod.weightKg + (oldNeed?.weight ?? 0);
+    if (restoredQty < need.qty) return "INSUFFICIENT_STOCK";
+    if (restoredWeight < need.weight) return "INSUFFICIENT_STOCK";
+  }
+  for (const [pid, need] of oldAgg.entries()) {
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: need.qty, weightKg: need.weight } }, { session });
+  }
+  await CustomerModel.updateOne({ id: oldCustomerId }, { $inc: { balance: -oldTotal } }, { session });
+  for (const [pid, need] of newAgg.entries()) {
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: -need.qty, weightKg: -need.weight } }, { session });
+  }
+  await CustomerModel.updateOne({ id: newCustomerId }, { $inc: { balance: newTotal } }, { session });
+  for (const pid of allPids) {
+    const prodAfter: any = await ProductModel.findOne({ id: pid }).session(session);
+    const rev = await getNextRevision(session);
+    await ProductModel.updateOne({ id: pid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const prodAfterWithRev: any = await ProductModel.findOne({ id: pid }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "product", entityId: pid, operation: "update", payload: prodAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const custIds = new Set<string>([oldCustomerId, newCustomerId]);
+  for (const cid of custIds) {
+    const custAfter: any = await CustomerModel.findOne({ id: cid }).session(session);
+    const rev = await getNextRevision(session);
+    await CustomerModel.updateOne({ id: cid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const custAfterWithRev: any = await CustomerModel.findOne({ id: cid }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "customer", entityId: cid, operation: "update", payload: custAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const now = Date.now();
+  const saleRev = await getNextRevision(session);
+  const toSet: Record<string, unknown> = { ...candidate, serverRevision: saleRev, syncStatus: "synced", lastSyncedAt: now, updatedAt: now };
+  delete (toSet as any).id;
+  delete (toSet as any)._id;
+  delete (toSet as any).__v;
+  await SaleModel.updateOne({ id: old.id }, { $set: toSet }, { session });
+  const saleAfter: any = await SaleModel.findOne({ id: old.id }).session(session);
+  await SyncChangeModel.create([{ revision: saleRev, entity: "sale", entityId: old.id, operation: "update", payload: saleAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handleSaleDelete(session: any, existingSale: any, clientId: string): Promise<string | null> {
+  const old: any = (existingSale as any).toObject ? (existingSale as any).toObject() : { ...(existingSale as any) };
+  const oldAgg = aggregateItems((old.items as any[]) || []);
+  const oldTotal = roundMoney(Number(old.total));
+  const oldCustomerId = String(old.customerId);
+  const cust: any = await CustomerModel.findOne({ id: oldCustomerId }).session(session);
+  if (!cust) return "CUSTOMER_NOT_FOUND";
+  if (cust.balance < oldTotal) return "INSUFFICIENT_CUSTOMER_BALANCE";
+  for (const pid of oldAgg.keys()) {
+    const prod: any = await ProductModel.findOne({ id: pid }).session(session);
+    if (!prod) return `PRODUCT_NOT_FOUND:${pid}`;
+  }
+  for (const [pid, need] of oldAgg.entries()) {
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: need.qty, weightKg: need.weight } }, { session });
+  }
+  await CustomerModel.updateOne({ id: oldCustomerId }, { $inc: { balance: -oldTotal } }, { session });
+  await SaleModel.deleteOne({ id: old.id }, { session });
+  for (const pid of oldAgg.keys()) {
+    const prodAfter: any = await ProductModel.findOne({ id: pid }).session(session);
+    const rev = await getNextRevision(session);
+    await ProductModel.updateOne({ id: pid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const prodAfterWithRev: any = await ProductModel.findOne({ id: pid }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "product", entityId: pid, operation: "update", payload: prodAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  {
+    const custAfter: any = await CustomerModel.findOne({ id: oldCustomerId }).session(session);
+    const rev = await getNextRevision(session);
+    await CustomerModel.updateOne({ id: oldCustomerId }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const custAfterWithRev: any = await CustomerModel.findOne({ id: oldCustomerId }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "customer", entityId: oldCustomerId, operation: "update", payload: custAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const revDel = await getNextRevision(session);
+  await SyncChangeModel.create([{ revision: revDel, entity: "sale", entityId: old.id, operation: "delete", payload: undefined, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handlePurchaseUpdate(session: any, existingPurchase: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
+  const old: any = (existingPurchase as any).toObject ? (existingPurchase as any).toObject() : { ...(existingPurchase as any) };
+  const candidate: any = { ...old, ...payload };
+  candidate.id = old.id;
+  const vErr = validatePurchaseSalePayload(candidate, "create", "purchase");
+  if (vErr) return vErr;
+  const oldAgg = aggregateItems((old.items as any[]) || []);
+  const newAgg = aggregateItems((candidate.items as any[]) || []);
+  const oldTotal = roundMoney(Number(old.total));
+  const newTotal = roundMoney(Number(candidate.total));
+  const oldSupplierId = String(old.supplierId);
+  const newSupplierId = String(candidate.supplierId);
+  const oldSup: any = await SupplierModel.findOne({ id: oldSupplierId }).session(session);
+  if (!oldSup) return "SUPPLIER_NOT_FOUND";
+  if (!Number.isFinite(oldSup.balance) || oldSup.balance < oldTotal) return "INSUFFICIENT_SUPPLIER_BALANCE";
+  for (const [pid, need] of oldAgg.entries()) {
+    const prod: any = await ProductModel.findOne({ id: pid }).session(session);
+    if (!prod) return `PRODUCT_NOT_FOUND:${pid}`;
+    if (prod.quantity < need.qty) return "INSUFFICIENT_STOCK";
+    if (prod.weightKg < need.weight) return "INSUFFICIENT_STOCK";
+  }
+  let newSup: any = null;
+  if (newSupplierId === oldSupplierId) newSup = oldSup;
+  else {
+    newSup = await SupplierModel.findOne({ id: newSupplierId }).session(session);
+    if (!newSup) return "SUPPLIER_NOT_FOUND";
+  }
+  for (const pid of newAgg.keys()) {
+    if (!oldAgg.has(pid)) {
+      const prod: any = await ProductModel.findOne({ id: pid }).session(session);
+      if (!prod) return `PRODUCT_NOT_FOUND:${pid}`;
+    }
+  }
+  await SupplierModel.updateOne({ id: oldSupplierId }, { $inc: { balance: -oldTotal } }, { session });
+  for (const [pid, need] of oldAgg.entries()) {
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: -need.qty, weightKg: -need.weight } }, { session });
+  }
+  for (const [pid, need] of newAgg.entries()) {
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: need.qty, weightKg: need.weight } }, { session });
+  }
+  await SupplierModel.updateOne({ id: newSupplierId }, { $inc: { balance: newTotal } }, { session });
+  const allPids = new Set<string>([...oldAgg.keys(), ...newAgg.keys()]);
+  for (const pid of allPids) {
+    const prodAfter: any = await ProductModel.findOne({ id: pid }).session(session);
+    const rev = await getNextRevision(session);
+    await ProductModel.updateOne({ id: pid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const prodAfterWithRev: any = await ProductModel.findOne({ id: pid }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "product", entityId: pid, operation: "update", payload: prodAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const supIds = new Set<string>([oldSupplierId, newSupplierId]);
+  for (const sid of supIds) {
+    const supAfter: any = await SupplierModel.findOne({ id: sid }).session(session);
+    const rev = await getNextRevision(session);
+    await SupplierModel.updateOne({ id: sid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const supAfterWithRev: any = await SupplierModel.findOne({ id: sid }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "supplier", entityId: sid, operation: "update", payload: supAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const now = Date.now();
+  const purRev = await getNextRevision(session);
+  const toSet: Record<string, unknown> = { ...candidate, serverRevision: purRev, syncStatus: "synced", lastSyncedAt: now, updatedAt: now };
+  delete (toSet as any).id;
+  delete (toSet as any)._id;
+  delete (toSet as any).__v;
+  await PurchaseModel.updateOne({ id: old.id }, { $set: toSet }, { session });
+  const purAfter: any = await PurchaseModel.findOne({ id: old.id }).session(session);
+  await SyncChangeModel.create([{ revision: purRev, entity: "purchase", entityId: old.id, operation: "update", payload: purAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handlePurchaseDelete(session: any, existingPurchase: any, clientId: string): Promise<string | null> {
+  const old: any = (existingPurchase as any).toObject ? (existingPurchase as any).toObject() : { ...(existingPurchase as any) };
+  const oldAgg = aggregateItems((old.items as any[]) || []);
+  const oldTotal = roundMoney(Number(old.total));
+  const oldSupplierId = String(old.supplierId);
+  const sup: any = await SupplierModel.findOne({ id: oldSupplierId }).session(session);
+  if (!sup) return "SUPPLIER_NOT_FOUND";
+  if (sup.balance < oldTotal) return "INSUFFICIENT_SUPPLIER_BALANCE";
+  for (const [pid, need] of oldAgg.entries()) {
+    const prod: any = await ProductModel.findOne({ id: pid }).session(session);
+    if (!prod) return `PRODUCT_NOT_FOUND:${pid}`;
+    if (prod.quantity < need.qty) return "INSUFFICIENT_STOCK";
+    if (prod.weightKg < need.weight) return "INSUFFICIENT_STOCK";
+  }
+  for (const [pid, need] of oldAgg.entries()) {
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: -need.qty, weightKg: -need.weight } }, { session });
+  }
+  await SupplierModel.updateOne({ id: oldSupplierId }, { $inc: { balance: -oldTotal } }, { session });
+  await PurchaseModel.deleteOne({ id: old.id }, { session });
+  for (const pid of oldAgg.keys()) {
+    const prodAfter: any = await ProductModel.findOne({ id: pid }).session(session);
+    const rev = await getNextRevision(session);
+    await ProductModel.updateOne({ id: pid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const prodAfterWithRev: any = await ProductModel.findOne({ id: pid }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "product", entityId: pid, operation: "update", payload: prodAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  {
+    const supAfter: any = await SupplierModel.findOne({ id: oldSupplierId }).session(session);
+    const rev = await getNextRevision(session);
+    await SupplierModel.updateOne({ id: oldSupplierId }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const supAfterWithRev: any = await SupplierModel.findOne({ id: oldSupplierId }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "supplier", entityId: oldSupplierId, operation: "update", payload: supAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const revDel = await getNextRevision(session);
+  await SyncChangeModel.create([{ revision: revDel, entity: "purchase", entityId: old.id, operation: "delete", payload: undefined, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handlePaymentUpdate(session: any, existingPayment: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
+  const old: any = (existingPayment as any).toObject ? (existingPayment as any).toObject() : { ...(existingPayment as any) };
+  const candidate: any = { ...old, ...payload };
+  candidate.id = old.id;
+  const newAmount = roundMoney(Number(candidate.amount));
+  if (!Number.isFinite(newAmount) || newAmount <= 0) return "PAYMENT_AMOUNT_INVALID";
+  const newEntityType = String(candidate.entityType);
+  const newEntityId = String(candidate.entityId);
+  const newAccountId = String(candidate.accountId);
+  const oldAmount = roundMoney(Number(old.amount));
+  const oldEntityType = String(old.entityType);
+  const oldEntityId = String(old.entityId);
+  const oldAccountId = String(old.accountId);
+  const allowed = ["supplier", "customer", "worker", "expense"];
+  if (!allowed.includes(newEntityType)) return "PAYMENT_TYPE_INVALID";
+  if (!isNonEmptyString(newEntityId)) return "PAYMENT_ENTITY_INVALID";
+  if (!isNonEmptyString(newAccountId)) return "PAYMENT_ACCOUNT_INVALID";
+  const oldAccount: any = await BankAccountModel.findOne({ id: oldAccountId }).session(session);
+  if (!oldAccount) return "ACCOUNT_NOT_FOUND";
+  if (oldEntityType === "supplier") {
+    const s: any = await SupplierModel.findOne({ id: oldEntityId }).session(session);
+    if (!s) return "SUPPLIER_NOT_FOUND";
+  } else if (oldEntityType === "customer") {
+    const c: any = await CustomerModel.findOne({ id: oldEntityId }).session(session);
+    if (!c) return "CUSTOMER_NOT_FOUND";
+  } else if (oldEntityType === "worker") {
+    const w: any = await WorkerModel.findOne({ id: oldEntityId }).session(session);
+    if (!w) return "WORKER_NOT_FOUND";
+  } else if (oldEntityType === "expense") {
+    const e: any = await ExpenseModel.findOne({ id: oldEntityId }).session(session);
+    if (!e) return "EXPENSE_NOT_FOUND";
+  } else return "PAYMENT_TYPE_INVALID";
+  const newAccount: any = await BankAccountModel.findOne({ id: newAccountId }).session(session);
+  if (!newAccount) return "ACCOUNT_NOT_FOUND";
+  let projectedNewAccountBalance = newAccount.balance;
+  if (oldAccountId === newAccountId) {
+    if (oldEntityType === "supplier" || oldEntityType === "worker" || oldEntityType === "expense") projectedNewAccountBalance += oldAmount;
+    else if (oldEntityType === "customer") projectedNewAccountBalance -= oldAmount;
+  }
+  if (projectedNewAccountBalance < newAmount) return "INSUFFICIENT_BANK_BALANCE";
+  if (newEntityType === "supplier") {
+    const nd: any = await SupplierModel.findOne({ id: newEntityId }).session(session);
+    if (!nd) return "SUPPLIER_NOT_FOUND";
+    let projected = nd.balance;
+    if (oldEntityType === "supplier" && oldEntityId === newEntityId) projected += oldAmount;
+    if (projected < newAmount) return "INSUFFICIENT_SUPPLIER_BALANCE";
+  } else if (newEntityType === "customer") {
+    const nd: any = await CustomerModel.findOne({ id: newEntityId }).session(session);
+    if (!nd) return "CUSTOMER_NOT_FOUND";
+    let projected = nd.balance;
+    if (oldEntityType === "customer" && oldEntityId === newEntityId) projected += oldAmount;
+    if (projected < newAmount) return "INSUFFICIENT_CUSTOMER_BALANCE";
+  } else if (newEntityType === "worker") {
+    const nd: any = await WorkerModel.findOne({ id: newEntityId }).session(session);
+    if (!nd) return "WORKER_NOT_FOUND";
+    if (nd.status !== "active") return "WORKER_ARCHIVED";
+    let projected = nd.balance;
+    if (oldEntityType === "worker" && oldEntityId === newEntityId) projected += oldAmount;
+    if (projected < newAmount) return "INSUFFICIENT_WORKER_BALANCE";
+  } else if (newEntityType === "expense") {
+    const e: any = await ExpenseModel.findOne({ id: newEntityId }).session(session);
+    if (!e) return "EXPENSE_NOT_FOUND";
+  }
+  if (oldEntityType === "supplier") {
+    await SupplierModel.updateOne({ id: oldEntityId }, { $inc: { balance: oldAmount } }, { session });
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: oldAmount } }, { session });
+  } else if (oldEntityType === "customer") {
+    await CustomerModel.updateOne({ id: oldEntityId }, { $inc: { balance: oldAmount } }, { session });
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: -oldAmount } }, { session });
+  } else if (oldEntityType === "worker") {
+    await WorkerModel.updateOne({ id: oldEntityId }, { $inc: { balance: oldAmount } }, { session });
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: oldAmount } }, { session });
+  } else if (oldEntityType === "expense") {
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: oldAmount } }, { session });
+  }
+  if (newEntityType === "supplier") {
+    await SupplierModel.updateOne({ id: newEntityId }, { $inc: { balance: -newAmount } }, { session });
+    await BankAccountModel.updateOne({ id: newAccountId }, { $inc: { balance: -newAmount } }, { session });
+  } else if (newEntityType === "customer") {
+    await CustomerModel.updateOne({ id: newEntityId }, { $inc: { balance: -newAmount } }, { session });
+    await BankAccountModel.updateOne({ id: newAccountId }, { $inc: { balance: newAmount } }, { session });
+  } else if (newEntityType === "worker") {
+    await WorkerModel.updateOne({ id: newEntityId }, { $inc: { balance: -newAmount } }, { session });
+    await BankAccountModel.updateOne({ id: newAccountId }, { $inc: { balance: -newAmount } }, { session });
+  } else if (newEntityType === "expense") {
+    await BankAccountModel.updateOne({ id: newAccountId }, { $inc: { balance: -newAmount } }, { session });
+  }
+  const bankIds = new Set<string>([oldAccountId, newAccountId]);
+  for (const bid of bankIds) {
+    const bankAfter: any = await BankAccountModel.findOne({ id: bid }).session(session);
+    const rev = await getNextRevision(session);
+    await BankAccountModel.updateOne({ id: bid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const bankAfterWithRev: any = await BankAccountModel.findOne({ id: bid }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "bankAccount", entityId: bid, operation: "update", payload: bankAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const entityKeys: Array<{ type: string; id: string }> = [];
+  if (["supplier", "customer", "worker"].includes(oldEntityType)) entityKeys.push({ type: oldEntityType, id: oldEntityId });
+  if (["supplier", "customer", "worker"].includes(newEntityType)) {
+    if (!(newEntityType === oldEntityType && newEntityId === oldEntityId)) entityKeys.push({ type: newEntityType, id: newEntityId });
+  }
+  const seen = new Set<string>();
+  for (const ek of entityKeys) {
+    const key = `${ek.type}:${ek.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let after: any = null;
+    if (ek.type === "supplier") after = await SupplierModel.findOne({ id: ek.id }).session(session);
+    else if (ek.type === "customer") after = await CustomerModel.findOne({ id: ek.id }).session(session);
+    else if (ek.type === "worker") after = await WorkerModel.findOne({ id: ek.id }).session(session);
+    if (!after) continue;
+    const rev = await getNextRevision(session);
+    if (ek.type === "supplier") await SupplierModel.updateOne({ id: ek.id }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    else if (ek.type === "customer") await CustomerModel.updateOne({ id: ek.id }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    else if (ek.type === "worker") await WorkerModel.updateOne({ id: ek.id }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const afterWithRev: any = ek.type === "supplier" ? await SupplierModel.findOne({ id: ek.id }).session(session) : ek.type === "customer" ? await CustomerModel.findOne({ id: ek.id }).session(session) : await WorkerModel.findOne({ id: ek.id }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: ek.type, entityId: ek.id, operation: "update", payload: afterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const nowPayment = Date.now();
+  const payRev = await getNextRevision(session);
+  const toSet: Record<string, unknown> = { ...candidate, serverRevision: payRev, syncStatus: "synced", lastSyncedAt: nowPayment, updatedAt: nowPayment };
+  delete (toSet as any).id;
+  delete (toSet as any)._id;
+  delete (toSet as any).__v;
+  await PaymentModel.updateOne({ id: old.id }, { $set: toSet }, { session });
+  const payAfter: any = await PaymentModel.findOne({ id: old.id }).session(session);
+  await SyncChangeModel.create([{ revision: payRev, entity: "payment", entityId: old.id, operation: "update", payload: payAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handlePaymentDelete(session: any, existingPayment: any, clientId: string): Promise<string | null> {
+  const old: any = (existingPayment as any).toObject ? (existingPayment as any).toObject() : { ...(existingPayment as any) };
+  const oldAmount = roundMoney(Number(old.amount));
+  const oldEntityType = String(old.entityType);
+  const oldEntityId = String(old.entityId);
+  const oldAccountId = String(old.accountId);
+  const oldAccount: any = await BankAccountModel.findOne({ id: oldAccountId }).session(session);
+  if (!oldAccount) return "ACCOUNT_NOT_FOUND";
+  if (oldEntityType === "supplier") {
+    const s: any = await SupplierModel.findOne({ id: oldEntityId }).session(session);
+    if (!s) return "SUPPLIER_NOT_FOUND";
+  } else if (oldEntityType === "customer") {
+    const c: any = await CustomerModel.findOne({ id: oldEntityId }).session(session);
+    if (!c) return "CUSTOMER_NOT_FOUND";
+  } else if (oldEntityType === "worker") {
+    const w: any = await WorkerModel.findOne({ id: oldEntityId }).session(session);
+    if (!w) return "WORKER_NOT_FOUND";
+  } else if (oldEntityType === "expense") {
+    const e: any = await ExpenseModel.findOne({ id: oldEntityId }).session(session);
+    if (!e) return "EXPENSE_NOT_FOUND";
+  } else return "PAYMENT_TYPE_INVALID";
+  if (oldEntityType === "supplier") {
+    await SupplierModel.updateOne({ id: oldEntityId }, { $inc: { balance: oldAmount } }, { session });
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: oldAmount } }, { session });
+  } else if (oldEntityType === "customer") {
+    await CustomerModel.updateOne({ id: oldEntityId }, { $inc: { balance: oldAmount } }, { session });
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: -oldAmount } }, { session });
+  } else if (oldEntityType === "worker") {
+    await WorkerModel.updateOne({ id: oldEntityId }, { $inc: { balance: oldAmount } }, { session });
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: oldAmount } }, { session });
+  } else if (oldEntityType === "expense") {
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $inc: { balance: oldAmount } }, { session });
+  }
+  await PaymentModel.deleteOne({ id: old.id }, { session });
+  {
+    const bankAfter: any = await BankAccountModel.findOne({ id: oldAccountId }).session(session);
+    const rev = await getNextRevision(session);
+    await BankAccountModel.updateOne({ id: oldAccountId }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const bankAfterWithRev: any = await BankAccountModel.findOne({ id: oldAccountId }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: "bankAccount", entityId: oldAccountId, operation: "update", payload: bankAfterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  if (["supplier", "customer", "worker"].includes(oldEntityType)) {
+    let after: any = null;
+    if (oldEntityType === "supplier") after = await SupplierModel.findOne({ id: oldEntityId }).session(session);
+    else if (oldEntityType === "customer") after = await CustomerModel.findOne({ id: oldEntityId }).session(session);
+    else if (oldEntityType === "worker") after = await WorkerModel.findOne({ id: oldEntityId }).session(session);
+    const rev = await getNextRevision(session);
+    if (oldEntityType === "supplier") await SupplierModel.updateOne({ id: oldEntityId }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    else if (oldEntityType === "customer") await CustomerModel.updateOne({ id: oldEntityId }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    else if (oldEntityType === "worker") await WorkerModel.updateOne({ id: oldEntityId }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    const afterWithRev: any = oldEntityType === "supplier" ? await SupplierModel.findOne({ id: oldEntityId }).session(session) : oldEntityType === "customer" ? await CustomerModel.findOne({ id: oldEntityId }).session(session) : await WorkerModel.findOne({ id: oldEntityId }).session(session);
+    await SyncChangeModel.create([{ revision: rev, entity: oldEntityType, entityId: oldEntityId, operation: "update", payload: afterWithRev, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  const revDel = await getNextRevision(session);
+  await SyncChangeModel.create([{ revision: revDel, entity: "payment", entityId: old.id, operation: "delete", payload: undefined, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handleTransferUpdate(_session: any, _existing: any, _payload: Record<string, unknown>, _clientId: string): Promise<string | null> {
+  return "TRANSFER_UPDATE_UNSUPPORTED";
+}
+
+async function handleTransferDelete(_session: any, _existing: any, _clientId: string): Promise<string | null> {
+  return "TRANSFER_DELETE_UNSUPPORTED";
 }
 
 export function validateHshPayload(
@@ -1478,6 +1907,12 @@ export async function processSyncOperation(
       if (operation.operation === "update") {
         const existing: any = await (model as any).findOne({ id: operation.entityId }).session(session as any);
         if (!existing) {
+          if (operation.entity === "transfer") {
+            const err = "TRANSFER_UPDATE_UNSUPPORTED";
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+            return;
+          }
           const err = "Entity not found.";
           result = {
             operationId: opId,
@@ -1545,6 +1980,31 @@ export async function processSyncOperation(
             result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
             return;
           }
+        }
+        // SERVER-AUTHORITATIVE handlers for Sale/Purchase/Payment/Transfer update — must precede generic updateOne
+        if (["sale", "purchase", "payment", "transfer"].includes(operation.entity)) {
+          if (operation.entity === "transfer") {
+            const err = "TRANSFER_UPDATE_UNSUPPORTED";
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+            return;
+          }
+          let handlerErr: string | null = null;
+          if (operation.entity === "sale") handlerErr = await handleSaleUpdate(session, existing, payload as Record<string, unknown>, operation.clientId as string);
+          else if (operation.entity === "purchase") handlerErr = await handlePurchaseUpdate(session, existing, payload as Record<string, unknown>, operation.clientId as string);
+          else if (operation.entity === "payment") handlerErr = await handlePaymentUpdate(session, existing, payload as Record<string, unknown>, operation.clientId as string);
+          if (handlerErr) {
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: handlerErr, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: handlerErr, error: handlerErr, retryable: false };
+            return;
+          }
+          const updated = await (model as any).findOne({ id: operation.entityId }).session(session as any);
+          const rev = (updated as any)?.serverRevision;
+          canonical = updated;
+          revision = rev;
+          await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: true, revision, canonicalEntity: canonical, conflict, processedAt: new Date(), clientId: operation.clientId }], { session });
+          result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: true, message: "Entity updated.", revision, canonicalEntity: canonical, conflict };
+          return;
         }
         revision = await getNextRevision(session);
         const toSet: Record<string, unknown> = {
@@ -1628,6 +2088,33 @@ export async function processSyncOperation(
               result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
               return;
             }
+          }
+        }
+        // SERVER-AUTHORITATIVE handlers for Sale/Purchase/Payment/Transfer delete — must precede generic deleteOne
+        if (["sale", "purchase", "payment", "transfer"].includes(operation.entity)) {
+          if (operation.entity === "transfer") {
+            const err = "TRANSFER_DELETE_UNSUPPORTED";
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+            return;
+          }
+          if (!existing) {
+            // Idempotent delete for missing entity — fall through to generic handling below
+          } else {
+            let handlerErr: string | null = null;
+            if (operation.entity === "sale") handlerErr = await handleSaleDelete(session, existing, operation.clientId as string);
+            else if (operation.entity === "purchase") handlerErr = await handlePurchaseDelete(session, existing, operation.clientId as string);
+            else if (operation.entity === "payment") handlerErr = await handlePaymentDelete(session, existing, operation.clientId as string);
+            if (handlerErr) {
+              await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: handlerErr, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+              result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: handlerErr, error: handlerErr, retryable: false };
+              return;
+            }
+            const lastChange: any = await SyncChangeModel.findOne({ entity: operation.entity, entityId: operation.entityId, operation: "delete" }).sort({ revision: -1 }).session(session);
+            revision = lastChange?.revision;
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: true, revision, canonicalEntity: undefined, conflict, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: true, message: "Entity deleted.", revision, conflict };
+            return;
           }
         }
         revision = await getNextRevision(session);

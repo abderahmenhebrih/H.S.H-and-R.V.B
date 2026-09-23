@@ -55,13 +55,13 @@ export class PurchaseReversalOperation {
           quantity: product.quantity - item.quantity,
           weightKg: product.weightKg - item.weightKg,
           updatedAt: now,
-          });
+        } as any, { queueSync: false } as any);
       }
 
       await supplierRepository.update(purchase.supplierId, {
         balance: supplier.balance - purchase.total,
         updatedAt: now,
-        });
+      } as any, { queueSync: false } as any);
 
       await purchaseRepository.delete(purchaseId);
     });

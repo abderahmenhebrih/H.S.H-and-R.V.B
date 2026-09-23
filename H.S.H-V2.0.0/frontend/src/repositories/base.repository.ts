@@ -2,6 +2,7 @@ import type { Table } from "dexie";
 import { db } from "../lib/database/db";
 import { generateId } from "../lib/id";
 import type { SyncEntity } from "../types/sync/sync";
+import { coalescePendingOperations } from "../services/sync/queue";
 
 let triggerSyncFn: (() => void) | null = null;
 export function setTriggerSync(fn: () => void) {
@@ -56,19 +57,12 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
         } catch {}
         const doCreate = async () => {
           await this.table.add(toStore);
-          await db.syncOperations.add({
+          await coalescePendingOperations(entityName, toStore.id, "create", toStore as any, {
             operationId: opId,
-            entity: entityName,
-            entityId: toStore.id,
-            operation: "create",
-            payload: toStore,
-            createdAt: now,
-            synced: false,
-            attempts: 0,
             baseRevision,
             clientId,
-            status: "pending",
-          } as any);
+            createdAt: now,
+          });
         };
         const currentTx: any = (await import("dexie")).default.currentTransaction;
         if (currentTx) {
@@ -128,19 +122,12 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
         const payload = { id, ...changes, updatedAt: now };
         const doUpdate = async () => {
           await this.table.update(id, mergedChanges);
-          await db.syncOperations.add({
+          await coalescePendingOperations(entityName, id, "update", payload as any, {
             operationId: opId,
-            entity: entityName,
-            entityId: id,
-            operation: "update",
-            payload,
-            createdAt: now,
-            synced: false,
-            attempts: 0,
             baseRevision,
             clientId,
-            status: "pending",
-          } as any);
+            createdAt: now,
+          });
         };
         const currentTx: any = (await import("dexie")).default.currentTransaction;
         if (currentTx) {
@@ -194,21 +181,15 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
           }
         } catch {}
         const opId = generateId();
+        const nowDel = Date.now();
         const doDelete = async () => {
           await this.table.delete(id);
-          await db.syncOperations.add({
+          await coalescePendingOperations(entityName, id, "delete", { id } as any, {
             operationId: opId,
-            entity: entityName,
-            entityId: id,
-            operation: "delete",
-            payload: { id },
-            createdAt: Date.now(),
-            synced: false,
-            attempts: 0,
             baseRevision,
             clientId,
-            status: "pending",
-          } as any);
+            createdAt: nowDel,
+          });
         };
         const currentTx: any = (await import("dexie")).default.currentTransaction;
         if (currentTx) {

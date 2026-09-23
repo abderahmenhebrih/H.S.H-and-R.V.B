@@ -46,13 +46,13 @@ export class SaleReversalOperation {
           quantity: product.quantity + item.quantity,
           weightKg: product.weightKg + item.weightKg,
           updatedAt: now,
-          });
+        } as any, { queueSync: false } as any);
       }
 
       await customerRepository.update(sale.customerId, {
         balance: customer.balance - sale.total,
         updatedAt: now,
-        });
+      } as any, { queueSync: false } as any);
 
       await saleRepository.delete(saleId);
     });

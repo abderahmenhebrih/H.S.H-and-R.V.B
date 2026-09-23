@@ -7,7 +7,8 @@
     "dev": "tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "rvb:bootstrap-manager": "tsx scripts/bootstrap-rvb-manager.ts"
+    "rvb:bootstrap-manager": "tsx scripts/bootstrap-rvb-manager.ts",
+    "test:hsh-sync": "tsx test-hsh-sync-integrity.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

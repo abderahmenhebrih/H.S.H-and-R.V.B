@@ -60,22 +60,23 @@ export class SaleEditOperation {
         }
       }
 
-      // Validate new sale.
+      // Validate new sale - unified with CREATE
       for (const item of input.items) {
-        if (item.quantity < 0) {
-          throw new Error("Sale quantity cannot be negative.");
+        if (!Number.isFinite(item.quantity) || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+          throw new Error(`Invalid item quantity: ${item.productId}`);
         }
-
-        if (item.weightKg < 0) {
-          throw new Error("Sale weight cannot be negative.");
+        if (!Number.isFinite(item.weightKg) || item.weightKg < 0) {
+          throw new Error(`Invalid item weightKg: ${item.productId}`);
         }
-
-        if (item.price < 0) {
-          throw new Error("Sale price cannot be negative.");
+        if (!Number.isFinite(item.price) || item.price < 0) {
+          throw new Error(`Invalid item price: ${item.productId}`);
         }
-
-        if (item.total < 0) {
-          throw new Error("Sale item total cannot be negative.");
+        if (!Number.isFinite(item.total) || item.total < 0) {
+          throw new Error(`Invalid item total: ${item.productId}`);
+        }
+        const expected = Math.round(item.weightKg * item.price * 100) / 100;
+        if (Math.abs(item.total - expected) > 0.005) {
+          throw new Error(`Item total mismatch for ${item.productId}: expected ${expected}, got ${item.total}`);
         }
 
         const product = await db.products.get(item.productId);

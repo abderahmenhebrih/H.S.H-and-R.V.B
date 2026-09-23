@@ -36,6 +36,174 @@ export async function setLastSuccessfulSyncAt(ts: number): Promise<void> {
   await db.syncMeta.put({ key: "lastSuccessfulSyncAt", value: ts });
 }
 
+function mergePayloads(oldPayload: unknown, newPayload: unknown): unknown {
+  if (!oldPayload || typeof oldPayload !== "object") return newPayload;
+  if (!newPayload || typeof newPayload !== "object") return newPayload;
+  return { ...(oldPayload as any), ...(newPayload as any) };
+}
+
+export async function coalescePendingOperations(
+  entity: string,
+  entityId: string,
+  newOperation: SyncOperation["operation"],
+  newPayload: unknown,
+  opts: { baseRevision?: number; clientId?: string; operationId?: string; createdAt?: number } = {},
+): Promise<number | null> {
+  const now = opts.createdAt ?? Date.now();
+  const operationId = opts.operationId ?? generateId();
+  const clientId = opts.clientId ?? (await getOrCreateClientId());
+  const baseRevision = opts.baseRevision ?? (await getServerRevision());
+  // Find pending for same key
+  const all = await db.syncOperations.toArray();
+  const pendingForKey = all
+    .filter((o) => o.entity === entity && o.entityId === entityId && !o.synced && (o as any).status !== "terminal")
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  if (pendingForKey.length === 0) {
+    // No pending to coalesce, just add
+    return db.syncOperations.add({
+      operationId,
+      entity,
+      entityId,
+      operation: newOperation as any,
+      payload: newPayload,
+      createdAt: now,
+      synced: false,
+      attempts: 0,
+      baseRevision,
+      clientId,
+      status: "pending",
+    } as any);
+  }
+
+  const hasCreate = pendingForKey.some((o) => o.operation === "create");
+  const hasDelete = pendingForKey.some((o) => o.operation === "delete");
+  const first = pendingForKey[0];
+
+  if (newOperation === "update") {
+    if (hasDelete) {
+      // Delete already pending — update after delete: treat as new operation (don't coalesce into delete)
+      return db.syncOperations.add({
+        operationId,
+        entity,
+        entityId,
+        operation: newOperation as any,
+        payload: newPayload,
+        createdAt: now,
+        synced: false,
+        attempts: 0,
+        baseRevision,
+        clientId,
+        status: "pending",
+      } as any);
+    }
+    if (hasCreate) {
+      // CREATE+UPDATE → CREATE merged
+      const createOp = pendingForKey.find((o) => o.operation === "create")!;
+      // Merge all pending payloads after create plus newPayload into createOp
+      let merged: any = { ...(createOp.payload as any) };
+      for (const op of pendingForKey) {
+        if (op.id === createOp.id) continue;
+        merged = { ...merged, ...(op.payload as any) };
+      }
+      merged = { ...merged, ...(newPayload as any) };
+      if (entityId) merged.id = entityId;
+      await db.syncOperations.update(createOp.id!, { payload: merged, createdAt: now });
+      const toDelete = pendingForKey.filter((o) => o.id !== createOp.id).map((o) => o.id!);
+      if (toDelete.length) await db.syncOperations.bulkDelete(toDelete);
+      return createOp.id!;
+    } else {
+      // UPDATE+UPDATE → UPDATE merged with original baseRevision retained
+      let merged: any = { ...(first.payload as any) };
+      for (let i = 1; i < pendingForKey.length; i++) {
+        merged = { ...merged, ...(pendingForKey[i].payload as any) };
+      }
+      merged = { ...merged, ...(newPayload as any) };
+      if (entityId) merged.id = entityId;
+      await db.syncOperations.update(first.id!, { payload: merged, createdAt: now, baseRevision: first.baseRevision });
+      const extra = pendingForKey.slice(1).map((o) => o.id!);
+      if (extra.length) await db.syncOperations.bulkDelete(extra);
+      return first.id!;
+    }
+  } else if (newOperation === "delete") {
+    if (hasDelete) {
+      // Already have pending delete for same key — keep original delete, ignore duplicate
+      return first.id!;
+    }
+    if (hasCreate) {
+      // CREATE+DELETE → cancel both (delete pending creates)
+      const allIds = pendingForKey.map((o) => o.id!);
+      await db.syncOperations.bulkDelete(allIds);
+      return null;
+    } else {
+      // UPDATE+DELETE → DELETE with original baseRevision
+      const originalBaseRevision = first.baseRevision ?? baseRevision;
+      const allIds = pendingForKey.map((o) => o.id!);
+      await db.syncOperations.bulkDelete(allIds);
+      const newId = await db.syncOperations.add({
+        operationId,
+        entity,
+        entityId,
+        operation: "delete",
+        payload: (newPayload as any) ?? { id: entityId },
+        createdAt: now,
+        synced: false,
+        attempts: 0,
+        baseRevision: originalBaseRevision,
+        clientId,
+        status: "pending",
+      } as any);
+      return newId;
+    }
+  } else if (newOperation === "create") {
+    if (hasDelete) {
+      // Delete pending then create same id -> treat as new create (re-create)
+      return db.syncOperations.add({
+        operationId,
+        entity,
+        entityId,
+        operation: newOperation as any,
+        payload: newPayload,
+        createdAt: now,
+        synced: false,
+        attempts: 0,
+        baseRevision,
+        clientId,
+        status: "pending",
+      } as any);
+    }
+    // CREATE+CREATE unlikely but handle as merge into CREATE
+    if (hasCreate) {
+      const createOp = pendingForKey.find((o) => o.operation === "create")!;
+      let merged: any = { ...(createOp.payload as any) };
+      for (const op of pendingForKey) {
+        if (op.id === createOp.id) continue;
+        merged = { ...merged, ...(op.payload as any) };
+      }
+      merged = { ...merged, ...(newPayload as any) };
+      if (entityId) merged.id = entityId;
+      await db.syncOperations.update(createOp.id!, { payload: merged, createdAt: now });
+      const toDelete = pendingForKey.filter((o) => o.id !== createOp.id).map((o) => o.id!);
+      if (toDelete.length) await db.syncOperations.bulkDelete(toDelete);
+      return createOp.id!;
+    }
+  }
+  // Fallback: no coalescing rule matched, add as new
+  return db.syncOperations.add({
+    operationId,
+    entity,
+    entityId,
+    operation: newOperation as any,
+    payload: newPayload,
+    createdAt: now,
+    synced: false,
+    attempts: 0,
+    baseRevision,
+    clientId,
+    status: "pending",
+  } as any);
+}
+
 export async function queueSyncOperation(
   operation: Omit<SyncOperation, "id" | "createdAt" | "synced" | "attempts" | "operationId" | "status"> & {
     operationId?: string;
@@ -46,19 +214,29 @@ export async function queueSyncOperation(
   const operationId = operation.operationId ?? generateId();
   const clientId = await getOrCreateClientId();
   const baseRevision = operation.baseRevision ?? (await getServerRevision());
-  return db.syncOperations.add({
-    operationId,
-    entity: operation.entity,
-    entityId: operation.entityId,
-    operation: operation.operation as any,
-    payload: operation.payload,
-    createdAt: Date.now(),
-    synced: false,
-    attempts: 0,
-    baseRevision,
-    clientId,
-    status: (operation as any).status ?? "pending",
-  } as SyncOperation);
+  const now = Date.now();
+  // Check if inside Dexie transaction — if so, use coalescing without starting new transaction
+  const Dexie = (await import("dexie")).default as any;
+  const inTx = Dexie.currentTransaction;
+  if (inTx) {
+    const res = await coalescePendingOperations(operation.entity, operation.entityId, operation.operation as any, operation.payload, {
+      baseRevision,
+      clientId,
+      operationId,
+      createdAt: now,
+    });
+    return res ?? -1;
+  }
+  // Otherwise transactional
+  return db.transaction("rw", db.syncOperations, db.syncMeta, async () => {
+    const res = await coalescePendingOperations(operation.entity, operation.entityId, operation.operation as any, operation.payload, {
+      baseRevision,
+      clientId,
+      operationId,
+      createdAt: now,
+    });
+    return res ?? -1;
+  });
 }
 
 export async function getPendingSyncOperations(): Promise<SyncOperation[]> {

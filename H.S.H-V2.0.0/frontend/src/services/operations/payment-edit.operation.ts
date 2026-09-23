@@ -18,8 +18,11 @@ export class PaymentEditOperation {
     note?: string;
   }) {
     return runDatabaseTransaction(async () => {
-      if (input.amount <= 0) {
-        throw new Error("Payment amount must be greater than zero.");
+      if (!Number.isFinite(input.amount) || input.amount <= 0) {
+        throw new Error("Payment amount must be a finite number greater than zero.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Payment date must be a valid finite timestamp.");
       }
 
       const payment = await paymentRepository.getById(input.paymentId);
@@ -46,12 +49,12 @@ export class PaymentEditOperation {
           await supplierRepository.update(payment.entityId, {
             balance: supplier.balance + payment.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(payment.accountId, {
             balance: oldAccount.balance + payment.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -66,12 +69,12 @@ export class PaymentEditOperation {
           await customerRepository.update(payment.entityId, {
             balance: customer.balance + payment.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(payment.accountId, {
             balance: oldAccount.balance - payment.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -86,12 +89,12 @@ export class PaymentEditOperation {
           await workerRepository.update(payment.entityId, {
             balance: worker.balance + payment.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(payment.accountId, {
             balance: oldAccount.balance + payment.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -106,7 +109,7 @@ export class PaymentEditOperation {
           await bankAccountRepository.update(payment.accountId, {
             balance: oldAccount.balance + payment.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -138,12 +141,12 @@ export class PaymentEditOperation {
           await supplierRepository.update(input.entityId, {
             balance: supplier.balance - input.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(input.accountId, {
             balance: newAccount.balance - input.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -162,12 +165,12 @@ export class PaymentEditOperation {
           await customerRepository.update(input.entityId, {
             balance: customer.balance - input.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(input.accountId, {
             balance: newAccount.balance + input.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -190,12 +193,12 @@ export class PaymentEditOperation {
           await workerRepository.update(input.entityId, {
             balance: worker.balance - input.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(input.accountId, {
             balance: newAccount.balance - input.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -210,7 +213,7 @@ export class PaymentEditOperation {
           await bankAccountRepository.update(input.accountId, {
             balance: newAccount.balance - input.amount,
             updatedAt: Date.now(),
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }

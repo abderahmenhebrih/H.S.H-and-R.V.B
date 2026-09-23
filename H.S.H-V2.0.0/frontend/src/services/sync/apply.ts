@@ -148,11 +148,24 @@ export async function applySnapshot(snapshot: Record<string, any[]>, currentRevi
       "rw",
       snapshotTables,
       async () => {
-        // Upsert server records
+        // Build pending set from syncOperations where status !== terminal and not synced (skip overwriting local pending).
+        // Exception: if pending operation just rejected and was deleted, its canonical should overwrite — so terminal ops not in set.
+        const allOps = await db.syncOperations.toArray();
+        const pendingSet = new Set<string>(
+          allOps
+            .filter((o: any) => !o.synced && o.status !== "terminal")
+            .map((o) => `${o.entity}:${o.entityId}`)
+        );
+        // Upsert server records, but preserve pending locals (do not overwrite).
         for (const [entity, docs] of entries) {
           const table = getTable(entity);
           if (!table) continue;
           for (const doc of docs as any[]) {
+            const key = `${entity}:${doc.id}`;
+            if (pendingSet.has(key)) {
+              // Do not overwrite local pending — keeps optimistic state until pushed.
+              continue;
+            }
             const toStore = {
               ...doc,
               syncStatus: "synced",
@@ -170,8 +183,8 @@ export async function applySnapshot(snapshot: Record<string, any[]>, currentRevi
           const localAll: any[] = await table.toArray();
           for (const local of localAll) {
             if (!serverIds.has(local.id)) {
-              const pending = await hasPendingOperation(entity, local.id);
-              if (!pending) {
+              const key = `${entity}:${local.id}`;
+              if (!pendingSet.has(key)) {
                 await table.delete(local.id);
               }
             }
@@ -187,8 +200,8 @@ export async function applySnapshot(snapshot: Record<string, any[]>, currentRevi
             if (!table) continue;
             const localAll: any[] = await table.toArray();
             for (const local of localAll) {
-              const pending = await hasPendingOperation(ent, local.id);
-              if (!pending) {
+              const key = `${ent}:${local.id}`;
+              if (!pendingSet.has(key)) {
                 await table.delete(local.id);
               }
             }

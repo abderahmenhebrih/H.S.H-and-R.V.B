@@ -256,6 +256,27 @@ export async function getPendingSyncOperations(): Promise<SyncOperation[]> {
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
+export async function getReadyPendingSyncOperations(): Promise<SyncOperation[]> {
+  const all = await db.syncOperations.toArray();
+  const activeIds = new Set<string>(
+    all
+      .filter((op: any) => !op.synced && op.status !== "terminal")
+      .map((op) => op.operationId),
+  );
+  return all
+    .filter((op: any) => {
+      if (op.synced) return false;
+      if (op.status === "terminal" || op.status === "in_flight") return false;
+      // allow legacy unset status as pending/retrying
+      const dep = (op as any).dependsOnOperationId as string | undefined;
+      const parent = (op as any).parentOperationId as string | undefined;
+      if (dep && activeIds.has(dep)) return false;
+      if (parent && activeIds.has(parent)) return false;
+      return true;
+    })
+    .sort((a: any, b: any) => a.createdAt - b.createdAt);
+}
+
 export async function getInFlightOperations(): Promise<SyncOperation[]> {
   const all = await db.syncOperations.toArray();
   return all.filter((op) => (op as any).status === "in_flight").sort((a, b) => a.createdAt - b.createdAt);
@@ -263,23 +284,40 @@ export async function getInFlightOperations(): Promise<SyncOperation[]> {
 
 export async function transitionPendingToInFlight(operations: SyncOperation[]): Promise<SyncOperation[]> {
   if (operations.length === 0) return [];
-  const ids = operations.map((o) => o.id!).filter(Boolean);
   const operationIds = operations.map((o) => o.operationId);
-  // Atomically transition pending -> in_flight only for exact ids that are still pending
+  const resultIds: string[] = [];
   await db.transaction("rw", db.syncOperations, async () => {
+    // Build active set inside transaction for dependency check
+    const allInside: any[] = await db.syncOperations.toArray();
+    const activeIdsInside = new Set<string>(
+      allInside.filter((op: any) => !op.synced && op.status !== "terminal").map((op: any) => op.operationId),
+    );
     for (let i = 0; i < operations.length; i++) {
       const op = operations[i];
       if (op.id === undefined) continue;
       const current: any = await db.syncOperations.get(op.id);
       if (!current) continue;
-      if (current.status === "pending" || current.status === "retrying" || (!current.status && !current.synced)) {
-        await db.syncOperations.update(op.id, { status: "in_flight" as any });
+      const isPendingLike =
+        current.status === "pending" || current.status === "retrying" || (!current.status && !current.synced);
+      if (!isPendingLike) continue;
+      const dep = (current as any).dependsOnOperationId as string | undefined;
+      const parent = (current as any).parentOperationId as string | undefined;
+      const depActive = dep ? activeIdsInside.has(dep) : false;
+      const parentActive = parent ? activeIdsInside.has(parent) : false;
+      // Also check if dependency is the same operation (should not happen) but guard
+      // For the input batch, if parent is also in this batch, the active set still contains it, so child will be blocked
+      // That's desired: parent and child must not be in same request
+      if (depActive || parentActive) {
+        // Leave child pending — do not transition
+        continue;
       }
+      await db.syncOperations.update(op.id, { status: "in_flight" as any });
+      resultIds.push(current.operationId);
     }
   });
-  // Return immutable snapshot of in_flight ops (payload captured)
+  // Return immutable snapshot of only successfully transitioned ops
   const updated: SyncOperation[] = [];
-  for (const oid of operationIds) {
+  for (const oid of resultIds) {
     const cur = await db.syncOperations.where("operationId").equals(oid).first();
     if (cur && (cur as any).status === "in_flight") {
       updated.push({ ...cur } as SyncOperation);

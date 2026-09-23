@@ -1,5 +1,6 @@
 import {
   getPendingSyncOperations,
+  getReadyPendingSyncOperations,
   markSyncOperationAsSyncedByOperationId,
   incrementAttemptsAndSetError,
   getOrCreateClientId,
@@ -54,20 +55,28 @@ export interface SyncChangesResponse {
 const BATCH_SIZE = 100;
 
 export async function syncPendingOperations(): Promise<SyncResponse> {
-  const pending = await getPendingSyncOperations();
-  if (pending.length === 0) {
-    return { success: true, results: [] };
-  }
   const clientId = await getOrCreateClientId();
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
   const allResults: SyncOperationResult[] = [];
   let overallSuccess = true;
-
-  for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-    const batchSlice = pending.slice(i, i + BATCH_SIZE);
-    // P0: atomically transition pending -> in_flight to capture immutable batch
+  const MAX_DRAIN_ITERATIONS = 1000;
+  let drainIterations = 0;
+  while (drainIterations < MAX_DRAIN_ITERATIONS) {
+    drainIterations++;
+    const ready = await getReadyPendingSyncOperations();
+    if (ready.length === 0) {
+      if (allResults.length === 0) return { success: true, results: [] };
+      break;
+    }
+    const batchSlice = ready.slice(0, BATCH_SIZE);
+    // P0: atomically transition ready -> in_flight to capture immutable batch, dependency-aware
     const batch = await transitionPendingToInFlight(batchSlice);
-    if (batch.length === 0) continue;
+    if (batch.length === 0) {
+      // No progress — all ready were blocked by dependencies after query
+      const stillReady = await getReadyPendingSyncOperations();
+      if (stillReady.length === 0) break;
+      break;
+    }
     // Build immutable payload from transitioned batch
     const payload = {
       clientId,

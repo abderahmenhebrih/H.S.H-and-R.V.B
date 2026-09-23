@@ -6,6 +6,14 @@ import { SyncChangeModel } from "../models/sync-change.model";
 import { ProcessedSyncOperationModel } from "../models/processed-sync-operation.model";
 import { SupplierModel } from "../models/supplier.model";
 import { IncomingInvoiceModel } from "../models/incoming-invoice.model";
+import { ProductModel } from "../models/product.model";
+import { CustomerModel } from "../models/customer.model";
+import { BankAccountModel } from "../models/bank-account.model";
+import { WorkerModel } from "../models/worker.model";
+import { SaleModel } from "../models/sale.model";
+import { PurchaseModel } from "../models/purchase.model";
+import { PaymentModel } from "../models/payment.model";
+import { TransferModel } from "../models/transfer.model";
 
 type SyncModel = {
   findOne: (filter: { id: string }) => Promise<any>;
@@ -248,6 +256,179 @@ function validatePurchaseSalePayload(
     if (isCreateUpsert && !isNonEmptyString(cid)) return "SALE_CUSTOMER_REQUIRED";
   }
 
+  return null;
+}
+
+async function checkStaleCrossClient(
+  session: any,
+  operation: SyncRequestOperation,
+  existingRev: number,
+): Promise<boolean> {
+  // Returns true if should reject as stale cross-client
+  if (operation.baseRevision === undefined) return false;
+  if (operation.baseRevision >= existingRev) return false;
+  // Find last SyncChange for this entity to get sourceClientId
+  try {
+    const last = await SyncChangeModel.findOne({ entity: operation.entity, entityId: operation.entityId })
+      .sort({ revision: -1 })
+      .session(session)
+      .lean();
+    const lastClient = (last as any)?.sourceClientId;
+    if (lastClient && lastClient === operation.clientId) return false; // same client sequential allowed
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+async function handleSaleCreate(session: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
+  const items: any[] = (payload as any).items;
+  const customerId = String((payload as any).customerId);
+  const cust = await CustomerModel.findOne({ id: customerId }).session(session);
+  if (!cust) return "CUSTOMER_NOT_FOUND";
+  const agg = new Map<string, { qty: number; weight: number }>();
+  for (const it of items) {
+    const pid = String(it.productId);
+    const cur = agg.get(pid) || { qty: 0, weight: 0 };
+    cur.qty += Number(it.quantity);
+    cur.weight += Number(it.weightKg);
+    agg.set(pid, cur);
+  }
+  for (const [pid, need] of agg) {
+    const prod: any = await ProductModel.findOne({ id: pid }).session(session);
+    if (!prod) return `PRODUCT_NOT_FOUND:${pid}`;
+    if (prod.quantity < need.qty) return "INSUFFICIENT_STOCK";
+    if (prod.weightKg < need.weight) return "INSUFFICIENT_STOCK";
+  }
+  const total = roundMoney(Number((payload as any).total));
+  for (const [pid, need] of agg) {
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: -need.qty, weightKg: -need.weight } }, { session });
+    const prodAfter: any = await ProductModel.findOne({ id: pid }).session(session);
+    const rev = await getNextRevision(session);
+    await ProductModel.updateOne({ id: pid }, { $set: { serverRevision: rev, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+    await SyncChangeModel.create([{ revision: rev, entity: "product", entityId: pid, operation: "update", payload: prodAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  await CustomerModel.updateOne({ id: customerId }, { $inc: { balance: total } }, { session });
+  const custAfter: any = await CustomerModel.findOne({ id: customerId }).session(session);
+  const revC = await getNextRevision(session);
+  await CustomerModel.updateOne({ id: customerId }, { $set: { serverRevision: revC, syncStatus: "synced", lastSyncedAt: Date.now() } }, { session });
+  await SyncChangeModel.create([{ revision: revC, entity: "customer", entityId: customerId, operation: "update", payload: custAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handlePurchaseCreate(session: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
+  const items: any[] = (payload as any).items;
+  const supplierId = String((payload as any).supplierId);
+  const sup = await SupplierModel.findOne({ id: supplierId }).session(session);
+  if (!sup) return "SUPPLIER_NOT_FOUND";
+  const total = roundMoney(Number((payload as any).total));
+  const agg = new Map<string, { qty: number; weight: number }>();
+  for (const it of items) {
+    const pid = String(it.productId);
+    const cur = agg.get(pid) || { qty: 0, weight: 0 };
+    cur.qty += Number(it.quantity);
+    cur.weight += Number(it.weightKg);
+    agg.set(pid, cur);
+  }
+  for (const [pid, need] of agg) {
+    const prod: any = await ProductModel.findOne({ id: pid }).session(session);
+    if (!prod) return `PRODUCT_NOT_FOUND:${pid}`;
+    await ProductModel.updateOne({ id: pid }, { $inc: { quantity: need.qty, weightKg: need.weight } }, { session });
+    const prodAfter: any = await ProductModel.findOne({ id: pid }).session(session);
+    const rev = await getNextRevision(session);
+    await ProductModel.updateOne({ id: pid }, { $set: { serverRevision: rev } }, { session });
+    await SyncChangeModel.create([{ revision: rev, entity: "product", entityId: pid, operation: "update", payload: prodAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  }
+  await SupplierModel.updateOne({ id: supplierId }, { $inc: { balance: total } }, { session });
+  const supAfter: any = await SupplierModel.findOne({ id: supplierId }).session(session);
+  const revS = await getNextRevision(session);
+  await SupplierModel.updateOne({ id: supplierId }, { $set: { serverRevision: revS } }, { session });
+  await SyncChangeModel.create([{ revision: revS, entity: "supplier", entityId: supplierId, operation: "update", payload: supAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  return null;
+}
+
+async function handlePaymentCreate(session: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
+  const amount = roundMoney(Number((payload as any).amount));
+  const accountId = String((payload as any).accountId);
+  const entityId = String((payload as any).entityId);
+  const entityType = String((payload as any).entityType);
+  const acc: any = await BankAccountModel.findOne({ id: accountId }).session(session);
+  if (!acc) return "ACCOUNT_NOT_FOUND";
+  if (acc.balance < amount) return "INSUFFICIENT_BANK_BALANCE";
+  if (entityType === "supplier") {
+    const sup: any = await SupplierModel.findOne({ id: entityId }).session(session);
+    if (!sup) return "SUPPLIER_NOT_FOUND";
+    if (sup.balance < amount) return "INSUFFICIENT_SUPPLIER_BALANCE";
+    await SupplierModel.updateOne({ id: entityId }, { $inc: { balance: -amount } }, { session });
+    await BankAccountModel.updateOne({ id: accountId }, { $inc: { balance: -amount } }, { session });
+    const supAfter: any = await SupplierModel.findOne({ id: entityId }).session(session);
+    const accAfter: any = await BankAccountModel.findOne({ id: accountId }).session(session);
+    const rev1 = await getNextRevision(session);
+    await SupplierModel.updateOne({ id: entityId }, { $set: { serverRevision: rev1 } }, { session });
+    await SyncChangeModel.create([{ revision: rev1, entity: "supplier", entityId, operation: "update", payload: supAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+    const rev2 = await getNextRevision(session);
+    await BankAccountModel.updateOne({ id: accountId }, { $set: { serverRevision: rev2 } }, { session });
+    await SyncChangeModel.create([{ revision: rev2, entity: "bankAccount", entityId: accountId, operation: "update", payload: accAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  } else if (entityType === "customer") {
+    const cust: any = await CustomerModel.findOne({ id: entityId }).session(session);
+    if (!cust) return "CUSTOMER_NOT_FOUND";
+    if (cust.balance < amount) return "INSUFFICIENT_CUSTOMER_BALANCE";
+    await CustomerModel.updateOne({ id: entityId }, { $inc: { balance: -amount } }, { session });
+    await BankAccountModel.updateOne({ id: accountId }, { $inc: { balance: amount } }, { session });
+    const custAfter: any = await CustomerModel.findOne({ id: entityId }).session(session);
+    const accAfter: any = await BankAccountModel.findOne({ id: accountId }).session(session);
+    const rev1 = await getNextRevision(session);
+    await CustomerModel.updateOne({ id: entityId }, { $set: { serverRevision: rev1 } }, { session });
+    await SyncChangeModel.create([{ revision: rev1, entity: "customer", entityId, operation: "update", payload: custAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+    const rev2 = await getNextRevision(session);
+    await BankAccountModel.updateOne({ id: accountId }, { $set: { serverRevision: rev2 } }, { session });
+    await SyncChangeModel.create([{ revision: rev2, entity: "bankAccount", entityId: accountId, operation: "update", payload: accAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  } else if (entityType === "worker") {
+    const { WorkerModel } = await import("../models/worker.model");
+    const w: any = await WorkerModel.findOne({ id: entityId }).session(session);
+    if (!w) return "WORKER_NOT_FOUND";
+    if (w.status !== "active") return "WORKER_ARCHIVED";
+    if (w.balance < amount) return "INSUFFICIENT_WORKER_BALANCE";
+    await WorkerModel.updateOne({ id: entityId }, { $inc: { balance: -amount } }, { session });
+    await BankAccountModel.updateOne({ id: accountId }, { $inc: { balance: -amount } }, { session });
+    const wAfter: any = await WorkerModel.findOne({ id: entityId }).session(session);
+    const accAfter: any = await BankAccountModel.findOne({ id: accountId }).session(session);
+    const rev1 = await getNextRevision(session);
+    await WorkerModel.updateOne({ id: entityId }, { $set: { serverRevision: rev1 } }, { session });
+    await SyncChangeModel.create([{ revision: rev1, entity: "worker", entityId, operation: "update", payload: wAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+    const rev2 = await getNextRevision(session);
+    await BankAccountModel.updateOne({ id: accountId }, { $set: { serverRevision: rev2 } }, { session });
+    await SyncChangeModel.create([{ revision: rev2, entity: "bankAccount", entityId: accountId, operation: "update", payload: accAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  } else if (entityType === "expense") {
+    await BankAccountModel.updateOne({ id: accountId }, { $inc: { balance: -amount } }, { session });
+    const accAfter: any = await BankAccountModel.findOne({ id: accountId }).session(session);
+    const rev = await getNextRevision(session);
+    await BankAccountModel.updateOne({ id: accountId }, { $set: { serverRevision: rev } }, { session });
+    await SyncChangeModel.create([{ revision: rev, entity: "bankAccount", entityId: accountId, operation: "update", payload: accAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  } else return "PAYMENT_TYPE_INVALID";
+  return null;
+}
+
+async function handleTransferCreate(session: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
+  const amount = roundMoney(Number((payload as any).amount));
+  const fromId = String((payload as any).fromAccountId);
+  const toId = String((payload as any).toAccountId);
+  if (fromId === toId) return "TRANSFER_ACCOUNTS_SAME";
+  const from: any = await BankAccountModel.findOne({ id: fromId }).session(session);
+  const to: any = await BankAccountModel.findOne({ id: toId }).session(session);
+  if (!from) return "ACCOUNT_NOT_FOUND";
+  if (!to) return "ACCOUNT_NOT_FOUND";
+  if (from.balance < amount) return "INSUFFICIENT_BANK_BALANCE";
+  await BankAccountModel.updateOne({ id: fromId }, { $inc: { balance: -amount } }, { session });
+  await BankAccountModel.updateOne({ id: toId }, { $inc: { balance: amount } }, { session });
+  const fromAfter: any = await BankAccountModel.findOne({ id: fromId }).session(session);
+  const toAfter: any = await BankAccountModel.findOne({ id: toId }).session(session);
+  const rev1 = await getNextRevision(session);
+  await BankAccountModel.updateOne({ id: fromId }, { $set: { serverRevision: rev1 } }, { session });
+  await SyncChangeModel.create([{ revision: rev1, entity: "bankAccount", entityId: fromId, operation: "update", payload: fromAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
+  const rev2 = await getNextRevision(session);
+  await BankAccountModel.updateOne({ id: toId }, { $set: { serverRevision: rev2 } }, { session });
+  await SyncChangeModel.create([{ revision: rev2, entity: "bankAccount", entityId: toId, operation: "update", payload: toAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
   return null;
 }
 
@@ -1058,6 +1239,19 @@ export async function processSyncOperation(
           return;
         }
         // No global conflict check for create (only entity-specific, but create has no existing)
+        // Server-authoritative business transaction — apply derived effects atomically before creating transaction record
+        if (["sale","purchase","payment","transfer"].includes(operation.entity)) {
+          let bizErr: string | null = null;
+          if (operation.entity === "sale") bizErr = await handleSaleCreate(session, payload, operation.clientId as string);
+          else if (operation.entity === "purchase") bizErr = await handlePurchaseCreate(session, payload, operation.clientId as string);
+          else if (operation.entity === "payment") bizErr = await handlePaymentCreate(session, payload, operation.clientId as string);
+          else if (operation.entity === "transfer") bizErr = await handleTransferCreate(session, payload, operation.clientId as string);
+          if (bizErr) {
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: bizErr, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: bizErr, error: bizErr, retryable: false };
+            return;
+          }
+        }
         revision = await getNextRevision(session);
         const toCreate: Record<string, unknown> = {
           ...payload,
@@ -1137,7 +1331,24 @@ export async function processSyncOperation(
           }
           const existingRev = (existingUpsert as any).serverRevision ?? 0;
           if (operation.baseRevision !== undefined && operation.baseRevision < existingRev) {
+            const shouldReject = await checkStaleCrossClient(session, operation, existingRev);
+            if (shouldReject) {
+              const err = "CONFLICT_STALE_REVISION";
+              await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, conflict: true, processedAt: new Date(), clientId: operation.clientId }], { session });
+              result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false, conflict: true };
+              return;
+            }
             conflict = true;
+          }
+          // For purchase/sale upsert-existing, validate merged candidate to prevent partial bypass
+          if (["purchase","sale"].includes(operation.entity)) {
+            const candidate: any = { ...(existingUpsert as any), ...payload };
+            const err = validatePurchaseSalePayload(candidate, "create", operation.entity);
+            if (err) {
+              await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+              result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+              return;
+            }
           }
           revision = await getNextRevision(session);
           const toSet: Record<string, unknown> = {
@@ -1316,7 +1527,24 @@ export async function processSyncOperation(
         }
         const existingRev = (existing as any).serverRevision ?? 0;
         if (operation.baseRevision !== undefined && operation.baseRevision < existingRev) {
+          const shouldReject = await checkStaleCrossClient(session, operation, existingRev);
+          if (shouldReject) {
+            const err = "CONFLICT_STALE_REVISION";
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, conflict: true, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false, conflict: true };
+            return;
+          }
           conflict = true;
+        }
+        // For purchase/sale update, validate merged candidate to prevent partial bypass
+        if (["purchase","sale"].includes(operation.entity)) {
+          const candidate: any = { ...(existing as any), ...payload };
+          const err = validatePurchaseSalePayload(candidate, "create", operation.entity);
+          if (err) {
+            await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+            result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+            return;
+          }
         }
         revision = await getNextRevision(session);
         const toSet: Record<string, unknown> = {
@@ -1382,6 +1610,13 @@ export async function processSyncOperation(
         if (existing) {
           const existingRev = (existing as any).serverRevision ?? 0;
           if (operation.baseRevision !== undefined && operation.baseRevision < existingRev) {
+            const shouldReject = await checkStaleCrossClient(session, operation, existingRev);
+            if (shouldReject) {
+              const err = "CONFLICT_STALE_REVISION";
+              await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, conflict: true, processedAt: new Date(), clientId: operation.clientId }], { session });
+              result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false, conflict: true };
+              return;
+            }
             conflict = true;
           }
           // INVOICE_IMMUTABLE: only DRAFT may be deleted via generic sync

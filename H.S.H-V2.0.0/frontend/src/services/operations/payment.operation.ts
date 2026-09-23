@@ -54,11 +54,11 @@ export class PaymentOperation {
 
           await supplierRepository.update(input.entityId, {
             balance: supplier.balance - input.amount,
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(input.accountId, {
             balance: account.balance - input.amount,
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -79,11 +79,11 @@ export class PaymentOperation {
 
           await customerRepository.update(input.entityId, {
             balance: customer.balance - input.amount,
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(input.accountId, {
             balance: account.balance + input.amount,
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -112,11 +112,11 @@ export class PaymentOperation {
 
           await workerRepository.update(input.entityId, {
             balance: worker.balance - input.amount,
-          } as any);
+          } as any, { queueSync: false } as any);
 
           await bankAccountRepository.update(input.accountId, {
             balance: account.balance - input.amount,
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }
@@ -130,7 +130,7 @@ export class PaymentOperation {
 
           await bankAccountRepository.update(input.accountId, {
             balance: account.balance - input.amount,
-          } as any);
+          } as any, { queueSync: false } as any);
 
           break;
         }

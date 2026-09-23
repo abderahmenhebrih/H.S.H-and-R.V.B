@@ -481,7 +481,7 @@ function HebrihTableModal({ language, onClose, onInsert }: { language:Language; 
         <h3>{TM.insertTableTitle}</h3>
         <p style={{ margin:0, fontSize:11, color:"var(--muted)"}}>{TM.tableSnapshotHelp}</p>
         <label><span style={{ fontSize:11, fontWeight:700, color:"var(--muted)"}}>{TM.entity}</span>
-          <StyledSelect value={type} onChange={setType} placeholder={TM.entity} ariaLabel={TM.entity} options={[{value:"customer",label:TM.customers},{value:"supplier",label:TM.suppliers},{value:"product",label:TM.products},{value:"sale",label:TM.sales},{value:"purchase",label:TM.purchases},{value:"worker",label:TM.workers}]} />
+          <StyledSelect value={type} onChange={setType} placeholder={TM.entity} ariaLabel={TM.entity} options={[{value:"customer",label:TM.customers},{value:"supplier",label:TM.suppliers},{value:"product",label:TM.products},{value:"sale",label:TM.sales},{value:"purchase",label:TM.purchases},{value:"worker",label:TM.workers},{value:"vehicle",label:(TM as any).vehicle ?? "Vehicle"},{value:"task",label:(TM as any).task ?? "Task"}]} />
         </label>
         <div style={{ display:"flex", gap:6 }}>
           <button type="button" onClick={()=>onClose()} style={{ flex:1, minHeight:36, border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)", color:"var(--text)", fontWeight:700 }}>{TM.cancel}</button>

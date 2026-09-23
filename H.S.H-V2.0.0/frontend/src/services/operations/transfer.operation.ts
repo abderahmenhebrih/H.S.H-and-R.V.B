@@ -54,12 +54,12 @@ export class TransferOperation {
       await bankAccountRepository.update(input.fromAccountId, {
         balance: sourceAccount.balance - input.amount,
         updatedAt: now,
-        });
+        } as any, { queueSync: false } as any);
 
       await bankAccountRepository.update(input.toAccountId, {
         balance: destinationAccount.balance + input.amount,
         updatedAt: now,
-        });
+        } as any, { queueSync: false } as any);
 
       return transferService.create(input);
     });

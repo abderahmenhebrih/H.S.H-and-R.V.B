@@ -71,7 +71,7 @@ export class PurchaseOperation {
         await productRepository.update(item.productId, {
           quantity: product.quantity + item.quantity,
           weightKg: product.weightKg + item.weightKg,
-        } as any);
+        } as any, { queueSync: false } as any);
       }
 
       if (!Number.isFinite(supplier.balance)) {
@@ -88,7 +88,7 @@ export class PurchaseOperation {
 
       await supplierRepository.update(input.supplierId, {
         balance: roundMoney(supplier.balance + canonicalTotal),
-      } as any);
+      } as any, { queueSync: false } as any);
 
       try {
         const { notifySalePurchase } = await import("../notification-engine");

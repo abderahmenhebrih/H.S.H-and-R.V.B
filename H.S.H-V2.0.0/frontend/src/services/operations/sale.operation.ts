@@ -83,7 +83,7 @@ export class SaleOperation {
         await productRepository.update(item.productId, {
           quantity: product.quantity - item.quantity,
           weightKg: product.weightKg - item.weightKg,
-        } as any);
+        } as any, { queueSync: false } as any);
       }
 
       const sale = await saleService.create({
@@ -95,7 +95,7 @@ export class SaleOperation {
 
       await customerRepository.update(input.customerId, {
         balance: roundMoney(customer.balance + canonicalTotal),
-      } as any);
+      } as any, { queueSync: false } as any);
 
       // Notification for sale (will sync, in-app only by default)
       try {

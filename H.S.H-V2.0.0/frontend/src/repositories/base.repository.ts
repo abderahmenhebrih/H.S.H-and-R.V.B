@@ -17,7 +17,7 @@ function triggerSync() {
   }
 }
 
-type SourceOption = { source?: "local" | "remote"; serverRevision?: number };
+type SourceOption = { source?: "local" | "remote"; serverRevision?: number; queueSync?: boolean };
 
 export class BaseRepository<T extends { id: string } & { syncStatus?: string; lastSyncedAt?: number; serverRevision?: number; updatedAt?: number }> {
   constructor(
@@ -35,14 +35,15 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
 
   async create(entity: T, opts: SourceOption = {}): Promise<string> {
     const source = opts.source ?? "local";
+    const queueSync = opts.queueSync ?? true;
     const now = Date.now();
     const toStore: T = { ...entity } as T;
     if (source === "local") {
-      (toStore as any).syncStatus = "pending";
-      (toStore as any).updatedAt = (toStore as any).updatedAt ?? now;
-      const opId = generateId();
       const entityName = this.entityName;
-      if (entityName) {
+      if (entityName && queueSync) {
+        (toStore as any).syncStatus = "pending";
+        (toStore as any).updatedAt = (toStore as any).updatedAt ?? now;
+        const opId = generateId();
         const baseRevision = await db.syncMeta.get("serverRevision").then((r) => (typeof r?.value === "number" ? (r.value as number) : 0)).catch(() => 0);
         let clientId = "unknown";
         try {
@@ -69,17 +70,22 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
             status: "pending",
           } as any);
         };
-        // Use existing transaction if already in one, otherwise start new
         const currentTx: any = (await import("dexie")).default.currentTransaction;
         if (currentTx) {
           await doCreate();
         } else {
           await db.transaction("rw", this.table, db.syncOperations, db.syncMeta, doCreate);
         }
+      } else if (entityName && !queueSync) {
+        // Local optimistic derived mutation — do not queue sync, just update Dexie
+        // Keep pending status so UI reflects optimistic, but server will canonicalize via authoritative transaction
+        (toStore as any).syncStatus = "pending";
+        (toStore as any).updatedAt = (toStore as any).updatedAt ?? now;
+        await this.table.add(toStore);
       } else {
         await this.table.add(toStore);
       }
-      triggerSync();
+      if (queueSync) triggerSync();
     } else {
       const { runAsRemote } = await import("../lib/database/sync-hooks");
       await runAsRemote(async () => {
@@ -94,11 +100,12 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
 
   async update(id: string, changes: Partial<T>, opts: SourceOption = {}): Promise<void> {
     const source = opts.source ?? "local";
+    const queueSync = opts.queueSync ?? true;
     if (source === "local") {
       const now = Date.now();
-      const mergedChanges: any = { ...changes, updatedAt: now, syncStatus: "pending" };
+      const mergedChanges: any = { ...changes, updatedAt: now, syncStatus: queueSync ? "pending" : "pending" };
       const entityName = this.entityName;
-      if (entityName) {
+      if (entityName && queueSync) {
         let baseRevision = 0;
         let clientId = "unknown";
         try {
@@ -141,10 +148,12 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
         } else {
           await db.transaction("rw", this.table, db.syncOperations, db.syncMeta, doUpdate);
         }
+      } else if (entityName && !queueSync) {
+        await this.table.update(id, mergedChanges);
       } else {
         await this.table.update(id, mergedChanges);
       }
-      triggerSync();
+      if (queueSync) triggerSync();
     } else {
       const { runAsRemote } = await import("../lib/database/sync-hooks");
       await runAsRemote(async () => {

@@ -548,7 +548,8 @@ export default function AccountsPage() {
   }, [accounts, search]);
 
   const totalAccounts = accounts.length;
-  const totalBalance = useMemo(() => accounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0), [accounts]);
+  const hasInvalidBalance = useMemo(() => accounts.some((a) => a.balance !== undefined && a.balance !== null && !Number.isFinite(a.balance)), [accounts]);
+  const totalBalance = useMemo(() => accounts.reduce((sum, a) => sum + (Number.isFinite(a.balance) ? a.balance : 0), 0), [accounts]);
   const bankCount = useMemo(() => accounts.filter((a) => a.type === "bank").length, [accounts]);
   const cashCount = useMemo(() => accounts.filter((a) => a.type === "cash").length, [accounts]);
 
@@ -696,7 +697,7 @@ export default function AccountsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalBalance}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalBalance, currency)}</strong>
+                <strong className={styles.summaryValue}>{formatCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>
@@ -794,9 +795,15 @@ export default function AccountsPage() {
 
                     <span className={styles.typeText}>{typeLabel(a.type)}</span>
 
-                    <strong className={Number(a.balance) === 0 ? styles.balanceZero : styles.balanceValue}>
-                      {formatCurrency(Number(a.balance) || 0, currency)}
-                    </strong>
+                    {Number.isFinite(a.balance) ? (
+                      <strong className={a.balance === 0 ? styles.balanceZero : styles.balanceValue}>
+                        {formatCurrency(a.balance, currency)}
+                      </strong>
+                    ) : a.balance === undefined || a.balance === null ? (
+                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                    ) : (
+                      <span title={`Invalid balance: ${String(a.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                    )}
 
                     <div className={styles.rowActions}>
                       <button type="button" className={styles.rowEditButton} onClick={() => openEdit(a)}>

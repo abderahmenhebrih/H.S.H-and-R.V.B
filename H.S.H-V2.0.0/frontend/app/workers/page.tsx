@@ -443,9 +443,11 @@ export default function WorkersPage() {
   // Summary metrics
   const totalWorkers = workers.length;
   const activeWorkers = useMemo(() => workers.filter((w) => w.status === "active").length, [workers]);
-  const totalPayroll = useMemo(() => workers.reduce((sum, w) => sum + (Number(w.monthlySalary) || 0), 0), [workers]);
-  const totalOutstanding = useMemo(() => workers.reduce((sum, w) => sum + (Number(w.balance) || 0), 0), [workers]);
-  const workersWithBalance = useMemo(() => workers.filter((w) => Number(w.balance) > 0).length, [workers]);
+  const hasInvalidPayroll = useMemo(() => workers.some((w) => w.monthlySalary !== undefined && w.monthlySalary !== null && !Number.isFinite(w.monthlySalary)), [workers]);
+  const hasInvalidBalance = useMemo(() => workers.some((w) => w.balance !== undefined && w.balance !== null && !Number.isFinite(w.balance)), [workers]);
+  const totalPayroll = useMemo(() => workers.reduce((sum, w) => sum + (Number.isFinite(w.monthlySalary) ? w.monthlySalary : 0), 0), [workers]);
+  const totalOutstanding = useMemo(() => workers.reduce((sum, w) => sum + (Number.isFinite(w.balance) ? w.balance : 0), 0), [workers]);
+  const workersWithBalance = useMemo(() => workers.filter((w) => Number.isFinite(w.balance) && w.balance > 0).length, [workers]);
 
   function openCreate() {
     setEditingId(null);
@@ -619,7 +621,7 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalPayroll}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalPayroll, currency)}</strong>
+                <strong className={styles.summaryValue}>{formatCurrency(totalPayroll, currency)}{hasInvalidPayroll && <span title="Invalid salary value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
                 <small className={styles.summarySub}>{t.totalPayrollSub}</small>
               </div>
             </div>
@@ -641,7 +643,7 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.outstandingBalance}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalOutstanding, currency)}</strong>
+                <strong className={styles.summaryValue}>{formatCurrency(totalOutstanding, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
                 <small className={styles.summarySub}>{workersWithBalance} {t.outstandingBalanceSub.toLowerCase()}</small>
               </div>
             </div>
@@ -718,10 +720,22 @@ export default function WorkersPage() {
                     </span>
                     <span className={styles.positionText}>{w.position}</span>
                     <span className={styles.phoneText}>{w.phone}</span>
-                    <span className={styles.salaryText}>{formatCurrency(Number(w.monthlySalary) || 0, currency)}</span>
-                    <strong className={Number(w.balance) === 0 ? styles.balanceZero : styles.balanceValue}>
-                      {formatCurrency(Number(w.balance) || 0, currency)}
-                    </strong>
+                    {Number.isFinite(w.monthlySalary) ? (
+                      <span className={styles.salaryText}>{formatCurrency(w.monthlySalary, currency)}</span>
+                    ) : w.monthlySalary === undefined || w.monthlySalary === null ? (
+                      <span title="No salary" style={{ color: "var(--muted)" }}>—</span>
+                    ) : (
+                      <span title={`Invalid salary: ${String(w.monthlySalary)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                    )}
+                    {Number.isFinite(w.balance) ? (
+                      <strong className={w.balance === 0 ? styles.balanceZero : styles.balanceValue}>
+                        {formatCurrency(w.balance, currency)}
+                      </strong>
+                    ) : w.balance === undefined || w.balance === null ? (
+                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                    ) : (
+                      <span title={`Invalid balance: ${String(w.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                    )}
                     <div className={styles.rowActions}>
                       <button
                         type="button"

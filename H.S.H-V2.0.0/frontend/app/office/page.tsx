@@ -33,6 +33,16 @@ import type { OfficeFile, OfficeFileType } from "../../src/types/entities/office
 import type { Language } from "../../src/types/settings/settings";
 import styles from "./page.module.css";
 
+const ENTITY_TEMPLATES: Record<string, { kind: "customer" | "supplier" | "worker"; label: string }> = {
+  "tpl-customer-notice": { kind: "customer", label: "Customer" },
+  "tpl-supplier-letter": { kind: "supplier", label: "Supplier" },
+  "tpl-employee-att": { kind: "worker", label: "Worker" },
+};
+function getRequiredEntityKind(templateId: string | null): "customer" | "supplier" | "worker" | null {
+  if (!templateId) return null;
+  return ENTITY_TEMPLATES[templateId]?.kind ?? null;
+}
+
 const T = {
   en: {
     title: "Workspace",
@@ -316,6 +326,8 @@ export default function OfficePage() {
   const [showCreate, setShowCreate] = useState<null | OfficeFileType>(null);
   const [createTitle, setCreateTitle] = useState("");
   const [createTemplateId, setCreateTemplateId] = useState<string | null>(null);
+  const [templateEntities, setTemplateEntities] = useState<any[]>([]);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [renameFile, setRenameFile] = useState<OfficeFile | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteFile, setDeleteFile] = useState<OfficeFile | null>(null);
@@ -361,6 +373,36 @@ export default function OfficePage() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  // Load entities for template selector when required
+  useEffect(() => {
+    const kind = getRequiredEntityKind(createTemplateId);
+    if (!showCreate || !kind) {
+      setTemplateEntities([]);
+      setSelectedEntityId(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadEntities() {
+      try {
+        if (kind === "customer") {
+          const { customerService } = await import("../../src/services/customer.service");
+          const list = await customerService.getAll();
+          if (!cancelled) { setTemplateEntities(list); setSelectedEntityId(null); }
+        } else if (kind === "supplier") {
+          const { supplierService } = await import("../../src/services/supplier.service");
+          const list = await supplierService.getAll();
+          if (!cancelled) { setTemplateEntities(list); setSelectedEntityId(null); }
+        } else if (kind === "worker") {
+          const { workerService } = await import("../../src/services/worker.service");
+          const list = await workerService.getAll();
+          if (!cancelled) { setTemplateEntities(list); setSelectedEntityId(null); }
+        }
+      } catch { if (!cancelled) { setTemplateEntities([]); setSelectedEntityId(null); } }
+    }
+    void loadEntities();
+    return () => { cancelled = true; };
+  }, [showCreate, createTemplateId]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return files.filter((f) => {
@@ -400,18 +442,32 @@ export default function OfficePage() {
           let langContent = getTemplateContent(tpl.id, language);
           if (!langContent && tpl.content) langContent = tpl.content;
           if (!langContent) langContent = tpl.type==="document" ? getBlankDocumentContent() : getBlankSpreadsheetContent(language);
-          // Resolve placeholders recursively for production path
+          // Resolve placeholders recursively for production path — use explicitly selected entity, not first record
           try {
             const settings = await settingsService.get();
             const currency = settings?.currency ?? "DA";
             const ctx: any = { language, currency };
-            // For entity-requiring templates, fetch a representative entity to resolve
             if (tpl.id === "tpl-customer-notice") {
-              try { const { customerService } = await import("../../src/services/customer.service"); const list = await customerService.getAll(); if (list[0]) ctx.customer = list[0]; } catch {}
+              try {
+                const { customerService } = await import("../../src/services/customer.service");
+                const list = await customerService.getAll();
+                const sel = selectedEntityId ? list.find((e: any) => e.id === selectedEntityId) : null;
+                if (sel) ctx.customer = sel;
+              } catch {}
             } else if (tpl.id === "tpl-supplier-letter") {
-              try { const { supplierService } = await import("../../src/services/supplier.service"); const list = await supplierService.getAll(); if (list[0]) ctx.supplier = list[0]; } catch {}
+              try {
+                const { supplierService } = await import("../../src/services/supplier.service");
+                const list = await supplierService.getAll();
+                const sel = selectedEntityId ? list.find((e: any) => e.id === selectedEntityId) : null;
+                if (sel) ctx.supplier = sel;
+              } catch {}
             } else if (tpl.id === "tpl-employee-att") {
-              try { const { workerService } = await import("../../src/services/worker.service"); const list = await workerService.getAll(); if (list[0]) ctx.worker = list[0]; } catch {}
+              try {
+                const { workerService } = await import("../../src/services/worker.service");
+                const list = await workerService.getAll();
+                const sel = selectedEntityId ? list.find((e: any) => e.id === selectedEntityId) : null;
+                if (sel) ctx.worker = sel;
+              } catch {}
             }
             content = resolvePlaceholdersInObject(langContent, ctx);
           } catch { content = langContent; }
@@ -429,6 +485,8 @@ export default function OfficePage() {
       setShowCreate(null);
       setCreateTitle("");
       setCreateTemplateId(null);
+      setSelectedEntityId(null);
+      setTemplateEntities([]);
       await loadFiles();
       router.push(type==="document" ? `/office/document/${created.id}` : `/office/spreadsheet/${created.id}`);
     } catch (e) { console.error(e); setToast(e instanceof Error ? e.message : String(e)); }
@@ -654,22 +712,40 @@ export default function OfficePage() {
           </>
         )}
 
-        {showCreate && (
-          <div className={styles.modalBackdrop} onClick={()=>setShowCreate(null)} role="presentation">
+        {showCreate && (() => {
+          const requiredKind = getRequiredEntityKind(createTemplateId);
+          const needsSelector = !!requiredKind;
+          const options = templateEntities.map((e: any) => ({ value: e.id, label: e.name, sublabel: e.phone ?? e.position ?? undefined }));
+          const isEmpty = needsSelector && templateEntities.length === 0;
+          const missingSelection = needsSelector && !isEmpty && !selectedEntityId;
+          const createDisabled = creating || (needsSelector && (isEmpty || !selectedEntityId));
+          const selectorLabel = requiredKind === "customer" ? (language==="fr"?"Client": language==="ar"?"الزبون":"Customer") : requiredKind==="supplier" ? (language==="fr"?"Fournisseur": language==="ar"?"المورد":"Supplier") : requiredKind==="worker" ? (language==="fr"?"Employé": language==="ar"?"العامل":"Worker") : "";
+          const placeholderSel = language==="fr" ? `Choisir ${selectorLabel.toLowerCase()}` : language==="ar" ? `اختر ${selectorLabel}` : `Select ${selectorLabel}`;
+          const emptyMsg = requiredKind==="customer" ? (language==="fr"?"Créez d'abord un Client": language==="ar"?"أنشئ زبونا أولا":"Create a Customer first") : requiredKind==="supplier" ? (language==="fr"?"Créez d'abord un Fournisseur": language==="ar"?"أنشئ موردا أولا":"Create a Supplier first") : (language==="fr"?"Créez d'abord un Employé": language==="ar"?"أنشئ عاملا أولا":"Create a Worker first");
+          return (
+          <div className={styles.modalBackdrop} onClick={()=>{ setShowCreate(null); setSelectedEntityId(null); }} role="presentation">
             <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()}>
               <div className={styles.modalHeader}>
                 <h2>{showCreate==="document"? t.newDoc : t.newSheet}</h2>
-                <button type="button" className={styles.iconBtn} onClick={()=>setShowCreate(null)} aria-label={(t as any).close ?? "Close"}><Plus size={16} strokeWidth={2} style={{ transform:"rotate(45deg)"}} aria-hidden="true" /></button>
+                <button type="button" className={styles.iconBtn} onClick={()=>{ setShowCreate(null); setSelectedEntityId(null); }} aria-label={(t as any).close ?? "Close"}><Plus size={16} strokeWidth={2} style={{ transform:"rotate(45deg)"}} aria-hidden="true" /></button>
               </div>
               <label><span style={{ fontSize:11, fontWeight:700, color:"var(--muted)" }}>{t.titleLabel}</span><input value={createTitle} onChange={(e)=>setCreateTitle(e.target.value)} placeholder={showCreate==="document"? t.untitledDoc : t.untitledSheet} autoFocus /></label>
               {createTemplateId && <small style={{ fontSize:11, color:"var(--muted)" }}>Template: {createTemplateId}</small>}
+              {needsSelector && (
+                <div style={{ display:"flex", flexDirection:"column", gap:6, marginTop:4 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:"var(--muted)" }}>{selectorLabel}</span>
+                  <StyledSelect value={selectedEntityId ?? ""} onChange={(v)=>setSelectedEntityId(v)} options={options} placeholder={placeholderSel} ariaLabel={placeholderSel} disabled={isEmpty} />
+                  {isEmpty && <small style={{ color:"var(--danger)", fontSize:11, fontWeight:700 }}>{emptyMsg}</small>}
+                  {missingSelection && <small style={{ color:"var(--muted)", fontSize:11 }}>{placeholderSel}</small>}
+                </div>
+              )}
               <div className={styles.modalActions}>
-                <button type="button" className={styles.secondaryBtn} onClick={()=>setShowCreate(null)} disabled={creating}>{t.cancel}</button>
-                <button type="button" className={styles.primaryBtn} onClick={()=>handleCreate(showCreate)} disabled={creating}>{creating ? t.saving : t.create}</button>
+                <button type="button" className={styles.secondaryBtn} onClick={()=>{ setShowCreate(null); setSelectedEntityId(null); }} disabled={creating}>{t.cancel}</button>
+                <button type="button" className={styles.primaryBtn} onClick={()=>handleCreate(showCreate)} disabled={createDisabled}>{creating ? t.saving : t.create}</button>
               </div>
             </section>
           </div>
-        )}
+        );})()}
 
         {renameFile && (
           <div className={styles.modalBackdrop} onClick={()=>setRenameFile(null)} role="presentation">

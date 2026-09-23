@@ -355,7 +355,10 @@ function HebrihInsertModal({ language, currency, onClose, onInsert }: { language
     payment: ["amount","date"],
   };
 
+  const seqRef = useRef(0);
   useEffect(()=> {
+    let cancelled = false;
+    const seq = ++seqRef.current;
     async function load(){
       try{
         let list:any[]=[];
@@ -369,12 +372,14 @@ function HebrihInsertModal({ language, currency, onClose, onInsert }: { language
         else if(entityType==="vehicle"){ const { vehicleService } = await import("../../../../src/services/vehicle.service"); list = await vehicleService.getAll(); }
         else if(entityType==="task"){ const { taskService } = await import("../../../../src/services/task.service"); list = await taskService.getAll(); }
         else if(entityType==="payment"){ const { paymentService } = await import("../../../../src/services/payment.service"); list = await paymentService.getAll(); }
+        if (cancelled || seq !== seqRef.current) return;
         setEntities(list.slice(0,100));
         setSelectedId(list[0]?.id || "");
         setField(fieldOptions[entityType]?.[0] || "name");
-      } catch(e){ console.error(e); }
+      } catch(e){ if (cancelled || seq !== seqRef.current) return; console.error(e); }
     }
     void load();
+    return () => { cancelled = true; };
   }, [entityType]);
 
   const modalT = HEBRIH_MODAL_T[language];

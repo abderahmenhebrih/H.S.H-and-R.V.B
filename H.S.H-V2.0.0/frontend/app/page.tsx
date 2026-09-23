@@ -408,6 +408,7 @@ export default function Dashboard() {
   }, [overviewPeriod]);
 
   const [kpi, setKpi] = useState({ salesToday: 0, salesCount: 0, purchasesToday: 0, purchasesCount: 0, outstanding: 0, outstandingCount: 0, activeWorkers: 0 });
+  const [kpiIntegrity, setKpiIntegrity] = useState({ sales: false, purchases: false, outstanding: false });
   const [kpiLoading, setKpiLoading] = useState(true);
 
   async function loadKpi() {
@@ -423,6 +424,10 @@ export default function Dashboard() {
         supplierService.getAll().catch(()=>[]),
         workerService.getAll().catch(()=>[]),
       ]);
+      const hasInvalidSales = (salesToday as any[]).some((s:any)=> s.total !== undefined && s.total !== null && !Number.isFinite(s.total));
+      const hasInvalidPurchases = (purchasesToday as any[]).some((p:any)=> p.total !== undefined && p.total !== null && !Number.isFinite(p.total));
+      const hasInvalidOutstanding = [...(customers as any[]), ...(suppliers as any[])].some((e:any)=> e.balance !== undefined && e.balance !== null && !Number.isFinite(e.balance));
+      setKpiIntegrity({ sales: hasInvalidSales, purchases: hasInvalidPurchases, outstanding: hasInvalidOutstanding });
       const sTotal = roundMoney((salesToday as any[]).reduce((sum, s:any)=> sum + (Number.isFinite(s.total)? s.total : 0), 0));
       const pTotal = roundMoney((purchasesToday as any[]).reduce((sum, p:any)=> sum + (Number.isFinite(p.total)? p.total : 0), 0));
       const outstandingEntities = [...(customers as any[]), ...(suppliers as any[])].filter((e:any)=> Number.isFinite(e.balance) && roundMoney(e.balance) > 0);
@@ -594,7 +599,6 @@ export default function Dashboard() {
                     purchases: "/purchases",
                     sales: "/sales",
                     payments: "/payments",
-                    expenses: "/expenses",
                     workers: "/workers",
                     vehicles: "/vehicles",
                     tasks: "/tasks",
@@ -704,6 +708,7 @@ export default function Dashboard() {
               title={t.sales}
               value={kpiLoading ? "…" : formatCurrency(kpi.salesToday, settings.currency)}
               subtitle={kpiLoading ? "Loading…" : `${kpi.salesCount} ${t.transactions}`}
+              warning={kpiIntegrity.sales}
             />
 
             <KpiCard
@@ -712,6 +717,7 @@ export default function Dashboard() {
               title={t.purchases}
               value={kpiLoading ? "…" : formatCurrency(kpi.purchasesToday, settings.currency)}
               subtitle={kpiLoading ? "Loading…" : `${kpi.purchasesCount} ${t.transactions}`}
+              warning={kpiIntegrity.purchases}
             />
 
             <KpiCard
@@ -720,6 +726,7 @@ export default function Dashboard() {
               title={t.outstanding}
               value={kpiLoading ? "…" : formatCurrency(kpi.outstanding, settings.currency)}
               subtitle={kpiLoading ? "Loading…" : `${kpi.outstandingCount} ${t.pending}`}
+              warning={kpiIntegrity.outstanding}
             />
 
             <KpiCard
@@ -924,12 +931,14 @@ function KpiCard({
   title,
   value,
   subtitle,
+  warning,
 }: {
   accent: string;
   icon: LucideIcon;
   title: string;
   value: string;
   subtitle: string;
+  warning?: boolean;
 }) {
   return (
     <article
@@ -948,7 +957,7 @@ function KpiCard({
 
       <div className={styles.kpiContent}>
         <span>{title}</span>
-        <strong>{value}</strong>
+        <strong>{value}{warning && <span title="Invalid financial value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
         <small>{subtitle}</small>
       </div>
     </article>

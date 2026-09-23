@@ -582,8 +582,9 @@ export default function CustomersPage() {
   }, [customers, search, filterType]);
 
   const totalCustomers = customers.length;
+  const hasInvalidBalance = useMemo(() => customers.some((c) => c.balance !== undefined && c.balance !== null && !Number.isFinite(c.balance)), [customers]);
   const totalBalance = useMemo(
-    () => customers.reduce((sum, c) => sum + (Number(c.balance) || 0), 0),
+    () => customers.reduce((sum, c) => sum + (Number.isFinite(c.balance) ? c.balance : 0), 0),
     [customers],
   );
   const distinctTypes = useMemo(
@@ -591,7 +592,7 @@ export default function CustomersPage() {
     [customers],
   );
   const withBalance = useMemo(
-    () => customers.filter((c) => Number(c.balance) !== 0).length,
+    () => customers.filter((c) => Number.isFinite(c.balance) && c.balance !== 0).length,
     [customers],
   );
 
@@ -797,7 +798,7 @@ export default function CustomersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalBalance}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalBalance, currency)}</strong>
+                <strong className={styles.summaryValue}>{formatCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>
@@ -882,15 +883,21 @@ export default function CustomersPage() {
 
                     <span className={styles.phone}>{customer.phone}</span>
 
-                    <strong
-                      className={
-                        customer.balance === 0
-                          ? styles.balanceZero
-                          : styles.balanceValue
-                      }
-                    >
-                      {formatCurrency(customer.balance, currency)}
-                    </strong>
+                    {Number.isFinite(customer.balance) ? (
+                      <strong
+                        className={
+                          customer.balance === 0
+                            ? styles.balanceZero
+                            : styles.balanceValue
+                        }
+                      >
+                        {formatCurrency(customer.balance, currency)}
+                      </strong>
+                    ) : customer.balance === undefined || customer.balance === null ? (
+                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                    ) : (
+                      <span title={`Invalid balance: ${String(customer.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                    )}
 
                     <div className={styles.rowActions}>
                       <button

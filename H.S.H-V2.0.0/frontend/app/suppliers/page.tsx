@@ -265,12 +265,13 @@ export default function SuppliersPage() {
   }, [suppliers, search]);
 
   const totalSuppliers = suppliers.length;
+  const hasInvalidBalance = useMemo(() => suppliers.some((s) => s.balance !== undefined && s.balance !== null && !Number.isFinite(s.balance)), [suppliers]);
   const outstandingPayable = useMemo(
-    () => suppliers.reduce((sum, s) => sum + (Number(s.balance) || 0), 0),
+    () => suppliers.reduce((sum, s) => sum + (Number.isFinite(s.balance) ? s.balance : 0), 0),
     [suppliers]
   );
   const withBalance = useMemo(
-    () => suppliers.filter((s) => Number(s.balance) !== 0).length,
+    () => suppliers.filter((s) => Number.isFinite(s.balance) && s.balance !== 0).length,
     [suppliers]
   );
   const contactsCount = useMemo(
@@ -401,7 +402,7 @@ export default function SuppliersPage() {
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.outstandingPayable}</span>
                 <strong className={styles.summaryValue}>
-                  {formatCurrency(outstandingPayable, currency)}
+                  {formatCurrency(outstandingPayable, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}
                 </strong>
                 <small className={styles.summarySub}>{t.outstandingPayableSub}</small>
               </div>
@@ -500,13 +501,19 @@ export default function SuppliersPage() {
 
                     <span className={styles.phone}>{supplier.phone}</span>
 
-                    <strong
-                      className={
-                        Number(supplier.balance) === 0 ? styles.balanceZero : styles.balanceValue
-                      }
-                    >
-                      {formatCurrency(Number(supplier.balance) || 0, currency)}
-                    </strong>
+                    {Number.isFinite(supplier.balance) ? (
+                      <strong
+                        className={
+                          supplier.balance === 0 ? styles.balanceZero : styles.balanceValue
+                        }
+                      >
+                        {formatCurrency(supplier.balance, currency)}
+                      </strong>
+                    ) : supplier.balance === undefined || supplier.balance === null ? (
+                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                    ) : (
+                      <span title={`Invalid balance: ${String(supplier.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                    )}
 
                     <span className={styles.infoText}>
                       {supplier.email ||

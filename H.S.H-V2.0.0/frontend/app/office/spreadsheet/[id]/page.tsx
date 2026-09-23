@@ -19,6 +19,7 @@ const SHEET_T = {
 import {
   Printer, Download, Database, Table as TableIcon, FileSpreadsheet, Maximize2, Minimize2
 } from "lucide-react";
+import { getCellValue, getCellDisplayValue, getSheetBounds } from "../../../../src/lib/office/sheet-data";
 
 // Dynamically import Univer wrapper to avoid SSR
 const UniverWrapper = dynamic(() => import("./UniverWrapper"), { ssr: false, loading: () => <div style={{ padding: 20, color:"var(--muted)"}}>Loading…</div> });
@@ -96,43 +97,80 @@ export default function SpreadsheetEditorPage() {
       setStatus(navigator.onLine ? "saved" : "offline");
     } catch(e){ console.error(e); setStatus("offline"); }
   }, [id]);
-  // Flush workbook pending save on unmount: ask Univer for snapshot
+  // Flush workbook pending save on unmount via wrapper contract
   useEffect(() => {
     return () => {
       try {
-        const snap = (univerRef.current as any)?.getSnapshot?.() || (univerRef.current as any)?.save?.();
-        // getSnapshot via wrapper handle: univerRef.current may expose getSnapshot
-        // Fallback: if not available, rely on scheduled save already queued
-        if (snap && JSON.stringify(snap) !== "") {
-          officeFileService.update(id, { content: snap }).catch(()=>{});
+        // Prefer wrapper flushSave which handles dedup and pending timer
+        if ((univerRef.current as any)?.flushSave) {
+          (univerRef.current as any).flushSave();
+        } else {
+          const snap = (univerRef.current as any)?.getSnapshot?.();
+          if (snap && JSON.stringify(snap) !== "") {
+            officeFileService.update(id, { content: snap }).catch(()=>{});
+          }
         }
       } catch {}
-      if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); }
+      if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); titleTimerRef.current = null; }
+      // Title already flushed via its own cleanup
     };
   }, [id]);
 
   const [officeFeedback, setOfficeFeedback] = useState<string | null>(null);
   useEffect(()=>{ if(!officeFeedback) return; const t=setTimeout(()=>setOfficeFeedback(null), 2800); return ()=>clearTimeout(t); }, [officeFeedback]);
 
+  const isComplexForInsert = (content:any): boolean => {
+    if (!content || typeof content !== "object") return false;
+    const sheets = content.sheets;
+    if (!sheets) return false;
+    if (!Array.isArray(sheets)) return true;
+    if (sheets.length > 1) return true;
+    if ((content as any).sheetOrder && (content as any).sheetOrder.length>1) return true;
+    const first = sheets[0];
+    if (first?.mergeData && Object.keys(first.mergeData).length>0) return true;
+    if (first?.data) {
+      for (const v of Object.values(first.data) as any[]) if(v && typeof v==="object" && (v.f!==undefined||v.si!==undefined||v.s!==undefined)) return true;
+    }
+    return false;
+  };
   const handleHebrihInsert = useCallback(async (entityType:string, entityId:string, field:string) => {
     try {
       const mod = await getSnapshotForInsert(entityType, entityId, field);
       const value = mod.value;
       let inserted = false;
-      // Try Univer API if available
+      let insertError: string | null = null;
+      // Try Univer API if available — respect new contract {success,error}
       if (univerRef.current?.insertValue) {
-        try { univerRef.current.insertValue(value); inserted = true; } catch(e){ console.error(e); }
-      } else if (univerRef.current?.insertAtSelection) {
-        try { univerRef.current.insertAtSelection(value); inserted = true; } catch(e){ console.error(e); }
+        try {
+          const res: any = (univerRef.current as any).insertValue(value);
+          if (res && typeof res === "object" && "success" in res) {
+            if (res.success) inserted = true;
+            else insertError = res.error || "Insert failed";
+          } else {
+            // void return (old) — assume success if no throw
+            inserted = true;
+          }
+        } catch(e:any){ console.error(e); insertError = e?.message || String(e); }
+      } else if ((univerRef.current as any)?.insertAtSelection) {
+        try { (univerRef.current as any).insertAtSelection(value); inserted = true; } catch(e:any){ console.error(e); insertError = e?.message || String(e); }
+      }
+      if (insertError) {
+        setOfficeFeedback(insertError);
+        setShowHebrih(false);
+        return;
       }
       if (!inserted) {
-        // Fallback: insert via fallback grid content (active sheet 0,0 or next empty cell)
+        // Block fallback insert for complex workbook (read-only)
         const current = file?.content as any;
-        // Try to find first empty cell in fallback format
+        if (isComplexForInsert(current)) {
+          setOfficeFeedback(language==="fr" ? "Classeur complexe — insertion bloquée en mode secours" : language==="ar" ? "مصنف معقد — الإدراج محظور" : "Complex workbook — insert blocked in fallback");
+          setShowHebrih(false);
+          return;
+        }
+        // Fallback: insert via fallback grid content (active sheet 0,0 or next empty cell)
         if (current && Array.isArray(current.sheets)) {
           const sheet = current.sheets[0] as any;
           const data = sheet?.data || {};
-          // find first empty row col
           let found: string | null = null;
           for(let r=0;r<40;r++){ for(let c=0;c<10;c++){ const k=`${r},${c}`; if(!data[k]){ found=k; break; } } if(found) break; }
           const key = found || "0,0";
@@ -145,13 +183,17 @@ export default function SpreadsheetEditorPage() {
           setOfficeFeedback(`${TT.valueInserted} (${value})`);
           inserted = true;
         } else if (current && current.sheets && typeof current.sheets==="object") {
-          // Univer snapshot fallback: add to first sheet cellData
+          // For Univer map in fallback (should be blocked above, but handle simple single-sheet map)
+          if (isComplexForInsert(current)) {
+            setOfficeFeedback(language==="fr" ? "Classeur complexe — insertion bloquée" : "Complex workbook — insert blocked");
+            setShowHebrih(false);
+            return;
+          }
           const sheetsObj = current.sheets as any;
           const firstId = current.sheetOrder?.[0] || Object.keys(sheetsObj)[0];
           if (firstId && sheetsObj[firstId]) {
             const sh = sheetsObj[firstId];
             const cellData = sh.cellData || {};
-            // find empty
             let found: string | null = null;
             for(let r=0;r<40;r++){ if(!cellData[r]){ found=`${r},0`; break; } const row=cellData[r]; let emptyCol=-1; for(let c=0;c<10;c++){ if(!row[c]){ emptyCol=c; break; } } if(emptyCol!==-1){ found=`${r},${emptyCol}`; break; } if(Object.keys(row).length<10) {found=`${r},${Object.keys(row).length}`; break;} }
             const key = found || "0,0";
@@ -168,9 +210,12 @@ export default function SpreadsheetEditorPage() {
         }
       }
       if (!inserted) {
-        setOfficeFeedback(`${TT.valueInserted} (${value})`);
+        setOfficeFeedback(insertError || `${TT.valueInserted} (${value})`);
+        // Do not link entity if not inserted
+        setShowHebrih(false);
+        return;
       }
-      // link entity
+      // link entity only after successful persistence
       if (file) {
         const linked = file.linkedEntities || [];
         const exists = linked.some((l)=> l.entityType===entityType && l.entityId===entityId);
@@ -244,16 +289,30 @@ export default function SpreadsheetEditorPage() {
         return;
       }
     }
-    // fallback: export from stored content if possible
+    // fallback: export from stored content using canonical helper supporting flat and nested
     const content = file?.content as any;
     if (content?.sheets) {
-      // try to export first sheet as csv
-      let rows:any[][]=[];
-      if (Array.isArray(content.sheets) && content.sheets[0]?.data) {
-        const data = content.sheets[0].data;
-        const maxRow = Math.max(...Object.keys(data).map((k)=> parseInt(k.split(",")[0],10)),0);
-        const maxCol = Math.max(...Object.keys(data).map((k)=> parseInt(k.split(",")[1],10)),0);
-        for(let r=0;r<=maxRow;r++){ const row=[]; for(let c=0;c<=maxCol;c++){ row.push(data[`${r},${c}`]?.v ?? ""); } rows.push(row); }
+      let rows: string[][] = [];
+      let data: any = {};
+      if (Array.isArray(content.sheets)) {
+        const sh = content.sheets[0] as any;
+        if (sh) data = sh.data ?? sh.cellData ?? {};
+      } else if (typeof content.sheets === "object") {
+        const sheetsObj: any = content.sheets;
+        const firstId = content.sheetOrder?.[0] || Object.keys(sheetsObj)[0];
+        const sh = firstId ? sheetsObj[firstId] : null;
+        if (sh) data = sh.cellData ?? sh.data ?? {};
+      }
+      const { maxRow, maxCol } = getSheetBounds(data);
+      if (maxRow >= 0 && maxCol >= 0) {
+        for (let r = 0; r <= maxRow; r++) {
+          const row: string[] = [];
+          for (let c = 0; c <= maxCol; c++) {
+            const cell = getCellValue(data, r, c);
+            row.push(getCellDisplayValue(cell ?? ""));
+          }
+          rows.push(row);
+        }
       }
       const csv = rows.map((r)=> r.map((c)=> `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
       const blob = new Blob([csv], { type:"text/csv" });
@@ -266,7 +325,7 @@ export default function SpreadsheetEditorPage() {
     if (univerRef.current?.exportXLSX) {
       try { const fileBlob = await univerRef.current.exportXLSX(); if (fileBlob){ const url=URL.createObjectURL(fileBlob); const a=document.createElement("a"); a.href=url; a.download=`${title||"sheet"}.xlsx`; a.click(); URL.revokeObjectURL(url); return; } } catch(e){ console.error(e); }
     }
-    // fallback via ExcelJS from stored content
+    // fallback via ExcelJS from stored content using canonical helper (supports flat and nested, all sheets, A1/K11/Z30, Unicode)
     try {
       const ExcelJSMod: any = await import("exceljs");
       const WorkbookCtor = ExcelJSMod.Workbook ?? ExcelJSMod.default?.Workbook;
@@ -276,12 +335,19 @@ export default function SpreadsheetEditorPage() {
         const sheetsArr = Array.isArray(content.sheets) ? content.sheets : Object.values(content.sheets);
         sheetsArr.forEach((sh:any)=>{
           const data = sh.data || sh.cellData || {};
-          const rows:any[][]=[];
-          const keys = Object.keys(data);
-          if(keys.length===0){ rows.push([]); } else {
-            const maxRow = Math.max(...keys.map((k)=> parseInt(k.split(",")[0],10)),0);
-            const maxCol = Math.max(...keys.map((k)=> parseInt(k.split(",")[1],10)),0);
-            for(let r=0;r<=maxRow;r++){ const row=[]; for(let c=0;c<=maxCol;c++){ row.push(data[`${r},${c}`]?.v ?? ""); } rows.push(row); }
+          const { maxRow, maxCol } = getSheetBounds(data);
+          const rows: string[][] = [];
+          if (maxRow < 0 || maxCol < 0) {
+            rows.push([]);
+          } else {
+            for (let r = 0; r <= maxRow; r++) {
+              const row: string[] = [];
+              for (let c = 0; c <= maxCol; c++) {
+                const cell = getCellValue(data, r, c);
+                row.push(getCellDisplayValue(cell ?? ""));
+              }
+              rows.push(row);
+            }
           }
           const sheetName = (sh.name||"Sheet").slice(0,31);
           const ws = workbook.addWorksheet(sheetName);
@@ -357,7 +423,10 @@ function HebrihInsertModal({ language, onClose, onInsert }: { language:Language;
     task: ["name","status"],
     payment: ["amount","date"],
   };
+  const seqRef = useRef(0);
   useEffect(()=> {
+    let cancelled = false;
+    const seq = ++seqRef.current;
     async function load(){
       try{
         let list:any[]=[];
@@ -370,12 +439,14 @@ function HebrihInsertModal({ language, onClose, onInsert }: { language:Language;
         else if(entityType==="invoice"){ const { invoiceService } = await import("../../../../src/services/invoice.service"); list = await invoiceService.getAll().catch(()=>[]); }
         else if(entityType==="vehicle"){ const { vehicleService } = await import("../../../../src/services/vehicle.service"); list = await vehicleService.getAll(); }
         else if(entityType==="task"){ const { taskService } = await import("../../../../src/services/task.service"); list = await taskService.getAll(); }
+        if (cancelled || seq !== seqRef.current) return;
         setEntities(list.slice(0,100));
         setSelectedId(list[0]?.id || "");
         setField(fieldOptions[entityType]?.[0] || "name");
-      } catch(e){ console.error(e); }
+      } catch(e){ if (cancelled || seq !== seqRef.current) return; console.error(e); }
     }
     void load();
+    return () => { cancelled = true; };
   }, [entityType]);
   const TT2 = SHEET_T[language];
   return (

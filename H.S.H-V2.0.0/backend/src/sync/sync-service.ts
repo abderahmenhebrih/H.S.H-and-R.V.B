@@ -37,7 +37,7 @@ async function getNextRevision(session?: any): Promise<number> {
   return (doc as any).revision;
 }
 
-function isTransientError(error: unknown): boolean {
+export function isTransientError(error: unknown): boolean {
   const err: any = error;
   const msg = err instanceof Error ? err.message : String(err);
   const name = err?.name ? String(err.name) : "";
@@ -83,15 +83,22 @@ export const HSH_SYNC_ENTITIES = new Set<string>([
   "customer",
   "supplier",
   "bankAccount",
-  "transfer",
+  "vehicle",
+  "worker",
+  "expense",
+  "task",
   "purchase",
   "sale",
   "payment",
-  "worker",
-  "vehicle",
-  "task",
+  "transfer",
+  "injuryEquation",
+  "settings",
+  "notification",
+  "invoice",
+  "invoiceSellerProfile",
   "invoiceTaxProfile",
   "incomingInvoice",
+  "officeFile",
 ]);
 
 function isNonEmptyString(v: unknown): boolean {
@@ -461,6 +468,93 @@ export function validateHshPayload(
         const ttc = toFiniteNumber(amountTTCRaw);
         if (Number.isFinite(ht) && Number.isFinite(ttc) && ttc < ht) return "INCOMING_AMOUNT_INVALID";
       }
+      break;
+    }
+    case "expense": {
+      const amountRaw: any = (payload as any).amount;
+      const dateRaw: any = (payload as any).date;
+      const accountIdRaw: any = (payload as any).accountId;
+      const nameRaw: any = (payload as any).name;
+      if (isCreateUpsert) {
+        if (amountRaw === undefined || amountRaw === null) return "EXPENSE_AMOUNT_REQUIRED";
+        if (dateRaw === undefined || dateRaw === null) return "EXPENSE_DATE_REQUIRED";
+        if (!isNonEmptyString(accountIdRaw)) return "EXPENSE_ACCOUNT_REQUIRED";
+        if (!isNonEmptyString(nameRaw)) return "EXPENSE_NAME_REQUIRED";
+      }
+      if (amountRaw !== undefined && amountRaw !== null) {
+        const n = toFiniteNumber(amountRaw);
+        if (!Number.isFinite(n) || n < 0) return "EXPENSE_AMOUNT_INVALID";
+      }
+      if (dateRaw !== undefined && dateRaw !== null) {
+        const ms = typeof dateRaw === "number" ? dateRaw : new Date(dateRaw as any).getTime();
+        if (!Number.isFinite(ms)) return "EXPENSE_DATE_INVALID";
+      }
+      break;
+    }
+    case "invoice": {
+      // DRAFT generic sync only, but validate monetary fields finite
+      const monetaryKeys = ["subtotalHT","taxTotal","otherTaxTotal","totalTTC","discountTotal","taxableBase","additionalChargesTotal"];
+      for (const k of monetaryKeys) {
+        const v: any = (payload as any)[k];
+        if (v !== undefined && v !== null) {
+          const n = toFiniteNumber(v);
+          if (!Number.isFinite(n) || n < 0) return "INVOICE_AMOUNT_INVALID";
+        }
+      }
+      const invDateRaw: any = (payload as any).invoiceDate;
+      if (invDateRaw !== undefined && invDateRaw !== null) {
+        const ms = typeof invDateRaw === "number" ? invDateRaw : new Date(invDateRaw as any).getTime();
+        if (!Number.isFinite(ms)) return "INVOICE_DATE_INVALID";
+      }
+      const currRaw: any = (payload as any).currencyCode;
+      if (currRaw !== undefined && currRaw !== null && currRaw !== "") {
+        const allowed = ["DA","€","$"];
+        if (!allowed.includes(String(currRaw).trim())) return "INVOICE_CURRENCY_INVALID";
+      }
+      break;
+    }
+    case "invoiceSellerProfile": {
+      const nextNumRaw: any = (payload as any).nextNumber;
+      const padRaw: any = (payload as any).paddingLength;
+      const yearRaw: any = (payload as any).lastSequenceYear;
+      const commRaw: any = (payload as any).commercialName;
+      const prefRaw: any = (payload as any).invoicePrefix;
+      if (nextNumRaw !== undefined && nextNumRaw !== null) {
+        const n = toFiniteNumber(nextNumRaw);
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return "SELLER_NEXTNUMBER_INVALID";
+      }
+      if (padRaw !== undefined && padRaw !== null) {
+        const n = toFiniteNumber(padRaw);
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > 12) return "SELLER_PADDING_INVALID";
+      }
+      if (yearRaw !== undefined && yearRaw !== null) {
+        const n = toFiniteNumber(yearRaw);
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 2000 || n > 2100) return "SELLER_YEAR_INVALID";
+      }
+      if (isCreateUpsert) {
+        if (!isNonEmptyString(commRaw)) return "SELLER_COMMERCIAL_REQUIRED";
+        if (!isNonEmptyString(prefRaw)) return "SELLER_PREFIX_REQUIRED";
+      }
+      const curr2: any = (payload as any).defaultCurrency;
+      if (curr2 !== undefined && curr2 !== null && curr2 !== "") {
+        const allowed = ["DA","€","$"];
+        if (!allowed.includes(String(curr2).trim())) return "SELLER_CURRENCY_INVALID";
+      }
+      break;
+    }
+    case "officeFile": {
+      // Size/title already validated in sync-service special block before this; keep generic finite for numeric version fields
+      const verRaw: any = (payload as any).contentVersion;
+      if (verRaw !== undefined && verRaw !== null) {
+        const n = toFiniteNumber(verRaw);
+        if (!Number.isFinite(n) || n < 0) return "OFFICE_VERSION_INVALID";
+      }
+      break;
+    }
+    case "injuryEquation":
+    case "settings":
+    case "notification": {
+      // Minimal — generic numeric sweep covers finite checks; no extra business rules materially required per spec
       break;
     }
     default:

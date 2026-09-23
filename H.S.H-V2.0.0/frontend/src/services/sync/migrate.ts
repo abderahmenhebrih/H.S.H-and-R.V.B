@@ -2,10 +2,11 @@ import { db } from "@/src/lib/database/db";
 import { getServerRevision } from "./queue";
 
 const LEGACY_FLAG = "legacySyncBackfillCompleted";
+const LEGACY_FLAG_V2 = "legacySyncBackfill:v2:new-office-invoice-tables";
 
 export async function runLegacyBackfill(): Promise<void> {
-  const flag = await db.syncMeta.get(LEGACY_FLAG);
-  if (flag) {
+  const v2Flag = await db.syncMeta.get(LEGACY_FLAG_V2);
+  if (v2Flag) {
     return;
   }
 
@@ -26,6 +27,11 @@ export async function runLegacyBackfill(): Promise<void> {
     { name: "injuryEquations", entity: "injuryEquation" },
     { name: "settings", entity: "settings" },
     { name: "notifications", entity: "notification" },
+    { name: "invoices", entity: "invoice" },
+    { name: "invoiceSellerProfiles", entity: "invoiceSellerProfile" },
+    { name: "invoiceTaxProfiles", entity: "invoiceTaxProfile" },
+    { name: "incomingInvoices", entity: "incomingInvoice" },
+    { name: "officeFiles", entity: "officeFile" },
   ];
 
   const pendingOps = await db.syncOperations.toArray();
@@ -69,6 +75,8 @@ export async function runLegacyBackfill(): Promise<void> {
     }
   }
 
+  await db.syncMeta.put({ key: LEGACY_FLAG_V2, value: true });
+  // keep legacy flag for backward compatibility
   await db.syncMeta.put({ key: LEGACY_FLAG, value: true });
   console.log(`[sync] legacy backfill completed, queued ${queued} records`);
 }

@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { OfficeFile } from "../../../../src/types/entities/office-file";
 import type { Language } from "../../../../src/types/settings/settings";
+import { getCellValue, getCellDisplayValue, getSheetBounds } from "../../../../src/lib/office/sheet-data";
 import "@univerjs/preset-sheets-core/lib/index.css";
 import styles from "./page.module.css";
 
@@ -14,11 +15,32 @@ type Props = {
 };
 
 export type UniverHandle = {
-  insertValue: (value: string) => void;
+  insertValue: (value: string) => { success: boolean; error?: string };
   insertTable: (entityType: string, rows: any[]) => { success: boolean; sheetId?: string; error?: string };
   exportCSV: () => Promise<string | null>;
   exportXLSX: () => Promise<Blob | null>;
+  getSnapshot: () => any | null;
+  flushSave: () => void;
 };
+
+export function isComplexWorkbook(content: any): boolean {
+  if (!content || typeof content !== "object") return false;
+  const sheets = content.sheets;
+  if (!sheets) return false;
+  if (!Array.isArray(sheets)) return true;
+  if (sheets.length > 1) return true;
+  if ((content as any).sheetOrder && Array.isArray((content as any).sheetOrder) && (content as any).sheetOrder.length > 1) return true;
+  const first = sheets[0];
+  if (!first) return false;
+  if (first.mergeData && Array.isArray(first.mergeData) && first.mergeData.length > 0) return true;
+  if (first.mergeData && typeof first.mergeData === "object" && Object.keys(first.mergeData).length>0) return true;
+  if (first.data) {
+    for (const v of Object.values(first.data) as any[]) {
+      if (v && typeof v === "object" && (v.f !== undefined || v.si !== undefined || v.s !== undefined)) return true;
+    }
+  }
+  return false;
+}
 
 function getLocalizedFallbackSheetName(lang: Language, explicit?: string): string {
   if (explicit) return explicit;
@@ -62,36 +84,51 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
     }, 900);
   };
 
+  const flushSave = () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const snap = getSnapshot();
+    if (!snap) return;
+    const str = JSON.stringify(snap);
+    if (str === lastSnapshotRef.current) return;
+    lastSnapshotRef.current = str;
+    onSave(snap);
+  };
+
   useImperativeHandle(ref, () => ({
-    insertValue: (value: string) => {
+    insertValue: (value: string): { success: boolean; error?: string } => {
       try {
         const api = apiRef.current;
         const wb = api?.getActiveWorkbook?.();
         const sheet = wb?.getActiveSheet?.() || wb?.getActiveWorksheet?.();
+        let mutated = false;
         if (sheet) {
-          // Try to get active range and set value
           const range = sheet.getActiveRange?.() || sheet.getSelection?.();
           if (range?.setValue) {
             range.setValue(value);
-            scheduleSave();
-            return;
-          }
-          // Try setCellValue on sheet
-          if (sheet.setCellValue) {
-            // need row col from selection
+            mutated = true;
+          } else if (sheet.setCellValue) {
             const sel = sheet.getActiveRange?.();
             const row = sel?.getRow?.() ?? 0;
             const col = sel?.getColumn?.() ?? 0;
             sheet.setCellValue(row, col, value);
-            scheduleSave();
-            return;
+            mutated = true;
           }
         }
-        // fallback: try univerAPI method
-        if (api?.insertValue) api.insertValue(value);
-        scheduleSave();
-      } catch (e) { console.error("insertValue failed", e); }
+        if (!mutated && api?.insertValue) {
+          try { api.insertValue(value); mutated = true; } catch {}
+        }
+        if (mutated) {
+          scheduleSave();
+          return { success: true };
+        }
+        return { success: false, error: "No active workbook/sheet" };
+      } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertValue failed", e); return { success: false, error: msg }; }
     },
+    getSnapshot: () => getSnapshot(),
+    flushSave: () => flushSave(),
     insertTable: (entityType: string, rows: any[]): { success: boolean; sheetId?: string; error?: string } => {
       try {
         const api = apiRef.current;
@@ -142,51 +179,25 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
       try {
         const snap = getSnapshot();
         if (!snap) return null;
-        // Convert snapshot to CSV via simple logic (first sheet)
+        // Convert snapshot to CSV via canonical helper supporting flat and nested
         const sheets = snap.sheets || {};
         const firstId = snap.sheetOrder?.[0] || Object.keys(sheets)[0];
         const sheet = sheets[firstId];
         if (!sheet) return null;
         const cellData = sheet.cellData || {};
-        // determine max row/col
-        let maxR = 0, maxC = 0;
-        Object.keys(cellData).forEach((k) => {
-          const [r,c] = k.split(",").map(Number);
-          if (r>maxR) maxR=r;
-          if (c>maxC) maxC=c;
-        });
-        // cellData is object of row -> col -> cell
-        // Univer stores as { row: { col: {v} } }? Handle both
-        let csv = "";
-        // try to handle nested structure
-        if (cellData["0"]) {
-          // Nested: cellData is { "0": { "0": {v} } }
-          const rows: string[][] = [];
-          for (let r=0;r<=maxR+5;r++) {
-            const row: string[] = [];
-            for (let c=0;c<=maxC+5;c++) {
-              const cell = cellData[r]?.[c] ?? cellData[`${r},${c}`];
-              const v = cell?.v ?? cell?.m ?? "";
-              row.push(`"${String(v).replace(/"/g,'""')}"`);
-            }
-            // trim trailing empty?
-            if (row.some((x)=>x!=='""')) rows.push(row);
+        const { maxRow, maxCol } = getSheetBounds(cellData);
+        if (maxRow < 0 || maxCol < 0) return "";
+        const rows: string[][] = [];
+        for (let r = 0; r <= maxRow; r++) {
+          const row: string[] = [];
+          for (let c = 0; c <= maxCol; c++) {
+            const cell = getCellValue(cellData, r, c);
+            const v = getCellDisplayValue(cell ?? "");
+            row.push(`"${String(v).replace(/"/g, '""')}"`);
           }
-          csv = rows.map((r)=>r.join(",")).join("\n");
-        } else {
-          // flat
-          const rows: string[][] = [];
-          for (let r=0;r<=20;r++) {
-            const row: string[] = [];
-            for (let c=0;c<=5;c++) {
-              const cell = cellData[`${r},${c}`] ?? cellData[r]?.[c];
-              const v = cell?.v ?? "";
-              row.push(`"${String(v).replace(/"/g,'""')}"`);
-            }
-            rows.push(row);
-          }
-          csv = rows.map((r)=>r.join(",")).join("\n");
+          rows.push(row);
         }
+        const csv = rows.map((r) => r.join(",")).join("\n");
         return csv;
       } catch (e) { console.error(e); return null; }
     },
@@ -339,7 +350,21 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
         }, 1200);
         dispose = () => {
           clearInterval(interval);
-          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+          // Flush pending changed snapshot BEFORE clearing timer/disposal
+          try {
+            const snap = getSnapshot();
+            if (snap) {
+              const str = JSON.stringify(snap);
+              if (str !== lastSnapshotRef.current) {
+                lastSnapshotRef.current = str;
+                try { onSave(snap); } catch {}
+              }
+            }
+          } catch {}
+          if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+          }
           queueMicrotask(() => {
             try { univer.dispose(); } catch {}
             try { container.remove(); } catch {}
@@ -366,32 +391,6 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
 
   return <div ref={containerRef} style={{ height: "100%", width: "100%", minHeight: 520 }} />;
 });
-
-// Detection of complex workbooks that fallback cannot represent losslessly
-function isComplexWorkbook(content: any): boolean {
-  if (!content || typeof content !== "object") return false;
-  const sheets = content.sheets;
-  if (!sheets) return false;
-  // Map form (Univer) => complex
-  if (!Array.isArray(sheets)) return true;
-  // Array form but multiple sheets => would lose sheets beyond first (fallback shows one)
-  if (sheets.length > 1) return true;
-  // sheetOrder indicates map-style workbook (even if array, extra meta)
-  if ((content as any).sheetOrder && Array.isArray((content as any).sheetOrder) && (content as any).sheetOrder.length > 1) return true;
-  // Check for merge/formula/style metadata that fallback cannot preserve
-  const first = sheets[0];
-  if (!first) return false;
-  if (first.mergeData && Array.isArray(first.mergeData) && first.mergeData.length > 0) return true;
-  if (first.mergeData && typeof first.mergeData === "object" && Object.keys(first.mergeData).length>0) return true;
-  // Detect nested cellData with f/formula or s/style fields (fallback only handles v)
-  // If any data entry has f, si, formula, style -> complex
-  if (first.data) {
-    for (const v of Object.values(first.data) as any[]) {
-      if (v && typeof v === "object" && (v.f !== undefined || v.si !== undefined || v.s !== undefined)) return true;
-    }
-  }
-  return false;
-}
 
 // Simple fallback grid for when Univer fails (offline or not compatible)
 function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: OfficeFile; onSave: (snap:any)=>void; language: Language; defaultSheetName: string }) {

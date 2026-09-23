@@ -5,6 +5,10 @@ import {
   getOrCreateClientId,
   deleteSyncedOperations,
   getServerRevision,
+  transitionPendingToInFlight,
+  rebaseSuccessorsAfterSuccess,
+  revertInFlightToPending,
+  revertInFlightToTerminalAndRebaseSuccessors,
 } from "./queue";
 import { db } from "@/src/lib/database/db";
 import { getTableForSyncEntity } from "./tables";
@@ -60,7 +64,11 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
   let overallSuccess = true;
 
   for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-    const batch = pending.slice(i, i + BATCH_SIZE);
+    const batchSlice = pending.slice(i, i + BATCH_SIZE);
+    // P0: atomically transition pending -> in_flight to capture immutable batch
+    const batch = await transitionPendingToInFlight(batchSlice);
+    if (batch.length === 0) continue;
+    // Build immutable payload from transitioned batch
     const payload = {
       clientId,
       operations: batch.map((op) => ({
@@ -82,11 +90,18 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
         body: JSON.stringify(payload),
       });
     } catch (error) {
-      // Network failure, keep pending, throw to let caller handle retry
+      // Network/transient failure: revert in_flight -> retryable without destroying successors
+      for (const op of batch) {
+        try { await revertInFlightToPending((op as any).operationId, error instanceof Error ? error.message : String(error), true); } catch {}
+      }
       throw new Error(error instanceof Error ? `Sync request failed: ${error.message}` : "Sync request failed.");
     }
     if (!response.ok) {
       const text = await response.text().catch(() => "");
+      // Treat HTTP error as transient for in_flight revert
+      for (const op of batch) {
+        try { await revertInFlightToPending((op as any).operationId, `HTTP ${response.status}: ${text}`, true); } catch {}
+      }
       throw new Error(`Sync request failed with status ${response.status}: ${text}`);
     }
     const result = (await response.json()) as SyncResponse;
@@ -96,8 +111,30 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
         overallSuccess = false;
         const match = batch.find((b) => ((b as any).operationId ?? String(b.id)) === r.operationId);
         const isTerminal = (r as any).retryable === false;
-        if (match?.id !== undefined) {
-          await incrementAttemptsAndSetError(match.id, r.error ?? r.message, isTerminal);
+        // Locate in_flight operationId (batch already in_flight)
+        const operationId = r.operationId;
+        if (isTerminal) {
+          // Terminal: reconcile canonical, rebase successors, keep successors
+          try {
+            const { getServerRevision: getRev } = await import("./queue");
+            // For retryable false, need to transition in_flight to terminal and rebase successors
+            const currentRev = await getRev().catch(()=>0);
+            // Use dedicated terminal+rebase helper
+            await revertInFlightToTerminalAndRebaseSuccessors(operationId, r.error ?? r.message, currentRev);
+          } catch {}
+          // Also need to increment attempts for parent already done in helper, but ensure terminal marking
+          if (match?.id !== undefined) {
+            try { await incrementAttemptsAndSetError(match.id, r.error ?? r.message, true); } catch {}
+          }
+        } else {
+          // Retryable false? Actually terminal false means retryable true? For retryable (transient) we revert to pending
+          if (match?.id !== undefined) {
+            await incrementAttemptsAndSetError(match.id, r.error ?? r.message, false);
+            // revert in_flight to retrying so it will be retried before successor
+            try { await revertInFlightToPending(operationId, r.error ?? r.message, true); } catch {}
+          } else {
+            try { await revertInFlightToPending(operationId, r.error ?? r.message, true); } catch {}
+          }
         }
         // Log conflict if present
         if (r.conflict) {
@@ -134,7 +171,6 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
               }
             }
             // For business terminal (any op) or any terminal update/delete, fetch canonical snapshot and apply preserving pending locals.
-            // Current applySnapshot preserves pending locals via pendingSet (terminal excluded), so rejected entity will be overwritten.
             const shouldFetchSnapshot = isTerminalBusiness || isTerminalUpdateDelete;
             if (shouldFetchSnapshot) {
               try {
@@ -146,22 +182,29 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
               }
             }
             // Delete terminal sync operation so it doesn't remain as ghost pending (after snapshot applied)
-            if (match?.id !== undefined) {
+            // But for in_flight we already marked terminal via helper, ensure deleted if needed after reconciliation
+            const opInFlight = await db.syncOperations.where("operationId").equals(operationId).first().catch(()=>null);
+            if (opInFlight?.id !== undefined) {
+              try { await db.syncOperations.delete(opInFlight.id); } catch {}
+            } else if (match?.id !== undefined) {
               try { await db.syncOperations.delete(match.id); } catch {}
             }
           } catch {}
         } else if (isTerminal && isBusiness) {
           // Fallback delete terminal business op if not covered above
           try {
-            if (match?.id !== undefined) {
+            const opInFlight2 = await db.syncOperations.where("operationId").equals(operationId).first().catch(()=>null);
+            if (opInFlight2?.id !== undefined) { try { await db.syncOperations.delete(opInFlight2.id); } catch {} }
+            else if (match?.id !== undefined) {
               try { await db.syncOperations.delete(match.id); } catch {}
             }
           } catch {}
         }
         continue;
       }
-      // Success: mark synced, update local entity metadata, delete queue entry
-      const match = batch.find((b) => ((b as any).operationId ?? String(b.id)) === r.operationId);
+      // Success: handle in_flight success with successor rebase (P0)
+      const operationId = r.operationId;
+      const match = batch.find((b) => ((b as any).operationId ?? String(b.id)) === operationId);
       if (match) {
         // Update local entity syncStatus to synced if still exists
         try {
@@ -177,13 +220,16 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
             }
           }
         } catch {}
-        if (match.id !== undefined) {
-          await markSyncOperationAsSyncedByOperationId(r.operationId);
-          // Delete synced operation to avoid accumulation (or keep for diagnostics then prune)
-          try {
-            await db.syncOperations.delete(match.id);
-          } catch {}
+        // Rebase pending successors before deleting parent to preserve intent at new revision
+        if (r.revision !== undefined) {
+          try { await rebaseSuccessorsAfterSuccess(operationId, r.revision); } catch {}
         }
+        // Delete the in_flight operation (consume)
+        try {
+          const opToDelete = await db.syncOperations.where("operationId").equals(operationId).first();
+          if (opToDelete?.id !== undefined) await db.syncOperations.delete(opToDelete.id);
+          else if (match.id !== undefined) await db.syncOperations.delete(match.id);
+        } catch {}
         if (r.conflict) {
           try {
             await db.syncConflicts.add({
@@ -198,6 +244,15 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
             });
           } catch {}
         }
+      } else {
+        // Batch mismatch? still try to clean in_flight by operationId
+        try {
+          const opToDelete = await db.syncOperations.where("operationId").equals(operationId).first();
+          if (opToDelete?.id !== undefined) {
+            if (r.revision !== undefined) try { await rebaseSuccessorsAfterSuccess(operationId, r.revision); } catch {}
+            await db.syncOperations.delete(opToDelete.id);
+          }
+        } catch {}
       }
     }
     // Apply canonical entity without queuing (must use remote context)

@@ -33,7 +33,9 @@ export class PaymentOperation {
         throw new Error("Account balance corrupted.");
       }
 
-      if (account.balance < input.amount) {
+      // Incoming customer payments receive funds, don't require bank balance pre-check
+      const isOutgoing = ["supplier","worker","expense"].includes(input.entityType as string);
+      if (isOutgoing && account.balance < input.amount) {
         throw new Error("Insufficient account balance.");
       }
 
@@ -106,6 +108,7 @@ export class PaymentOperation {
             throw new Error("Payment exceeds worker balance.");
           }
 
+          // already checked bank balance above for outgoing
           if (account.balance < input.amount) {
             throw new Error("Insufficient account balance.");
           }

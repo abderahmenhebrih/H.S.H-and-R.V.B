@@ -125,6 +125,73 @@ export async function applyRemoteChanges(changes: SyncChange[]): Promise<void> {
   } catch {}
 }
 
+function collectBusinessAffectedKeys(op: any, localEntity: any | null): Set<string> {
+  const keys = new Set<string>();
+  const entity = op.entity as string;
+  const payload: any = op.payload || {};
+  try {
+    if (entity === "sale") {
+      // For sale, protect sale id itself already in pendingSet, but also customer and products
+      const customerIds = new Set<string>();
+      const productIds = new Set<string>();
+      // Payload new
+      if (payload.customerId) customerIds.add(String(payload.customerId));
+      if (Array.isArray(payload.items)) for (const it of payload.items) if (it?.productId) productIds.add(String(it.productId));
+      // Local existing (old) for update/delete
+      if (localEntity) {
+        if (localEntity.customerId) customerIds.add(String(localEntity.customerId));
+        if (Array.isArray(localEntity.items)) for (const it of localEntity.items) if (it?.productId) productIds.add(String(it.productId));
+      }
+      for (const cid of customerIds) keys.add(`customer:${cid}`);
+      for (const pid of productIds) keys.add(`product:${pid}`);
+      keys.add(`sale:${op.entityId}`);
+    } else if (entity === "purchase") {
+      const supplierIds = new Set<string>();
+      const productIds = new Set<string>();
+      if (payload.supplierId) supplierIds.add(String(payload.supplierId));
+      if (Array.isArray(payload.items)) for (const it of payload.items) if (it?.productId) productIds.add(String(it.productId));
+      if (localEntity) {
+        if (localEntity.supplierId) supplierIds.add(String(localEntity.supplierId));
+        if (Array.isArray(localEntity.items)) for (const it of localEntity.items) if (it?.productId) productIds.add(String(it.productId));
+      }
+      for (const sid of supplierIds) keys.add(`supplier:${sid}`);
+      for (const pid of productIds) keys.add(`product:${pid}`);
+      keys.add(`purchase:${op.entityId}`);
+    } else if (entity === "payment") {
+      const accountIds = new Set<string>();
+      const entityKeys = new Set<string>();
+      const payloadAccount = payload.accountId ? String(payload.accountId) : null;
+      const payloadEntityType = payload.entityType ? String(payload.entityType) : null;
+      const payloadEntityId = payload.entityId ? String(payload.entityId) : null;
+      if (payloadAccount) accountIds.add(payloadAccount);
+      if (payloadEntityType && payloadEntityId && ["supplier","customer","worker"].includes(payloadEntityType)) entityKeys.add(`${payloadEntityType}:${payloadEntityId}`);
+      if (payloadEntityType === "expense" && payloadEntityId) {
+        // expense entity itself not pending-protected? but bank still
+      }
+      // Old from localEntity (for update/delete payload may not contain old)
+      if (localEntity) {
+        if (localEntity.accountId) accountIds.add(String(localEntity.accountId));
+        if (localEntity.entityType && localEntity.entityId && ["supplier","customer","worker"].includes(String(localEntity.entityType))) entityKeys.add(`${String(localEntity.entityType)}:${String(localEntity.entityId)}`);
+      }
+      // Also consider op.entityId is payment id itself
+      keys.add(`payment:${op.entityId}`);
+      for (const aid of accountIds) keys.add(`bankAccount:${aid}`);
+      for (const ek of entityKeys) keys.add(ek);
+    } else if (entity === "transfer") {
+      const accIds = new Set<string>();
+      if (payload.fromAccountId) accIds.add(String(payload.fromAccountId));
+      if (payload.toAccountId) accIds.add(String(payload.toAccountId));
+      if (localEntity) {
+        if (localEntity.fromAccountId) accIds.add(String(localEntity.fromAccountId));
+        if (localEntity.toAccountId) accIds.add(String(localEntity.toAccountId));
+      }
+      keys.add(`transfer:${op.entityId}`);
+      for (const aid of accIds) keys.add(`bankAccount:${aid}`);
+    }
+  } catch {}
+  return keys;
+}
+
 export async function applySnapshot(snapshot: Record<string, any[]>, currentRevision: number): Promise<void> {
   const entries = Object.entries(snapshot);
   // Empty snapshot is still canonical — must reconcile stale locals (remove non-pending records)
@@ -156,6 +223,29 @@ export async function applySnapshot(snapshot: Record<string, any[]>, currentRevi
             .filter((o: any) => !o.synced && o.status !== "terminal")
             .map((o) => `${o.entity}:${o.entityId}`)
         );
+        // Extend pendingSet with derived business keys: queueSync:false for derived entities
+        // Business authoritative ops protect their affected derived records from snapshot overwrite
+        const businessEntities = new Set(["sale","purchase","payment","transfer"]);
+        for (const op of allOps) {
+          if (!businessEntities.has(op.entity)) continue;
+          if ((op as any).synced) continue;
+          if ((op as any).status === "terminal") continue;
+          if ((op as any).status === "in_flight") {
+            // in_flight also protects derived keys (still pending optimistic)
+            // Need to also protect? But in_flight will be resolved before snapshot? Keep for safety.
+          }
+          if (!op.entity || !op.entityId) continue;
+          // Determine if this op is still pending (includes in_flight for protection)
+          const isPendingLike = !(op as any).synced && (op as any).status !== "terminal";
+          if (!isPendingLike) continue;
+          let localEntity: any = null;
+          try {
+            const table = getTable(op.entity);
+            if (table) localEntity = await table.get(op.entityId);
+          } catch {}
+          const affected = collectBusinessAffectedKeys(op, localEntity);
+          for (const k of affected) pendingSet.add(k);
+        }
         // Upsert server records, but preserve pending locals (do not overwrite).
         for (const [entity, docs] of entries) {
           const table = getTable(entity);

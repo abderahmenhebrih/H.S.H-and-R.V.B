@@ -53,14 +53,18 @@ export async function coalescePendingOperations(
   const operationId = opts.operationId ?? generateId();
   const clientId = opts.clientId ?? (await getOrCreateClientId());
   const baseRevision = opts.baseRevision ?? (await getServerRevision());
-  // Find pending for same key
+  // Find pending for same key - MUST NEVER modify in_flight operations
   const all = await db.syncOperations.toArray();
+  // Pending excludes terminal and in_flight - in_flight is immutable
   const pendingForKey = all
-    .filter((o) => o.entity === entity && o.entityId === entityId && !o.synced && (o as any).status !== "terminal")
+    .filter((o) => o.entity === entity && o.entityId === entityId && !o.synced && (o as any).status !== "terminal" && (o as any).status !== "in_flight")
     .sort((a, b) => a.createdAt - b.createdAt);
+  const inFlightForKey = all.filter((o) => o.entity === entity && o.entityId === entityId && (o as any).status === "in_flight");
+  const successorParentId = inFlightForKey.length > 0 ? inFlightForKey[0].operationId : undefined;
 
   if (pendingForKey.length === 0) {
     // No pending to coalesce, just add
+    // If in_flight exists for same key, mark successor relationship explicitly
     return db.syncOperations.add({
       operationId,
       entity,
@@ -73,6 +77,7 @@ export async function coalescePendingOperations(
       baseRevision,
       clientId,
       status: "pending",
+      ...(successorParentId ? { dependsOnOperationId: successorParentId, parentOperationId: successorParentId } : {}),
     } as any);
   }
 
@@ -95,6 +100,7 @@ export async function coalescePendingOperations(
         baseRevision,
         clientId,
         status: "pending",
+        ...(successorParentId ? { dependsOnOperationId: successorParentId, parentOperationId: successorParentId } : {}),
       } as any);
     }
     if (hasCreate) {
@@ -132,6 +138,7 @@ export async function coalescePendingOperations(
     }
     if (hasCreate) {
       // CREATE+DELETE → cancel both (delete pending creates)
+      // If in_flight CREATE exists, pendingForKey does not include it, so this path only deletes pending successors, not in_flight.
       const allIds = pendingForKey.map((o) => o.id!);
       await db.syncOperations.bulkDelete(allIds);
       return null;
@@ -152,6 +159,7 @@ export async function coalescePendingOperations(
         baseRevision: originalBaseRevision,
         clientId,
         status: "pending",
+        ...(successorParentId ? { dependsOnOperationId: successorParentId, parentOperationId: successorParentId } : {}),
       } as any);
       return newId;
     }
@@ -170,6 +178,7 @@ export async function coalescePendingOperations(
         baseRevision,
         clientId,
         status: "pending",
+        ...(successorParentId ? { dependsOnOperationId: successorParentId, parentOperationId: successorParentId } : {}),
       } as any);
     }
     // CREATE+CREATE unlikely but handle as merge into CREATE
@@ -201,6 +210,7 @@ export async function coalescePendingOperations(
     baseRevision,
     clientId,
     status: "pending",
+    ...(successorParentId ? { dependsOnOperationId: successorParentId, parentOperationId: successorParentId } : {}),
   } as any);
 }
 
@@ -242,8 +252,117 @@ export async function queueSyncOperation(
 export async function getPendingSyncOperations(): Promise<SyncOperation[]> {
   const operations = await db.syncOperations.toArray();
   return operations
-    .filter((op) => !op.synced && (op as any).status !== "terminal")
+    .filter((op) => !op.synced && (op as any).status !== "terminal" && (op as any).status !== "in_flight")
     .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function getInFlightOperations(): Promise<SyncOperation[]> {
+  const all = await db.syncOperations.toArray();
+  return all.filter((op) => (op as any).status === "in_flight").sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function transitionPendingToInFlight(operations: SyncOperation[]): Promise<SyncOperation[]> {
+  if (operations.length === 0) return [];
+  const ids = operations.map((o) => o.id!).filter(Boolean);
+  const operationIds = operations.map((o) => o.operationId);
+  // Atomically transition pending -> in_flight only for exact ids that are still pending
+  await db.transaction("rw", db.syncOperations, async () => {
+    for (let i = 0; i < operations.length; i++) {
+      const op = operations[i];
+      if (op.id === undefined) continue;
+      const current: any = await db.syncOperations.get(op.id);
+      if (!current) continue;
+      if (current.status === "pending" || current.status === "retrying" || (!current.status && !current.synced)) {
+        await db.syncOperations.update(op.id, { status: "in_flight" as any });
+      }
+    }
+  });
+  // Return immutable snapshot of in_flight ops (payload captured)
+  const updated: SyncOperation[] = [];
+  for (const oid of operationIds) {
+    const cur = await db.syncOperations.where("operationId").equals(oid).first();
+    if (cur && (cur as any).status === "in_flight") {
+      updated.push({ ...cur } as SyncOperation);
+    }
+  }
+  return updated;
+}
+
+export async function rebaseSuccessorsAfterSuccess(parentOperationId: string, newRevision: number): Promise<void> {
+  const all = await db.syncOperations.toArray();
+  const successors = all.filter((o: any) => (o.dependsOnOperationId === parentOperationId || o.parentOperationId === parentOperationId) && !o.synced && o.status !== "terminal" && o.status !== "in_flight");
+  for (const s of successors) {
+    await db.syncOperations.update(s.id!, {
+      baseRevision: newRevision,
+      dependsOnOperationId: undefined,
+      parentOperationId: undefined,
+    } as any);
+  }
+  // Also for any remaining pending for same entity that had no explicit depends but is pending successor (entity-local rebasing)
+  // Find inFlight entity key to identify successors without explicit depends
+  const parent = all.find((o: any) => o.operationId === parentOperationId);
+  if (parent) {
+    const siblingPending = all.filter((o: any) => o.entity === parent.entity && o.entityId === parent.entityId && !o.synced && o.status === "pending" && o.operationId !== parentOperationId);
+    for (const sib of siblingPending) {
+      const hasDepends = (sib as any).dependsOnOperationId || (sib as any).parentOperationId;
+      if (!hasDepends) {
+        await db.syncOperations.update(sib.id!, { baseRevision: newRevision } as any);
+      }
+    }
+  }
+}
+
+export async function revertInFlightToPending(operationId: string, error?: string, retrying = true): Promise<void> {
+  const op = await db.syncOperations.where("operationId").equals(operationId).first();
+  if (!op || (op as any).status !== "in_flight") return;
+  await db.syncOperations.update(op.id!, {
+    status: retrying ? "retrying" as any : "pending" as any,
+    lastError: error,
+    attempts: (op.attempts ?? 0) + 1,
+  } as any);
+  // Keep successors pending with original baseRevision — order preserved (parent before successor due to createdAt)
+  // Successors will be requeued after parent succeeds
+}
+
+export async function revertInFlightToTerminalAndRebaseSuccessors(operationId: string, error: string, currentRevision: number): Promise<void> {
+  const op = await db.syncOperations.where("operationId").equals(operationId).first();
+  if (!op) return;
+  // Mark parent as terminal then delete after reconciliation? For now mark terminal
+  await db.syncOperations.update(op.id!, { status: "terminal" as any, lastError: error, attempts: (op.attempts ?? 0) + 1 } as any);
+  // Rebase successors to canonical revision so they represent intent against current server state
+  const all = await db.syncOperations.toArray();
+  const successors = all.filter((o: any) => (o.dependsOnOperationId === operationId || o.parentOperationId === operationId || (o.entity === op.entity && o.entityId === op.entityId)) && o.id !== op.id && !o.synced && o.status !== "in_flight");
+  for (const s of successors) {
+    // For normal entity updates: rebase against canonical. For business transactions: keep but rebase (do not delete)
+    // Spec says never silently delete successor. So we keep and rebase.
+    await db.syncOperations.update(s.id!, {
+      baseRevision: currentRevision,
+      dependsOnOperationId: undefined,
+      parentOperationId: undefined,
+      lastError: `parent terminal ${error}; rebased`,
+    } as any);
+  }
+}
+
+export async function recoverAbandonedInFlightOperations(): Promise<number> {
+  const all = await db.syncOperations.toArray();
+  const abandoned = all.filter((op: any) => !op.synced && op.status === "in_flight");
+  if (abandoned.length === 0) return 0;
+  // Must run inside exclusive lock - caller ensures cross-tab ownership
+  await db.transaction("rw", db.syncOperations, async () => {
+    for (const op of abandoned) {
+      const cur: any = await db.syncOperations.get(op.id!);
+      if (!cur || cur.status !== "in_flight" || cur.synced) continue;
+      // Preserve all identity/payload fields, transition to retryable without new operationId
+      await db.syncOperations.update(cur.id!, {
+        status: "retrying" as any,
+        lastError: cur.lastError ? `${cur.lastError} | recovered abandoned in_flight` : "recovered abandoned in_flight",
+        // do not increment attempts here; next attempt will count
+        // keep dependsOn/parent, baseRevision, payload, createdAt, operationId
+      } as any);
+    }
+  });
+  return abandoned.length;
 }
 
 export async function getTerminalOperations(): Promise<SyncOperation[]> {

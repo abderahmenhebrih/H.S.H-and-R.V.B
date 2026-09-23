@@ -1,0 +1,14 @@
+Read every file in this fix-tool folder, starting with MASTER-FIX-INSTRUCTIONS.md.
+
+Work only on:
+C:\Users\islam\OneDrive\Desktop\H.S.H and R.V.B\H.S.H-V2.0.0
+
+This is H.S.H only. Do not touch R.V.B.
+
+Inspect the current source before editing. Do not repeat a broad audit. Fix only the remaining confirmed release blocker: crash/restart recovery of persisted in_flight sync operations, plus the test:hsh-client local tsx wiring issue.
+
+Preserve all green Pass-7 transaction, payment, queue, locking, reconciliation, and Office behavior.
+
+Implement the fix, add persistent regression coverage for crash-before-response and server-commit-before-client-ack, run all required tests, and return a precise report with exact pass/fail counts and git diff/status.
+
+Do not claim READY TO FREEZE unless every release criterion in MASTER-FIX-INSTRUCTIONS.md passes.

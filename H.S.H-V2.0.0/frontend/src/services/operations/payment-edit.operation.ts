@@ -37,6 +37,11 @@ export class PaymentEditOperation {
         throw new Error("Original account not found.");
       }
 
+      // Directional check: reversing old customer incoming deducts from bank — ensure sufficient
+      if (payment.entityType === "customer" && oldAccount.balance < payment.amount) {
+        throw new Error("Insufficient account balance to reverse customer payment.");
+      }
+
       // Reverse old payment
       switch (payment.entityType) {
         case "supplier": {
@@ -122,7 +127,9 @@ export class PaymentEditOperation {
         throw new Error("Account not found.");
       }
 
-      if (newAccount.balance < input.amount) {
+      // Incoming customer receives funds — no bank balance check; outgoing requires bank funds
+      const isOutgoingNew = ["supplier","worker","expense"].includes(input.entityType as string);
+      if (isOutgoingNew && newAccount.balance < input.amount) {
         throw new Error("Insufficient account balance.");
       }
 

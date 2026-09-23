@@ -34,7 +34,9 @@ export interface SyncOperation {
   lastError?: string;
   baseRevision?: number;
   clientId?: string;
-  status?: "pending" | "terminal" | "retrying";
+  status?: "pending" | "in_flight" | "terminal" | "retrying";
+  dependsOnOperationId?: string;
+  parentOperationId?: string;
 }
 
 export interface SyncMeta {
@@ -210,6 +212,33 @@ class HebrihDatabase extends Dexie {
     });
 
     this.version(9).stores({
+      products: "id, name, createdAt, updatedAt",
+      suppliers: "id, name, createdAt, updatedAt",
+      customers: "id, name, type, createdAt, updatedAt",
+      bankAccounts: "id, name, type, createdAt, updatedAt",
+      vehicles: "id, name, registrationNumber, type, createdAt, updatedAt",
+      workers: "id, name, status, position, employmentDate, createdAt, updatedAt",
+      expenses: "id, accountId, date, createdAt, updatedAt",
+      tasks: "id, deadline, createdAt, updatedAt",
+      purchases: "id, supplierId, date, createdAt, updatedAt",
+      sales: "id, customerId, date, createdAt, updatedAt",
+      payments: "id, entityType, entityId, accountId, date, createdAt, updatedAt",
+      transfers: "id, fromAccountId, toAccountId, date, createdAt, updatedAt",
+      injuryEquations: "id, productId, enabled, createdAt, updatedAt",
+      settings: "id",
+      notifications: "id, type, severity, createdAt, readAt, archivedAt, priority, sourceEventId, syncStatus, serverRevision",
+      invoices: "id, sellerProfileId, invoiceNumber, status, customerId, invoiceDate, createdAt, updatedAt",
+      invoiceSellerProfiles: "id, commercialName, invoicePrefix, nextNumber, enabled, createdAt, updatedAt",
+      invoiceTaxProfiles: "id, code, vatRate, enabled, createdAt, updatedAt",
+      incomingInvoices: "id, supplierId, supplierInvoiceNumber, invoiceDate, createdAt, updatedAt",
+      officeFiles: "id, type, title, updatedAt, lastOpenedAt, isArchived, syncStatus",
+      syncOperations:
+        "++id, operationId, entity, entityId, operation, createdAt, synced, clientId, status",
+      syncMeta: "key",
+      syncConflicts: "++id, entity, entityId, operationId, serverRevision",
+    });
+
+    this.version(10).stores({
       products: "id, name, createdAt, updatedAt",
       suppliers: "id, name, createdAt, updatedAt",
       customers: "id, name, type, createdAt, updatedAt",

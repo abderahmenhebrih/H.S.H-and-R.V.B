@@ -265,21 +265,11 @@ async function checkStaleCrossClient(
   operation: SyncRequestOperation,
   existingRev: number,
 ): Promise<boolean> {
-  // Returns true if should reject as stale cross-client
+  // P0 Fix: reject ALL stale revisions regardless of clientId.
+  // Sequential local intent must be handled by client coalescing + successor rebasing, not server bypass.
   if (operation.baseRevision === undefined) return false;
   if (operation.baseRevision >= existingRev) return false;
-  // Find last SyncChange for this entity to get sourceClientId
-  try {
-    const last = await SyncChangeModel.findOne({ entity: operation.entity, entityId: operation.entityId })
-      .sort({ revision: -1 })
-      .session(session)
-      .lean();
-    const lastClient = (last as any)?.sourceClientId;
-    if (lastClient && lastClient === operation.clientId) return false; // same client sequential allowed
-    return true;
-  } catch {
-    return true;
-  }
+  return true;
 }
 
 async function handleSaleCreate(session: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
@@ -355,8 +345,9 @@ async function handlePaymentCreate(session: any, payload: Record<string, unknown
   const entityType = String((payload as any).entityType);
   const acc: any = await BankAccountModel.findOne({ id: accountId }).session(session);
   if (!acc) return "ACCOUNT_NOT_FOUND";
-  if (acc.balance < amount) return "INSUFFICIENT_BANK_BALANCE";
+  // Bank funds check is directional: only outgoing requires bank funds. Customer incoming receives funds.
   if (entityType === "supplier") {
+    if (acc.balance < amount) return "INSUFFICIENT_BANK_BALANCE";
     const sup: any = await SupplierModel.findOne({ id: entityId }).session(session);
     if (!sup) return "SUPPLIER_NOT_FOUND";
     if (sup.balance < amount) return "INSUFFICIENT_SUPPLIER_BALANCE";
@@ -374,6 +365,7 @@ async function handlePaymentCreate(session: any, payload: Record<string, unknown
     const cust: any = await CustomerModel.findOne({ id: entityId }).session(session);
     if (!cust) return "CUSTOMER_NOT_FOUND";
     if (cust.balance < amount) return "INSUFFICIENT_CUSTOMER_BALANCE";
+    // Incoming: Bank receives funds, no bank balance check required
     await CustomerModel.updateOne({ id: entityId }, { $inc: { balance: -amount } }, { session });
     await BankAccountModel.updateOne({ id: accountId }, { $inc: { balance: amount } }, { session });
     const custAfter: any = await CustomerModel.findOne({ id: entityId }).session(session);
@@ -385,6 +377,7 @@ async function handlePaymentCreate(session: any, payload: Record<string, unknown
     await BankAccountModel.updateOne({ id: accountId }, { $set: { serverRevision: rev2 } }, { session });
     await SyncChangeModel.create([{ revision: rev2, entity: "bankAccount", entityId: accountId, operation: "update", payload: accAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
   } else if (entityType === "worker") {
+    if (acc.balance < amount) return "INSUFFICIENT_BANK_BALANCE";
     const { WorkerModel } = await import("../models/worker.model");
     const w: any = await WorkerModel.findOne({ id: entityId }).session(session);
     if (!w) return "WORKER_NOT_FOUND";
@@ -401,6 +394,7 @@ async function handlePaymentCreate(session: any, payload: Record<string, unknown
     await BankAccountModel.updateOne({ id: accountId }, { $set: { serverRevision: rev2 } }, { session });
     await SyncChangeModel.create([{ revision: rev2, entity: "bankAccount", entityId: accountId, operation: "update", payload: accAfter, changedAt: new Date(), sourceClientId: clientId } as any], { session });
   } else if (entityType === "expense") {
+    if (acc.balance < amount) return "INSUFFICIENT_BANK_BALANCE";
     await BankAccountModel.updateOne({ id: accountId }, { $inc: { balance: -amount } }, { session });
     const accAfter: any = await BankAccountModel.findOne({ id: accountId }).session(session);
     const rev = await getNextRevision(session);
@@ -700,24 +694,37 @@ async function handlePaymentUpdate(session: any, existingPayment: any, payload: 
   } else return "PAYMENT_TYPE_INVALID";
   const newAccount: any = await BankAccountModel.findOne({ id: newAccountId }).session(session);
   if (!newAccount) return "ACCOUNT_NOT_FOUND";
-  let projectedNewAccountBalance = newAccount.balance;
-  if (oldAccountId === newAccountId) {
-    if (oldEntityType === "supplier" || oldEntityType === "worker" || oldEntityType === "expense") projectedNewAccountBalance += oldAmount;
-    else if (oldEntityType === "customer") projectedNewAccountBalance -= oldAmount;
+  // Directional validation before applying update.
+  // Reversal may affect bank negatively when old is customer (bank loses funds).
+  // Apply checks atomically using projected balances.
+  // Build projected Bank balances map
+  const bankBalances = new Map<string, number>();
+  bankBalances.set(oldAccountId, oldAccount.balance);
+  if (newAccountId !== oldAccountId) bankBalances.set(newAccountId, newAccount.balance);
+  // Simulate reversal effect on banks
+  if (oldEntityType === "customer") {
+    const bal = bankBalances.get(oldAccountId)! - oldAmount;
+    if (bal < 0) return "INSUFFICIENT_BANK_BALANCE";
+    bankBalances.set(oldAccountId, bal);
+  } else if (oldEntityType === "supplier" || oldEntityType === "worker" || oldEntityType === "expense") {
+    bankBalances.set(oldAccountId, bankBalances.get(oldAccountId)! + oldAmount);
   }
-  if (projectedNewAccountBalance < newAmount) return "INSUFFICIENT_BANK_BALANCE";
+  // Validate new entity balances and new bank requirement
   if (newEntityType === "supplier") {
     const nd: any = await SupplierModel.findOne({ id: newEntityId }).session(session);
     if (!nd) return "SUPPLIER_NOT_FOUND";
     let projected = nd.balance;
     if (oldEntityType === "supplier" && oldEntityId === newEntityId) projected += oldAmount;
     if (projected < newAmount) return "INSUFFICIENT_SUPPLIER_BALANCE";
+    const bankBal = bankBalances.get(newAccountId)!;
+    if (bankBal < newAmount) return "INSUFFICIENT_BANK_BALANCE";
   } else if (newEntityType === "customer") {
     const nd: any = await CustomerModel.findOne({ id: newEntityId }).session(session);
     if (!nd) return "CUSTOMER_NOT_FOUND";
     let projected = nd.balance;
     if (oldEntityType === "customer" && oldEntityId === newEntityId) projected += oldAmount;
     if (projected < newAmount) return "INSUFFICIENT_CUSTOMER_BALANCE";
+    // Incoming: Bank receives, no bank balance check (even after reversal)
   } else if (newEntityType === "worker") {
     const nd: any = await WorkerModel.findOne({ id: newEntityId }).session(session);
     if (!nd) return "WORKER_NOT_FOUND";
@@ -725,9 +732,13 @@ async function handlePaymentUpdate(session: any, existingPayment: any, payload: 
     let projected = nd.balance;
     if (oldEntityType === "worker" && oldEntityId === newEntityId) projected += oldAmount;
     if (projected < newAmount) return "INSUFFICIENT_WORKER_BALANCE";
+    const bankBal = bankBalances.get(newAccountId)!;
+    if (bankBal < newAmount) return "INSUFFICIENT_BANK_BALANCE";
   } else if (newEntityType === "expense") {
     const e: any = await ExpenseModel.findOne({ id: newEntityId }).session(session);
     if (!e) return "EXPENSE_NOT_FOUND";
+    const bankBal = bankBalances.get(newAccountId)!;
+    if (bankBal < newAmount) return "INSUFFICIENT_BANK_BALANCE";
   }
   if (oldEntityType === "supplier") {
     await SupplierModel.updateOne({ id: oldEntityId }, { $inc: { balance: oldAmount } }, { session });
@@ -809,6 +820,8 @@ async function handlePaymentDelete(session: any, existingPayment: any, clientId:
   } else if (oldEntityType === "customer") {
     const c: any = await CustomerModel.findOne({ id: oldEntityId }).session(session);
     if (!c) return "CUSTOMER_NOT_FOUND";
+    // Reversing customer payment deducts from Bank — ensure sufficient
+    if (oldAccount.balance < oldAmount) return "INSUFFICIENT_BANK_BALANCE";
   } else if (oldEntityType === "worker") {
     const w: any = await WorkerModel.findOne({ id: oldEntityId }).session(session);
     if (!w) return "WORKER_NOT_FOUND";

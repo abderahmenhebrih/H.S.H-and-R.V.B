@@ -1,4 +1,4 @@
-import { getServerRevision, setServerRevision, getPendingSyncOperations, getOrCreateClientId } from "./queue";
+import { getServerRevision, setServerRevision, getPendingSyncOperations, getOrCreateClientId, recoverAbandonedInFlightOperations } from "./queue";
 import { syncPendingOperations, fetchRemoteChanges, fetchBootstrap } from "./client";
 import { applyRemoteChanges, applyBootstrapChanges } from "./apply";
 import { db } from "@/src/lib/database/db";
@@ -125,6 +125,107 @@ async function pullPhase(): Promise<void> {
   if (totalPulled > 0) console.log(`[sync] pull completed, total ${totalPulled}, now at ${after}`);
 }
 
+let cachedTabOwnerId: string | null = null;
+export function getTabOwnerId(): string {
+  if (cachedTabOwnerId) return cachedTabOwnerId;
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      const stored = sessionStorage.getItem("hsh-tab-owner");
+      if (stored) { cachedTabOwnerId = stored; return stored; }
+      const gen = (Math.random().toString(36).slice(2) + Date.now().toString(36));
+      sessionStorage.setItem("hsh-tab-owner", gen);
+      cachedTabOwnerId = gen;
+      return gen;
+    }
+  } catch {}
+  try {
+    // fallback to generateId if available dynamically
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { generateId: genFn } = require("@/src/lib/id");
+    cachedTabOwnerId = genFn();
+  } catch {
+    cachedTabOwnerId = `tab-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  }
+  return cachedTabOwnerId!;
+}
+export function __resetTabOwnerForTest(): void { cachedTabOwnerId = null; try{ sessionStorage?.removeItem("hsh-tab-owner"); }catch{} }
+
+export const FALLBACK_LEASE_KEY = "syncLease";
+export const FALLBACK_TTL = 30000;
+export const FALLBACK_HEARTBEAT = 10000;
+
+export interface FallbackLease { ownerId: string; expiresAt: number; }
+
+export async function getFallbackLease(): Promise<FallbackLease | null> {
+  const rec = await db.syncMeta.get(FALLBACK_LEASE_KEY);
+  if (!rec?.value || typeof rec.value !== "object") {
+    // legacy numeric expiry -> treat as expired owner unknown
+    if (typeof rec?.value === "number") return null;
+    return null;
+  }
+  const v: any = rec.value;
+  if (typeof v.ownerId === "string" && typeof v.expiresAt === "number") return v as FallbackLease;
+  return null;
+}
+
+export async function tryAcquireFallbackLease(ownerId: string): Promise<boolean> {
+  const now = Date.now();
+  let acquired = false;
+  try {
+    await db.transaction("rw", db.syncMeta, async () => {
+      const rec = await db.syncMeta.get(FALLBACK_LEASE_KEY);
+      const cur: any = rec?.value;
+      let expiresAt: number | undefined;
+      let curOwner: string | undefined;
+      if (cur && typeof cur === "object" && typeof cur.expiresAt === "number") { expiresAt = cur.expiresAt; curOwner = cur.ownerId; }
+      else if (typeof cur === "number") { expiresAt = cur; }
+      if (!expiresAt || expiresAt < now || curOwner === ownerId) {
+        await db.syncMeta.put({ key: FALLBACK_LEASE_KEY, value: { ownerId, expiresAt: now + FALLBACK_TTL } });
+        acquired = true;
+      }
+    });
+  } catch {}
+  return acquired;
+}
+
+export async function renewFallbackLease(ownerId: string): Promise<boolean> {
+  const now = Date.now();
+  let renewed = false;
+  try {
+    await db.transaction("rw", db.syncMeta, async () => {
+      const rec = await db.syncMeta.get(FALLBACK_LEASE_KEY);
+      const cur: any = rec?.value;
+      if (!cur || typeof cur !== "object" || cur.ownerId !== ownerId) return;
+      // only renew if still owner
+      await db.syncMeta.put({ key: FALLBACK_LEASE_KEY, value: { ownerId, expiresAt: now + FALLBACK_TTL } });
+      renewed = true;
+    });
+  } catch {}
+  return renewed;
+}
+
+export async function releaseFallbackLease(ownerId: string): Promise<boolean> {
+  let released = false;
+  try {
+    await db.transaction("rw", db.syncMeta, async () => {
+      const rec = await db.syncMeta.get(FALLBACK_LEASE_KEY);
+      const cur: any = rec?.value;
+      if (!cur) return;
+      // Legacy numeric lease: treat as not owned by anyone, allow release only if caller expects numeric? But spec says owner-safe, so don't delete numeric leases unless expired? For safety, if legacy numeric, we delete but not owner-safe.
+      if (typeof cur === "number") {
+        // numeric legacy: allow deletion only if expired
+        if (cur < Date.now()) { await db.syncMeta.delete(FALLBACK_LEASE_KEY); released = true; }
+        return;
+      }
+      if (typeof cur === "object" && cur.ownerId === ownerId) {
+        await db.syncMeta.delete(FALLBACK_LEASE_KEY);
+        released = true;
+      }
+    });
+  } catch {}
+  return released;
+}
+
 async function withCrossTabLock(task: () => Promise<void>): Promise<boolean> {
   // Prefer navigator.locks if available (automatically released on crash/tab close)
   const nav: any = typeof navigator !== "undefined" ? (navigator as any) : undefined;
@@ -134,32 +235,27 @@ async function withCrossTabLock(task: () => Promise<void>): Promise<boolean> {
     });
     return true;
   }
-  // Fallback: IndexedDB lease via syncMeta (crash-safe via TTL expiry)
-  const leaseKey = "syncLease";
-  const ttl = 30000;
-  const now = Date.now();
-  let acquired = false;
-  try {
-    await db.transaction("rw", db.syncMeta, async () => {
-      const rec = await db.syncMeta.get(leaseKey);
-      const expiry = rec?.value as number | undefined;
-      if (!expiry || expiry < now) {
-        await db.syncMeta.put({ key: leaseKey, value: now + ttl });
-        acquired = true;
-      }
-    });
-  } catch {}
+  // Fallback: IndexedDB lease via syncMeta with owner + heartbeat (crash-safe via TTL)
+  const ownerId = getTabOwnerId();
+  const acquired = await tryAcquireFallbackLease(ownerId);
   if (!acquired) {
     console.log("[sync] cross-tab lease held, skipping sync");
     return false;
   }
+  let heartbeat: any = null;
   try {
+    heartbeat = setInterval(async () => {
+      const ok = await renewFallbackLease(ownerId);
+      if (!ok) {
+        console.warn("[sync] fallback lease heartbeat failed, lost ownership");
+        if (heartbeat) clearInterval(heartbeat);
+      }
+    }, FALLBACK_HEARTBEAT);
     await task();
     return true;
   } finally {
-    try {
-      await db.syncMeta.delete(leaseKey);
-    } catch {}
+    if (heartbeat) clearInterval(heartbeat);
+    await releaseFallbackLease(ownerId);
   }
 }
 
@@ -180,6 +276,13 @@ export async function syncCycle(): Promise<void> {
           await runLegacyBackfill();
         } catch (e) {
           console.warn("[sync] legacy backfill failed", e);
+        }
+        // Recover abandoned in_flight only while owning exclusive lock (safe per RECOVERY-DESIGN-NOTES)
+        try {
+          const recovered = await recoverAbandonedInFlightOperations();
+          if (recovered > 0) console.log(`[sync] recovered ${recovered} abandoned in_flight operations`);
+        } catch (e) {
+          console.warn("[sync] abandoned in_flight recovery failed", e);
         }
         // Push first
         await pushPhase();

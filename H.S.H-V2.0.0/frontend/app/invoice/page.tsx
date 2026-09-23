@@ -642,9 +642,19 @@ export default function InvoicePage() {
 
   const filteredSales = useMemo(() => {
     if (!selectedCustomerId) return [];
-    const invoicedSaleIds = new Set(invoices.filter(i=> i.status==="ISSUED" && Array.isArray(i.sourceSaleIds)).flatMap(i=> i.sourceSaleIds));
-    return sales.filter(s => s.customerId === selectedCustomerId && !invoicedSaleIds.has(s.id));
-  }, [sales, selectedCustomerId, invoices]);
+    const blockedIds = new Set<string>();
+    for (const inv of invoices) {
+      if (!Array.isArray((inv as any).sourceSaleIds)) continue;
+      if (inv.status === "ISSUED") {
+        for (const sid of (inv as any).sourceSaleIds) blockedIds.add(sid);
+      } else if (inv.status === "DRAFT") {
+        // Allow re-selecting the sale of the draft currently being edited
+        if (editingDraftId && inv.id === editingDraftId) continue;
+        for (const sid of (inv as any).sourceSaleIds) blockedIds.add(sid);
+      }
+    }
+    return sales.filter(s => s.customerId === selectedCustomerId && !blockedIds.has(s.id));
+  }, [sales, selectedCustomerId, invoices, editingDraftId]);
 
   const selectedSale = useMemo(() => {
     return sales.find(s => s.id === selectedSaleId);
@@ -693,10 +703,20 @@ export default function InvoicePage() {
         }
         const vatRate = Number(taxProfile.vatRate);
         const otherTaxRate = Number(taxProfile.otherTaxRate || 0);
+        if (!Number.isFinite(vatRate) || vatRate < 0 || vatRate > 100 || !Number.isFinite(otherTaxRate) || otherTaxRate < 0 || otherTaxRate > 100) {
+          setError(t.taxUnresolved);
+          setSaving(false);
+          return;
+        }
         const totalHT = Math.round(item.weightKg * item.price * 100)/100;
         const taxAmount = Math.round(totalHT * (vatRate/100) * 100)/100;
         const otherTaxAmount = Math.round(totalHT * (otherTaxRate/100) * 100)/100;
         const totalTTC = Math.round((totalHT + taxAmount + otherTaxAmount)*100)/100;
+        if (!Number.isFinite(totalHT) || !Number.isFinite(taxAmount) || !Number.isFinite(otherTaxAmount) || !Number.isFinite(totalTTC)) {
+          setError(t.taxUnresolved);
+          setSaving(false);
+          return;
+        }
         lines.push({
           productId: item.productId,
           description: product?.name ?? item.productId,
@@ -724,6 +744,19 @@ export default function InvoicePage() {
       const taxTotal = Math.round(lines.reduce((sum, l) => sum + l.taxAmount, 0)*100)/100;
       const otherTaxTotal = Math.round(lines.reduce((sum, l) => sum + (l.otherTaxAmount||0), 0)*100)/100;
       const totalTTC = Math.round(lines.reduce((sum, l) => sum + l.totalTTC, 0)*100)/100;
+      if (!Number.isFinite(subtotalHT) || !Number.isFinite(taxTotal) || !Number.isFinite(otherTaxTotal) || !Number.isFinite(totalTTC)) {
+        setError(t.taxUnresolved);
+        setSaving(false);
+        return;
+      }
+      const rawCurrencyDraft = (seller as any).defaultCurrency || docDefaults?.defaultCurrency || currency || "DA";
+      const allowedCurrenciesDraft: readonly string[] = ["DA","€","$"];
+      if (!allowedCurrenciesDraft.includes(String(rawCurrencyDraft).trim())) {
+        setError(t.invoiceCurrencyInvalid);
+        setSaving(false);
+        return;
+      }
+      const validatedCurrencyDraft = String(rawCurrencyDraft).trim();
       
       // Determine id and timestamps: reuse editingDraftId if editing
       const isEdit = !!editingDraftId;
@@ -790,7 +823,7 @@ export default function InvoicePage() {
         taxTotal,
         otherTaxTotal,
         totalTTC,
-        currencyCode: (() => { const v = seller.defaultCurrency || docDefaults?.defaultCurrency || currency || "DA"; return ["DA","€","$"].includes(v) ? v : "DA"; })(),
+        currencyCode: validatedCurrencyDraft,
         documentLanguage,
         notes: notes || undefined,
         createdAt: createdAtVal,
@@ -844,9 +877,25 @@ export default function InvoicePage() {
         }
         const vatRate = Number(taxProfile.vatRate);
         const otherTaxRate = Number(taxProfile.otherTaxRate || 0);
+        if (!Number.isFinite(vatRate) || vatRate < 0 || vatRate > 100 || !Number.isFinite(otherTaxRate) || otherTaxRate < 0 || otherTaxRate > 100) {
+          setError(t.taxUnresolved);
+          setSaving(false);
+          return;
+        }
         const totalHT = Math.round(item.weightKg * item.price * 100)/100;
         const taxAmount = Math.round(totalHT * (vatRate/100) * 100)/100;
         const otherTaxAmount = Math.round(totalHT * (otherTaxRate/100) * 100)/100;
+        if (!Number.isFinite(totalHT) || !Number.isFinite(taxAmount) || !Number.isFinite(otherTaxAmount)) {
+          setError(t.taxUnresolved);
+          setSaving(false);
+          return;
+        }
+        const lineTotalTTCInt = Math.round((totalHT + taxAmount + otherTaxAmount)*100)/100;
+        if (!Number.isFinite(lineTotalTTCInt)) {
+          setError(t.taxUnresolved);
+          setSaving(false);
+          return;
+        }
         lines.push({
           productId: item.productId,
           description: product?.name ?? item.productId,
@@ -866,13 +915,26 @@ export default function InvoicePage() {
           otherTaxRate: otherTaxRate || undefined,
           otherTaxLabel: taxProfile.otherTaxLabel,
           otherTaxAmount: otherTaxAmount || undefined,
-          totalTTC: Math.round((totalHT + taxAmount + otherTaxAmount)*100)/100,
+          totalTTC: lineTotalTTCInt,
         });
       }
       const subtotalHT = Math.round(lines.reduce((s, l) => s + l.totalHT, 0)*100)/100;
       const taxTotal = Math.round(lines.reduce((s, l) => s + l.taxAmount, 0)*100)/100;
       const otherTaxTotal = Math.round(lines.reduce((s, l) => s + (l.otherTaxAmount||0), 0)*100)/100;
       const totalTTC = Math.round(lines.reduce((s, l) => s + l.totalTTC, 0)*100)/100;
+      if (!Number.isFinite(subtotalHT) || !Number.isFinite(taxTotal) || !Number.isFinite(otherTaxTotal) || !Number.isFinite(totalTTC)) {
+        setError(t.taxUnresolved);
+        setSaving(false);
+        return;
+      }
+      const rawCurrencyIssue = (seller as any).defaultCurrency || docDefaults?.defaultCurrency || currency || "DA";
+      const allowedCurrenciesIssue: readonly string[] = ["DA","€","$"];
+      if (!allowedCurrenciesIssue.includes(String(rawCurrencyIssue).trim())) {
+        setError(t.invoiceCurrencyInvalid);
+        setSaving(false);
+        return;
+      }
+      const validatedCurrencyIssue = String(rawCurrencyIssue).trim();
       // Find applicable local DRAFT for same seller + source sale to atomically replace on server
       let draftIdToSend: string | undefined;
       try {
@@ -895,7 +957,7 @@ export default function InvoicePage() {
           paymentMethodId: paymentMethod,
           paymentMethodLabel: (paymentMethodsConfig.find((p:any)=>p.id===paymentMethod)?.label || paymentMethod),
           documentLanguage,
-          currencyCode: (() => { const v = seller.defaultCurrency || docDefaults?.defaultCurrency || currency || "DA"; return ["DA","€","$"].includes(v) ? v : "DA"; })(),
+          currencyCode: validatedCurrencyIssue,
           notes: notes || undefined,
           lines,
           subtotalHT,
@@ -1234,13 +1296,19 @@ export default function InvoicePage() {
                   (() => {
                     const taxProfile = taxProfiles.find(tp => tp.id === selectedTaxProfileId && (tp as any).enabled === true) || (selectedSale.items[0] ? products.find(p=>p.id===selectedSale.items[0].productId)?.taxProfileId ? taxProfiles.find(tp=>tp.id===products.find(p=>p.id===selectedSale.items[0].productId)?.taxProfileId && (tp as any).enabled === true) : null : null) || sellerProfiles.find(s=>s.id===selectedSellerId)?.defaultTaxProfileId ? taxProfiles.find(tp=>tp.id===sellerProfiles.find(s=>s.id===selectedSellerId)?.defaultTaxProfileId && (tp as any).enabled === true) : null;
                     const vatRate = taxProfile?.vatRate;
-                    if (vatRate == null) {
+                    const vatNum = Number(vatRate);
+                    if (vatRate == null || !Number.isFinite(vatNum) || vatNum < 0 || vatNum > 100) {
                       return <div style={{ padding: 20, color: "#B00020", fontWeight: 700 }}>{language==="fr"?"Sélectionnez un profil fiscal": language==="ar"?"اختر الملف الضريبي":"Select a tax profile — unresolved line"}</div>;
                     }
                     const lines = selectedSale.items.map(item => {
                       const product = products.find(p => p.id === item.productId);
                       const totalHT = Math.round(item.weightKg * item.price * 100)/100;
-                      const taxAmount = Math.round(totalHT * (vatRate/100) * 100)/100;
+                      const taxAmount = Math.round(totalHT * (vatNum/100) * 100)/100;
+                      if (!Number.isFinite(totalHT) || !Number.isFinite(taxAmount)) {
+                        return null as any;
+                      }
+                      const lineTTC = Math.round((totalHT + taxAmount)*100)/100;
+                      if (!Number.isFinite(lineTTC)) return null as any;
                       return {
                         productId: item.productId,
                         description: product?.name ?? item.productId,
@@ -1253,16 +1321,27 @@ export default function InvoicePage() {
                         discountAmount: 0,
                         totalHT,
                         taxProfileId: taxProfile?.id,
-                        taxRate: vatRate,
+                        taxRate: vatNum,
                         taxAmount,
                         otherTaxRate: 0,
                         otherTaxAmount: 0,
-                        totalTTC: Math.round((totalHT + taxAmount)*100)/100,
+                        totalTTC: lineTTC,
                       };
                     });
+                    if (lines.some((l:any)=> !l || !Number.isFinite(l.totalHT) || !Number.isFinite(l.taxAmount) || !Number.isFinite(l.totalTTC))) {
+                      return <div style={{ padding: 20, color: "#B00020", fontWeight: 700 }}>{t.taxUnresolved}</div>;
+                    }
                     const subtotalHT = Math.round(lines.reduce((s,l)=>s+l.totalHT,0)*100)/100;
                     const taxTotal = Math.round(lines.reduce((s,l)=>s+l.taxAmount,0)*100)/100;
                     const totalTTC = Math.round(lines.reduce((s,l)=>s+l.totalTTC,0)*100)/100;
+                    if (!Number.isFinite(subtotalHT) || !Number.isFinite(taxTotal) || !Number.isFinite(totalTTC)) {
+                      return <div style={{ padding: 20, color: "#B00020", fontWeight: 700 }}>{t.taxUnresolved}</div>;
+                    }
+                    const previewCurrencyRaw = (selectedSeller as any).defaultCurrency || docDefaults?.defaultCurrency || currency || "DA";
+                    if (!["DA","€","$"].includes(String(previewCurrencyRaw).trim())) {
+                      return <div style={{ padding: 20, color: "#B00020", fontWeight: 700 }}>{t.invoiceCurrencyInvalid}</div>;
+                    }
+                    const previewCurrency = String(previewCurrencyRaw).trim();
                     const draftPreview: Invoice = {
                       id: "draft-preview",
                       status: "DRAFT",
@@ -1315,7 +1394,7 @@ export default function InvoicePage() {
                       taxTotal,
                       otherTaxTotal: 0,
                       totalTTC,
-                      currencyCode: (() => { const v = selectedSeller.defaultCurrency || docDefaults?.defaultCurrency || currency || "DA"; return ["DA","€","$"].includes(v) ? v : "DA"; })(),
+                      currencyCode: previewCurrency,
                       documentLanguage,
                       notes: notes || undefined,
                       createdAt: Date.now(),

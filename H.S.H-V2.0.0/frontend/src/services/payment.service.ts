@@ -12,8 +12,11 @@ export class PaymentService extends BaseService {
     date: number;
     note?: string;
   }): Promise<Payment> {
-    if (input.amount <= 0) {
-      throw new Error("Payment amount must be greater than zero.");
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error("Payment amount must be a finite number greater than zero.");
+    }
+    if (!Number.isFinite(input.date)) {
+      throw new Error("Payment date must be a valid finite timestamp.");
     }
 
     this.assertValidId(input.entityId, "Payment entity");

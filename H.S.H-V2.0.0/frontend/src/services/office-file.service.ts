@@ -122,19 +122,18 @@ export class OfficeFileService extends BaseService {
   }
 
   async touchOpened(id: string): Promise<void> {
-    await officeFileRepository.update(id, { lastOpenedAt: Date.now() } as any, { source: "local" } as any).catch(async () => {
-      // Fallback via service (will queue sync but lastOpenedAt is not critical)
-      await this.update(id, { lastOpenedAt: Date.now() } as any).catch(() => {});
-    });
-    // Direct low-level touch without sync queue is preferable for lastOpenedAt, but BaseRepository always queues.
-    // We'll use a silent update that doesn't trigger sync by using source remote pattern then revert?
-    // For now, ensure we at least update timestamp locally without infinite loop.
+    // lastOpenedAt is local-only, should not enqueue sync
     try {
       const { db } = await import("../lib/database/db");
       const { runAsRemote } = await import("../lib/database/sync-hooks");
       await runAsRemote(async () => {
         await db.officeFiles.update(id, { lastOpenedAt: Date.now() });
       });
+      return;
+    } catch {}
+    // fallback: silent local update if hook not available
+    try {
+      await officeFileRepository.update(id, { lastOpenedAt: Date.now() } as any, { source: "local" } as any);
     } catch {}
   }
 }

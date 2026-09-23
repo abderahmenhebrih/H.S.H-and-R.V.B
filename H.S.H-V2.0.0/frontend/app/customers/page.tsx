@@ -23,8 +23,9 @@ import { settingsService } from "../../src/services/settings.service";
 import {
   SETTINGS_EVENT,
   DEFAULT_SETTINGS,
+  formatCurrency,
 } from "../../src/lib/settings";
-import type { Language } from "../../src/types/settings/settings";
+import type { Currency, Language } from "../../src/types/settings/settings";
 
 import type { Customer } from "../../src/types/entities/customer";
 
@@ -279,7 +280,7 @@ const TRANSLATIONS = {
     type: "Type",
     phone: "Phone",
     balance: "Balance",
-    balanceDA: "Balance (DA)",
+    balanceDA: "Balance",
     actions: "Actions",
     addCustomer: "Add Customer",
     loading: "Loading customers...",
@@ -317,7 +318,7 @@ const TRANSLATIONS = {
     cancel: "Cancel",
     delete: "Delete",
     edit: "Edit",
-    invalidPhone: "Phone number must contain digits only.",
+    invalidPhone: "Phone may contain +, digits, spaces and dashes only.",
     invoiceIdentity: "Invoice Identity",
     invoiceCustomerType: "Invoice customer type",
     consumer: "Consumer",
@@ -348,7 +349,7 @@ const TRANSLATIONS = {
     type: "Type",
     phone: "Téléphone",
     balance: "Solde",
-    balanceDA: "Solde (DA)",
+    balanceDA: "Solde",
     actions: "Actions",
     addCustomer: "Ajouter un client",
     loading: "Chargement des clients...",
@@ -386,7 +387,7 @@ const TRANSLATIONS = {
     cancel: "Annuler",
     delete: "Supprimer",
     edit: "Modifier",
-    invalidPhone: "Le numéro de téléphone doit contenir uniquement des chiffres.",
+    invalidPhone: "Le téléphone peut contenir +, chiffres, espaces et tirets uniquement.",
     invoiceIdentity: "Identité de facturation",
     invoiceCustomerType: "Type de client facturation",
     consumer: "Particulier",
@@ -417,7 +418,7 @@ const TRANSLATIONS = {
     type: "النوع",
     phone: "الهاتف",
     balance: "الرصيد",
-    balanceDA: "الرصيد (دج)",
+    balanceDA: "الرصيد",
     actions: "الإجراءات",
     addCustomer: "إضافة عميل",
     loading: "جارٍ تحميل العملاء...",
@@ -455,7 +456,7 @@ const TRANSLATIONS = {
     cancel: "إلغاء",
     delete: "حذف",
     edit: "تعديل",
-    invalidPhone: "يجب أن يحتوي رقم الهاتف على أرقام فقط.",
+    invalidPhone: "قد يحتوي الهاتف على + وأرقام ومسافات وشرطات فقط.",
     invoiceIdentity: "هوية الفوترة",
     invoiceCustomerType: "نوع الزبون للفوترة",
     consumer: "مستهلك",
@@ -493,6 +494,7 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [language, setLanguage] = useState<Language>(DEFAULT_SETTINGS.language);
+  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.currency);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -514,15 +516,16 @@ export default function CustomersPage() {
   );
 
   useEffect(() => {
-    const readLanguage = async () => {
+    const readSettings = async () => {
       const settings = await settingsService.get();
       setLanguage(settings?.language ?? DEFAULT_SETTINGS.language);
+      setCurrency(settings?.currency ?? DEFAULT_SETTINGS.currency);
     };
 
-    readLanguage();
+    readSettings();
 
     const handleSettingsChange = () => {
-      readLanguage();
+      readSettings();
     };
 
     window.addEventListener(SETTINGS_EVENT, handleSettingsChange);
@@ -650,7 +653,7 @@ export default function CustomersPage() {
       return;
     }
 
-    if (!/^\d+$/.test(form.phone.trim())) {
+    if (!/^\+?[0-9\s\-]+$/.test(form.phone.trim())) {
       setError(t.invalidPhone);
       return;
     }
@@ -794,7 +797,7 @@ export default function CustomersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalBalance}</span>
-                <strong className={styles.summaryValue}>{totalBalance.toFixed(2)} DA</strong>
+                <strong className={styles.summaryValue}>{formatCurrency(totalBalance, currency)}</strong>
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>
@@ -834,7 +837,7 @@ export default function CustomersPage() {
               <span>{t.customer}</span>
               <span>{t.type}</span>
               <span>{t.phone}</span>
-              <span>{t.balanceDA}</span>
+              <span>{`${t.balance} (${currency})`}</span>
               <span>{t.actions}</span>
             </div>
 
@@ -886,7 +889,7 @@ export default function CustomersPage() {
                           : styles.balanceValue
                       }
                     >
-                      {customer.balance.toFixed(2)} DA
+                      {formatCurrency(customer.balance, currency)}
                     </strong>
 
                     <div className={styles.rowActions}>
@@ -951,65 +954,25 @@ export default function CustomersPage() {
                     <input
                       ref={phoneRef}
                       type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                      inputMode="tel"
+                      pattern="^\+?[0-9\s\-]*$"
                       autoComplete="tel"
                       dir="ltr"
                       value={form.phone}
                       className={error === t.invalidPhone ? styles.inputInvalid : undefined}
                       aria-invalid={error === t.invalidPhone}
                       onChange={(event) => {
-                        const filtered = event.target.value.replace(/\D/g, "");
-                        setForm({ ...form, phone: filtered });
-                        if (error === t.invalidPhone && /^\d*$/.test(filtered)) {
+                        const raw = event.target.value;
+                        setForm({ ...form, phone: raw });
+                        if (error === t.invalidPhone && /^\+?[0-9\s\-]*$/.test(raw.trim())) {
                           setError("");
                         }
-                      }}
-                      onBeforeInput={(e: React.FormEvent<HTMLInputElement>) => {
-                        const ev = e.nativeEvent as InputEvent;
-                        if (ev.data && /[^0-9]/.test(ev.data)) {
-                          e.preventDefault();
-                        }
-                      }}
-                      onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {
-                        e.preventDefault();
-                        const pasted = e.clipboardData.getData("text");
-                        const filtered = pasted.replace(/\D/g, "");
-                        const input = e.currentTarget;
-                        const start = input.selectionStart ?? form.phone.length;
-                        const end = input.selectionEnd ?? form.phone.length;
-                        const next =
-                          form.phone.slice(0, start) + filtered + form.phone.slice(end);
-                        setForm({ ...form, phone: next.replace(/\D/g, "") });
-                        requestAnimationFrame(() => {
-                          const pos = start + filtered.length;
-                          try {
-                            input.setSelectionRange(pos, pos);
-                          } catch {}
-                        });
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
                           typeTriggerRef.current?.focus();
                           return;
-                        }
-                        if (e.ctrlKey || e.metaKey) return;
-                        if (
-                          e.key === "Backspace" ||
-                          e.key === "Delete" ||
-                          e.key === "ArrowLeft" ||
-                          e.key === "ArrowRight" ||
-                          e.key === "ArrowUp" ||
-                          e.key === "ArrowDown" ||
-                          e.key === "Tab" ||
-                          e.key === "Home" ||
-                          e.key === "End"
-                        ) {
-                          return;
-                        }
-                        if (e.key.length === 1 && !/[0-9]/.test(e.key)) {
-                          e.preventDefault();
                         }
                       }}
                     />

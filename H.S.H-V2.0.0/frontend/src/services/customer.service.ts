@@ -22,7 +22,24 @@ export class CustomerService extends BaseService {
     nif?: string;
     nis?: string;
   }): Promise<Customer> {
-    const existing = await customerRepository.getByName(input.name);
+    const trimmedName = input.name?.trim();
+    if (!trimmedName) {
+      throw new Error("Customer name is required.");
+    }
+    const trimmedPhone = input.phone?.trim();
+    if (!trimmedPhone) {
+      throw new Error("Customer phone is required.");
+    }
+    // Preserve raw value (+, spaces, dashes allowed) — do not strip silently
+    if (!/^\+?[0-9\s\-]+$/.test(trimmedPhone)) {
+      throw new Error("Invalid phone number. Phone may contain +, digits, spaces and dashes only.");
+    }
+    const trimmedType = input.type?.trim();
+    if (!trimmedType) {
+      throw new Error("Customer type is required.");
+    }
+
+    const existing = await customerRepository.getByName(trimmedName);
 
     if (existing) {
       throw new Error("A customer with this name already exists.");
@@ -35,13 +52,13 @@ export class CustomerService extends BaseService {
       createdAt: now,
       updatedAt: now,
       syncStatus: "pending",
-      name: input.name,
-      phone: input.phone,
-      address: input.address,
-      identificationNumber: input.identificationNumber,
-      email: input.email,
-      notes: input.notes,
-      type: input.type,
+      name: trimmedName,
+      phone: trimmedPhone,
+      address: input.address?.trim() || undefined,
+      identificationNumber: input.identificationNumber?.trim() || undefined,
+      email: input.email?.trim() || undefined,
+      notes: input.notes?.trim() || undefined,
+      type: trimmedType,
       balance: 0,
       invoiceCustomerType: input.invoiceCustomerType || "consumer",
       legalName: input.legalName?.trim() || undefined,

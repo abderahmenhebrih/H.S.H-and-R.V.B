@@ -12,22 +12,15 @@ export class VehicleService extends BaseService {
     type: string;
     notes?: string;
   }): Promise<Vehicle> {
-    const existingName = await vehicleRepository.getByName(input.name);
-
-    if (existingName) {
-      throw new Error("A vehicle with this name already exists.");
-    }
-
-    const existingRegistration =
-      await vehicleRepository.getByRegistrationNumber(
-        input.registrationNumber,
-      );
-
-    if (existingRegistration) {
-      throw new Error(
-        "A vehicle with this registration number already exists.",
-      );
-    }
+    const trimmedName = input.name.trim();
+    const normalizedPlate = input.registrationNumber.trim().toUpperCase();
+    if (!trimmedName) throw new Error("Vehicle name is required.");
+    if (!normalizedPlate) throw new Error("Registration number is required.");
+    const all = await vehicleRepository.getAll();
+    const nameDup = all.find((v) => v.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (nameDup) throw new Error("A vehicle with this name already exists.");
+    const plateDup = all.find((v) => v.registrationNumber.trim().toUpperCase() === normalizedPlate);
+    if (plateDup) throw new Error("A vehicle with this registration number already exists.");
 
     const now = Date.now();
 
@@ -36,12 +29,12 @@ export class VehicleService extends BaseService {
       createdAt: now,
       updatedAt: now,
       syncStatus: "pending",
-      name: input.name,
-      registrationNumber: input.registrationNumber,
+      name: trimmedName,
+      registrationNumber: normalizedPlate,
       image: input.image,
       imageName: input.imageName,
       type: input.type,
-      notes: input.notes,
+      notes: input.notes?.trim() || undefined,
     };
 
     await vehicleRepository.create(vehicle);

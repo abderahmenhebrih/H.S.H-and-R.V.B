@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useDbSync } from "../../src/hooks/useDbSync";
 import { AlertTriangle, Receipt, Search, X } from "lucide-react";
 import StyledSelect from "../../src/components/common/StyledSelect";
@@ -160,6 +161,13 @@ const TRANSLATIONS = {
 } as const;
 
 export default function ExpensesPage() {
+  const router = useRouter();
+  // Expenses route retained for data integrity (Reports aggregates historical expenses)
+  // but navigation removed per CANONICAL_NAVIGATION. Redirect stale direct access to Reports.
+  useEffect(() => {
+    router.replace("/reports");
+  }, [router]);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [search, setSearch] = useState("");
@@ -320,8 +328,11 @@ export default function ExpensesPage() {
   }
 
   return (
-    <AppShell activePage="expenses">
+    <AppShell activePage="reports">
       <main className={styles.expensesPage}>
+        <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, background: "var(--accent-soft)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 12, fontWeight: 600 }}>
+          Expenses moved to Reports — redirecting...
+        </div>
         <section className={styles.toolbar}>
           <div className={styles.searchBox}>
             <span className={styles.searchIcon} aria-hidden="true">

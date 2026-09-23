@@ -61,15 +61,33 @@ export default function SpreadsheetEditorPage() {
     void load();
   }, [id, router]);
 
+  const titleSaveRef = useRef<string | null>(null);
+  const pendingTitleRef = useRef<string | null>(null);
   const handleTitleChange = (v: string) => {
     setTitle(v);
+    pendingTitleRef.current = v;
     if (!v.trim()) return;
+    titleSaveRef.current = v.trim();
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
     setStatus("saving");
     titleTimerRef.current = setTimeout(async () => {
-      try { await officeFileService.update(id, { title: v.trim() }); setStatus("saved"); } catch(e){ setStatus("offline"); }
+      const toSave = titleSaveRef.current;
+      pendingTitleRef.current = null;
+      try { await officeFileService.update(id, { title: toSave as string }); setStatus("saved"); } catch(e){ setStatus("offline"); }
     }, 600);
   };
+  // Flush pending title save on unmount / navigation
+  useEffect(() => {
+    return () => {
+      if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); titleTimerRef.current = null; }
+      const pending = pendingTitleRef.current?.trim();
+      const saveVal = titleSaveRef.current;
+      if (pending && pending === saveVal) {
+        // Fire-and-forget flush (no await in cleanup, but queued via service)
+        officeFileService.update(id, { title: saveVal as string }).catch(()=>{});
+      }
+    };
+  }, [id]);
 
   const handleWorkbookSave = useCallback(async (snapshot: any) => {
     setStatus("saving");
@@ -77,6 +95,20 @@ export default function SpreadsheetEditorPage() {
       await officeFileService.update(id, { content: snapshot });
       setStatus(navigator.onLine ? "saved" : "offline");
     } catch(e){ console.error(e); setStatus("offline"); }
+  }, [id]);
+  // Flush workbook pending save on unmount: ask Univer for snapshot
+  useEffect(() => {
+    return () => {
+      try {
+        const snap = (univerRef.current as any)?.getSnapshot?.() || (univerRef.current as any)?.save?.();
+        // getSnapshot via wrapper handle: univerRef.current may expose getSnapshot
+        // Fallback: if not available, rely on scheduled save already queued
+        if (snap && JSON.stringify(snap) !== "") {
+          officeFileService.update(id, { content: snap }).catch(()=>{});
+        }
+      } catch {}
+      if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); }
+    };
   }, [id]);
 
   const [officeFeedback, setOfficeFeedback] = useState<string | null>(null);
@@ -312,13 +344,13 @@ function HebrihInsertModal({ language, onClose, onInsert }: { language:Language;
   const fieldOptions: Record<string, string[]> = {
     customer: ["name","phone","balance","type"],
     supplier: ["name","phone","balance"],
-    worker: ["name","position","salary"],
-    product: ["name","price","quantity"],
-    sale: ["total","customer","date"],
-    purchase: ["total","supplier","date"],
-    invoice: ["number","totalTTC"],
-    vehicle: ["name","type"],
-    task: ["title","status"],
+    worker: ["name","position","startingSalary","monthlySalary","balance"],
+    product: ["name","price","quantity","weightKg"],
+    sale: ["total","customerId","date"],
+    purchase: ["total","supplierId","date"],
+    invoice: ["invoiceNumber","totalTTC"],
+    vehicle: ["name","type","registrationNumber"],
+    task: ["name","status"],
     payment: ["amount","date"],
   };
   useEffect(()=> {
@@ -405,10 +437,10 @@ async function getTableSnapshot(type:string, language: import("../../../../src/t
   try{
     if(type==="customer"){ const { customerService } = await import("../../../../src/services/customer.service"); const list=await customerService.getAll(); return list.map((c:any)=>({ [t.customer ?? "Name"]:c.name, [language==="fr"?"Type":language==="ar"?"النوع":"Type"]:c.type, [language==="fr"?"Téléphone":language==="ar"?"الهاتف":"Phone"]:c.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(c.balance) })); }
     if(type==="supplier"){ const { supplierService } = await import("../../../../src/services/supplier.service"); const list=await supplierService.getAll(); return list.map((s:any)=>({ [t.customer ?? "Name"]:s.name, [language==="fr"?"Téléphone":language==="ar"?"الهاتف":"Phone"]:s.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(s.balance) })); }
-    if(type==="product"){ const { productService } = await import("../../../../src/services/product.service"); const list=await productService.getAll(); return list.map((p:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:p.name, [language==="fr"?"Prix":language==="ar"?"السعر":"Price"]:String(p.price??""), [language==="fr"?"Quantité":language==="ar"?"الكمية":"Quantity"]:String(p.quantity??"") })); }
-    if(type==="sale"){ const { saleService } = await import("../../../../src/services/sale.service"); const list=await saleService.getAll(); return list.slice(0,50).map((s:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:s.id, [t.customer]:s.customerId, [t.date]:new Date(s.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(s.items?.reduce((a:any,b:any)=>a+(b.total||0),0) ?? "") })); }
-    if(type==="purchase"){ const { purchaseService } = await import("../../../../src/services/purchase.service"); const list=await purchaseService.getAll(); return list.slice(0,50).map((p:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:p.id, [t.supplier]:p.supplierId, [t.date]:new Date(p.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(p.total??"") })); }
-    if(type==="worker"){ const { workerService } = await import("../../../../src/services/worker.service"); const list=await workerService.getAll(); return list.map((w:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:w.name, [language==="fr"?"Poste":language==="ar"?"المنصب":"Position"]:w.position, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(w.balance??"") })); }
+    if(type==="product"){ const { productService } = await import("../../../../src/services/product.service"); const list=await productService.getAll(); return list.map((p:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:p.name, [language==="fr"?"Prix":language==="ar"?"السعر":"Price"]:String(p.price??""), [language==="fr"?"Quantité":language==="ar"?"الكمية":"Quantity"]:String(p.quantity??""), [language==="fr"?"Poids":language==="ar"?"الوزن":"Weight"]:String((p as any).weightKg ?? "") })); }
+    if(type==="sale"){ const { saleService } = await import("../../../../src/services/sale.service"); const { customerService } = await import("../../../../src/services/customer.service"); const [list, customers] = await Promise.all([saleService.getAll(), customerService.getAll().catch(()=>[])]) as any; const custMap = new Map((customers||[]).map((c:any)=>[c.id, c.name])); return list.slice(0,50).map((s:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:s.id, [t.customer]: custMap.get(s.customerId) ?? s.customerId, [t.date]:new Date(s.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(s.items?.reduce((a:any,b:any)=>a+(b.total||0),0) ?? "") })); }
+    if(type==="purchase"){ const { purchaseService } = await import("../../../../src/services/purchase.service"); const { supplierService } = await import("../../../../src/services/supplier.service"); const [list, suppliers] = await Promise.all([purchaseService.getAll(), supplierService.getAll().catch(()=>[])]) as any; const supMap = new Map((suppliers||[]).map((s:any)=>[s.id, s.name])); return list.slice(0,50).map((p:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:p.id, [t.supplier]: supMap.get(p.supplierId) ?? p.supplierId, [t.date]:new Date(p.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(p.total??"") })); }
+    if(type==="worker"){ const { workerService } = await import("../../../../src/services/worker.service"); const list=await workerService.getAll(); return list.map((w:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:w.name, [language==="fr"?"Poste":language==="ar"?"المنصب":"Position"]:w.position, [language==="fr"?"Salaire initial":language==="ar"?"الراتب الابتدائي":"Starting"]:String((w as any).startingSalary ?? ""), [language==="fr"?"Salaire mensuel":language==="ar"?"الراتب الشهري":"Monthly"]:String((w as any).monthlySalary ?? ""), [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(w.balance??"") })); }
   } catch(e){ console.error(e); }
   return [];
 }

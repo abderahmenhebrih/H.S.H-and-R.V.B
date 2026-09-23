@@ -15,14 +15,36 @@ export class WorkerService extends BaseService {
     startingSalary: number;
     monthlySalary: number;
   }): Promise<Worker> {
-    const existing = await workerRepository.getByName(input.name);
+    const trimmedName = input.name?.trim();
+    if (!trimmedName) {
+      throw new Error("Worker name is required.");
+    }
+    const trimmedPhone = input.phone?.trim();
+    if (!trimmedPhone) {
+      throw new Error("Worker phone is required.");
+    }
+    // Preserve raw value (+, spaces, dashes allowed) — do not strip silently
+    if (!/^\+?[0-9\s\-]+$/.test(trimmedPhone)) {
+      throw new Error("Invalid phone number. Phone may contain +, digits, spaces and dashes only.");
+    }
+    const trimmedPosition = input.position?.trim();
+    if (!trimmedPosition) {
+      throw new Error("Worker position is required.");
+    }
+    if (!Number.isFinite(input.startingSalary) || Number.isNaN(input.startingSalary)) {
+      throw new Error("Worker starting salary must be a valid number.");
+    }
+    if (!Number.isFinite(input.monthlySalary) || Number.isNaN(input.monthlySalary)) {
+      throw new Error("Worker monthly salary must be a valid number.");
+    }
+    if (input.startingSalary < 0 || input.monthlySalary < 0) {
+      throw new Error("Worker salary cannot be negative.");
+    }
+
+    const existing = await workerRepository.getByName(trimmedName);
 
     if (existing) {
       throw new Error("A worker with this name already exists.");
-    }
-
-    if (input.startingSalary < 0 || input.monthlySalary < 0) {
-      throw new Error("Worker salary cannot be negative.");
     }
 
     const now = Date.now();
@@ -32,13 +54,13 @@ export class WorkerService extends BaseService {
       createdAt: now,
       updatedAt: now,
       syncStatus: "pending",
-      name: input.name,
-      phone: input.phone,
-      address: input.address,
+      name: trimmedName,
+      phone: trimmedPhone,
+      address: input.address?.trim() || undefined,
       birthDate: input.birthDate,
       employmentDate: input.employmentDate,
-      position: input.position,
-      notes: input.notes,
+      position: trimmedPosition,
+      notes: input.notes?.trim() || undefined,
       startingSalary: input.startingSalary,
       monthlySalary: input.monthlySalary,
       status: "active",

@@ -15,7 +15,9 @@ export class WorkerLifecycleOperation {
         throw new Error("Worker is already archived.");
       }
 
-      if (worker.balance !== 0) {
+      // Use rounded monetary comparison (cents epsilon) — balances are monetary
+      const rounded = Math.round(worker.balance * 100) / 100;
+      if (Math.abs(rounded) > 0.005) {
         throw new Error(
           "Cannot archive worker while the worker balance is not zero.",
         );

@@ -17,16 +17,16 @@ export class ProductEditOperation {
         throw new Error("Product name is required.");
       }
 
-      if (input.price < 0) {
-        throw new Error("Product price cannot be negative.");
+      if (!Number.isFinite(input.price) || input.price < 0) {
+        throw new Error("Product price must be a finite number >= 0.");
       }
 
-      if (input.quantity < 0) {
-        throw new Error("Product quantity cannot be negative.");
+      if (!Number.isFinite(input.quantity) || input.quantity < 0 || !Number.isInteger(input.quantity)) {
+        throw new Error("Product quantity must be a finite integer >= 0.");
       }
 
-      if (input.weightKg < 0) {
-        throw new Error("Product weight cannot be negative.");
+      if (!Number.isFinite(input.weightKg) || input.weightKg < 0) {
+        throw new Error("Product weight must be a finite number >= 0.");
       }
 
       const product = await productRepository.getById(input.productId);
@@ -35,9 +35,10 @@ export class ProductEditOperation {
         throw new Error("Product not found.");
       }
 
-      const existing = await productRepository.getByName(input.name);
-
-      if (existing && existing.id !== input.productId) {
+      const all = await productRepository.getAll();
+      const normalized = input.name.trim().toLowerCase();
+      const existingNorm = all.find((p) => p.name.trim().toLowerCase() === normalized && p.id !== input.productId);
+      if (existingNorm) {
         throw new Error("A product with this name already exists.");
       }
 

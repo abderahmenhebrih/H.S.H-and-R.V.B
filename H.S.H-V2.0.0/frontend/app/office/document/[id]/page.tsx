@@ -116,12 +116,15 @@ export default function DocumentEditorPage() {
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       const json = editor.getJSON();
+      pendingContentRef.current = json;
       // debounce save 800ms
       setStatus("saving");
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(async () => {
+        const toSave = pendingContentRef.current;
+        pendingContentRef.current = null;
         try {
-          await officeFileService.update(id, { content: json as any });
+          await officeFileService.update(id, { content: toSave as any });
           setStatus(navigator.onLine ? "saved" : "offline");
         } catch(e){ console.error(e); setStatus("offline"); }
       }, 800);
@@ -140,15 +143,37 @@ export default function DocumentEditorPage() {
     }
   }, [file, editor]);
 
+  const pendingTitleRef = useRef<string | null>(null);
+  const titleSaveRef = useRef<string | null>(null);
+  const pendingContentRef = useRef<any>(null);
   const handleTitleChange = (v: string) => {
     setTitle(v);
+    pendingTitleRef.current = v;
+    titleSaveRef.current = v.trim();
     if (!v.trim()) return;
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
     setStatus("saving");
     titleTimerRef.current = setTimeout(async () => {
-      try { await officeFileService.update(id, { title: v.trim() }); setStatus("saved"); } catch(e){ setStatus("offline"); }
+      const toSave = titleSaveRef.current;
+      pendingTitleRef.current = null;
+      try { await officeFileService.update(id, { title: toSave as string }); setStatus("saved"); } catch(e){ setStatus("offline"); }
     }, 600);
   };
+  // Flush pending debounced saves on unmount / navigation
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); }
+      if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); }
+      if (pendingContentRef.current) {
+        officeFileService.update(id, { content: pendingContentRef.current }).catch(()=>{});
+      }
+      const pending = pendingTitleRef.current?.trim();
+      const saveVal = titleSaveRef.current;
+      if (pending && pending === saveVal) {
+        officeFileService.update(id, { title: saveVal as string }).catch(()=>{});
+      }
+    };
+  }, [id]);
 
   const insertHebrihData = useCallback(async (entityType: string, entityId: string, field: string) => {
     // Load entity snapshot via service dynamically
@@ -320,13 +345,13 @@ function HebrihInsertModal({ language, currency, onClose, onInsert }: { language
   const fieldOptions: Record<string, string[]> = {
     customer: ["name","phone","balance","type"],
     supplier: ["name","phone","balance"],
-    worker: ["name","position","salary","balance"],
-    product: ["name","price","quantity"],
-    sale: ["total","customer","date"],
-    purchase: ["total","supplier","date"],
-    invoice: ["number","totalTTC","customer"],
+    worker: ["name","position","startingSalary","monthlySalary","balance"],
+    product: ["name","price","quantity","weightKg"],
+    sale: ["total","customerId","date"],
+    purchase: ["total","supplierId","date"],
+    invoice: ["invoiceNumber","totalTTC","customerId"],
     vehicle: ["name","type","registrationNumber"],
-    task: ["title","status"],
+    task: ["name","status"],
     payment: ["amount","date"],
   };
 

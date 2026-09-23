@@ -49,6 +49,8 @@ import {
   SETTINGS_EVENT,
 } from "../../../src/lib/settings";
 import { formatDate as formatDateLib } from "../../../src/lib/datetime";
+import { CANONICAL_NAVIGATION, type NavKey } from "../../../src/lib/navigation";
+import { roundMoney } from "../../../src/lib/money";
 
 import type { Product } from "../../../src/types/entities/product";
 import type { Supplier } from "../../../src/types/entities/supplier";
@@ -250,7 +252,7 @@ const TRANSLATIONS = {
   },
 } as const;
 
-// Shell translations for drawer navigation (copied from AppShell)
+// Shell translations for drawer navigation — labels derived from AppShell but nav structure from canonical
 const SHELL_TRANSLATIONS = {
   en: {
     nav: {
@@ -261,13 +263,13 @@ const SHELL_TRANSLATIONS = {
       purchases: "Purchases",
       sales: "Sales",
       payments: "Payments",
-      expenses: "Expenses",
       workers: "Workers",
       vehicles: "Vehicles",
       tasks: "Tasks",
       accounts: "Accounts",
       reports: "Reports",
       invoice: "Invoice",
+      office: "My Office",
       about: "About",
       settings: "Settings",
     },
@@ -286,13 +288,13 @@ const SHELL_TRANSLATIONS = {
       purchases: "Achats",
       sales: "Ventes",
       payments: "Paiements",
-      expenses: "Dépenses",
       workers: "Employés",
       vehicles: "Véhicules",
       tasks: "Tâches",
       accounts: "Comptes",
       reports: "Rapports",
       invoice: "Facture",
+      office: "Mon Bureau",
       about: "À propos",
       settings: "Paramètres",
     },
@@ -311,13 +313,13 @@ const SHELL_TRANSLATIONS = {
       purchases: "المشتريات",
       sales: "المبيعات",
       payments: "المدفوعات",
-      expenses: "المصاريف",
       workers: "العمال",
       vehicles: "المركبات",
       tasks: "المهام",
       accounts: "الحسابات",
       reports: "التقارير",
       invoice: "الفاتورة",
+      office: "مكتبي",
       about: "حول البرنامج",
       settings: "الإعدادات",
     },
@@ -329,23 +331,7 @@ const SHELL_TRANSLATIONS = {
   },
 } as const;
 
-type ActivePage =
-  | "dashboard"
-  | "products"
-  | "customers"
-  | "suppliers"
-  | "purchases"
-  | "sales"
-  | "payments"
-  | "expenses"
-  | "workers"
-  | "vehicles"
-  | "tasks"
-  | "accounts"
-  | "reports"
-  | "invoice"
-  | "about"
-  | "settings";
+type ActivePage = NavKey | "about";
 
 type NavItem = {
   icon: LucideIcon;
@@ -354,22 +340,10 @@ type NavItem = {
   path: string;
 };
 
+// Deduplicated navigation — canonical source of truth, plus optional About extension
 const navigation: readonly NavItem[] = [
-  { icon: LayoutDashboard, key: "dashboard", label: "Management Dashboard", path: "/" },
-  { icon: Package, key: "products", label: "Products", path: "/products" },
-  { icon: Users, key: "customers", label: "Customers", path: "/customers" },
-  { icon: Truck, key: "suppliers", label: "Suppliers", path: "/suppliers" },
-  { icon: Wallet, key: "accounts", label: "Accounts", path: "/accounts" },
-  { icon: ShoppingCart, key: "purchases", label: "Purchases", path: "/purchases" },
-  { icon: ShoppingBag, key: "sales", label: "Sales", path: "/sales" },
-  { icon: Banknote, key: "payments", label: "Payments", path: "/payments" },
-  { icon: UsersRound, key: "workers", label: "Workers", path: "/workers" },
-  { icon: CarFront, key: "vehicles", label: "Vehicles", path: "/vehicles" },
-  { icon: ClipboardCheck, key: "tasks", label: "Tasks", path: "/tasks" },
-  { icon: BarChart3, key: "reports", label: "Reports", path: "/reports" },
-  { icon: FileText, key: "invoice", label: "Invoice", path: "/invoice" },
-  { icon: SettingsIcon, key: "settings", label: "Settings", path: "/settings" },
-  { icon: Info, key: "about", label: "About", path: "/about" },
+  ...(CANONICAL_NAVIGATION as unknown as readonly NavItem[]),
+  { icon: Info, key: "about" as ActivePage, label: "About", path: "/about" },
 ] as const;
 
 export default function PurchaseEntryPage() {
@@ -445,13 +419,13 @@ export default function PurchaseEntryPage() {
 
   const navLabels: Record<ActivePage, string> = {
     dashboard: shellT.nav.dashboard,
+    office: (shellT.nav as any).office,
     products: shellT.nav.products,
     customers: shellT.nav.customers,
     suppliers: shellT.nav.suppliers,
     purchases: shellT.nav.purchases,
     sales: shellT.nav.sales,
     payments: shellT.nav.payments,
-    expenses: shellT.nav.expenses,
     workers: shellT.nav.workers,
     vehicles: shellT.nav.vehicles,
     tasks: shellT.nav.tasks,
@@ -641,7 +615,7 @@ export default function PurchaseEntryPage() {
       const weight = Number(row.weightKg);
       const price = Number(row.price);
       if (!Number.isFinite(weight) || !Number.isFinite(price)) return sum;
-      return sum + weight * price;
+      return sum + roundMoney(weight * price);
     }, 0);
   }
 
@@ -723,7 +697,7 @@ export default function PurchaseEntryPage() {
           return;
         }
         const supplierId = supplierIds[0];
-        const total = Number(parsedRows.reduce((sum, row) => sum + row.weightKg * row.price, 0).toFixed(2));
+        const total = parsedRows.reduce((sum, row) => sum + roundMoney(row.weightKg * row.price), 0);
         await purchaseEditOperation.edit({
           purchaseId: editingPurchaseId,
           supplierId,
@@ -733,7 +707,7 @@ export default function PurchaseEntryPage() {
             quantity: row.quantity,
             weightKg: row.weightKg,
             price: row.price,
-            total: Number((row.weightKg * row.price).toFixed(2)),
+            total: roundMoney(row.weightKg * row.price),
           })),
           total,
           calculation: calculation ?? undefined,
@@ -750,10 +724,10 @@ export default function PurchaseEntryPage() {
                 quantity: row.quantity,
                 weightKg: row.weightKg,
                 price: row.price,
-                total: Number((row.weightKg * row.price).toFixed(2)),
+                total: roundMoney(row.weightKg * row.price),
               },
             ],
-            total: Number((row.weightKg * row.price).toFixed(2)),
+            total: roundMoney(row.weightKg * row.price),
             calculation: calculation ?? undefined,
           });
         }
@@ -1086,7 +1060,7 @@ export default function PurchaseEntryPage() {
                       </div>
 
                       <strong className={styles.totalCell}>
-                        {formatCurrency(Number(row.weightKg || 0) * Number(row.price || 0), currency)}
+                        {formatCurrency(roundMoney(Number(row.weightKg || 0) * Number(row.price || 0)), currency)}
                       </strong>
 
                       <div className={styles.actionsCell}>

@@ -21,8 +21,8 @@ export class BankAccountService extends BaseService {
 
     const initialBalance = input.initialBalance ?? 0;
 
-    if (initialBalance < 0) {
-      throw new Error("Initial balance cannot be negative.");
+    if (!Number.isFinite(initialBalance) || initialBalance < 0) {
+      throw new Error("Initial balance must be a finite number >= 0.");
     }
 
     const now = Date.now();

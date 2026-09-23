@@ -17,14 +17,20 @@ export class PaymentOperation {
     note?: string;
   }) {
     return runDatabaseTransaction(async () => {
-      if (input.amount <= 0) {
-        throw new Error("Payment amount must be greater than zero.");
+      if (!Number.isFinite(input.amount) || input.amount <= 0) {
+        throw new Error("Payment amount must be a finite number greater than zero.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Payment date must be a valid finite timestamp.");
       }
 
       const account = await db.bankAccounts.get(input.accountId);
 
       if (!account) {
         throw new Error("Account not found.");
+      }
+      if (!Number.isFinite(account.balance)) {
+        throw new Error("Account balance corrupted.");
       }
 
       if (account.balance < input.amount) {
@@ -37,6 +43,9 @@ export class PaymentOperation {
 
           if (!supplier) {
             throw new Error("Supplier not found.");
+          }
+          if (!Number.isFinite(supplier.balance)) {
+            throw new Error("Supplier balance corrupted.");
           }
 
           if (supplier.balance < input.amount) {
@@ -59,6 +68,9 @@ export class PaymentOperation {
 
           if (!customer) {
             throw new Error("Customer not found.");
+          }
+          if (!Number.isFinite(customer.balance)) {
+            throw new Error("Customer balance corrupted.");
           }
 
           if (customer.balance < input.amount) {
@@ -85,6 +97,9 @@ export class PaymentOperation {
 
           if (worker.status !== "active") {
             throw new Error("Archived worker cannot receive payments.");
+          }
+          if (!Number.isFinite(worker.balance)) {
+            throw new Error("Worker balance corrupted.");
           }
 
           if (worker.balance < input.amount) {

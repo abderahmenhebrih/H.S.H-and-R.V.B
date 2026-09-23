@@ -46,15 +46,21 @@ function isTransientError(error: unknown): boolean {
   if (msg.includes("MongoNetworkError")) return true;
   if (msg.includes("NoSuchTransaction")) return true;
   if (msg.includes("WriteConflict")) return true;
-  // Validation/terminal errors
+  // Terminal duplicate key / validation errors — never retry
+  if (msg.includes("E11000") || msg.toLowerCase().includes("duplicate")) return false;
+  if (msg.includes("INCOMING_INVOICE_DUPLICATE")) return false;
+  if (msg.includes("INVOICE_IMMUTABLE")) return false;
+  if (msg.includes("Validation")) return false;
   if (msg.includes("Unsupported")) return false;
   if (msg.includes("Entity not found")) return false;
   if (msg.includes("Missing operationId")) return false;
-  // Default: treat as transient for safety (allow retry) unless explicitly terminal
-  // For now, only validation errors are terminal; others are transient
-  const terminalKeywords = ["Unsupported", "Entity not found", "Missing", "Invalid entity", "Validation"];
+  if (msg.includes("already exists")) return false;
+  if (msg.includes("must be")) return false;
+  if (msg.includes("required")) return false;
+  // Default: treat known transient only, otherwise terminal to avoid infinite retry
+  const terminalKeywords = ["Unsupported", "Entity not found", "Missing", "Invalid entity", "Validation", "already exists", "INVOICE", "INCOMING"];
   for (const kw of terminalKeywords) if (msg.includes(kw)) return false;
-  return true;
+  return false;
 }
 
 export async function validateIncomingInvoiceSync(payload: Record<string, unknown>, operation: SyncRequestOperation): Promise<string | null> {

@@ -236,6 +236,7 @@ type FormState = {
 };
 
 function getDeadlineCategory(deadline: number, now = Date.now()) {
+  if (!Number.isFinite(deadline)) return "black";
   const d = new Date(deadline);
   const n = new Date(now);
   d.setHours(0, 0, 0, 0);
@@ -244,14 +245,6 @@ function getDeadlineCategory(deadline: number, now = Date.now()) {
   if (diff < 0) return "black";
   if (diff === 0) return "red";
   if (diff <= 7) return "orange";
-  const dMonth = d.getMonth();
-  const nMonth = n.getMonth();
-  const dYear = d.getFullYear();
-  const nYear = n.getFullYear();
-  const monthDiff = (dYear - nYear) * 12 + (dMonth - nMonth);
-  if (monthDiff === 0 || (monthDiff === 1 && diff <= 31)) {
-    if (diff <= 31) return "green";
-  }
   if (diff <= 31) return "green";
   return "blue";
 }
@@ -270,6 +263,7 @@ function getTaskUrgency(deadline: number, now = Date.now()): "far" | "upcoming" 
 }
 
 function getStatusLabel(deadline: number, t: (typeof TRANSLATIONS)[Language]): string {
+  if (!Number.isFinite(deadline)) return t.missed;
   const d = new Date(deadline);
   const n = new Date();
   d.setHours(0, 0, 0, 0);
@@ -278,12 +272,6 @@ function getStatusLabel(deadline: number, t: (typeof TRANSLATIONS)[Language]): s
   if (diff < 0) return t.missed;
   if (diff === 0) return t.today;
   if (diff <= 7) return t.week;
-  const dMonth = d.getMonth();
-  const nMonth = n.getMonth();
-  const dYear = d.getFullYear();
-  const nYear = n.getFullYear();
-  const monthDiff = (dYear - nYear) * 12 + (dMonth - nMonth);
-  if (monthDiff === 0) return t.month;
   if (diff <= 31) return t.month;
   return t.pending;
 }
@@ -391,11 +379,13 @@ export default function TasksPage() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
     const startWeek = new Date(now);
     const day = now.getDay();
     const diffToMonday = day === 0 ? -6 : 1 - day;
     startWeek.setDate(now.getDate() + diffToMonday);
     startWeek.setHours(0, 0, 0, 0);
+    const nextWeek = startWeek.getTime() + 7 * 24 * 60 * 60 * 1000;
     const todayStart = now.getTime();
     const todayEnd = todayStart + 24 * 60 * 60 * 1000 - 1;
 
@@ -407,8 +397,9 @@ export default function TasksPage() {
     let missedCount = 0;
 
     for (const task of activeTasks) {
-      if (task.deadline >= startMonth) monthCount++;
-      if (task.deadline >= startWeek.getTime()) weekCount++;
+      if (!Number.isFinite(task.deadline)) continue;
+      if (task.deadline >= startMonth && task.deadline < nextMonth) monthCount++;
+      if (task.deadline >= startWeek.getTime() && task.deadline < nextWeek) weekCount++;
       if (task.deadline >= todayStart && task.deadline <= todayEnd) todayCount++;
       if (task.deadline < todayStart) missedCount++;
     }
@@ -556,10 +547,14 @@ export default function TasksPage() {
       setError(t.failedSave);
       return;
     }
+    const deadline = new Date(`${form.deadline}T12:00:00`).getTime();
+    if (!Number.isFinite(deadline)) {
+      setError(t.failedSave);
+      return;
+    }
     setSaving(true);
     setError("");
     try {
-      const deadline = new Date(`${form.deadline}T12:00:00`).getTime();
       if (editingId) {
         await taskRepository.update(editingId, { name: form.name.trim(), deadline, updatedAt: Date.now(), syncStatus: "pending" });
       } else {

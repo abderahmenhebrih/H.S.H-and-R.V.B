@@ -18,6 +18,7 @@ import { saleService } from "../../src/services/sale.service";
 import { paymentService } from "../../src/services/payment.service";
 import { transferService } from "../../src/services/transfer.service";
 import { settingsService } from "../../src/services/settings.service";
+import { useDbSync } from "../../src/hooks/useDbSync";
 import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../src/lib/settings";
 import type { Supplier } from "../../src/types/entities/supplier";
 import type { Customer } from "../../src/types/entities/customer";
@@ -237,14 +238,19 @@ export default function ReportsPage() {
     return () => window.removeEventListener(SETTINGS_EVENT, h);
   }, []);
 
+  useDbSync(() => {
+    void loadData();
+  }, []);
+
   const fromTs = new Date(`${fromDate}T00:00:00`).getTime();
   const toTs = new Date(`${toDate}T23:59:59`).getTime();
+  const hasInvalidDate = Number.isNaN(fromTs) || Number.isNaN(toTs);
 
-  const filteredSales = sales.filter((s) => s.date >= fromTs && s.date <= toTs);
-  const filteredPurchases = purchases.filter((p) => p.date >= fromTs && p.date <= toTs);
-  const filteredPayments = payments.filter((p) => p.date >= fromTs && p.date <= toTs);
-  const filteredExpenses = expenses.filter((e) => e.date >= fromTs && e.date <= toTs);
-  const filteredTransfers = transfers.filter((tr) => tr.date >= fromTs && tr.date <= toTs);
+  const filteredSales = hasInvalidDate ? [] : sales.filter((s) => s.date >= fromTs && s.date <= toTs);
+  const filteredPurchases = hasInvalidDate ? [] : purchases.filter((p) => p.date >= fromTs && p.date <= toTs);
+  const filteredPayments = hasInvalidDate ? [] : payments.filter((p) => p.date >= fromTs && p.date <= toTs);
+  const filteredExpenses = hasInvalidDate ? [] : expenses.filter((e) => e.date >= fromTs && e.date <= toTs);
+  const filteredTransfers = hasInvalidDate ? [] : transfers.filter((tr) => tr.date >= fromTs && tr.date <= toTs);
 
   function getEntityOptions() {
     if (category === "suppliers") return suppliers.map((s) => ({ id: s.id, name: s.name }));
@@ -270,17 +276,29 @@ export default function ReportsPage() {
       return filteredPayments.some((p) => p.entityType === "worker" && p.entityId === entityId);
     }
     if (category === "expenses") {
+      // 'all' is the only valid pseudo-entity for expenses
+      if (entityId !== "all") return false;
       return filteredExpenses.length > 0;
     }
     if (category === "vehicles") {
-      return filteredExpenses.some((e) => e.note?.includes(entityId) || e.note?.includes(vehicles.find((v) => v.id === entityId)?.name ?? ""));
+      if (entityId === "all") {
+        return filteredExpenses.some((e) => e.note?.startsWith("vehicle:"));
+      }
+      return filteredExpenses.some((e) => e.note === `vehicle:${entityId}` || e.note?.startsWith(`vehicle:${entityId}|`));
     }
     return false;
   }
 
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   useEffect(()=>{ if(!reportFeedback) return; const id=setTimeout(()=>setReportFeedback(null), 3000); return ()=>clearTimeout(id); }, [reportFeedback]);
+  useEffect(()=>{
+    if (hasInvalidDate) setReportFeedback(language === "ar" ? "تاريخ غير صالح" : language === "fr" ? "Date invalide" : "Invalid date range");
+  }, [hasInvalidDate, language]);
   function handlePrintSelected() {
+    if (hasInvalidDate) {
+      setReportFeedback(language === "ar" ? "تاريخ غير صالح" : language === "fr" ? "Date invalide" : "Invalid date range");
+      return;
+    }
     if (!selectedId && category !== "expenses") return;
     if (selectedId !== "all" && !hasActivity(selectedId) && category !== "expenses") {
       setReportFeedback(t.noActivity); return;
@@ -302,13 +320,17 @@ export default function ReportsPage() {
   }
 
   function handlePrintAll() {
+    if (hasInvalidDate) {
+      setReportFeedback(language === "ar" ? "تاريخ غير صالح" : language === "fr" ? "Date invalide" : "Invalid date range");
+      return;
+    }
     const activeIds = getEntityOptions().map((o) => o.id).filter((id) => id !== "all" && hasActivity(id));
     if (activeIds.length === 0 && !(category === "expenses" && filteredExpenses.length > 0)) {
       setReportFeedback(t.noActivity); return;
     }
     const params = new URLSearchParams({
       category,
-      entity: selectedId,
+      entity: "all",
       from: fromDate,
       to: toDate,
       mode: "all",
@@ -322,6 +344,7 @@ export default function ReportsPage() {
 
   function renderHistory() {
     if (loading) return <div className={styles.statePanel}><h2>{t.loading}</h2></div>;
+    if (hasInvalidDate) return <div className={styles.empty}><p>{language === "ar" ? "تاريخ غير صالح" : language === "fr" ? "Date invalide" : "Invalid date range"}</p></div>;
 
     if (category === "customers" && selectedId) {
       if (selectedId === "all") {
@@ -562,7 +585,7 @@ export default function ReportsPage() {
           </div>
         );
       }
-      const related = filteredExpenses.filter((e) => e.note?.includes(selectedId) || e.note?.includes(vehicles.find((v) => v.id === selectedId)?.name ?? ""));
+      const related = filteredExpenses.filter((e) => e.note === `vehicle:${selectedId}` || e.note?.startsWith(`vehicle:${selectedId}|`));
       if (related.length === 0) return <div className={styles.empty}><p>{t.noActivity}</p></div>;
       return (
         <div className={styles.simpleList}>
@@ -571,6 +594,10 @@ export default function ReportsPage() {
           ))}
         </div>
       );
+    }
+
+    if (hasInvalidDate) {
+      return <div className={styles.empty}><p>{language === "ar" ? "تاريخ غير صالح" : language === "fr" ? "Date invalide" : "Invalid date range"}</p></div>;
     }
 
     return <div className={styles.empty}><p>{language === "ar" ? "اختر جهة لعرض السجل" : language === "fr" ? "Sélectionnez une entité pour afficher l'historique" : "Select an entity to view history"}</p></div>;

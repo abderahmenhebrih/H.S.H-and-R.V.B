@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect as useEffectRedirect } from "react";
+
+// OBSOLETE route: /purchases/new is an orphaned alternative to /purchases/entry
+// Redirect to canonical entry to avoid maintaining two conflicting implementations
 import {
   ArrowLeft,
   BarChart3,
@@ -374,6 +378,7 @@ const navigation: readonly NavItem[] = [
 
 export default function PurchaseEntryPage() {
   const router = useRouter();
+  useEffectRedirect(() => { router.replace("/purchases/entry"); }, [router]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

@@ -8,6 +8,9 @@ export class TaskService extends BaseService {
     name: string;
     deadline: number;
   }): Promise<Task> {
+    if (!input.name.trim()) throw new Error("Task name is required.");
+    if (!Number.isFinite(input.deadline)) throw new Error("Task deadline must be a valid finite timestamp.");
+
     const now = Date.now();
 
     const task: Task = {
@@ -15,7 +18,7 @@ export class TaskService extends BaseService {
       createdAt: now,
       updatedAt: now,
       syncStatus: "pending",
-      name: input.name,
+      name: input.name.trim(),
       deadline: input.deadline,
       status: "pending",
     };

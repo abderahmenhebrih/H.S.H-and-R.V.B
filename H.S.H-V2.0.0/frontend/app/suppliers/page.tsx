@@ -91,7 +91,7 @@ const TRANSLATIONS = {
     cancel: "Cancel",
     delete: "Delete",
     edit: "Edit",
-    invalidPhone: "Phone number must contain digits only.",
+    invalidPhone: "Phone may contain +, digits, spaces and dashes only.",
   },
 
   fr: {
@@ -133,7 +133,7 @@ const TRANSLATIONS = {
     cancel: "Annuler",
     delete: "Supprimer",
     edit: "Modifier",
-    invalidPhone: "Le numéro de téléphone doit contenir uniquement des chiffres.",
+    invalidPhone: "Le téléphone peut contenir +, chiffres, espaces et tirets uniquement.",
   },
 
   ar: {
@@ -175,7 +175,7 @@ const TRANSLATIONS = {
     cancel: "إلغاء",
     delete: "حذف",
     edit: "تعديل",
-    invalidPhone: "يجب أن يحتوي رقم الهاتف على أرقام فقط.",
+    invalidPhone: "قد يحتوي الهاتف على + وأرقام ومسافات وشرطات فقط.",
   },
 } as const;
 
@@ -320,7 +320,7 @@ export default function SuppliersPage() {
       return;
     }
 
-    if (!/^\d+$/.test(form.phone.trim())) {
+    if (!/^\+?[0-9\s\-]+$/.test(form.phone.trim())) {
       setError(t.invalidPhone);
       return;
     }
@@ -575,65 +575,25 @@ export default function SuppliersPage() {
                     <input
                       ref={phoneRef}
                       type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                      inputMode="tel"
+                      pattern="^\+?[0-9\s\-]*$"
                       autoComplete="tel"
                       dir="ltr"
                       value={form.phone}
                       className={error === t.invalidPhone ? styles.inputInvalid : undefined}
                       aria-invalid={error === t.invalidPhone}
                       onChange={(event) => {
-                        const filtered = event.target.value.replace(/\D/g, "");
-                        setForm({ ...form, phone: filtered });
-                        if (error === t.invalidPhone && /^\d*$/.test(filtered)) {
+                        const raw = event.target.value;
+                        setForm({ ...form, phone: raw });
+                        if (error === t.invalidPhone && /^\+?[0-9\s\-]*$/.test(raw.trim())) {
                           setError("");
                         }
-                      }}
-                      onBeforeInput={(e: React.FormEvent<HTMLInputElement>) => {
-                        const ev = e.nativeEvent as InputEvent;
-                        if (ev.data && /[^0-9]/.test(ev.data)) {
-                          e.preventDefault();
-                        }
-                      }}
-                      onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {
-                        e.preventDefault();
-                        const pasted = e.clipboardData.getData("text");
-                        const filtered = pasted.replace(/\D/g, "");
-                        const input = e.currentTarget;
-                        const start = input.selectionStart ?? form.phone.length;
-                        const end = input.selectionEnd ?? form.phone.length;
-                        const next =
-                          form.phone.slice(0, start) + filtered + form.phone.slice(end);
-                        setForm({ ...form, phone: next.replace(/\D/g, "") });
-                        requestAnimationFrame(() => {
-                          const pos = start + filtered.length;
-                          try {
-                            input.setSelectionRange(pos, pos);
-                          } catch {}
-                        });
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
                           idRef.current?.focus();
                           return;
-                        }
-                        if (e.ctrlKey || e.metaKey) return;
-                        if (
-                          e.key === "Backspace" ||
-                          e.key === "Delete" ||
-                          e.key === "ArrowLeft" ||
-                          e.key === "ArrowRight" ||
-                          e.key === "ArrowUp" ||
-                          e.key === "ArrowDown" ||
-                          e.key === "Tab" ||
-                          e.key === "Home" ||
-                          e.key === "End"
-                        ) {
-                          return;
-                        }
-                        if (e.key.length === 1 && !/[0-9]/.test(e.key)) {
-                          e.preventDefault();
                         }
                       }}
                     />

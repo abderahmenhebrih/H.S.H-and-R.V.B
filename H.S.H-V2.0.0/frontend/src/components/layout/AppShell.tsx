@@ -49,7 +49,6 @@ type ActivePage =
   | "purchases"
   | "sales"
   | "payments"
-  | "expenses"
   | "workers"
   | "vehicles"
   | "tasks"
@@ -85,7 +84,6 @@ const translations = {
       purchases: "Purchases",
       sales: "Sales",
       payments: "Payments",
-      expenses: "Expenses",
       workers: "Workers",
       vehicles: "Vehicles",
       tasks: "Tasks",
@@ -130,11 +128,6 @@ const translations = {
       title: "Payments",
       badge: "PAYMENT MANAGEMENT",
       description: "Manage payments, accounts and financial transactions.",
-    },
-    expense: {
-      title: "Expenses",
-      badge: "EXPENSE MANAGEMENT",
-      description: "Manage business expenses and expense records.",
     },
     worker: {
       title: "Workers",
@@ -197,7 +190,6 @@ const translations = {
       purchases: "Achats",
       sales: "Ventes",
       payments: "Paiements",
-      expenses: "Dépenses",
       workers: "Employés",
       vehicles: "Véhicules",
       tasks: "Tâches",
@@ -242,11 +234,6 @@ const translations = {
       title: "Paiements",
       badge: "GESTION DES PAIEMENTS",
       description: "Gérer les paiements, comptes et transactions financières.",
-    },
-    expense: {
-      title: "Dépenses",
-      badge: "GESTION DES DÉPENSES",
-      description: "Gérer les dépenses professionnelles et leurs enregistrements.",
     },
     worker: {
       title: "Employés",
@@ -309,7 +296,6 @@ const translations = {
       purchases: "المشتريات",
       sales: "المبيعات",
       payments: "المدفوعات",
-      expenses: "المصاريف",
       workers: "العمال",
       vehicles: "المركبات",
       tasks: "المهام",
@@ -354,11 +340,6 @@ const translations = {
       title: "المدفوعات",
       badge: "إدارة المدفوعات",
       description: "إدارة المدفوعات والحسابات والمعاملات المالية.",
-    },
-    expense: {
-      title: "المصاريف",
-      badge: "إدارة المصاريف",
-      description: "إدارة مصاريف المؤسسة وسجلات المصاريف.",
     },
     worker: {
       title: "العمال",
@@ -586,7 +567,6 @@ export default function AppShell({
     purchases: t.purchase.title,
     sales: t.sale.title,
     payments: t.payment.title,
-    expenses: t.expense.title,
     workers: t.worker.title,
     vehicles: t.vehicle.title,
     tasks: t.task.title,
@@ -606,7 +586,6 @@ export default function AppShell({
     purchases: t.purchase.description,
     sales: t.sale.description,
     payments: t.payment.description,
-    expenses: t.expense.description,
     workers: t.worker.description,
     vehicles: t.vehicle.description,
     tasks: t.task.description,
@@ -626,7 +605,6 @@ export default function AppShell({
     purchases: t.nav.purchases,
     sales: t.nav.sales,
     payments: t.nav.payments,
-    expenses: t.nav.expenses,
     workers: t.nav.workers,
     vehicles: t.nav.vehicles,
     tasks: t.nav.tasks,

@@ -12,7 +12,20 @@ export class SupplierService extends BaseService {
     email?: string;
     notes?: string;
   }): Promise<Supplier> {
-    const existing = await supplierRepository.getByName(input.name);
+    const trimmedName = input.name?.trim();
+    if (!trimmedName) {
+      throw new Error("Supplier name is required.");
+    }
+    const trimmedPhone = input.phone?.trim();
+    if (!trimmedPhone) {
+      throw new Error("Supplier phone is required.");
+    }
+    // Preserve raw value (+, spaces, dashes allowed) — do not strip silently
+    if (!/^\+?[0-9\s\-]+$/.test(trimmedPhone)) {
+      throw new Error("Invalid phone number. Phone may contain +, digits, spaces and dashes only.");
+    }
+
+    const existing = await supplierRepository.getByName(trimmedName);
 
     if (existing) {
       throw new Error("A supplier with this name already exists.");
@@ -25,12 +38,12 @@ export class SupplierService extends BaseService {
       createdAt: now,
       updatedAt: now,
       syncStatus: "pending",
-      name: input.name,
-      phone: input.phone,
-      address: input.address,
-      identificationNumber: input.identificationNumber,
-      email: input.email,
-      notes: input.notes,
+      name: trimmedName,
+      phone: trimmedPhone,
+      address: input.address?.trim() || undefined,
+      identificationNumber: input.identificationNumber?.trim() || undefined,
+      email: input.email?.trim() || undefined,
+      notes: input.notes?.trim() || undefined,
       balance: 0,
     };
 

@@ -14,26 +14,28 @@ export class ProductService extends BaseService {
     taxProfileId?: string;
   }): Promise<Product> {
     return runDatabaseTransaction(async () => {
-      const existing = await productRepository.getByName(input.name);
-
-      if (existing) {
+      const trimmedName = input.name.trim();
+      const normalized = trimmedName.toLowerCase();
+      const all = await productRepository.getAll();
+      const existingNorm = all.find((p) => p.name.trim().toLowerCase() === normalized);
+      if (existingNorm) {
         throw new Error("A product with this name already exists.");
       }
 
-      if (!input.name.trim()) {
+      if (!trimmedName) {
         throw new Error("Product name is required.");
       }
 
-      if (input.price < 0) {
-        throw new Error("Product price cannot be negative.");
+      if (!Number.isFinite(input.price) || input.price < 0) {
+        throw new Error("Product price must be a finite number >= 0.");
       }
 
-      if (input.quantity < 0) {
-        throw new Error("Product quantity cannot be negative.");
+      if (!Number.isFinite(input.quantity) || input.quantity < 0 || !Number.isInteger(input.quantity)) {
+        throw new Error("Product quantity must be a finite integer >= 0.");
       }
 
-      if (input.weightKg < 0) {
-        throw new Error("Product weight cannot be negative.");
+      if (!Number.isFinite(input.weightKg) || input.weightKg < 0) {
+        throw new Error("Product weight must be a finite number >= 0.");
       }
 
       const now = Date.now();

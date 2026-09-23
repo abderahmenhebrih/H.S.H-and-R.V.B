@@ -8,6 +8,10 @@ import { useDbSync } from "../src/hooks/useDbSync";
 import { settingsService } from "../src/services/settings.service";
 import { saleService } from "../src/services/sale.service";
 import { purchaseService } from "../src/services/purchase.service";
+import { customerService } from "../src/services/customer.service";
+import { supplierService } from "../src/services/supplier.service";
+import { workerService } from "../src/services/worker.service";
+import { roundMoney } from "../src/lib/money";
 import {
   SETTINGS_EVENT,
   DEFAULT_SETTINGS,
@@ -403,8 +407,39 @@ export default function Dashboard() {
     };
   }, [overviewPeriod]);
 
+  const [kpi, setKpi] = useState({ salesToday: 0, salesCount: 0, purchasesToday: 0, purchasesCount: 0, outstanding: 0, outstandingCount: 0, activeWorkers: 0 });
+  const [kpiLoading, setKpiLoading] = useState(true);
+
+  async function loadKpi() {
+    try {
+      const now = new Date();
+      const start = new Date(now); start.setHours(0,0,0,0);
+      const end = new Date(now); end.setHours(23,59,59,999);
+      const from = start.getTime(); const to = end.getTime();
+      const [salesToday, purchasesToday, customers, suppliers, workers] = await Promise.all([
+        saleService.getByDateRange(from, to).catch(()=>[]),
+        purchaseService.getByDateRange(from, to).catch(()=>[]),
+        customerService.getAll().catch(()=>[]),
+        supplierService.getAll().catch(()=>[]),
+        workerService.getAll().catch(()=>[]),
+      ]);
+      const sTotal = roundMoney((salesToday as any[]).reduce((sum, s:any)=> sum + (Number.isFinite(s.total)? s.total : 0), 0));
+      const pTotal = roundMoney((purchasesToday as any[]).reduce((sum, p:any)=> sum + (Number.isFinite(p.total)? p.total : 0), 0));
+      const custBal = (customers as any[]).reduce((sum,c:any)=> sum + (Number.isFinite(c.balance)? c.balance : 0), 0);
+      const supBal = (suppliers as any[]).reduce((sum,s:any)=> sum + (Number.isFinite(s.balance)? s.balance : 0), 0);
+      const outstandingVal = roundMoney(custBal + supBal);
+      const outstandingCnt = (customers as any[]).filter((c:any)=> Number.isFinite(c.balance) && c.balance > 0.005).length + (suppliers as any[]).filter((s:any)=> Number.isFinite(s.balance) && s.balance > 0.005).length;
+      const activeWorkers = (workers as any[]).filter((w:any)=> w.status==="active").length;
+      setKpi({ salesToday: sTotal, salesCount: salesToday.length, purchasesToday: pTotal, purchasesCount: purchasesToday.length, outstanding: outstandingVal, outstandingCount: outstandingCnt, activeWorkers });
+    } catch {}
+    finally { setKpiLoading(false); }
+  }
+
+  useEffect(()=>{ void loadKpi(); }, []);
+
   useDbSync(() => {
-    // Reload overview on remote sync
+    // Reload overview and KPI on remote sync
+    void loadKpi();
     const c = overviewPeriod;
     setOverviewPeriod("today" as any);
     setTimeout(() => setOverviewPeriod(c), 0);
@@ -668,31 +703,31 @@ export default function Dashboard() {
               accent="red"
               icon={TrendingUp}
               title={t.sales}
-              value={formatCurrency(0, settings.currency)}
-              subtitle={`0 ${t.transactions}`}
+              value={kpiLoading ? "…" : formatCurrency(kpi.salesToday, settings.currency)}
+              subtitle={kpiLoading ? "Loading…" : `${kpi.salesCount} ${t.transactions}`}
             />
 
             <KpiCard
               accent="yellow"
               icon={ShoppingCart}
               title={t.purchases}
-              value={formatCurrency(0, settings.currency)}
-              subtitle={`0 ${t.transactions}`}
+              value={kpiLoading ? "…" : formatCurrency(kpi.purchasesToday, settings.currency)}
+              subtitle={kpiLoading ? "Loading…" : `${kpi.purchasesCount} ${t.transactions}`}
             />
 
             <KpiCard
               accent="black"
               icon={Wallet}
               title={t.outstanding}
-              value={formatCurrency(0, settings.currency)}
-              subtitle={`0 ${t.pending}`}
+              value={kpiLoading ? "…" : formatCurrency(kpi.outstanding, settings.currency)}
+              subtitle={kpiLoading ? "Loading…" : `${kpi.outstandingCount} ${t.pending}`}
             />
 
             <KpiCard
               accent="light"
               icon={UsersRound}
               title={t.workers}
-              value="0"
+              value={kpiLoading ? "…" : String(kpi.activeWorkers)}
               subtitle={t.activeWorkers}
             />
           </section>

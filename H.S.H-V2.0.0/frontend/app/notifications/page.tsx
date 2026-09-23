@@ -17,7 +17,7 @@ const FILTERS = [
   { key: "all", label: { en: "All", fr: "Tous", ar: "الكل" } },
   { key: "unread", label: { en: "Unread", fr: "Non lus", ar: "غير مقروءة" } },
   { key: "orders", label: { en: "Orders", fr: "Commandes", ar: "الطلبات" } },
-  { key: "tasks", label: { en: "Tasks", fr: "Tâches", ar: "المهام" } },
+  { key: "task", label: { en: "Tasks", fr: "Tâches", ar: "المهام" } },
   { key: "financial", label: { en: "Financial", fr: "Financier", ar: "المالية" } },
   { key: "inventory", label: { en: "Inventory", fr: "Stock", ar: "المخزون" } },
   { key: "system", label: { en: "System", fr: "Système", ar: "النظام" } },
@@ -26,10 +26,10 @@ const FILTERS = [
 function formatDateGroup(ts: number, lang: string): string {
   const d = new Date(ts);
   const now = new Date();
-  const diff = now.getTime() - d.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return lang === "ar" ? "اليوم" : lang === "fr" ? "Aujourd'hui" : "Today";
-  if (days === 1) return lang === "ar" ? "أمس" : lang === "fr" ? "Hier" : "Yesterday";
+  if (now.toDateString() === d.toDateString()) return lang === "ar" ? "اليوم" : lang === "fr" ? "Aujourd'hui" : "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (yesterday.toDateString() === d.toDateString()) return lang === "ar" ? "أمس" : lang === "fr" ? "Hier" : "Yesterday";
   return lang === "ar" ? "سابقا" : lang === "fr" ? "Plus tôt" : "Earlier";
 }
 
@@ -55,11 +55,15 @@ export default function NotificationsPage() {
 
   const load = async () => {
     setLoading(true);
-    const all = await notificationService.getFiltered({ type: filter, search: search || undefined });
-    // Handle unreadOnly via filter
-    let filtered = all;
-    if (filter === "unread") filtered = all.filter((n) => !n.readAt);
-    setNotifications(filtered);
+    if (filter === "unread") {
+      const all = await notificationService.getFiltered({ type: "all", search: search || undefined });
+      setNotifications(all.filter((n) => !n.readAt));
+    } else {
+      // Normalize legacy "tasks" to correct type "task"
+      const typeParam = filter === "tasks" ? "task" : filter;
+      const all = await notificationService.getFiltered({ type: typeParam, search: search || undefined });
+      setNotifications(all);
+    }
     setLoading(false);
   };
 

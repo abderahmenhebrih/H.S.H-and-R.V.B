@@ -12,8 +12,11 @@ export class TransferOperation {
     note?: string;
   }) {
     return runDatabaseTransaction(async () => {
-      if (input.amount <= 0) {
-        throw new Error("Transfer amount must be greater than zero.");
+      if (!Number.isFinite(input.amount) || input.amount <= 0) {
+        throw new Error("Transfer amount must be a finite number greater than zero.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Transfer date must be a valid finite timestamp.");
       }
 
       if (input.fromAccountId === input.toAccountId) {
@@ -36,6 +39,10 @@ export class TransferOperation {
 
       if (!destinationAccount) {
         throw new Error("Destination account not found.");
+      }
+
+      if (!Number.isFinite(sourceAccount.balance) || !Number.isFinite(destinationAccount.balance)) {
+        throw new Error("Account balance corrupted.");
       }
 
       if (sourceAccount.balance < input.amount) {

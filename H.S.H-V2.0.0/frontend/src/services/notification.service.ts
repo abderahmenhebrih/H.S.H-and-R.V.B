@@ -171,7 +171,11 @@ export class NotificationService {
     all = all.filter((n) => !(n as any).archivedAt);
     if (filter.unreadOnly) all = all.filter((n) => !n.readAt);
     if (filter.type && filter.type !== "all") {
-      if (filter.type === "financial") {
+      if (filter.type === "unread") {
+        all = all.filter((n) => !n.readAt);
+      } else if (filter.type === "task" || filter.type === "tasks") {
+        all = all.filter((n) => n.type === "task");
+      } else if (filter.type === "financial") {
         const financial = ["payment", "purchase", "sale", "expense", "transfer", "account"];
         all = all.filter((n) => financial.includes(n.type));
       } else if (filter.type === "orders") {
@@ -224,8 +228,11 @@ export class NotificationService {
     if (filter.date && filter.date !== "all") {
       const now = Date.now();
       let since: number | null = null;
-      if (filter.date === "today") since = now - 86400000;
-      else if (filter.date === "7days") since = now - 7 * 86400000;
+      if (filter.date === "today") {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        since = start.getTime();
+      } else if (filter.date === "7days") since = now - 7 * 86400000;
       else if (filter.date === "30days") since = now - 30 * 86400000;
       if (since) all = all.filter((n) => n.createdAt >= since!);
     }

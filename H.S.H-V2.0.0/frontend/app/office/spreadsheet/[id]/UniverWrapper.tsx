@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { OfficeFile } from "../../../../src/types/entities/office-file";
 import type { Language } from "../../../../src/types/settings/settings";
 import "@univerjs/preset-sheets-core/lib/index.css";
+import styles from "./page.module.css";
 
 type Props = {
   file: OfficeFile;
@@ -377,26 +378,30 @@ function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: Offi
       if (avgMatch) {
         const [_, a1, a2] = avgMatch;
         const vals = getRangeValues(a1,a2);
-        const nums = vals.map((v)=> parseFloat(v)||0).filter((n)=> !isNaN(n));
-        return nums.length? String(nums.reduce((a,b)=>a+b,0)/nums.length) : "0";
+        const nums = vals.map((v)=> parseFloat(v)).filter((n)=> Number.isFinite(n));
+        if (nums.length===0) return "0";
+        return String(nums.reduce((a,b)=>a+b,0)/nums.length);
       }
       const minMatch = expr.match(/^MIN\(([A-Z]+\d+):([A-Z]+\d+)\)$/);
       if (minMatch) {
         const [_, a1,a2] = minMatch;
-        const nums = getRangeValues(a1,a2).map((v)=> parseFloat(v)||0);
-        return String(Math.min(...nums));
+        const vals = getRangeValues(a1,a2);
+        const nums = vals.map((v)=> parseFloat(v)).filter((n)=> Number.isFinite(n));
+        return nums.length ? String(Math.min(...nums)) : "0";
       }
       const maxMatch = expr.match(/^MAX\(([A-Z]+\d+):([A-Z]+\d+)\)$/);
       if (maxMatch) {
         const [_, a1,a2] = maxMatch;
-        const nums = getRangeValues(a1,a2).map((v)=> parseFloat(v)||0);
-        return String(Math.max(...nums));
+        const vals = getRangeValues(a1,a2);
+        const nums = vals.map((v)=> parseFloat(v)).filter((n)=> Number.isFinite(n));
+        return nums.length ? String(Math.max(...nums)) : "0";
       }
       const countMatch = expr.match(/^COUNT\(([A-Z]+\d+):([A-Z]+\d+)\)$/);
       if (countMatch) {
         const [_, a1,a2] = countMatch;
         const vals = getRangeValues(a1,a2);
-        return String(vals.filter((v)=> v!=="").length);
+        // COUNT counts numeric values only, not every non-empty (spec H)
+        return String(vals.filter((v)=> v!=="" && Number.isFinite(Number(v)) && String(v).trim()!=="" ).length);
       }
     } catch {}
     return val;
@@ -432,9 +437,9 @@ function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: Offi
   };
 
   return (
-    <div className="fallbackGrid">
+    <div className={styles.fallbackGrid}>
       <div style={{ fontSize:11, color:"var(--muted)", marginBottom:8 }}>Fallback grid — Univer failed to load. Formulas: =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT</div>
-      <table className="fallbackTable">
+      <table className={styles.fallbackTable}>
         <thead><tr><th></th>{colLabels.map((l)=> <th key={l}>{l}</th>)}</tr></thead>
         <tbody>
           {Array.from({ length: rows }, (_,r)=> (

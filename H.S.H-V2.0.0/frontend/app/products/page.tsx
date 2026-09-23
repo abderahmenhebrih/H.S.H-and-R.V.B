@@ -64,7 +64,7 @@ const TRANSLATIONS = {
     products: "products",
     productSingular: "product",
     price: "Price",
-    priceDA: "Price (DA)",
+    priceDA: "Price",
     quantity: "Quantity",
     weight: "Weight",
     weightKg: "Weight (kg)",
@@ -142,7 +142,7 @@ const TRANSLATIONS = {
     products: "produits",
     productSingular: "produit",
     price: "Prix",
-    priceDA: "Prix (DA)",
+    priceDA: "Prix",
     quantity: "Quantité",
     weight: "Poids",
     weightKg: "Poids (kg)",
@@ -220,7 +220,7 @@ const TRANSLATIONS = {
     products: "سلع",
     productSingular: "سلعة",
     price: "السعر",
-    priceDA: "السعر (دج)",
+    priceDA: "السعر",
     quantity: "الكمية",
     weight: "الوزن",
     weightKg: "الوزن (كغ)",
@@ -660,7 +660,7 @@ export default function ProductsPage() {
           <div className={styles.tableContainer}>
             <div className={styles.tableHeader} role="row">
               <span className={styles.thProduct}>{t.product}</span>
-              <span className={styles.thPrice}>{t.priceDA}</span>
+              <span className={styles.thPrice}>{`${t.price} (${currency})`}</span>
               <span className={styles.thQuantity}>{t.quantity}</span>
               <span className={styles.thWeight}>{t.weightKg}</span>
               <span className={styles.thActions}>{t.actions}</span>

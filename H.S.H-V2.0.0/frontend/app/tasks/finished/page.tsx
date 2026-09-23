@@ -8,6 +8,7 @@ import AppShell from "../../../src/components/layout/AppShell";
 import { taskService } from "../../../src/services/task.service";
 import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { useDbSync } from "../../../src/hooks/useDbSync";
 import type { Task } from "../../../src/types/entities/task";
 import type { Language } from "../../../src/types/settings/settings";
 import styles from "../page.module.css";
@@ -100,6 +101,8 @@ export default function FinishedTasksPage() {
     window.addEventListener(SETTINGS_EVENT, h);
     return () => window.removeEventListener(SETTINGS_EVENT, h);
   }, []);
+
+  useDbSync(() => { void loadTasks(); }, []);
 
   const finishedTasks = useMemo(() => {
     return [...tasks].filter((task) => task.status === "completed").sort((a, b) => (b.completedAt ?? b.updatedAt) - (a.completedAt ?? a.updatedAt));

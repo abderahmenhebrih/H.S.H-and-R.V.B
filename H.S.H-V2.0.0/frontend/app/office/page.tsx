@@ -27,6 +27,7 @@ import {
 import { officeFileService, getBlankDocumentContent, getBlankSpreadsheetContent, getLocalizedSheetName } from "../../src/services/office-file.service";
 import { settingsService } from "../../src/services/settings.service";
 import { DEFAULT_SETTINGS, getDirection } from "../../src/lib/settings";
+import { useDbSync } from "../../src/hooks/useDbSync";
 import type { OfficeFile, OfficeFileType } from "../../src/types/entities/office-file";
 import type { Language } from "../../src/types/settings/settings";
 import styles from "./page.module.css";
@@ -209,7 +210,7 @@ function getTemplateContent(id: string, lang: Language): any {
   }
   if (id === "tpl-employee-att") {
     const title = lang==="fr"?"Attestation de travail": lang==="ar"?"شهادة العمل":"Attestation";
-    return { type: "doc", content: [{ type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: title }] }, { type: "paragraph", content: [{ type: "text", text: "Worker: {{worker.name}}  Salary: {{worker.salary}}" }] }] };
+    return { type: "doc", content: [{ type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: title }] }, { type: "paragraph", content: [{ type: "text", text: "Worker: {{worker.name}}  Starting Salary: {{worker.startingSalary}}  Monthly Salary: {{worker.monthlySalary}}" }] }] };
   }
   if (id === "tpl-monthly-sales") {
     const month = lang==="fr"?"Mois": lang==="ar"?"الشهر":"Month";
@@ -238,6 +239,70 @@ function templateDescription(id: string, lang: Language): string {
     "tpl-monthly-sales": { en: "Sales analysis with sample table", fr: "Analyse des ventes avec tableau exemple", ar: "تحليل المبيعات مع جدول نموذجي" },
   };
   return map[id]?.[lang] || map[id]?.en || "";
+}
+
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentField = "";
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const char = text[i];
+    const next = text[i + 1];
+    if (inQuotes) {
+      if (char === '"') {
+        if (next === '"') {
+          currentField += '"';
+          i += 2;
+          continue;
+        } else {
+          inQuotes = false;
+          i++;
+          continue;
+        }
+      } else {
+        currentField += char;
+        i++;
+        continue;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+        i++;
+        continue;
+      } else if (char === ',') {
+        currentRow.push(currentField);
+        currentField = "";
+        i++;
+        continue;
+      } else if (char === '\r') {
+        currentRow.push(currentField);
+        rows.push(currentRow);
+        currentRow = [];
+        currentField = "";
+        i++;
+        if (next === '\n') i++;
+        continue;
+      } else if (char === '\n') {
+        currentRow.push(currentField);
+        rows.push(currentRow);
+        currentRow = [];
+        currentField = "";
+        i++;
+        continue;
+      } else {
+        currentField += char;
+        i++;
+        continue;
+      }
+    }
+  }
+  if (currentField !== "" || currentRow.length > 0) {
+    currentRow.push(currentField);
+    rows.push(currentRow);
+  }
+  return rows;
 }
 
 export default function OfficePage() {
@@ -285,6 +350,7 @@ export default function OfficePage() {
     } catch (e) { console.error(e); }
   }
   useEffect(() => { void loadFiles(); }, []);
+  useDbSync(() => { void loadFiles(); }, []);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -304,7 +370,7 @@ export default function OfficePage() {
   }, [files, search]);
 
   const recentFiles = useMemo(() => {
-    return [...filtered].filter((f)=>!f.isArchived && !f.deletedAt).sort((a,b)=> (b.lastOpenedAt ?? b.updatedAt) - (a.lastOpenedAt ?? a.updatedAt)).slice(0, 12);
+    return [...filtered].filter((f)=>!f.isArchived && !f.deletedAt && !f.isFavorite).sort((a,b)=> (b.lastOpenedAt ?? b.updatedAt) - (a.lastOpenedAt ?? a.updatedAt)).slice(0, 12);
   }, [filtered]);
 
   const docs = useMemo(() => filtered.filter((f)=>f.type==="document" && !f.isArchived), [filtered]);
@@ -319,8 +385,11 @@ export default function OfficePage() {
     archived: archived.length,
   };
 
+  const [creating, setCreating] = useState(false);
   async function handleCreate(type: OfficeFileType) {
+    if (creating) return;
     const title = createTitle.trim() || (type==="document" ? t.untitledDoc : t.untitledSheet);
+    setCreating(true);
     try {
       let content: any = undefined;
       let templateId: string | undefined = createTemplateId ?? undefined;
@@ -342,7 +411,8 @@ export default function OfficePage() {
       setCreateTemplateId(null);
       await loadFiles();
       router.push(type==="document" ? `/office/document/${created.id}` : `/office/spreadsheet/${created.id}`);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setToast(e instanceof Error ? e.message : String(e)); }
+    finally { setCreating(false); }
   }
 
   async function handleRename() {
@@ -354,22 +424,22 @@ export default function OfficePage() {
       setRenameFile(null);
       setRenameValue("");
       await loadFiles();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setToast(e instanceof Error ? e.message : String(e)); }
   }
 
   async function handleDuplicate(f: OfficeFile) {
     try {
       await officeFileService.duplicate(f.id);
       await loadFiles();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setToast(e instanceof Error ? e.message : String(e)); }
   }
 
   async function handleArchive(f: OfficeFile, archivedFlag: boolean) {
-    try { await officeFileService.archive(f.id, archivedFlag); await loadFiles(); } catch(e){console.error(e);}
+    try { await officeFileService.archive(f.id, archivedFlag); await loadFiles(); } catch(e){console.error(e); setToast(e instanceof Error ? e.message : String(e));}
   }
 
   async function handleFavorite(f: OfficeFile) {
-    try { await officeFileService.toggleFavorite(f.id); await loadFiles(); } catch(e){console.error(e);}
+    try { await officeFileService.toggleFavorite(f.id); await loadFiles(); } catch(e){console.error(e); setToast(e instanceof Error ? e.message : String(e));}
   }
 
   async function handleDeleteConfirm() {
@@ -409,9 +479,9 @@ export default function OfficePage() {
         router.push(`/office/document/${created.id}`);
       } else if (ext==="csv") {
         const text = await file.text();
-        const rows = text.split("\n").map((r)=>r.split(","));
-        const sheets = [{ id:"sheet-1", name:"Imported", data: {} as any, rowCount: rows.length, colCount: Math.max(...rows.map((r)=>r.length)) }];
-        rows.forEach((row, rIdx)=> row.forEach((cell,cIdx)=> { sheets[0].data[`${rIdx},${cIdx}`] = { v: cell.trim() }; }));
+        const rows = parseCSV(text);
+        const sheets = [{ id:"sheet-1", name:"Imported", data: {} as any, rowCount: rows.length, colCount: rows.length ? Math.max(...rows.map((r)=>r.length)) : 0 }];
+        rows.forEach((row, rIdx)=> row.forEach((cell,cIdx)=> { sheets[0].data[`${rIdx},${cIdx}`] = { v: cell }; }));
         const content = { sheets, activeSheetId:"sheet-1" };
         const created = await officeFileService.create({ type:"spreadsheet", title: file.name.replace(/\.[^/.]+$/,""), content } as any);
         await loadFiles();
@@ -574,8 +644,8 @@ export default function OfficePage() {
               <label><span style={{ fontSize:11, fontWeight:700, color:"var(--muted)" }}>{t.titleLabel}</span><input value={createTitle} onChange={(e)=>setCreateTitle(e.target.value)} placeholder={showCreate==="document"? t.untitledDoc : t.untitledSheet} autoFocus /></label>
               {createTemplateId && <small style={{ fontSize:11, color:"var(--muted)" }}>Template: {createTemplateId}</small>}
               <div className={styles.modalActions}>
-                <button type="button" className={styles.secondaryBtn} onClick={()=>setShowCreate(null)}>{t.cancel}</button>
-                <button type="button" className={styles.primaryBtn} onClick={()=>handleCreate(showCreate)}>{t.create}</button>
+                <button type="button" className={styles.secondaryBtn} onClick={()=>setShowCreate(null)} disabled={creating}>{t.cancel}</button>
+                <button type="button" className={styles.primaryBtn} onClick={()=>handleCreate(showCreate)} disabled={creating}>{creating ? t.saving : t.create}</button>
               </div>
             </section>
           </div>

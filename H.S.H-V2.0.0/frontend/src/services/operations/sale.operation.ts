@@ -3,6 +3,7 @@ import { saleService } from "../sale.service";
 import { runDatabaseTransaction } from "./database-transaction";
 import { productRepository } from "../../repositories/product.repository";
 import { customerRepository } from "../../repositories/customer.repository";
+import { roundMoney } from "../../lib/money";
 
 export class SaleOperation {
   async create(input: {
@@ -18,12 +19,43 @@ export class SaleOperation {
         throw new Error("Customer not found.");
       }
 
+      if (!Number.isFinite(input.total) || input.total < 0) {
+        throw new Error("Sale total must be a finite number >= 0.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Sale date must be a valid finite timestamp.");
+      }
+
       if (input.items.length === 0) {
         throw new Error("A sale must contain at least one item.");
       }
 
-      if (input.total < 0) {
-        throw new Error("Sale total cannot be negative.");
+      let canonicalTotal = 0;
+      for (const item of input.items) {
+        if (!Number.isFinite(item.quantity) || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+          throw new Error(`Invalid item quantity: ${item.productId}`);
+        }
+        if (!Number.isFinite(item.weightKg) || item.weightKg < 0) {
+          throw new Error(`Invalid item weightKg: ${item.productId}`);
+        }
+        if (!Number.isFinite(item.price) || item.price < 0) {
+          throw new Error(`Invalid item price: ${item.productId}`);
+        }
+        if (!Number.isFinite(item.total) || item.total < 0) {
+          throw new Error(`Invalid item total: ${item.productId}`);
+        }
+        const expected = roundMoney(item.weightKg * item.price);
+        if (Math.abs(item.total - expected) > 0.005) {
+          throw new Error(`Item total mismatch for ${item.productId}: expected ${expected}, got ${item.total}`);
+        }
+        canonicalTotal = roundMoney(canonicalTotal + expected);
+      }
+      if (Math.abs(input.total - canonicalTotal) > 0.005) {
+        throw new Error(`Sale total mismatch: expected ${canonicalTotal}, got ${input.total}`);
+      }
+
+      if (!Number.isFinite(customer.balance)) {
+        throw new Error("Customer balance corrupted.");
       }
 
       for (const item of input.items) {
@@ -31,6 +63,9 @@ export class SaleOperation {
 
         if (!product) {
           throw new Error(`Product not found: ${item.productId}`);
+        }
+        if (!Number.isFinite(product.quantity) || !Number.isFinite(product.weightKg)) {
+          throw new Error(`Product balance corrupted: ${item.productId}`);
         }
 
         if (product.quantity < item.quantity) {
@@ -55,11 +90,11 @@ export class SaleOperation {
         customerId: input.customerId,
         date: input.date,
         items: input.items,
-        total: input.total,
+        total: canonicalTotal,
       });
 
       await customerRepository.update(input.customerId, {
-        balance: customer.balance + input.total,
+        balance: roundMoney(customer.balance + canonicalTotal),
       } as any);
 
       // Notification for sale (will sync, in-app only by default)

@@ -60,12 +60,15 @@ app.use((_req, res, next) => {
 });
 
 const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+  ? process.env.CORS_ORIGIN.split(",")
+      .map((o) => o.trim())
+      .filter(Boolean)
   : ["http://localhost:3000"];
 
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Allow requests without Origin (native apps, curl, server-to-server)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -73,6 +76,8 @@ app.use(
       }
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-RVB-Client", "X-Refresh-Token", "X-Requested-With"],
   }),
 );
 app.use(cookieParser());

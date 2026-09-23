@@ -70,6 +70,8 @@ export function initChatSocket(httpServer: HttpServer, allowedOrigins: string[])
         else cb(new Error("CORS blocked"), false as any);
       },
       credentials: true,
+      methods: ["GET", "POST"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-RVB-Client", "X-Refresh-Token"],
     },
     path: "/api/rvb/chats/socket",
   });

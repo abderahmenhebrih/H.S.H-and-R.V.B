@@ -700,6 +700,21 @@ router.post("/incoming", async (req, res) => {
     res.status(400).json({ success: false, code: "INCOMING_AMOUNT_INVALID", message: "Invalid amounts: HT/TTC must be finite >=0 and TTC >= HT" });
     return;
   }
+  // Case-insensitive duplicate check: normalize via trim + toLowerCase (companion normalized field)
+  const normalizedSupplierNumber = trimmedSupplierNumber.toLowerCase();
+  try {
+    const { IncomingInvoiceModel: DupCheckModel } = await import("../models/incoming-invoice.model");
+    let dupCheck: any = await DupCheckModel.findOne({ supplierId, supplierInvoiceNumberNormalized: normalizedSupplierNumber }).lean();
+    if (!dupCheck) {
+      const escaped = trimmedSupplierNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      dupCheck = await DupCheckModel.findOne({ supplierId, supplierInvoiceNumber: { $regex: `^${escaped}$`, $options: "i" } } as any).lean();
+      if (dupCheck && String(dupCheck.supplierInvoiceNumber).trim().toLowerCase() !== normalizedSupplierNumber) dupCheck = null;
+    }
+    if (dupCheck) {
+      res.status(409).json({ success: false, code: "INCOMING_INVOICE_DUPLICATE", message: "An invoice with this number already exists for this supplier." });
+      return;
+    }
+  } catch {}
   try {
   const { IncomingInvoiceModel } = await import("../models/incoming-invoice.model");
       const now = Date.now();
@@ -711,6 +726,7 @@ router.post("/incoming", async (req, res) => {
           id: `inc-${uuidv4()}`,
           supplierId,
           supplierInvoiceNumber: trimmedSupplierNumber,
+          supplierInvoiceNumberNormalized: normalizedSupplierNumber,
           invoiceDate: invoiceDateMs,
           amountHT: htNum,
           taxAmount: taxNum,

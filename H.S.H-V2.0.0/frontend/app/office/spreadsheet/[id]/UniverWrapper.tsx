@@ -15,7 +15,7 @@ type Props = {
 
 export type UniverHandle = {
   insertValue: (value: string) => void;
-  insertTable: (entityType: string, rows: any[]) => void;
+  insertTable: (entityType: string, rows: any[]) => { success: boolean; sheetId?: string; error?: string };
   exportCSV: () => Promise<string | null>;
   exportXLSX: () => Promise<Blob | null>;
 };
@@ -92,35 +92,51 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
         scheduleSave();
       } catch (e) { console.error("insertValue failed", e); }
     },
-    insertTable: (entityType: string, rows: any[]) => {
+    insertTable: (entityType: string, rows: any[]): { success: boolean; sheetId?: string; error?: string } => {
       try {
         const api = apiRef.current;
         const wb = api?.getActiveWorkbook?.();
-        if (!wb) return;
+        if (!wb) return { success: false, error: "Workbook not available" };
         const header = Object.keys(rows[0] || {});
-        // try create sheet
+        // Insert Table is NEW-SHEET operation — must not fallback to active sheet
         let newSheet: any = null;
-        if (wb.createSheet) {
-          newSheet = wb.createSheet(entityType.slice(0, 20));
-        } else if (wb.addSheet) {
-          newSheet = wb.addSheet(entityType);
+        let newSheetId: string | undefined = undefined;
+        try {
+          if (wb.createSheet) {
+            newSheet = wb.createSheet(entityType.slice(0, 20));
+            newSheetId = newSheet?.getSheetId?.() || newSheet?.getId?.() || newSheet?.id || undefined;
+          } else if (wb.addSheet) {
+            newSheet = wb.addSheet(entityType);
+            newSheetId = newSheet?.getSheetId?.() || newSheet?.getId?.() || newSheet?.id || undefined;
+          } else {
+            return { success: false, error: "New sheet creation not available" };
+          }
+        } catch (err) {
+          return { success: false, error: err instanceof Error ? err.message : String(err) };
         }
-        const targetSheet = newSheet || wb.getActiveSheet?.();
-        if (!targetSheet) return;
-        // set header
+        if (!newSheet) return { success: false, error: "Failed to create new sheet" };
+        const targetSheet = newSheet;
+        // set header — collect failures
+        let writeErrors = 0;
         header.forEach((h, c) => {
-          try { targetSheet.getRange?.(0, c)?.setValue?.(h); } catch {}
-          try { targetSheet.setCellValue?.(0, c, h); } catch {}
+          let ok = false;
+          try { targetSheet.getRange?.(0, c)?.setValue?.(h); ok = true; } catch {}
+          try { if (!ok) { targetSheet.setCellValue?.(0, c, h); ok = true; } } catch { ok = false; }
+          if (!ok) writeErrors++;
         });
         rows.forEach((row, rIdx) => {
           header.forEach((h, c) => {
             const v = row[h];
-            try { targetSheet.getRange?.(rIdx+1, c)?.setValue?.(String(v ?? "")); } catch {}
-            try { targetSheet.setCellValue?.(rIdx+1, c, String(v ?? "")); } catch {}
+            let ok = false;
+            try { targetSheet.getRange?.(rIdx+1, c)?.setValue?.(String(v ?? "")); ok = true; } catch {}
+            try { if (!ok) { targetSheet.setCellValue?.(rIdx+1, c, String(v ?? "")); ok = true; } } catch { ok = false; }
+            if (!ok) writeErrors++;
           });
         });
+        if (writeErrors > 0) return { success: false, error: `Failed to write ${writeErrors} cells` };
         scheduleSave();
-      } catch (e) { console.error("insertTable failed", e); }
+        return { success: true, sheetId: newSheetId };
+      } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertTable failed", e); return { success: false, error: msg }; }
     },
     exportCSV: async () => {
       try {
@@ -351,9 +367,36 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
   return <div ref={containerRef} style={{ height: "100%", width: "100%", minHeight: 520 }} />;
 });
 
+// Detection of complex workbooks that fallback cannot represent losslessly
+function isComplexWorkbook(content: any): boolean {
+  if (!content || typeof content !== "object") return false;
+  const sheets = content.sheets;
+  if (!sheets) return false;
+  // Map form (Univer) => complex
+  if (!Array.isArray(sheets)) return true;
+  // Array form but multiple sheets => would lose sheets beyond first (fallback shows one)
+  if (sheets.length > 1) return true;
+  // sheetOrder indicates map-style workbook (even if array, extra meta)
+  if ((content as any).sheetOrder && Array.isArray((content as any).sheetOrder) && (content as any).sheetOrder.length > 1) return true;
+  // Check for merge/formula/style metadata that fallback cannot preserve
+  const first = sheets[0];
+  if (!first) return false;
+  if (first.mergeData && Array.isArray(first.mergeData) && first.mergeData.length > 0) return true;
+  if (first.mergeData && typeof first.mergeData === "object" && Object.keys(first.mergeData).length>0) return true;
+  // Detect nested cellData with f/formula or s/style fields (fallback only handles v)
+  // If any data entry has f, si, formula, style -> complex
+  if (first.data) {
+    for (const v of Object.values(first.data) as any[]) {
+      if (v && typeof v === "object" && (v.f !== undefined || v.si !== undefined || v.s !== undefined)) return true;
+    }
+  }
+  return false;
+}
+
 // Simple fallback grid for when Univer fails (offline or not compatible)
 function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: OfficeFile; onSave: (snap:any)=>void; language: Language; defaultSheetName: string }) {
   const content: any = file.content;
+  const isComplex = isComplexWorkbook(content);
   const initialSheet = Array.isArray(content?.sheets) ? content.sheets[0] : null;
   const [grid, setGrid] = useState<Record<string, string>>(()=> {
     const m: Record<string,string> = {};
@@ -422,6 +465,7 @@ function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: Offi
   const computeRange = (a1:string,a2:string, fn:(vals:string[])=>number): number => fn(getRangeValues(a1,a2));
 
   const handleCellChange = (r:number,c:number, v:string) => {
+    if (isComplex) return;
     const key=`${r},${c}`;
     const next={ ...grid, [key]: v };
     setGrid(next);
@@ -436,9 +480,24 @@ function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: Offi
     }, 800);
   };
 
+  const readOnlyMessage = language==="fr"
+    ? "Ce classeur nécessite l'éditeur complet. Le mode de secours est en lecture seule pour protéger vos données."
+    : language==="ar"
+    ? "يتطلب هذا المصنف المحرر الكامل. وضع الأمان للقراءة فقط لحماية البيانات."
+    : "This workbook requires the full spreadsheet editor. Fallback mode is read-only to protect your data.";
+
+  const previewNote = language==="fr"
+    ? "Aperçu sécurisé — aucune modification ne sera enregistrée."
+    : language==="ar"
+    ? "معاينة آمنة — لن يتم حفظ أي تعديل."
+    : "Safe preview — no changes will be saved.";
+
   return (
     <div className={styles.fallbackGrid}>
-      <div style={{ fontSize:11, color:"var(--muted)", marginBottom:8 }}>Fallback grid — Univer failed to load. Formulas: =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT</div>
+      <div style={{ fontSize:11, color:"var(--muted)", marginBottom:8 }}>
+        {isComplex ? readOnlyMessage : "Fallback grid — Univer failed to load. Formulas: =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT"}
+      </div>
+      {isComplex && <div style={{ fontSize:11, color:"var(--danger, #c00)", background:"var(--panel-hover)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", marginBottom:8 }}>{previewNote}</div>}
       <table className={styles.fallbackTable}>
         <thead><tr><th></th>{colLabels.map((l)=> <th key={l}>{l}</th>)}</tr></thead>
         <tbody>
@@ -447,7 +506,7 @@ function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: Offi
               const key=`${r},${c}`;
               const raw=grid[key] ?? "";
               const display = raw.startsWith("=") ? evaluate(raw) : raw;
-              return <td key={c}><input value={raw} onChange={(e)=>handleCellChange(r,c,e.target.value)} title={raw.startsWith("=")? `${raw} → ${display}`: raw} placeholder="" /></td>;
+              return <td key={c}><input value={raw} onChange={(e)=>handleCellChange(r,c,e.target.value)} disabled={isComplex} title={isComplex ? readOnlyMessage : raw.startsWith("=")? `${raw} → ${display}`: raw} placeholder="" style={isComplex ? { background:"var(--panel-hover)", cursor:"not-allowed" } : undefined} /></td>;
             })}</tr>
           ))}
         </tbody>

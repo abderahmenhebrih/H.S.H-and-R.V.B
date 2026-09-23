@@ -28,6 +28,7 @@ import { officeFileService, getBlankDocumentContent, getBlankSpreadsheetContent,
 import { settingsService } from "../../src/services/settings.service";
 import { DEFAULT_SETTINGS, getDirection } from "../../src/lib/settings";
 import { useDbSync } from "../../src/hooks/useDbSync";
+import { resolvePlaceholdersInObject } from "../../src/lib/office/placeholder";
 import type { OfficeFile, OfficeFileType } from "../../src/types/entities/office-file";
 import type { Language } from "../../src/types/settings/settings";
 import styles from "./page.module.css";
@@ -396,14 +397,33 @@ export default function OfficePage() {
       if (createTemplateId) {
         const tpl = TEMPLATE_DEFS.find((x)=>x.id===createTemplateId);
         if (tpl) {
-          const langContent = getTemplateContent(tpl.id, language);
-          if (langContent) content = langContent;
-          else if (tpl.content) content = tpl.content;
-          else content = tpl.type==="document" ? getBlankDocumentContent() : getBlankSpreadsheetContent(language);
+          let langContent = getTemplateContent(tpl.id, language);
+          if (!langContent && tpl.content) langContent = tpl.content;
+          if (!langContent) langContent = tpl.type==="document" ? getBlankDocumentContent() : getBlankSpreadsheetContent(language);
+          // Resolve placeholders recursively for production path
+          try {
+            const settings = await settingsService.get();
+            const currency = settings?.currency ?? "DA";
+            const ctx: any = { language, currency };
+            // For entity-requiring templates, fetch a representative entity to resolve
+            if (tpl.id === "tpl-customer-notice") {
+              try { const { customerService } = await import("../../src/services/customer.service"); const list = await customerService.getAll(); if (list[0]) ctx.customer = list[0]; } catch {}
+            } else if (tpl.id === "tpl-supplier-letter") {
+              try { const { supplierService } = await import("../../src/services/supplier.service"); const list = await supplierService.getAll(); if (list[0]) ctx.supplier = list[0]; } catch {}
+            } else if (tpl.id === "tpl-employee-att") {
+              try { const { workerService } = await import("../../src/services/worker.service"); const list = await workerService.getAll(); if (list[0]) ctx.worker = list[0]; } catch {}
+            }
+            content = resolvePlaceholdersInObject(langContent, ctx);
+          } catch { content = langContent; }
           templateId = tpl.id;
         }
       } else {
         content = type==="document" ? getBlankDocumentContent() : getBlankSpreadsheetContent(language);
+        try {
+          const settings = await settingsService.get();
+          const currency = settings?.currency ?? "DA";
+          content = resolvePlaceholdersInObject(content, { language, currency } as any);
+        } catch {}
       }
       const created = await officeFileService.create({ type, title, content, templateId } as any);
       setShowCreate(null);
@@ -449,7 +469,7 @@ export default function OfficePage() {
       await officeFileService.deletePermanent(deleteFile.id);
       setDeleteFile(null);
       await loadFiles();
-    } catch(e){console.error(e);} finally{ setDeleting(false);}
+    } catch(e){ console.error(e); setToast(e instanceof Error ? e.message : String(e)); } finally{ setDeleting(false);}
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -568,7 +588,7 @@ export default function OfficePage() {
             <button type="button" className={styles.secondaryBtn} onClick={()=>fileInputRef.current?.click()}>
               <FileInput size={16} strokeWidth={2} aria-hidden="true" /> {t.import}
             </button>
-            <input ref={fileInputRef} type="file" accept=".txt,.html,.csv,.xlsx,.xls" style={{ display:"none" }} onChange={handleImportFile} />
+            <input ref={fileInputRef} type="file" accept=".txt,.html,.csv,.xlsx" style={{ display:"none" }} onChange={handleImportFile} />
           </div>
         </div>
 

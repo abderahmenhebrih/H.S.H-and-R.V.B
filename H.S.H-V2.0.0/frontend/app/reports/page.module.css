@@ -17,7 +17,9 @@
 }
 
 .dateModal {
-  width: min(480px,100%);
+  width: min(520px,100%);
+  max-height: min(88vh, 860px);
+  overflow-y: auto;
   padding: 28px;
   border: 1px solid var(--border);
   border-radius: 15px;
@@ -25,6 +27,7 @@
   color: var(--text);
   box-shadow: 0 25px 70px rgba(0,0,0,.25);
   text-align: center;
+  scrollbar-width: thin;
 }
 
 .dateModal h2 {
@@ -74,6 +77,99 @@
   display: flex;
   justify-content: center;
   gap: 10px;
+  margin-top: 16px;
+}
+
+/* Fast presets — canonical from/to */
+.fastSection {
+  margin: 16px 0 12px;
+  text-align: left;
+}
+.fastLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.presetGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.presetButton {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.presetButton:hover {
+  border-color: var(--border-strong);
+  background: var(--panel);
+}
+.presetActive {
+  border-color: var(--accent);
+  background: var(--yellow, var(--accent));
+  color: #17191b;
+}
+
+/* Advanced inline settings staying with existing report design */
+.advancedInline {
+  margin-top: 14px;
+  text-align: left;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.advancedToggle {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+}
+.advancedToggle:hover {
+  text-decoration: underline;
+}
+.advancedPanel {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-hover);
+}
+.inlineSelectors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inlineSelectors span {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.monthYearRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.advancedHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .primaryButton {

@@ -411,11 +411,35 @@ async function getEntitySnapshot(entityType:string, entityId:string, field:strin
     else if(entityType==="supplier"){ const { supplierService } = await import("../../../../src/services/supplier.service"); const e = await supplierService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.name; value = String((e as any)[field] ?? ""); }}
     else if(entityType==="worker"){ const { workerService } = await import("../../../../src/services/worker.service"); const e = await workerService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.name; value = String((e as any)[field] ?? ""); }}
     else if(entityType==="product"){ const { productService } = await import("../../../../src/services/product.service"); const e = await productService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.name; value = String((e as any)[field] ?? ""); }}
-    else if(entityType==="sale"){ const { saleService } = await import("../../../../src/services/sale.service"); const e = await saleService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.id; value = field==="total"? String((e as any).total ?? (e as any).items?.reduce((s:any,it:any)=>s+(it.total||0),0) ?? "") : String((e as any)[field] ?? ""); }}
-    else if(entityType==="purchase"){ const { purchaseService } = await import("../../../../src/services/purchase.service"); const e = await purchaseService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.id; value = String((e as any)[field] ?? ""); }}
-    else if(entityType==="invoice"){ const { invoiceService } = await import("../../../../src/services/invoice.service"); const e = await invoiceService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.invoiceNumber || e.id; if(field==="number") value = e.invoiceNumber || e.id; else if(field==="totalTTC") value = String(e.totalTTC ?? ""); else value = String((e as any)[field] ?? ""); }}
+    else if(entityType==="sale"){
+      const { saleService } = await import("../../../../src/services/sale.service");
+      const { customerService } = await import("../../../../src/services/customer.service");
+      const e = await saleService.getAll().then((a)=>a.find((x:any)=>x.id===entityId));
+      if(e){
+        label = e.id;
+        if(field==="customerId" || field==="customer"){
+          const customers = await customerService.getAll().catch(()=>[] as any);
+          const c = customers.find((x:any)=>x.id===e.customerId);
+          value = c ? c.name : e.customerId;
+        } else value = field==="total"? String((e as any).total ?? (e as any).items?.reduce((s:any,it:any)=>s+(it.total||0),0) ?? "") : String((e as any)[field] ?? "");
+      }
+    }
+    else if(entityType==="purchase"){
+      const { purchaseService } = await import("../../../../src/services/purchase.service");
+      const { supplierService } = await import("../../../../src/services/supplier.service");
+      const e = await purchaseService.getAll().then((a)=>a.find((x:any)=>x.id===entityId));
+      if(e){
+        label = e.id;
+        if(field==="supplierId" || field==="supplier"){
+          const suppliers = await supplierService.getAll().catch(()=>[] as any);
+          const s = suppliers.find((x:any)=>x.id===e.supplierId);
+          value = s ? s.name : e.supplierId;
+        } else value = String((e as any)[field] ?? "");
+      }
+    }
+    else if(entityType==="invoice"){ const { invoiceService } = await import("../../../../src/services/invoice.service"); const e = await invoiceService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.invoiceNumber || e.id; if(field==="invoiceNumber") value = e.invoiceNumber || e.id; else if(field==="totalTTC") value = String(e.totalTTC ?? ""); else value = String((e as any)[field] ?? ""); }}
     else if(entityType==="vehicle"){ const { vehicleService } = await import("../../../../src/services/vehicle.service"); const e = await vehicleService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.name; value = String((e as any)[field] ?? ""); }}
-    else if(entityType==="task"){ const { taskService } = await import("../../../../src/services/task.service"); const e = await taskService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = (e as any).title || e.id; value = String((e as any)[field] ?? ""); }}
+    else if(entityType==="task"){ const { taskService } = await import("../../../../src/services/task.service"); const e = await taskService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = (e as any).name || e.id; value = String((e as any)[field] ?? ""); }}
     else if(entityType==="payment"){ const { paymentService } = await import("../../../../src/services/payment.service"); const e = await paymentService.getAll().then((a)=>a.find((x:any)=>x.id===entityId)); if(e){ label = e.id; value = String((e as any)[field] ?? ""); }}
   } catch(e){ console.error(e); }
   if(!value) value = `${entityType}.${field}`;

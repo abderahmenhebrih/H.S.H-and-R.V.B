@@ -188,12 +188,22 @@ export default function SpreadsheetEditorPage() {
     try {
       const rows = await getTableSnapshot(entityType, language);
       if (!rows || rows.length===0) { setOfficeFeedback(TT.noData); return; }
-      let insertedViaApi = false;
+      let apiResult: any = null;
       if (univerRef.current?.insertTable) {
-        try { univerRef.current.insertTable(entityType, rows); insertedViaApi = true; } catch(e){ console.error(e); }
+        try { apiResult = univerRef.current.insertTable(entityType, rows); } catch(e){ console.error(e); apiResult = { success: false, error: String(e) }; }
       }
-      if (!insertedViaApi) {
-        // fallback: create new sheet snapshot via content update and render immediately
+      if (apiResult) {
+        if (!apiResult.success) {
+          setOfficeFeedback(apiResult.error || "Failed to create new sheet");
+          return;
+        }
+        // Persist API-inserted snapshot by saving current Univer snapshot after short delay
+        setTimeout(async()=>{
+          try { const snap = (univerRef.current as any)?.getSnapshot?.() || (univerRef.current as any)?.save?.(); if(snap) await officeFileService.update(id, { content: snap }); const updated = await officeFileService.getById(id); if(updated) setFile(updated); } catch(e){ console.error(e); setOfficeFeedback(String(e)); }
+        }, 400);
+        setOfficeFeedback(TT.tableInserted);
+      } else {
+        // fallback: create new sheet snapshot via content update and render immediately — only for simple flat workbooks or when Univer not available
         const current = file?.content as any;
         const header = Object.keys(rows[0] || {});
         const data: any = {};
@@ -218,12 +228,6 @@ export default function SpreadsheetEditorPage() {
         await officeFileService.update(id, { content: nextContent });
         const updated = await officeFileService.getById(id);
         if (updated) setFile(updated);
-        setOfficeFeedback(TT.tableInserted);
-      } else {
-        // Persist API-inserted snapshot by saving current Univer snapshot after short delay
-        setTimeout(async()=>{
-          try { const snap = (univerRef.current as any)?.getSnapshot?.() || (univerRef.current as any)?.save?.(); if(snap) await officeFileService.update(id, { content: snap }); const updated = await officeFileService.getById(id); if(updated) setFile(updated); } catch(e){ console.error(e); }
-        }, 400);
         setOfficeFeedback(TT.tableInserted);
       }
       setShowTableInsert(false);
@@ -424,9 +428,35 @@ async function getSnapshotForInsert(type:string, id:string, field:string): Promi
     else if(type==="supplier"){ const { supplierService } = await import("../../../../src/services/supplier.service"); const e = await supplierService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.name; value=String((e as any)[field] ?? ""); }}
     else if(type==="worker"){ const { workerService } = await import("../../../../src/services/worker.service"); const e = await workerService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.name; value=String((e as any)[field] ?? ""); }}
     else if(type==="product"){ const { productService } = await import("../../../../src/services/product.service"); const e = await productService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.name; value=String((e as any)[field] ?? ""); }}
-    else if(type==="sale"){ const { saleService } = await import("../../../../src/services/sale.service"); const e = await saleService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.id; value=String((e as any)[field] ?? ""); }}
-    else if(type==="purchase"){ const { purchaseService } = await import("../../../../src/services/purchase.service"); const e = await purchaseService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.id; value=String((e as any)[field] ?? ""); }}
-    else if(type==="invoice"){ const { invoiceService } = await import("../../../../src/services/invoice.service"); const e = await invoiceService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.invoiceNumber||e.id; value= field==="number"? (e.invoiceNumber||e.id) : String((e as any)[field] ?? e.totalTTC ?? ""); }}
+    else if(type==="sale"){
+      const { saleService } = await import("../../../../src/services/sale.service");
+      const { customerService } = await import("../../../../src/services/customer.service");
+      const e = await saleService.getAll().then((a)=>a.find((x:any)=>x.id===id));
+      if(e){
+        label=e.id;
+        if(field==="customerId" || field==="customer"){
+          const customers = await customerService.getAll().catch(()=>[] as any);
+          const c = customers.find((x:any)=>x.id===e.customerId);
+          value = c ? c.name : e.customerId;
+        } else value=String((e as any)[field] ?? "");
+      }
+    }
+    else if(type==="purchase"){
+      const { purchaseService } = await import("../../../../src/services/purchase.service");
+      const { supplierService } = await import("../../../../src/services/supplier.service");
+      const e = await purchaseService.getAll().then((a)=>a.find((x:any)=>x.id===id));
+      if(e){
+        label=e.id;
+        if(field==="supplierId" || field==="supplier"){
+          const suppliers = await supplierService.getAll().catch(()=>[] as any);
+          const s = suppliers.find((x:any)=>x.id===e.supplierId);
+          value = s ? s.name : e.supplierId;
+        } else value=String((e as any)[field] ?? "");
+      }
+    }
+    else if(type==="invoice"){ const { invoiceService } = await import("../../../../src/services/invoice.service"); const e = await invoiceService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.invoiceNumber||e.id; value= field==="invoiceNumber"? (e.invoiceNumber||e.id) : String((e as any)[field] ?? e.totalTTC ?? ""); }}
+    else if(type==="vehicle"){ const { vehicleService } = await import("../../../../src/services/vehicle.service"); const e = await vehicleService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=e.name; value=String((e as any)[field] ?? ""); }}
+    else if(type==="task"){ const { taskService } = await import("../../../../src/services/task.service"); const e = await taskService.getAll().then((a)=>a.find((x:any)=>x.id===id)); if(e){ label=(e as any).name || e.id; value=String((e as any)[field] ?? ""); }}
   } catch(e){ console.error(e); }
   if(!value) value=`${type}.${field}`;
   return { value, label };
@@ -436,11 +466,13 @@ async function getTableSnapshot(type:string, language: import("../../../../src/t
   const t = SHEET_T[language];
   try{
     if(type==="customer"){ const { customerService } = await import("../../../../src/services/customer.service"); const list=await customerService.getAll(); return list.map((c:any)=>({ [t.customer ?? "Name"]:c.name, [language==="fr"?"Type":language==="ar"?"النوع":"Type"]:c.type, [language==="fr"?"Téléphone":language==="ar"?"الهاتف":"Phone"]:c.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(c.balance) })); }
-    if(type==="supplier"){ const { supplierService } = await import("../../../../src/services/supplier.service"); const list=await supplierService.getAll(); return list.map((s:any)=>({ [t.customer ?? "Name"]:s.name, [language==="fr"?"Téléphone":language==="ar"?"الهاتف":"Phone"]:s.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(s.balance) })); }
+    if(type==="supplier"){ const { supplierService } = await import("../../../../src/services/supplier.service"); const list=await supplierService.getAll(); return list.map((s:any)=>({ [t.supplier ?? "Name"]:s.name, [language==="fr"?"Téléphone":language==="ar"?"الهاتف":"Phone"]:s.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(s.balance) })); }
     if(type==="product"){ const { productService } = await import("../../../../src/services/product.service"); const list=await productService.getAll(); return list.map((p:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:p.name, [language==="fr"?"Prix":language==="ar"?"السعر":"Price"]:String(p.price??""), [language==="fr"?"Quantité":language==="ar"?"الكمية":"Quantity"]:String(p.quantity??""), [language==="fr"?"Poids":language==="ar"?"الوزن":"Weight"]:String((p as any).weightKg ?? "") })); }
-    if(type==="sale"){ const { saleService } = await import("../../../../src/services/sale.service"); const { customerService } = await import("../../../../src/services/customer.service"); const [list, customers] = await Promise.all([saleService.getAll(), customerService.getAll().catch(()=>[])]) as any; const custMap = new Map((customers||[]).map((c:any)=>[c.id, c.name])); return list.slice(0,50).map((s:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:s.id, [t.customer]: custMap.get(s.customerId) ?? s.customerId, [t.date]:new Date(s.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(s.items?.reduce((a:any,b:any)=>a+(b.total||0),0) ?? "") })); }
-    if(type==="purchase"){ const { purchaseService } = await import("../../../../src/services/purchase.service"); const { supplierService } = await import("../../../../src/services/supplier.service"); const [list, suppliers] = await Promise.all([purchaseService.getAll(), supplierService.getAll().catch(()=>[])]) as any; const supMap = new Map((suppliers||[]).map((s:any)=>[s.id, s.name])); return list.slice(0,50).map((p:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:p.id, [t.supplier]: supMap.get(p.supplierId) ?? p.supplierId, [t.date]:new Date(p.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(p.total??"") })); }
+    if(type==="sale"){ const { saleService } = await import("../../../../src/services/sale.service"); const { customerService } = await import("../../../../src/services/customer.service"); const [list, customers] = await Promise.all([saleService.getAll(), customerService.getAll().catch(()=>[])]) as any; const custMap = new Map((customers||[]).map((c:any)=>[c.id, c.name])); return list.map((s:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:s.id, [t.customer]: custMap.get(s.customerId) ?? s.customerId, [t.date]:new Date(s.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(s.items?.reduce((a:any,b:any)=>a+(b.total||0),0) ?? "") })); }
+    if(type==="purchase"){ const { purchaseService } = await import("../../../../src/services/purchase.service"); const { supplierService } = await import("../../../../src/services/supplier.service"); const [list, suppliers] = await Promise.all([purchaseService.getAll(), supplierService.getAll().catch(()=>[])]) as any; const supMap = new Map((suppliers||[]).map((s:any)=>[s.id, s.name])); return list.map((p:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:p.id, [t.supplier]: supMap.get(p.supplierId) ?? p.supplierId, [t.date]:new Date(p.date).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(p.total??"") })); }
     if(type==="worker"){ const { workerService } = await import("../../../../src/services/worker.service"); const list=await workerService.getAll(); return list.map((w:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:w.name, [language==="fr"?"Poste":language==="ar"?"المنصب":"Position"]:w.position, [language==="fr"?"Salaire initial":language==="ar"?"الراتب الابتدائي":"Starting"]:String((w as any).startingSalary ?? ""), [language==="fr"?"Salaire mensuel":language==="ar"?"الراتب الشهري":"Monthly"]:String((w as any).monthlySalary ?? ""), [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(w.balance??"") })); }
+    if(type==="vehicle"){ const { vehicleService } = await import("../../../../src/services/vehicle.service"); const list=await vehicleService.getAll(); return list.map((v:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:v.name, [language==="fr"?"Immatriculation":language==="ar"?"الترقيم":"Registration"]:v.registrationNumber, [language==="fr"?"Type":language==="ar"?"النوع":"Type"]:v.type })); }
+    if(type==="task"){ const { taskService } = await import("../../../../src/services/task.service"); const list=await taskService.getAll(); return list.map((tk:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:tk.name, [language==="fr"?"Statut":language==="ar"?"الحالة":"Status"]:tk.status ?? "pending", [language==="fr"?"Échéance":language==="ar"?"الموعد":"Deadline"]: tk.deadline ? new Date(tk.deadline).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn":language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any) : "" })); }
   } catch(e){ console.error(e); }
   return [];
 }

@@ -38,16 +38,25 @@ async function getNextRevision(session?: any): Promise<number> {
 }
 
 function isTransientError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error);
-  // Transient Mongo errors that should be retryable
+  const err: any = error;
+  const msg = err instanceof Error ? err.message : String(err);
+  const name = err?.name ? String(err.name) : "";
+  const code: any = err?.code;
+  const codeName: any = err?.codeName;
+  const labels: string[] = Array.isArray(err?.errorLabels) ? err.errorLabels : Array.isArray(err?.labels) ? err.labels : [];
+  const hasTransientLabel = labels.some((l: string) => /TransientTransactionError|UnknownTransactionCommitResult|RetryableWriteError/i.test(l));
+  if (hasTransientLabel) return true;
+  // Explicit Mongo error codes / names
+  if (code === 11000 || codeName === "DuplicateKey" || msg.includes("E11000")) return false;
+  if (name === "MongoNetworkError" || name === "MongoServerSelectionError" || name === "MongoTimeoutError" || msg.includes("MongoNetworkError") || msg.includes("MongoServerSelectionError") || msg.includes("NetworkTimeout") || msg.includes("MongoTimeout")) return true;
+  if (name === "MongooseError" && /buffering timed out/i.test(msg)) return true;
+  if (/ETIMEDOUT|ECONNRESET|ENOTFOUND|ECONNREFUSED|EPIPE/i.test(msg)) return true;
   if (msg.includes("TransientTransactionError")) return true;
   if (msg.includes("UnknownTransactionCommitResult")) return true;
-  if (msg.includes("NetworkTimeout")) return true;
-  if (msg.includes("MongoNetworkError")) return true;
   if (msg.includes("NoSuchTransaction")) return true;
   if (msg.includes("WriteConflict")) return true;
   // Terminal duplicate key / validation errors — never retry
-  if (msg.includes("E11000") || msg.toLowerCase().includes("duplicate")) return false;
+  if (msg.toLowerCase().includes("duplicate")) return false;
   if (msg.includes("INCOMING_INVOICE_DUPLICATE")) return false;
   if (msg.includes("INVOICE_IMMUTABLE")) return false;
   if (msg.includes("Validation")) return false;
@@ -61,6 +70,441 @@ function isTransientError(error: unknown): boolean {
   const terminalKeywords = ["Unsupported", "Entity not found", "Missing", "Invalid entity", "Validation", "already exists", "INVOICE", "INCOMING"];
   for (const kw of terminalKeywords) if (msg.includes(kw)) return false;
   return false;
+}
+
+// SERVER-SIDE H.S.H sync validation layer — H.S.H only, do not touch R.V.B
+// Mirrors frontend money helper: round to 2 decimals
+export function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export const HSH_SYNC_ENTITIES = new Set<string>([
+  "product",
+  "customer",
+  "supplier",
+  "bankAccount",
+  "transfer",
+  "purchase",
+  "sale",
+  "payment",
+  "worker",
+  "vehicle",
+  "task",
+  "invoiceTaxProfile",
+  "incomingInvoice",
+]);
+
+function isNonEmptyString(v: unknown): boolean {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function toFiniteNumber(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "string" && v.trim() !== "") return Number(v.trim());
+  return Number(v);
+}
+
+function isFiniteNumeric(v: unknown): boolean {
+  const n = toFiniteNumber(v);
+  return Number.isFinite(n);
+}
+
+function validatePurchaseSalePayload(
+  payload: Record<string, unknown>,
+  operation: string,
+  entity: string,
+): string | null {
+  const rawItems: any = (payload as any).items;
+  const rawTotal: any = (payload as any).total;
+  const hasItems = rawItems !== undefined;
+  const isCreateUpsert = operation === "create" || operation === "upsert";
+
+  // For create/upsert require items
+  if (isCreateUpsert && !hasItems) {
+    return entity === "purchase" ? "PURCHASE_ITEMS_REQUIRED" : "SALE_ITEMS_REQUIRED";
+  }
+
+  // If items present, validate thoroughly
+  if (hasItems) {
+    if (!Array.isArray(rawItems)) {
+      return entity === "purchase" ? "PURCHASE_ITEMS_INVALID" : "SALE_ITEMS_INVALID";
+    }
+    if (rawItems.length === 0) {
+      return entity === "purchase" ? "PURCHASE_ITEMS_REQUIRED" : "SALE_ITEMS_REQUIRED";
+    }
+    if (rawItems.length > 500) {
+      return entity === "purchase" ? "PURCHASE_ITEMS_TOO_MANY" : "SALE_ITEMS_TOO_MANY";
+    }
+
+    let grand = 0;
+    for (let i = 0; i < rawItems.length; i++) {
+      const it: any = rawItems[i];
+      if (it == null || typeof it !== "object" || Array.isArray(it)) {
+        return entity === "purchase" ? "PURCHASE_ITEM_INVALID" : "SALE_ITEM_INVALID";
+      }
+      const productId = it.productId;
+      if (!isNonEmptyString(productId)) {
+        return entity === "purchase" ? "PURCHASE_ITEM_PRODUCT_REQUIRED" : "SALE_ITEM_PRODUCT_REQUIRED";
+      }
+      const quantityRaw = it.quantity;
+      if (quantityRaw === undefined || quantityRaw === null) {
+        return entity === "purchase" ? "PURCHASE_QUANTITY_REQUIRED" : "SALE_QUANTITY_REQUIRED";
+      }
+      const quantity = toFiniteNumber(quantityRaw);
+      if (!Number.isFinite(quantity) || !Number.isInteger(quantity) || quantity <= 0) {
+        return entity === "purchase" ? "PURCHASE_QUANTITY_INVALID" : "SALE_QUANTITY_INVALID";
+      }
+      const weightRaw = it.weightKg !== undefined ? it.weightKg : it.weight;
+      if (weightRaw === undefined || weightRaw === null) {
+        return entity === "purchase" ? "PURCHASE_WEIGHT_REQUIRED" : "SALE_WEIGHT_REQUIRED";
+      }
+      const weightKg = toFiniteNumber(weightRaw);
+      if (!Number.isFinite(weightKg) || weightKg < 0) {
+        return entity === "purchase" ? "PURCHASE_WEIGHT_INVALID" : "SALE_WEIGHT_INVALID";
+      }
+      const priceRaw = it.price;
+      if (priceRaw === undefined || priceRaw === null) {
+        return entity === "purchase" ? "PURCHASE_PRICE_REQUIRED" : "SALE_PRICE_REQUIRED";
+      }
+      const price = toFiniteNumber(priceRaw);
+      if (!Number.isFinite(price) || price < 0) {
+        return entity === "purchase" ? "PURCHASE_PRICE_INVALID" : "SALE_PRICE_INVALID";
+      }
+      const totalRaw = it.total;
+      if (totalRaw === undefined || totalRaw === null) {
+        return entity === "purchase" ? "PURCHASE_ITEM_TOTAL_REQUIRED" : "SALE_ITEM_TOTAL_REQUIRED";
+      }
+      const total = toFiniteNumber(totalRaw);
+      if (!Number.isFinite(total) || total < 0) {
+        return entity === "purchase" ? "PURCHASE_ITEM_TOTAL_INVALID" : "SALE_ITEM_TOTAL_INVALID";
+      }
+      // Strict finite checks via !Number.isFinite already covered, but also reject NaN/Infinity explicitly
+      if (!Number.isFinite(quantity) || !Number.isFinite(weightKg) || !Number.isFinite(price) || !Number.isFinite(total)) {
+        return entity === "purchase" ? "PURCHASE_NUMERIC_INVALID" : "SALE_NUMERIC_INVALID";
+      }
+      const expected = roundMoney(weightKg * price);
+      if (!Number.isFinite(expected)) {
+        return entity === "purchase" ? "PURCHASE_TOTAL_INVALID" : "SALE_TOTAL_INVALID";
+      }
+      if (Math.abs(total - expected) > 0.005) {
+        return entity === "purchase" ? "PURCHASE_ITEM_TOTAL_MISMATCH" : "SALE_ITEM_TOTAL_MISMATCH";
+      }
+      grand = roundMoney(grand + expected);
+    }
+
+    if (!Number.isFinite(grand) || grand < 0) {
+      return entity === "purchase" ? "PURCHASE_TOTAL_INVALID" : "SALE_TOTAL_INVALID";
+    }
+
+    if (rawTotal !== undefined && rawTotal !== null) {
+      const totalNum = toFiniteNumber(rawTotal);
+      if (!Number.isFinite(totalNum) || totalNum < 0) {
+        return entity === "purchase" ? "PURCHASE_TOTAL_INVALID" : "SALE_TOTAL_INVALID";
+      }
+      if (Math.abs(totalNum - grand) > 0.005) {
+        return entity === "purchase" ? "PURCHASE_TOTAL_MISMATCH" : "SALE_TOTAL_MISMATCH";
+      }
+    } else if (isCreateUpsert) {
+      // For create/upsert total is required, never trust client to omit it
+      return entity === "purchase" ? "PURCHASE_TOTAL_REQUIRED" : "SALE_TOTAL_REQUIRED";
+    }
+  } else {
+    // No items but total present — still validate total finite
+    if (rawTotal !== undefined && rawTotal !== null) {
+      const totalNum = toFiniteNumber(rawTotal);
+      if (!Number.isFinite(totalNum) || totalNum < 0) {
+        return entity === "purchase" ? "PURCHASE_TOTAL_INVALID" : "SALE_TOTAL_INVALID";
+      }
+    }
+  }
+
+  // Also validate date finite if present
+  const dateRaw: any = (payload as any).date;
+  if (dateRaw !== undefined && dateRaw !== null) {
+    const d = toFiniteNumber(dateRaw);
+    if (!Number.isFinite(d)) {
+      return entity === "purchase" ? "PURCHASE_DATE_INVALID" : "SALE_DATE_INVALID";
+    }
+  } else if (isCreateUpsert) {
+    return entity === "purchase" ? "PURCHASE_DATE_REQUIRED" : "SALE_DATE_REQUIRED";
+  }
+
+  // Validate supplierId/customerId if present
+  if (entity === "purchase") {
+    const sid = (payload as any).supplierId;
+    if (sid !== undefined && sid !== null && !isNonEmptyString(sid)) return "PURCHASE_SUPPLIER_INVALID";
+    if (isCreateUpsert && !isNonEmptyString(sid)) return "PURCHASE_SUPPLIER_REQUIRED";
+  }
+  if (entity === "sale") {
+    const cid = (payload as any).customerId;
+    if (cid !== undefined && cid !== null && !isNonEmptyString(cid)) return "SALE_CUSTOMER_INVALID";
+    if (isCreateUpsert && !isNonEmptyString(cid)) return "SALE_CUSTOMER_REQUIRED";
+  }
+
+  return null;
+}
+
+export function validateHshPayload(
+  entity: string,
+  payload: Record<string, unknown>,
+  operation: string,
+): string | null {
+  // Scope: H.S.H only — do not touch R.V.B
+  if (!HSH_SYNC_ENTITIES.has(entity)) return null;
+  // Only validate mutations that go through generic path
+  if (operation !== "create" && operation !== "upsert" && operation !== "update") return null;
+  if (payload == null || typeof payload !== "object") return "HSH_PAYLOAD_INVALID";
+
+  const isCreateUpsert = operation === "create" || operation === "upsert";
+
+  // Entity-specific validations — run before generic sweep to return specific error codes
+  switch (entity) {
+    case "purchase":
+    case "sale": {
+      const psErr = validatePurchaseSalePayload(payload, operation, entity);
+      if (psErr) return psErr;
+      break;
+    }
+    case "transfer": {
+      const amountRaw: any = (payload as any).amount;
+      const dateRaw: any = (payload as any).date;
+      const fromRaw: any = (payload as any).fromAccountId;
+      const toRaw: any = (payload as any).toAccountId;
+
+      if (isCreateUpsert) {
+        if (amountRaw === undefined || amountRaw === null) return "TRANSFER_AMOUNT_REQUIRED";
+        if (dateRaw === undefined || dateRaw === null) return "TRANSFER_DATE_REQUIRED";
+        if (!isNonEmptyString(fromRaw) || !isNonEmptyString(toRaw)) return "TRANSFER_ACCOUNTS_REQUIRED";
+      }
+      if (amountRaw !== undefined && amountRaw !== null) {
+        const amount = toFiniteNumber(amountRaw);
+        if (!Number.isFinite(amount) || amount <= 0) return "TRANSFER_AMOUNT_INVALID";
+      }
+      if (dateRaw !== undefined && dateRaw !== null) {
+        const d = toFiniteNumber(dateRaw);
+        if (!Number.isFinite(d)) return "TRANSFER_DATE_INVALID";
+      }
+      if (fromRaw !== undefined || toRaw !== undefined) {
+        if (!isNonEmptyString(fromRaw) || !isNonEmptyString(toRaw)) return "TRANSFER_ACCOUNTS_INVALID";
+        if (String(fromRaw).trim() === String(toRaw).trim()) return "TRANSFER_ACCOUNTS_SAME";
+      }
+      // Business invariants: amount>0 already checked, source != destination already checked
+      break;
+    }
+    case "payment": {
+      const amountRaw: any = (payload as any).amount;
+      const dateRaw: any = (payload as any).date;
+      const entityIdRaw: any = (payload as any).entityId;
+      const accountIdRaw: any = (payload as any).accountId;
+      const entityTypeRaw: any = (payload as any).entityType;
+
+      if (isCreateUpsert) {
+        if (amountRaw === undefined || amountRaw === null) return "PAYMENT_AMOUNT_REQUIRED";
+        if (dateRaw === undefined || dateRaw === null) return "PAYMENT_DATE_REQUIRED";
+        if (!isNonEmptyString(entityIdRaw)) return "PAYMENT_ENTITY_INVALID";
+        if (!isNonEmptyString(accountIdRaw)) return "PAYMENT_ACCOUNT_INVALID";
+      }
+      if (amountRaw !== undefined && amountRaw !== null) {
+        const amount = toFiniteNumber(amountRaw);
+        if (!Number.isFinite(amount) || amount <= 0) return "PAYMENT_AMOUNT_INVALID";
+      }
+      if (dateRaw !== undefined && dateRaw !== null) {
+        const d = toFiniteNumber(dateRaw);
+        if (!Number.isFinite(d)) return "PAYMENT_DATE_INVALID";
+      }
+      if (entityIdRaw !== undefined && entityIdRaw !== null && !isNonEmptyString(entityIdRaw)) return "PAYMENT_ENTITY_INVALID";
+      if (accountIdRaw !== undefined && accountIdRaw !== null && !isNonEmptyString(accountIdRaw)) return "PAYMENT_ACCOUNT_INVALID";
+      if (entityTypeRaw !== undefined && entityTypeRaw !== null) {
+        const allowed = ["supplier", "customer", "worker", "expense"];
+        if (!isNonEmptyString(entityTypeRaw) || !allowed.includes(String(entityTypeRaw).trim())) return "PAYMENT_TYPE_INVALID";
+      }
+      break;
+    }
+    case "task": {
+      const deadlineRaw: any = (payload as any).deadline;
+      if (deadlineRaw !== undefined && deadlineRaw !== null) {
+        const d = toFiniteNumber(deadlineRaw);
+        if (!Number.isFinite(d)) return "TASK_DEADLINE_INVALID";
+      } else if (isCreateUpsert) {
+        return "TASK_DEADLINE_REQUIRED";
+      }
+      // Also validate name if present? Not required per spec, just numbers
+      break;
+    }
+    case "invoiceTaxProfile": {
+      const vatRaw: any = (payload as any).vatRate;
+      const otherRaw: any = (payload as any).otherTaxRate;
+      if (vatRaw !== undefined && vatRaw !== null) {
+        const n = toFiniteNumber(vatRaw);
+        if (!Number.isFinite(n) || n < 0 || n > 100) return "TAX_RATE_INVALID";
+      } else if (isCreateUpsert) {
+        return "TAX_RATE_REQUIRED";
+      }
+      if (otherRaw !== undefined && otherRaw !== null) {
+        const n = toFiniteNumber(otherRaw);
+        if (!Number.isFinite(n) || n < 0 || n > 100) return "TAX_RATE_INVALID";
+      }
+      break;
+    }
+    case "product": {
+      const priceRaw: any = (payload as any).price;
+      const qtyRaw: any = (payload as any).quantity;
+      const weightRaw: any = (payload as any).weightKg ?? (payload as any).weight;
+      const balanceRaw: any = (payload as any).balance; // not used but generic
+      if (priceRaw !== undefined && priceRaw !== null) {
+        const n = toFiniteNumber(priceRaw);
+        if (!Number.isFinite(n) || n < 0) return "PRODUCT_PRICE_INVALID";
+      }
+      if (qtyRaw !== undefined && qtyRaw !== null) {
+        const n = toFiniteNumber(qtyRaw);
+        if (!Number.isFinite(n) || n < 0) return "PRODUCT_QUANTITY_INVALID";
+      }
+      if (weightRaw !== undefined && weightRaw !== null) {
+        const n = toFiniteNumber(weightRaw);
+        if (!Number.isFinite(n) || n < 0) return "PRODUCT_WEIGHT_INVALID";
+      }
+      // Also check any numeric field finite already via generic sweep, but explicit above for error codes
+      break;
+    }
+    case "customer":
+    case "supplier": {
+      const balanceRaw: any = (payload as any).balance;
+      if (balanceRaw !== undefined && balanceRaw !== null) {
+        const n = toFiniteNumber(balanceRaw);
+        if (!Number.isFinite(n)) return entity === "customer" ? "CUSTOMER_BALANCE_INVALID" : "SUPPLIER_BALANCE_INVALID";
+      }
+      break;
+    }
+    case "bankAccount": {
+      const initRaw: any = (payload as any).initialBalance;
+      const balRaw: any = (payload as any).balance;
+      if (initRaw !== undefined && initRaw !== null) {
+        const n = toFiniteNumber(initRaw);
+        if (!Number.isFinite(n)) return "BANK_ACCOUNT_BALANCE_INVALID";
+      }
+      if (balRaw !== undefined && balRaw !== null) {
+        const n = toFiniteNumber(balRaw);
+        if (!Number.isFinite(n)) return "BANK_ACCOUNT_BALANCE_INVALID";
+      }
+      break;
+    }
+    case "worker": {
+      const startRaw: any = (payload as any).startingSalary;
+      const monthlyRaw: any = (payload as any).monthlySalary;
+      const balRaw: any = (payload as any).balance;
+      const birthRaw: any = (payload as any).birthDate;
+      const empRaw: any = (payload as any).employmentDate;
+      if (startRaw !== undefined && startRaw !== null) {
+        const n = toFiniteNumber(startRaw);
+        if (!Number.isFinite(n) || n < 0) return "WORKER_SALARY_INVALID";
+      }
+      if (monthlyRaw !== undefined && monthlyRaw !== null) {
+        const n = toFiniteNumber(monthlyRaw);
+        if (!Number.isFinite(n) || n < 0) return "WORKER_SALARY_INVALID";
+      }
+      if (balRaw !== undefined && balRaw !== null) {
+        const n = toFiniteNumber(balRaw);
+        if (!Number.isFinite(n)) return "WORKER_BALANCE_INVALID";
+      }
+      if (birthRaw !== undefined && birthRaw !== null) {
+        const n = toFiniteNumber(birthRaw);
+        if (!Number.isFinite(n)) return "WORKER_DATE_INVALID";
+      }
+      if (empRaw !== undefined && empRaw !== null) {
+        const n = toFiniteNumber(empRaw);
+        if (!Number.isFinite(n)) return "WORKER_DATE_INVALID";
+      }
+      break;
+    }
+    case "vehicle": {
+      // No numeric business invariants beyond generic finite check; payload mainly strings
+      break;
+    }
+    case "incomingInvoice": {
+      // Mirror frontend/backend finite checks for amounts/dates, but delegate full DB validation to validateIncomingInvoiceSync (async)
+      // Here we do synchronous numeric finite checks before that async hook
+      const amountHTRaw: any = (payload as any).amountHT ?? (payload as any).total;
+      const amountTTCRaw: any = (payload as any).amountTTC ?? (payload as any).total;
+      const taxRaw: any = (payload as any).taxAmount;
+      const dateRaw: any = (payload as any).invoiceDate ?? (payload as any).date;
+      if (isCreateUpsert) {
+        if (amountHTRaw !== undefined && amountHTRaw !== null) {
+          const n = toFiniteNumber(amountHTRaw);
+          if (!Number.isFinite(n) || n < 0) return "INCOMING_AMOUNT_INVALID";
+        }
+        if (amountTTCRaw !== undefined && amountTTCRaw !== null) {
+          const n = toFiniteNumber(amountTTCRaw);
+          if (!Number.isFinite(n) || n < 0) return "INCOMING_AMOUNT_INVALID";
+        }
+      } else {
+        // For update, if amounts provided validate finite
+        if (amountHTRaw !== undefined && amountHTRaw !== null) {
+          const n = toFiniteNumber(amountHTRaw);
+          if (!Number.isFinite(n) || n < 0) return "INCOMING_AMOUNT_INVALID";
+        }
+        if (amountTTCRaw !== undefined && amountTTCRaw !== null) {
+          const n = toFiniteNumber(amountTTCRaw);
+          if (!Number.isFinite(n) || n < 0) return "INCOMING_AMOUNT_INVALID";
+        }
+      }
+      if (taxRaw !== undefined && taxRaw !== null) {
+        const n = toFiniteNumber(taxRaw);
+        if (!Number.isFinite(n) || n < 0) return "INCOMING_AMOUNT_INVALID";
+      }
+      if (dateRaw !== undefined && dateRaw !== null) {
+        const ms = typeof dateRaw === "number" ? dateRaw : new Date(dateRaw as any).getTime();
+        if (!Number.isFinite(ms)) return "INVOICE_DATE_INVALID";
+      }
+      // Also check that if both HT/TTC present, TTC >= HT (business invariant)
+      if (amountHTRaw !== undefined && amountTTCRaw !== undefined && amountHTRaw !== null && amountTTCRaw !== null) {
+        const ht = toFiniteNumber(amountHTRaw);
+        const ttc = toFiniteNumber(amountTTCRaw);
+        if (Number.isFinite(ht) && Number.isFinite(ttc) && ttc < ht) return "INCOMING_AMOUNT_INVALID";
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  // Generic fallback: reject any remaining NaN/Infinity via !Number.isFinite for numeric fields
+  // This ensures Numbers: reject NaN, Infinity, -Infinity via !Number.isFinite even for fields not explicitly validated
+  for (const [k, v] of Object.entries(payload)) {
+    if (typeof v === "number" && !Number.isFinite(v)) {
+      return `${entity.toUpperCase()}_NUMERIC_INVALID`;
+    }
+    if (typeof v === "string" && (v.trim() === "Infinity" || v.trim() === "-Infinity" || v.trim().toLowerCase() === "nan")) {
+      const numericKeys = [
+        "amount",
+        "total",
+        "price",
+        "quantity",
+        "weightKg",
+        "weight",
+        "balance",
+        "initialBalance",
+        "startingSalary",
+        "monthlySalary",
+        "vatRate",
+        "otherTaxRate",
+        "deadline",
+        "date",
+        "birthDate",
+        "employmentDate",
+        "amountHT",
+        "amountTTC",
+        "taxAmount",
+        "invoiceDate",
+      ];
+      if (numericKeys.includes(k)) return `${entity.toUpperCase()}_NUMERIC_INVALID`;
+    }
+  }
+  // Also check nested items numbers for purchase/sale if not already handled? purchase/sale already returned above, but keep as defense
+  if (entity === "product" || entity === "customer" || entity === "supplier" || entity === "bankAccount" || entity === "worker" || entity === "vehicle" || entity === "task" || entity === "invoiceTaxProfile") {
+    // No further nested checks needed; generic above covers top-level
+  }
+
+  return null;
 }
 
 export async function validateIncomingInvoiceSync(payload: Record<string, unknown>, operation: SyncRequestOperation): Promise<string | null> {
@@ -134,12 +578,17 @@ export async function validateIncomingInvoiceSync(payload: Record<string, unknow
     if (taxAmountRaw != null && taxNum < 0) return "INCOMING_AMOUNT_INVALID";
   }
 
-  // Duplicate protection: same supplierId + supplierInvoiceNumber uniqueness
+  // Duplicate protection: case-insensitive via trim + toLowerCase (normalized companion field)
   try {
     const supplierIdToCheck = String(supplierId);
-    const numberToCheck = trimmed;
-    // For create/upsert, check if any document with same supplierId+number exists with different id
-    const dup = await IncomingInvoiceModel.findOne({ supplierId: supplierIdToCheck, supplierInvoiceNumber: numberToCheck }).lean();
+    const normalizedToCheck = trimmed.toLowerCase();
+    // Prefer normalized field (new docs), fallback to case-insensitive regex for legacy docs without normalized
+    let dup: any = await IncomingInvoiceModel.findOne({ supplierId: supplierIdToCheck, supplierInvoiceNumberNormalized: normalizedToCheck }).lean();
+    if (!dup) {
+      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      dup = await IncomingInvoiceModel.findOne({ supplierId: supplierIdToCheck, supplierInvoiceNumber: { $regex: `^${escaped}$`, $options: "i" } } as any).lean();
+      if (dup && String((dup as any).supplierInvoiceNumber).trim().toLowerCase() !== normalizedToCheck) dup = null;
+    }
     if (dup && String((dup as any).id) !== String(operation.entityId)) {
       return "INCOMING_INVOICE_DUPLICATE";
     }
@@ -223,6 +672,21 @@ export async function processSyncOperation(
   if (operation.entity === "notification") {
     const p: any = payload;
     if (!p.channel || p.channel !== "hsh") p.channel = "hsh";
+  }
+  // Incoming invoice: normalize supplierInvoiceNumber via trim + toLowerCase for uniqueness (companion field)
+  if (operation.entity === "incomingInvoice") {
+    const p: any = payload;
+    // Unify `number` alias into canonical supplierInvoiceNumber
+    if (p.number != null && (p.supplierInvoiceNumber == null || String(p.supplierInvoiceNumber).trim() === "")) {
+      p.supplierInvoiceNumber = p.number;
+    }
+    if (p.supplierInvoiceNumber != null) {
+      const trimmedNum = String(p.supplierInvoiceNumber).trim();
+      if (trimmedNum) {
+        p.supplierInvoiceNumber = trimmedNum;
+        p.supplierInvoiceNumberNormalized = trimmedNum.toLowerCase();
+      }
+    }
   }
 
   // Size safety for Office files (several MB per file, documented limit)
@@ -347,6 +811,35 @@ export async function processSyncOperation(
         success: false,
         message: syncErr,
         error: syncErr,
+        retryable: false,
+      };
+    }
+  }
+
+  // SERVER-SIDE H.S.H sync validation layer — hook before generic create/upsert/update
+  // Do not change R.V.B behavior: scope check via HSH_SYNC_ENTITIES inside validateHshPayload
+  if (operation.operation === "create" || operation.operation === "upsert" || operation.operation === "update") {
+    const hshErr = validateHshPayload(operation.entity, payload as Record<string, unknown>, operation.operation);
+    if (hshErr) {
+      await ProcessedSyncOperationModel.create({
+        operationId: opId,
+        entity: operation.entity,
+        entityId: operation.entityId,
+        operation: operation.operation,
+        success: false,
+        error: hshErr,
+        retryable: false,
+        processedAt: new Date(),
+        clientId: operation.clientId,
+      });
+      return {
+        operationId: opId,
+        entity: operation.entity,
+        entityId: operation.entityId,
+        operation: operation.operation,
+        success: false,
+        message: hshErr,
+        error: hshErr,
         retryable: false,
       };
     }
@@ -561,7 +1054,8 @@ export async function processSyncOperation(
             updatedAt: Date.now(),
           };
           delete (toSet as any).id;
-          await (model as any).updateOne({ id: operation.entityId }, { $set: toSet }, { session });
+          // Explicit validation already done via validateHshPayload; runValidators ensures schema enforcement as defense-in-depth
+          await (model as any).updateOne({ id: operation.entityId }, { $set: toSet }, { session, runValidators: true } as any);
           const updated = await (model as any).findOne({ id: operation.entityId }).session(session as any);
           canonical = updated ?? { ...existingUpsert, ...toSet, id: operation.entityId };
           await SyncChangeModel.create(
@@ -739,7 +1233,8 @@ export async function processSyncOperation(
           updatedAt: Date.now(),
         };
         delete (toSet as any).id;
-        await (model as any).updateOne({ id: operation.entityId }, { $set: toSet }, { session });
+        // Explicit H.S.H validation already ensures finite numbers and business invariants; runValidators as defense-in-depth
+        await (model as any).updateOne({ id: operation.entityId }, { $set: toSet }, { session, runValidators: true } as any);
         const updated = await (model as any).findOne({ id: operation.entityId }).session(session as any);
         canonical = updated ?? { ...existing, ...toSet, id: operation.entityId };
         await SyncChangeModel.create(

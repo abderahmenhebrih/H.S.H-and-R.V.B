@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "../../src/components/layout/AppShell";
 import StyledSelect from "../../src/components/common/StyledSelect";
@@ -74,6 +74,17 @@ const TRANSLATIONS = {
     workers: "Workers",
     expenses: "Expenses",
     vehicles: "Vehicles",
+    fastPresets: "Quick period",
+    today: "Today",
+    thisWeek: "This Week",
+    thisMonth: "This Month",
+    prevMonth: "Previous Month",
+    thisYear: "This Year",
+    showAdvanced: "Advanced ▾",
+    hideAdvanced: "Advanced ▴",
+    selectMonth: "Month",
+    selectYear: "Year",
+    customRange: "Custom range",
   },
   fr: {
     title: "Rapports périodiques",
@@ -112,6 +123,17 @@ const TRANSLATIONS = {
     workers: "Employés",
     expenses: "Dépenses",
     vehicles: "Véhicules",
+    fastPresets: "Période rapide",
+    today: "Aujourd'hui",
+    thisWeek: "Cette semaine",
+    thisMonth: "Ce mois",
+    prevMonth: "Mois précédent",
+    thisYear: "Cette année",
+    showAdvanced: "Avancé ▾",
+    hideAdvanced: "Avancé ▴",
+    selectMonth: "Mois",
+    selectYear: "Année",
+    customRange: "Plage perso",
   },
   ar: {
     title: "الوضعية الدورية",
@@ -150,6 +172,17 @@ const TRANSLATIONS = {
     workers: "العمال",
     expenses: "المصاريف",
     vehicles: "المركبات",
+    fastPresets: "فترة سريعة",
+    today: "اليوم",
+    thisWeek: "هذا الأسبوع",
+    thisMonth: "هذا الشهر",
+    prevMonth: "الشهر السابق",
+    thisYear: "هذه السنة",
+    showAdvanced: "متقدم ▾",
+    hideAdvanced: "متقدم ▴",
+    selectMonth: "الشهر",
+    selectYear: "السنة",
+    customRange: "نطاق مخصص",
   },
 } as const;
 
@@ -166,6 +199,73 @@ function serialForDate(date: number, index: number) {
   return `${dd}${mm}${yyyy}${seq}`;
 }
 
+// --- Canonical from/to helpers: fast / month / year / custom all produce same from/to ISO ---
+function toISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+function lastDayOfMonth(year: number, monthIndex: number): number {
+  // monthIndex 0-11; using day 0 of next month gives last day of target month — handles leap year Feb 29, 31->30, Dec->Jan
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+function getMonthRange(year: number, monthIndex: number): { from: string; to: string } {
+  const from = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+  const last = lastDayOfMonth(year, monthIndex);
+  const to = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+  return { from, to };
+}
+function getYearRange(year: number): { from: string; to: string } {
+  return { from: `${year}-01-01`, to: `${year}-12-31` };
+}
+function getTodayRange(now = new Date()): { from: string; to: string } {
+  const s = toISO(now);
+  return { from: s, to: s };
+}
+function getThisWeekRange(now = new Date()): { from: string; to: string } {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0 Sun .. 6 Sat
+  const diffToMonday = (day + 6) % 7; // Monday 0
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - diffToMonday);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { from: toISO(mon), to: toISO(sun) };
+}
+function getThisMonthRange(now = new Date()): { from: string; to: string } {
+  return getMonthRange(now.getFullYear(), now.getMonth());
+}
+function getPrevMonthRange(now = new Date()): { from: string; to: string } {
+  // Handles December→January via Date underflow; and Feb 29 leap etc via lastDayOfMonth
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return getMonthRange(d.getFullYear(), d.getMonth());
+}
+function getThisYearRange(now = new Date()): { from: string; to: string } {
+  return getYearRange(now.getFullYear());
+}
+
+const MONTH_OPTIONS = [
+  { value: "0", label: "Jan" },
+  { value: "1", label: "Feb" },
+  { value: "2", label: "Mar" },
+  { value: "3", label: "Apr" },
+  { value: "4", label: "May" },
+  { value: "5", label: "Jun" },
+  { value: "6", label: "Jul" },
+  { value: "7", label: "Aug" },
+  { value: "8", label: "Sep" },
+  { value: "9", label: "Oct" },
+  { value: "10", label: "Nov" },
+  { value: "11", label: "Dec" },
+];
+function buildYearOptions(center = new Date().getFullYear(), span = 7) {
+  const opts: { value: string; label: string }[] = [];
+  for (let y = center - span; y <= center + span; y++) opts.push({ value: String(y), label: String(y) });
+  return opts;
+}
+
 export default function ReportsPage() {
   const router = useRouter();
   const [language, setLanguage] = useState<Language>(DEFAULT_SETTINGS.language);
@@ -176,6 +276,13 @@ export default function ReportsPage() {
   const [applied, setApplied] = useState(false);
   const [category, setCategory] = useState<Category>("customers");
   const [selectedId, setSelectedId] = useState<string>("all");
+
+  // Advanced inline settings: month/year selectors staying with existing report design
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [pickerMonth, setPickerMonth] = useState<number>(() => new Date().getMonth());
+  const [pickerYear, setPickerYear] = useState<number>(() => new Date().getFullYear());
+  const [yearSelector, setYearSelector] = useState<number>(() => new Date().getFullYear());
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -192,13 +299,18 @@ export default function ReportsPage() {
 
   const t = TRANSLATIONS[language];
 
+  // Stale async protection: sequence token + cancelled flag + debounce, keep useDbSync
+  const loadSeqRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   async function loadSettings() {
     const s = await settingsService.get();
     setLanguage(s?.language ?? DEFAULT_SETTINGS.language);
     setCurrency(s?.currency ?? DEFAULT_SETTINGS.currency);
   }
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const [sup, cust, acc, work, exp, veh, purch, sal, pay, trans, prod] = await Promise.all([
@@ -214,6 +326,8 @@ export default function ReportsPage() {
         transferService.getAll(),
         productService.getAll(),
       ]);
+      // stale guard: if newer loadData started, discard this result
+      if (seq !== loadSeqRef.current) return;
       setSuppliers(sup);
       setCustomers(cust);
       setAccounts(acc);
@@ -226,21 +340,37 @@ export default function ReportsPage() {
       setTransfers(trans);
       setProducts(prod);
     } finally {
-      setLoading(false);
+      // only clear loading if this is the latest sequence
+      if (seq === loadSeqRef.current) setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
+    // cancelled flag protects unmount races
+    let cancelled = false;
     void loadSettings();
     void loadData();
-    const h = () => void loadSettings();
+    const h = () => {
+      if (cancelled) return;
+      void loadSettings();
+    };
     window.addEventListener(SETTINGS_EVENT, h);
-    return () => window.removeEventListener(SETTINGS_EVENT, h);
-  }, []);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SETTINGS_EVENT, h);
+    };
+  }, [loadData]);
 
   useDbSync(() => {
-    void loadData();
-  }, []);
+    // debounce prevents burst sync events from causing overlapping loads
+    if (debounceRef.current) clearTimeout(debounceRef.current as any);
+    debounceRef.current = setTimeout(() => {
+      void loadData();
+    }, 120);
+  }, [loadData]);
+
+  // Keep pickers in sync when fromDate changes via custom pickers? Optional: reflect month/year selectors when user edits custom range to last chosen preset's month
+  // No auto-sync to avoid overriding manual edits; month/year apply explicitly sets canonical from/to.
 
   const fromTs = new Date(`${fromDate}T00:00:00`).getTime();
   const toTs = new Date(`${toDate}T23:59:59`).getTime();
@@ -340,6 +470,32 @@ export default function ReportsPage() {
 
   function productName(id: string) {
     return products.find((p) => p.id === id)?.name ?? id.slice(0, 6);
+  }
+
+  // Fast period selection handlers: all produce canonical from/to
+  function applyPreset(kind: "today" | "thisWeek" | "thisMonth" | "prevMonth" | "thisYear") {
+    const now = new Date();
+    let r: { from: string; to: string };
+    if (kind === "today") r = getTodayRange(now);
+    else if (kind === "thisWeek") r = getThisWeekRange(now);
+    else if (kind === "thisMonth") r = getThisMonthRange(now);
+    else if (kind === "prevMonth") r = getPrevMonthRange(now);
+    else r = getThisYearRange(now);
+    setFromDate(r.from);
+    setToDate(r.to);
+    setActivePreset(kind);
+  }
+  function applyMonthYear(monthIdx: number, year: number) {
+    const r = getMonthRange(year, monthIdx);
+    setFromDate(r.from);
+    setToDate(r.to);
+    setActivePreset(null);
+  }
+  function applyYearOnly(year: number) {
+    const r = getYearRange(year);
+    setFromDate(r.from);
+    setToDate(r.to);
+    setActivePreset(null);
   }
 
   function renderHistory() {
@@ -603,6 +759,8 @@ export default function ReportsPage() {
     return <div className={styles.empty}><p>{language === "ar" ? "اختر جهة لعرض السجل" : language === "fr" ? "Sélectionnez une entité pour afficher l'historique" : "Select an entity to view history"}</p></div>;
   }
 
+  const yearOptions = buildYearOptions(new Date().getFullYear(), 8);
+
   return (
     <AppShell activePage="reports">
       <main className={styles.reportsPage}>
@@ -614,13 +772,75 @@ export default function ReportsPage() {
               <div className={styles.dateForm}>
                 <label>
                   <span>{t.from}</span>
-                  <StyledDatePicker value={fromDate} onChange={setFromDate} language={language} placeholder={t.from} ariaLabel={t.from} />
+                  <StyledDatePicker value={fromDate} onChange={(v)=>{ setFromDate(v); setActivePreset(null); }} language={language} placeholder={t.from} ariaLabel={t.from} />
                 </label>
                 <label>
                   <span>{t.to}</span>
-                  <StyledDatePicker value={toDate} onChange={setToDate} language={language} placeholder={t.to} ariaLabel={t.to} />
+                  <StyledDatePicker value={toDate} onChange={(v)=>{ setToDate(v); setActivePreset(null); }} language={language} placeholder={t.to} ariaLabel={t.to} />
                 </label>
               </div>
+
+              {/* Fast period selection — canonical from/to */}
+              <div className={styles.fastSection}>
+                <span className={styles.fastLabel}>{t.fastPresets}</span>
+                <div className={styles.presetGrid}>
+                  <button type="button" className={`${styles.presetButton} ${activePreset==="today"?styles.presetActive:""}`} onClick={()=>applyPreset("today")}>{t.today}</button>
+                  <button type="button" className={`${styles.presetButton} ${activePreset==="thisWeek"?styles.presetActive:""}`} onClick={()=>applyPreset("thisWeek")}>{t.thisWeek}</button>
+                  <button type="button" className={`${styles.presetButton} ${activePreset==="thisMonth"?styles.presetActive:""}`} onClick={()=>applyPreset("thisMonth")}>{t.thisMonth}</button>
+                  <button type="button" className={`${styles.presetButton} ${activePreset==="prevMonth"?styles.presetActive:""}`} onClick={()=>applyPreset("prevMonth")}>{t.prevMonth}</button>
+                  <button type="button" className={`${styles.presetButton} ${activePreset==="thisYear"?styles.presetActive:""}`} onClick={()=>applyPreset("thisYear")}>{t.thisYear}</button>
+                </div>
+              </div>
+
+              {/* Advanced inline settings staying with existing report design */}
+              <div className={styles.advancedInline}>
+                <button
+                  type="button"
+                  className={styles.advancedToggle}
+                  onClick={()=>setShowAdvanced(v=>!v)}
+                  aria-expanded={showAdvanced}
+                >
+                  {showAdvanced ? t.hideAdvanced : t.showAdvanced}
+                </button>
+                {showAdvanced && (
+                  <div className={styles.advancedPanel}>
+                    <div className={styles.inlineSelectors}>
+                      <label>
+                        <span>{t.selectMonth}</span>
+                        <div className={styles.monthYearRow}>
+                          <StyledSelect
+                            value={String(pickerMonth)}
+                            onChange={(v)=>{ const m=Number(v); setPickerMonth(m); applyMonthYear(m, pickerYear); }}
+                            ariaLabel={t.selectMonth}
+                            options={MONTH_OPTIONS}
+                          />
+                          <StyledSelect
+                            value={String(pickerYear)}
+                            onChange={(v)=>{ const y=Number(v); setPickerYear(y); applyMonthYear(pickerMonth, y); }}
+                            ariaLabel={t.selectYear}
+                            options={yearOptions}
+                          />
+                        </div>
+                      </label>
+                    </div>
+                    <div className={styles.inlineSelectors}>
+                      <label>
+                        <span>{t.selectYear}</span>
+                        <StyledSelect
+                          value={String(yearSelector)}
+                          onChange={(v)=>{ const y=Number(v); setYearSelector(y); applyYearOnly(y); }}
+                          ariaLabel={t.selectYear}
+                          options={yearOptions}
+                        />
+                      </label>
+                    </div>
+                    <p className={styles.advancedHint}>
+                      {language==="ar" ? "اختيار الشهر/السنة يحدد نفس الحقلين من/إلى" : language==="fr" ? "Mois/Année alimente le même intervalle Du→Au" : "Month/Year feeds the same From→To interval"}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className={styles.modalActions}>
                 <button type="button" className={styles.cancelButton} onClick={() => { setShowDatePopup(false); setApplied(false); }}>{t.cancel}</button>
                 <button type="button" className={styles.primaryButton} onClick={() => { setShowDatePopup(false); setApplied(true); }}>{t.apply}</button>

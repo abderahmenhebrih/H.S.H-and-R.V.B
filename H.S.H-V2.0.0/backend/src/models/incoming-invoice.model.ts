@@ -44,6 +44,11 @@ const incomingInvoiceSchema = new Schema(
       required: true,
     },
 
+    supplierInvoiceNumberNormalized: {
+      type: String,
+      required: false,
+    },
+
     invoiceDate: {
       type: Number,
       required: true,
@@ -99,6 +104,8 @@ const incomingInvoiceSchema = new Schema(
 );
 
 incomingInvoiceSchema.index({ supplierId: 1, supplierInvoiceNumber: 1 }, { unique: true });
+// Case-insensitive uniqueness via normalized companion field: supplierId + lowercased trimmed number
+incomingInvoiceSchema.index({ supplierId: 1, supplierInvoiceNumberNormalized: 1 }, { unique: true, sparse: true });
 
 export type IncomingInvoiceDocument = InferSchemaType<typeof incomingInvoiceSchema>;
 

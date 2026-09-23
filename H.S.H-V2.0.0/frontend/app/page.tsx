@@ -425,10 +425,9 @@ export default function Dashboard() {
       ]);
       const sTotal = roundMoney((salesToday as any[]).reduce((sum, s:any)=> sum + (Number.isFinite(s.total)? s.total : 0), 0));
       const pTotal = roundMoney((purchasesToday as any[]).reduce((sum, p:any)=> sum + (Number.isFinite(p.total)? p.total : 0), 0));
-      const custBal = (customers as any[]).reduce((sum,c:any)=> sum + (Number.isFinite(c.balance)? c.balance : 0), 0);
-      const supBal = (suppliers as any[]).reduce((sum,s:any)=> sum + (Number.isFinite(s.balance)? s.balance : 0), 0);
-      const outstandingVal = roundMoney(custBal + supBal);
-      const outstandingCnt = (customers as any[]).filter((c:any)=> Number.isFinite(c.balance) && c.balance > 0.005).length + (suppliers as any[]).filter((s:any)=> Number.isFinite(s.balance) && s.balance > 0.005).length;
+      const outstandingEntities = [...(customers as any[]), ...(suppliers as any[])].filter((e:any)=> Number.isFinite(e.balance) && roundMoney(e.balance) > 0);
+      const outstandingVal = roundMoney(outstandingEntities.reduce((sum,e:any)=> sum + roundMoney(e.balance), 0));
+      const outstandingCnt = outstandingEntities.length;
       const activeWorkers = (workers as any[]).filter((w:any)=> w.status==="active").length;
       setKpi({ salesToday: sTotal, salesCount: salesToday.length, purchasesToday: pTotal, purchasesCount: purchasesToday.length, outstanding: outstandingVal, outstandingCount: outstandingCnt, activeWorkers });
     } catch {}

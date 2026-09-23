@@ -50,6 +50,28 @@ export function resolvePlaceholders(template: string, ctx: PlaceholderContext): 
 }
 
 /**
+ * Recursively resolve placeholders inside structured template content.
+ * Traverses string values only, preserves object/array structure.
+ */
+export function resolvePlaceholdersInObject<T>(obj: T, ctx: PlaceholderContext): T {
+  if (obj == null) return obj;
+  if (typeof obj === "string") {
+    return resolvePlaceholders(obj, ctx) as unknown as T;
+  }
+  if (Array.isArray(obj)) {
+    return (obj as any[]).map((v) => resolvePlaceholdersInObject(v, ctx)) as unknown as T;
+  }
+  if (typeof obj === "object") {
+    const out: any = {};
+    for (const [k, v] of Object.entries(obj as any)) {
+      out[k] = resolvePlaceholdersInObject(v as any, ctx);
+    }
+    return out as T;
+  }
+  return obj;
+}
+
+/**
  * Future live formulas: =HEBRIH.CUSTOMER(...), =HEBRIH.SALES.TOTAL(...)
  * Evaluation not in alpha; detection only.
  */

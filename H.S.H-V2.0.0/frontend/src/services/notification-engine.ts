@@ -162,7 +162,7 @@ export async function notifyExpense(input: { expenseId: string; amount: number; 
     message: `${input.name} · ${formatted}`,
     entityType: "expense",
     entityId: input.expenseId,
-    route: "/expenses",
+    route: "/reports",
     sourceEventId,
   });
 }

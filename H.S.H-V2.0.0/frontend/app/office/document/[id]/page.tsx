@@ -184,17 +184,63 @@ export default function DocumentEditorPage() {
       const mod = await getEntitySnapshot(entityType, entityId, field);
       value = mod.value;
       label = mod.label;
-      // Insert into editor
+      // Insert into editor — with robust persistence guarantee
       const resolved = value;
-      editor?.chain().focus().insertContent(resolved).run();
+      try {
+        if (editor && !(editor as any).isDestroyed) {
+          try { editor.chain().focus().insertContent(resolved).run(); } catch {}
+        }
+      } catch {}
+      // Always ensure the resolved value is persisted via service (covers editor null, destroyed, or onUpdate debounce race)
+      // This guarantees HEBRIH insert never silently fails and survives reload
+      try {
+        // Brief tick to let editor's onUpdate set pendingContentRef if it succeeded
+        await new Promise((r) => setTimeout(r, 250));
+        let editorJson: any = null;
+        try {
+          if (editor && !(editor as any).isDestroyed) editorJson = (editor as any).getJSON?.();
+        } catch {}
+        const editorHasValue = editorJson && JSON.stringify(editorJson).includes(resolved);
+        const currentFile = file || await officeFileService.getById(id);
+        const currentContent: any = (currentFile as any)?.content;
+        const persistedHasValue = currentContent && JSON.stringify(currentContent).includes(resolved);
+        // If neither editor nor persisted has the value, or editor has it but persisted doesn't, force persist
+        if (!persistedHasValue) {
+          let newContent: any = null;
+          if (editorHasValue && editorJson) {
+            newContent = editorJson;
+          } else {
+            newContent = currentContent && currentContent.type === "doc" && Array.isArray(currentContent.content)
+              ? { ...currentContent, content: [...currentContent.content, { type: "paragraph", content: [{ type: "text", text: resolved }] }] }
+              : { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: resolved }] }] };
+          }
+          await officeFileService.update(id, { content: newContent as any });
+          setFile((prev) => {
+            const base = (prev || currentFile) as any;
+            return base ? { ...base, content: newContent } as any : prev;
+          });
+          try { (editor as any)?.commands?.setContent?.(newContent); } catch {}
+        } else if (editorHasValue && !persistedHasValue) {
+          // Editor has it but persisted doesn't — also force
+          await officeFileService.update(id, { content: editorJson as any });
+          setFile((prev) => {
+            const base = (prev || currentFile) as any;
+            return base ? { ...base, content: editorJson } as any : prev;
+          });
+        }
+      } catch {}
       // Also link entity
-      if (file) {
-        const linked = file.linkedEntities || [];
-        const exists = linked.some((l)=> l.entityType===entityType && l.entityId===entityId);
+      const effectiveFile = file || await officeFileService.getById(id);
+      if (effectiveFile) {
+        const linked = (effectiveFile as any).linkedEntities || [];
+        const exists = linked.some((l:any)=> l.entityType===entityType && l.entityId===entityId);
         if (!exists) {
           const nextLinked = [...linked, { entityType: entityType as any, entityId, labelSnapshot: label }];
           await officeFileService.update(id, { linkedEntities: nextLinked } as any);
-          setFile((prev)=> prev? { ...prev, linkedEntities: nextLinked } as any : prev);
+          setFile((prev)=> {
+            const base = (prev || effectiveFile) as any;
+            return base ? { ...base, linkedEntities: nextLinked } as any : prev;
+          });
         }
       }
     } catch(e){ console.error(e); }

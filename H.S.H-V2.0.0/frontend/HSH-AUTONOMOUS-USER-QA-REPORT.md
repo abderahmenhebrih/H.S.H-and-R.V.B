@@ -1,7 +1,7 @@
 # H.S.H AUTONOMOUS USER QA REPORT
 
-**Date:** 2026-09-24T03:16:33.507Z
-**Git commit:** 1536b35 024
+**Date:** 2026-09-24T10:16:34.871Z
+**Git commit:** 4cb753d 026
 **Browser:** chromium (Chromium)
 **Playwright:** ^1.63.0
 **Frontend:** http://localhost:3000
@@ -22,7 +22,7 @@
 - **Tasks performed:** 1
 - **Office files created:** 2
 - **Page errors:** 0
-- **Console errors (filtered):** 36
+- **Console errors (filtered):** 35
 - **Request failed:** 0
 - **HTTP errors (>=500):** 0
 
@@ -53,7 +53,7 @@ Call log:
 [2m      - <div class="page-module__ox25rq__modalBackdrop">…</div> intercepts pointer events[22m
 [2m    - retrying click action[22m
 [2m      - waiting 100ms[22m
-[2m    29 × waiting for element to be visible, enabled and stable[22m
+[2m    28 × waiting for element to be visible, enabled and stable[22m
 [2m       - element is visible, enabled and stable[22m
 [2m       - scrolling into view if needed[22m
 [2m       - done scrolling[22m
@@ -77,30 +77,30 @@ Call log:
 ### HSH-AUTO-002 — HIGH
 - **Route:** http://localhost:3000/customers
 - **Feature:** Customers
-- **Steps:** Create QA Customer Alpha yimwt
+- **Steps:** Create QA Customer Alpha dirgc
 - **Expected:** Visible in list
 - **Actual:** Not visible after reload
-- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202604:13 amCustomer Ty
+- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202611:13 amCustomer Ty
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-002.png (if captured)
 
 
 ### HSH-AUTO-003 — HIGH
 - **Route:** http://localhost:3000/customers
 - **Feature:** Customers
-- **Steps:** Create QA Customer Beta yimwt
+- **Steps:** Create QA Customer Beta dirgc
 - **Expected:** Visible in list
 - **Actual:** Not visible after reload
-- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202604:13 amCustomer Ty
+- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202611:14 amCustomer Ty
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-003.png (if captured)
 
 
 ### HSH-AUTO-004 — HIGH
 - **Route:** http://localhost:3000/customers
 - **Feature:** Customers
-- **Steps:** Create QA Customer Gamma yimwt
+- **Steps:** Create QA Customer Gamma dirgc
 - **Expected:** Visible in list
 - **Actual:** Not visible after reload
-- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202604:14 amCustomer Ty
+- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202611:14 amCustomer Ty
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-004.png (if captured)
 
 
@@ -128,7 +128,7 @@ Call log:
 [2m      - <div class="page-module__Kl9ugq__modalBackdrop">…</div> intercepts pointer events[22m
 [2m    - retrying click action[22m
 [2m      - waiting 100ms[22m
-[2m    29 × waiting for element to be visible, enabled and stable[22m
+[2m    28 × waiting for element to be visible, enabled and stable[22m
 [2m       - element is visible, enabled and stable[22m
 [2m       - scrolling into view if needed[22m
 [2m       - done scrolling[22m
@@ -156,41 +156,39 @@ Call log:
 - **Expected:** All
 - **Actual:** locator.click: Timeout 15000ms exceeded.
 Call log:
-[2m  - waiting for getByRole('button', { name: /Transfer/i }).first()[22m
-[2m    - locator resolved to <button type="button" class="page-module__SQfBAG__secondaryButton">…</button>[22m
+[2m  - waiting for locator('[role="dialog"], section[class*="modal"]').first().getByRole('button', { name: /Transfer|Confirm|Save/i }).first()[22m
+[2m    - locator resolved to <button type="button" class="page-module__SQfBAG__primaryButton">Transfer</button>[22m
 [2m  - attempting click action[22m
 [2m    2 × waiting for element to be visible, enabled and stable[22m
 [2m      - element is visible, enabled and stable[22m
 [2m      - scrolling into view if needed[22m
 [2m      - done scrolling[22m
-[2m      - <div class="page-module__SQfBAG__modalBackdrop">…</div> intercepts pointer events[22m
+[2m      - <button type="button" role="option" aria-selected="false" class="page-module__SQfBAG__customDropdownOption ">QA Bank BDL dirgc — 50000.00 DA</button> from <div class="page-module__SQfBAG__formGrid">…</div> subtree intercepts pointer events[22m
 [2m    - retrying click action[22m
 [2m    - waiting 20ms[22m
 [2m    2 × waiting for element to be visible, enabled and stable[22m
 [2m      - element is visible, enabled and stable[22m
 [2m      - scrolling into view if needed[22m
 [2m      - done scrolling[22m
-[2m      - <div class="page-module__SQfBAG__modalBackdrop">…</div> intercepts pointer events[22m
+[2m      - <button type="button" role="option" aria-selected="false" class="page-module__SQfBAG__customDropdownOption ">QA Bank BDL dirgc — 50000.00 DA</button> from <div class="page-module__SQfBAG__formGrid">…</div> subtree intercepts pointer events[22m
 [2m    - retrying click action[22m
 [2m      - waiting 100ms[22m
-[2m    29 × waiting for element to be visible, enabled and stable[22m
+[2m    28 × waiting for element to be visible, enabled and stable[22m
 [2m       - element is visible, enabled and stable[22m
 [2m       - scrolling into view if needed[22m
 [2m       - done scrolling[22m
-[2m       - <div class="page-module__SQfBAG__modalBackdrop">…</div> intercepts pointer events[22m
+[2m       - <button type="button" role="option" aria-selected="false" class="page-module__SQfBAG__customDropdownOption ">QA Bank BDL dirgc — 50000.00 DA</button> from <div class="page-module__SQfBAG__formGrid">…</div> subtree intercepts pointer events[22m
 [2m     - retrying click action[22m
 [2m       - waiting 500ms[22m
 
 - **Evidence:** locator.click: Timeout 15000ms exceeded.
 Call log:
-[2m  - waiting for getByRole('button', { name: /Transfer/i }).first()[22m
-[2m    - locator resolved to <button type="button" class="page-module__SQfBAG__secondaryButton">…</button>[22m
+[2m  - waiting for locator('[role="dialog"], section[class*="modal"]').first().getByRole('button', { name: /Transfer|Confirm|Save/i }).first()[22m
+[2m    - locator resolved to <button type="button" class="page-module__SQfBAG__primaryButton">Transfer</button>[22m
 [2m  - attempting click action[22m
 [2m    2 × waiting for element to be visible, enabled and stable[22m
 [2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div 
+[2m      - scroll
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-006.png (if captured)
 
 
@@ -201,8 +199,8 @@ Call log:
 - **Expected:** PASS
 - **Actual:** locator.click: Timeout 15000ms exceeded.
 Call log:
-[2m  - waiting for locator('text=QA Unique Task yimwt').first().locator('xpath=ancestor::article').first().getByRole('button', { name: /Modify/i }).first()[22m
-[2m    - locator resolved to <button type="button" title="Modify" aria-label="Modify QA Unique Task yimwt" class="page-module__UgkEVG__rowEditButton">…</button>[22m
+[2m  - waiting for locator('text=QA Unique Task dirgc').first().locator('xpath=ancestor::article').first().getByRole('button', { name: /Modify/i }).first()[22m
+[2m    - locator resolved to <button type="button" title="Modify" aria-label="Modify qa unique task dirgc" class="page-module__UgkEVG__rowEditButton">…</button>[22m
 [2m  - attempting click action[22m
 [2m    2 × waiting for element to be visible, enabled and stable[22m
 [2m      - element is visible, enabled and stable[22m
@@ -218,7 +216,7 @@ Call log:
 [2m      - <div class="page-module__UgkEVG__modalBackdrop">…</div> intercepts pointer events[22m
 [2m    - retrying click action[22m
 [2m      - waiting 100ms[22m
-[2m    29 × waiting for element to be visible, enabled and stable[22m
+[2m    28 × waiting for element to be visible, enabled and stable[22m
 [2m       - element is visible, enabled and stable[22m
 [2m       - scrolling into view if needed[22m
 [2m       - done scrolling[22m
@@ -228,8 +226,8 @@ Call log:
 
 - **Evidence:** locator.click: Timeout 15000ms exceeded.
 Call log:
-[2m  - waiting for locator('text=QA Unique Task yimwt').first().locator('xpath=ancestor::article').first().getByRole('button', { name: /Modify/i }).first()[22m
-[2m    - locator resolved to <button type="button" title="Modify" aria-label="Modify QA Unique Task yimwt" class="page-module__UgkEVG__rowEditButton">…</button>[22m
+[2m  - waiting for locator('text=QA Unique Task dirgc').first().locator('xpath=ancestor::article').first().getByRole('button', { name: /Modify/i }).first()[22m
+[2m    - locator resolved to <button type="button" title="Modify" aria-label="Modify qa unique task dirgc" class="page-module__UgkEVG__rowEditButton">…</button>[22m
 [2m  - attempting click action[22m
 [2m    2 × waiting for element to be visible, enabled and stable[22m
 [2m      - 
@@ -238,7 +236,7 @@ Call log:
 
 **Count by severity:** BLOCKER: 0, CRITICAL: 0, HIGH: 7, MEDIUM: 0, LOW: 0
 
-## POSSIBLE UPGRADES (2)
+## POSSIBLE UPGRADES (1)
 
 
 ### HSH-UPG-001
@@ -249,19 +247,10 @@ Call log:
 - **Priority:** HIGH VALUE
 
 
-### HSH-UPG-002
-- **Page:** /accounts
-- **Current:** Transfer same-account validation
-- **Why inconvenient:** Same-account transfer should show error 'Source and destination must be different'
-- **Suggestion:** Ensure error is visible in dialog
-- **Priority:** HIGH VALUE
-
-
-## PASSED WORKFLOWS (16)
+## PASSED WORKFLOWS (15)
 
 - Dashboard empty state usable — no fatal overlay, no NaN — PASS
 - Suppliers: create 2, edit, search, delete clean — PASS
-- Bank transfer 20000 Cash->BDL verified via UI — PASS
 - Purchases: lightweight UI controls verified — PASS
 - Sales: lightweight UI controls verified — PASS
 - Payments: lightweight UI controls verified — PASS
@@ -279,14 +268,13 @@ Call log:
 ## CONSOLE / NETWORK FINDINGS
 
 - **pageerror:** 0 
-- **console.error (filtered):** 36 
+- **console.error (filtered):** 35 
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/products
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/customers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/customers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/customers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/customers
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/suppliers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/suppliers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/accounts
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/purchases
@@ -308,12 +296,12 @@ Call log:
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/tasks
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/tasks
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/settings
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/accounts
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/suppliers
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/office
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/sales
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/sales
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/office
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/purchases
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/office
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/accounts
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/products
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/products
 - **requestfailed:** 0 

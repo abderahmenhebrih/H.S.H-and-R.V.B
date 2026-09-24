@@ -53,14 +53,22 @@ export async function coalescePendingOperations(
   const operationId = opts.operationId ?? generateId();
   const clientId = opts.clientId ?? (await getOrCreateClientId());
   const baseRevision = opts.baseRevision ?? (await getServerRevision());
-  // Find pending for same key - MUST NEVER modify in_flight operations
+  // Find pending for same key - MUST NEVER modify in_flight OR retrying operations (both immutable after first send)
   const all = await db.syncOperations.toArray();
-  // Pending excludes terminal and in_flight - in_flight is immutable
+  // Pending mutable: only status pending (or legacy unset) is coalescable; retrying/in_flight/terminal are immutable
   const pendingForKey = all
-    .filter((o) => o.entity === entity && o.entityId === entityId && !o.synced && (o as any).status !== "terminal" && (o as any).status !== "in_flight")
+    .filter((o) => {
+      if (o.entity !== entity || o.entityId !== entityId || o.synced) return false;
+      const s = (o as any).status;
+      if (s === "terminal" || s === "in_flight" || s === "retrying") return false;
+      // allow legacy undefined/null as pending
+      return s === "pending" || !s;
+    })
     .sort((a, b) => a.createdAt - b.createdAt);
-  const inFlightForKey = all.filter((o) => o.entity === entity && o.entityId === entityId && (o as any).status === "in_flight");
-  const successorParentId = inFlightForKey.length > 0 ? inFlightForKey[0].operationId : undefined;
+  const immutableParentForKey = all
+    .filter((o) => o.entity === entity && o.entityId === entityId && ((o as any).status === "in_flight" || (o as any).status === "retrying"))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const successorParentId = immutableParentForKey.length > 0 ? immutableParentForKey[0].operationId : undefined;
 
   if (pendingForKey.length === 0) {
     // No pending to coalesce, just add

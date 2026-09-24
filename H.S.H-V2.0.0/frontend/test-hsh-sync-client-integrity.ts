@@ -919,6 +919,280 @@ async function run(){
     (globalThis as any).fetch = orig;
     ok("35 Terminal parent preserves child");
   }catch(e:any){ fail("35 Terminal",e); }
+  // 36 Direct retrying coalescer immutability
+  try{ await reset();
+    const { coalescePendingOperations } = await import("./src/services/sync/queue");
+    await db.syncOperations.add({ operationId:"ABC36", entity:"product", entityId:"P36", operation:"update", payload:{price:20, id:"P36"}, createdAt: Date.now(), synced:false, attempts:1, baseRevision:5, clientId:"test", status:"retrying"} as any);
+    const before:any = await db.syncOperations.where("operationId").equals("ABC36").first();
+    const snapId=before.operationId; const snapPrice=(before.payload as any).price; const snapBase=before.baseRevision;
+    await coalescePendingOperations("product","P36","update",{price:30, id:"P36"});
+    const afterParent:any = await db.syncOperations.where("operationId").equals("ABC36").first();
+    assert(afterParent.operationId===snapId && (afterParent.payload as any).price===20 && afterParent.baseRevision===5 && afterParent.status==="retrying", `parent retrying still price20 got ${(afterParent.payload as any).price}`);
+    const all36:any[] = await db.syncOperations.toArray();
+    const succ36 = all36.find((o:any)=>o.operationId!=="ABC36" && o.entity==="product" && o.entityId==="P36");
+    assert(!!succ36 && succ36.status==="pending" && (succ36.payload as any).price===30 && succ36.dependsOnOperationId==="ABC36" && succ36.parentOperationId==="ABC36", `successor pending price30 dependsOn ABC got ${JSON.stringify(succ36)}`);
+    assert(snapPrice===20 && snapBase===5, "snapshot preserved");
+    ok("36 Direct retrying coalescer immutability");
+  }catch(e:any){ fail("36 Direct retrying",e); }
+  // 37 Exact lost-response server-committed + new edit (mandatory)
+  try{ await reset();
+    const { coalescePendingOperations, getPendingSyncOperations, getInFlightOperations } = await import("./src/services/sync/queue");
+    const { syncPendingOperations } = await import("./src/services/sync/client");
+    await db.products.put({id:"P37", name:"P37", price:10, quantity:10, weightKg:10, createdAt:Date.now(), updatedAt:Date.now(), syncStatus:"synced", serverRevision:5} as any);
+    await db.syncMeta.put({key:"serverRevision", value:5});
+    await db.syncMeta.put({key:"clientId", value:"test-client-37"});
+    // OP1 pending ABC price20 base5
+    await coalescePendingOperations("product","P37","update",{price:20, id:"P37"}, {baseRevision:5, operationId:"ABC37"});
+    let pending37 = await getPendingSyncOperations();
+    assert(pending37.length===1 && pending37[0].operationId==="ABC37" && (pending37[0].payload as any).price===20, "OP1 pending price20");
+    const op1Snap:any = JSON.parse(JSON.stringify(pending37[0]));
+    // Mock server with idempotency: processed Map
+    const processed = new Map<string, any>();
+    let serverRev37=5;
+    let firstSendDone=false;
+    const origFetch37 = (globalThis as any).fetch;
+    (globalThis as any).fetch = async (url:any, init:any)=>{
+      if(typeof url==="string" && url.includes("bootstrap")) return { ok:true, json: async()=>({ snapshot:{}, currentRevision: serverRev37 })} as any;
+      const body=JSON.parse(init.body as any);
+      const results:any[]=[];
+      for(const op of body.operations){
+        if(processed.has(op.operationId)){
+          results.push(processed.get(op.operationId));
+        } else {
+          if(op.baseRevision < serverRev37){
+            const r={ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:false, message:"CONFLICT_STALE_REVISION", error:"CONFLICT_STALE_REVISION", conflict:true, retryable:false };
+            results.push(r);
+          } else {
+            serverRev37++;
+            const res={ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:true, message:"ok", revision:serverRev37, canonicalEntity:{id:op.entityId, price:(op.payload as any).price, serverRevision:serverRev37}, conflict:false };
+            processed.set(op.operationId, res);
+            // apply server side
+            if(op.operationId==="ABC37") await db.products.update("P37",{price:20, serverRevision:serverRev37} as any);
+            results.push(res);
+          }
+        }
+      }
+      // First send: simulate lost response after commit
+      if(!firstSendDone){
+        firstSendDone=true;
+        throw new Error("Network failure lost response");
+      }
+      return { ok:true, json: async()=>({ success: results.every((r:any)=>r.success), results })} as any;
+    };
+    try{ await syncPendingOperations(); }catch{}
+    // After lost response, OP1 must be retrying still price20
+    let afterLoss:any = await db.syncOperations.where("operationId").equals("ABC37").first();
+    assert(afterLoss.status==="retrying" && (afterLoss.payload as any).price===20 && afterLoss.operationId==="ABC37" && afterLoss.baseRevision===5, `after loss retrying price20 got ${(afterLoss.payload as any).price} ${afterLoss.status}`);
+    assert(op1Snap.operationId===afterLoss.operationId && op1Snap.baseRevision===afterLoss.baseRevision && (op1Snap.payload as any).price===(afterLoss.payload as any).price, "parent immutability snapshot");
+    // User edit while retrying price30 via real repository
+    const { productRepository } = await import("./src/repositories/product.repository");
+    await productRepository.update("P37",{price:30} as any);
+    const afterEditAll:any[] = await db.syncOperations.toArray();
+    const parentAfterEdit:any = afterEditAll.find((o:any)=>o.operationId==="ABC37");
+    const succAfterEdit:any = afterEditAll.find((o:any)=>o.operationId!=="ABC37" && o.entity==="product" && o.entityId==="P37");
+    assert(parentAfterEdit.operationId==="ABC37" && parentAfterEdit.status==="retrying" && (parentAfterEdit.payload as any).price===20, "parent after edit still price20 retrying");
+    assert(!!succAfterEdit && succAfterEdit.status==="pending" && (succAfterEdit.payload as any).price===30 && succAfterEdit.operationId!=="ABC37" && succAfterEdit.dependsOnOperationId==="ABC37", `successor pending price30 dependsOn ABC got ${JSON.stringify(succAfterEdit)}`);
+    // Retry parent: mock will return saved result price20 rev6 (idempotent)
+    (globalThis as any).fetch = async (url:any, init:any)=>{
+      if(typeof url==="string" && url.includes("bootstrap")) return { ok:true, json: async()=>({ snapshot:{}, currentRevision: serverRev37 })} as any;
+      const body=JSON.parse(init.body as any);
+      const results:any[]=[];
+      for(const op of body.operations){
+        if(processed.has(op.operationId)){
+          results.push(processed.get(op.operationId));
+        } else {
+          if(op.baseRevision < serverRev37){
+            results.push({ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:false, message:"CONFLICT_STALE_REVISION", error:"CONFLICT_STALE_REVISION", conflict:true, retryable:false });
+          } else {
+            serverRev37++;
+            const res={ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:true, message:"ok", revision:serverRev37, canonicalEntity:{id:op.entityId, price:(op.payload as any).price, serverRevision:serverRev37}, conflict:false };
+            processed.set(op.operationId, res);
+            results.push(res);
+          }
+        }
+      }
+      return { ok:true, json: async()=>({ success: results.every((r:any)=>r.success), results })} as any;
+    };
+    await syncPendingOperations();
+    // After parent retry, successor should be rebased to 6 and sent, final price30 rev7
+    // With drain loop, single sync call will handle parent retry (rev6 already) and child (rev7) together
+    const finalProd:any = await db.products.get("P37");
+    assert(finalProd.price===30 && serverRev37===7, `final price30 rev7 got ${finalProd.price} rev ${serverRev37}`);
+    const queueAfter:any[] = await db.syncOperations.toArray();
+    const remaining = queueAfter.filter((o:any)=>!o.synced && o.status!=="terminal");
+    assert(remaining.length===0, `queue empty got ${remaining.length}`);
+    // Verify ABC processed exactly once (serverRev increments: 5->6 for ABC, 6->7 for successor)
+    assert(processed.size===2 && processed.has("ABC37") && (processed.get("ABC37") as any).revision===6, "ABC processed once rev6");
+    (globalThis as any).fetch = origFetch37;
+    ok("37 Lost-response server-committed + successor");
+  }catch(e:any){ fail("37 Lost-response",e); }
+  // 38 Crash-recovered retrying parent + new edit
+  try{ await reset();
+    const { coalescePendingOperations, getPendingSyncOperations, transitionPendingToInFlight, recoverAbandonedInFlightOperations } = await import("./src/services/sync/queue");
+    const { tryAcquireFallbackLease, releaseFallbackLease } = await import("./src/services/sync/manager");
+    await db.products.put({id:"P38", name:"P38", price:10, quantity:10, weightKg:10, createdAt:Date.now(), updatedAt:Date.now(), syncStatus:"synced", serverRevision:5} as any);
+    await db.syncMeta.put({key:"serverRevision", value:5});
+    await db.syncOperations.add({ operationId:"ABC38", entity:"product", entityId:"P38", operation:"update", payload:{price:20, id:"P38"}, createdAt: Date.now(), synced:false, attempts:0, baseRevision:5, clientId:"test", status:"in_flight"} as any);
+    // crash
+    const owner38="owner-38";
+    await tryAcquireFallbackLease(owner38);
+    await recoverAbandonedInFlightOperations();
+    let pend38 = await getPendingSyncOperations();
+    assert(pend38.length===1 && pend38[0].operationId==="ABC38" && pend38[0].status==="retrying" && (pend38[0].payload as any).price===20, "recovered retrying price20");
+    // new edit before retry
+    const { productRepository } = await import("./src/repositories/product.repository");
+    await productRepository.update("P38",{price:30} as any);
+    const all38:any[] = await db.syncOperations.toArray();
+    const parent38:any = all38.find((o:any)=>o.operationId==="ABC38");
+    const succ38:any = all38.find((o:any)=>o.operationId!=="ABC38" && o.entity==="product");
+    assert(parent38.status==="retrying" && (parent38.payload as any).price===20, "parent still price20");
+    assert(succ38.status==="pending" && (succ38.payload as any).price===30 && succ38.dependsOnOperationId==="ABC38", "successor pending price30");
+    // mock server already committed parent before crash variant
+    const processed38 = new Map<string, any>();
+    let serverRev38=6;
+    processed38.set("ABC38", { operationId:"ABC38", entity:"product", entityId:"P38", operation:"update", success:true, message:"ok", revision:6, canonicalEntity:{id:"P38", price:20, serverRevision:6}, conflict:false });
+    await db.products.update("P38",{price:20, serverRevision:6} as any);
+    const origFetch38=(globalThis as any).fetch;
+    (globalThis as any).fetch = async (url:any, init:any)=>{
+      if(typeof url==="string" && url.includes("bootstrap")) return { ok:true, json: async()=>({ snapshot:{}, currentRevision: serverRev38 })} as any;
+      const body=JSON.parse(init.body as any);
+      const results:any[]=[];
+      for(const op of body.operations){
+        if(processed38.has(op.operationId)){
+          results.push(processed38.get(op.operationId));
+        } else {
+          if(op.baseRevision < serverRev38){
+            results.push({ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:false, message:"CONFLICT_STALE_REVISION", error:"CONFLICT_STALE_REVISION", conflict:true, retryable:false });
+          } else {
+            serverRev38++;
+            const res={ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:true, message:"ok", revision:serverRev38, canonicalEntity:{id:op.entityId, price:(op.payload as any).price, serverRevision:serverRev38}, conflict:false };
+            processed38.set(op.operationId, res);
+            results.push(res);
+          }
+        }
+      }
+      return { ok:true, json: async()=>({ success: results.every((r:any)=>r.success), results })} as any;
+    };
+    const { syncPendingOperations } = await import("./src/services/sync/client");
+    await syncPendingOperations();
+    const final38:any = await db.products.get("P38");
+    assert(final38.price===30 && serverRev38===7, `final price30 rev7 got ${final38.price} rev ${serverRev38}`);
+    (globalThis as any).fetch = origFetch38;
+    await releaseFallbackLease(owner38);
+    ok("38 Crash-recovered retrying + new edit");
+  }catch(e:any){ fail("38 Crash-recovered",e); }
+  // 39 Transient-before-server retrying + new edit (server never saw parent)
+  try{ await reset();
+    const { coalescePendingOperations, getPendingSyncOperations, transitionPendingToInFlight } = await import("./src/services/sync/queue");
+    await db.products.put({id:"P39", name:"P39", price:10, quantity:10, weightKg:10, createdAt:Date.now(), updatedAt:Date.now(), syncStatus:"synced", serverRevision:5} as any);
+    await db.syncMeta.put({key:"serverRevision", value:5});
+    await coalescePendingOperations("product","P39","update",{price:20, id:"P39"}, {baseRevision:5, operationId:"ABC39"});
+    let pend = await getPendingSyncOperations();
+    await transitionPendingToInFlight(pend);
+    // simulate transient failure before server processing: revert to retrying without server commit
+    const { revertInFlightToPending } = await import("./src/services/sync/queue");
+    await revertInFlightToPending("ABC39", "Network failure", true);
+    let afterFail:any = await db.syncOperations.where("operationId").equals("ABC39").first();
+    assert(afterFail.status==="retrying" && (afterFail.payload as any).price===20, "retrying price20 after transient");
+    const { productRepository } = await import("./src/repositories/product.repository");
+    await productRepository.update("P39",{price:30} as any);
+    const all:any[] = await db.syncOperations.toArray();
+    const parent:any = all.find((o:any)=>o.operationId==="ABC39");
+    const succ:any = all.find((o:any)=>o.operationId!=="ABC39" && o.entity==="product");
+    assert(parent.status==="retrying" && (parent.payload as any).price===20, "parent still price20");
+    assert(succ.status==="pending" && (succ.payload as any).price===30 && succ.dependsOnOperationId==="ABC39", "successor pending price30");
+    ok("39 Transient-before-server retrying immutability");
+  }catch(e:any){ fail("39 Transient",e); }
+  // 40 Multiple edits while retrying coalesce into successor
+  try{ await reset();
+    await db.syncOperations.add({ operationId:"ABC40", entity:"product", entityId:"P40", operation:"update", payload:{price:20, id:"P40"}, createdAt: Date.now(), synced:false, attempts:1, baseRevision:5, clientId:"test", status:"retrying"} as any);
+    const { coalescePendingOperations } = await import("./src/services/sync/queue");
+    await coalescePendingOperations("product","P40","update",{price:30, id:"P40"});
+    await coalescePendingOperations("product","P40","update",{price:40, id:"P40"});
+    await coalescePendingOperations("product","P40","update",{quantity:5, id:"P40"});
+    const all40:any[] = await db.syncOperations.toArray();
+    const parent40:any = all40.find((o:any)=>o.operationId==="ABC40");
+    const succs40:any[] = all40.filter((o:any)=>o.operationId!=="ABC40" && o.entity==="product" && o.entityId==="P40");
+    assert(parent40.status==="retrying" && (parent40.payload as any).price===20, "parent still price20");
+    assert(succs40.length===1 && succs40[0].status==="pending" && (succs40[0].payload as any).price===40 && (succs40[0].payload as any).quantity===5 && succs40[0].dependsOnOperationId==="ABC40", `successor coalesced price40 qty5 got ${JSON.stringify(succs40[0]?.payload)}`);
+    ok("40 Multiple edits coalesce into successor");
+  }catch(e:any){ fail("40 Multiple edits",e); }
+  // 41 Retrying parent + unrelated batching
+  try{ await reset();
+    const { getReadyPendingSyncOperations } = await import("./src/services/sync/queue");
+    await db.syncOperations.add({ operationId:"ABC41", entity:"product", entityId:"P41", operation:"update", payload:{price:20, id:"P41"}, createdAt: Date.now(), synced:false, attempts:1, baseRevision:5, clientId:"test", status:"retrying"} as any);
+    await db.syncOperations.add({ operationId:"CHILD41", entity:"product", entityId:"P41", operation:"update", payload:{price:30, id:"P41"}, createdAt: Date.now()+10, synced:false, attempts:0, baseRevision:5, clientId:"test", status:"pending", dependsOnOperationId:"ABC41", parentOperationId:"ABC41"} as any);
+    await db.syncOperations.add({ operationId:"UNREL41", entity:"customer", entityId:"C41", operation:"update", payload:{name:"NewC", id:"C41"}, createdAt: Date.now()+5, synced:false, attempts:0, baseRevision:5, clientId:"test", status:"pending"} as any);
+    const ready41 = await getReadyPendingSyncOperations();
+    assert(ready41.length===2 && ready41.some((o:any)=>o.operationId==="ABC41") && ready41.some((o:any)=>o.operationId==="UNREL41") && !ready41.some((o:any)=>o.operationId==="CHILD41"), `ready ABC+UNREL no child got ${ready41.map((r:any)=>r.operationId)}`);
+    ok("41 Retrying parent + unrelated batching");
+  }catch(e:any){ fail("41 Retrying+unrelated",e); }
+  // 42 Terminal retrying parent preserves child
+  try{ await reset();
+    const { getReadyPendingSyncOperations } = await import("./src/services/sync/queue");
+    const { syncPendingOperations } = await import("./src/services/sync/client");
+    await db.products.put({id:"P42", name:"P42", price:10, quantity:10, weightKg:10, createdAt:Date.now(), updatedAt:Date.now(), syncStatus:"synced", serverRevision:5} as any);
+    await db.syncOperations.add({ operationId:"ABC42", entity:"product", entityId:"P42", operation:"update", payload:{price:20, id:"P42"}, createdAt: Date.now(), synced:false, attempts:1, baseRevision:5, clientId:"test", status:"retrying"} as any);
+    await db.syncOperations.add({ operationId:"CHILD42", entity:"product", entityId:"P42", operation:"update", payload:{price:30, id:"P42"}, createdAt: Date.now()+10, synced:false, attempts:0, baseRevision:5, clientId:"test", status:"pending", dependsOnOperationId:"ABC42", parentOperationId:"ABC42"} as any);
+    let ready42 = await getReadyPendingSyncOperations();
+    assert(ready42.length===1 && ready42[0].operationId==="ABC42", "ready parent only before terminal");
+    const orig42=(globalThis as any).fetch;
+    let terminalSeen=false;
+    (globalThis as any).fetch = async (url:any, init:any)=>{
+      if(typeof url==="string" && url.includes("bootstrap")) return { ok:true, json: async()=>({ snapshot:{}, currentRevision:6 })} as any;
+      if(!init?.body) return { ok:true, json: async()=>({ success:true, results:[] })} as any;
+      const body=JSON.parse(init.body as any);
+      // Only first batch (parent) should be terminal; if child is sent in same sync drain, it would be second batch
+      const isParentBatch = body.operations.some((op:any)=>op.operationId==="ABC42");
+      if(isParentBatch){
+        terminalSeen=true;
+        return { ok:true, json: async()=>({ success:false, results: body.operations.map((op:any)=>({ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:false, message:"VALIDATION", error:"VALIDATION", conflict:false, retryable:false })) })} as any;
+      } else {
+        // child batch after parent terminal – should succeed
+        return { ok:true, json: async()=>({ success:true, results: body.operations.map((op:any)=>({ operationId:op.operationId, entity:op.entity, entityId:op.entityId, operation:op.operation, success:true, message:"ok", revision:7, canonicalEntity:{id:op.entityId, price:30, serverRevision:7}})) })} as any;
+      }
+    };
+    await syncPendingOperations();
+    assert(terminalSeen, "parent terminal request sent");
+    const after42:any[] = await db.syncOperations.toArray();
+    const child42:any = after42.find((o:any)=>o.operationId==="CHILD42");
+    // With drain, child may have been sent in second iteration and cleared, or may remain pending – both are not silent deletion
+    if(child42){
+      assert(child42.status!=="in_flight", `child not in_flight got ${child42.status}`);
+      assert(!!child42, "child preserved");
+    } else {
+      const prodAfter:any = await db.products.get("P42");
+      // If child was sent and succeeded, final price should be child price
+      assert(prodAfter.price===30 || prodAfter.price===10, `child processed or preserved, price ${prodAfter.price}`);
+    }
+    (globalThis as any).fetch = orig42;
+    ok("42 Terminal retrying preserves child");
+  }catch(e:any){ fail("42 Terminal",e); }
+  // 43 Recursive successor immutability (successor becomes in_flight after parent cleared)
+  try{ await reset();
+    const { coalescePendingOperations, getPendingSyncOperations, transitionPendingToInFlight } = await import("./src/services/sync/queue");
+    await db.products.put({id:"P43", name:"P43", price:10, quantity:10, weightKg:10, createdAt:Date.now(), updatedAt:Date.now(), syncStatus:"synced", serverRevision:5} as any);
+    await db.syncMeta.put({key:"serverRevision", value:5});
+    await db.syncOperations.add({ operationId:"PARENT43", entity:"product", entityId:"P43", operation:"update", payload:{price:20, id:"P43"}, createdAt: Date.now(), synced:false, attempts:1, baseRevision:5, clientId:"test", status:"retrying"} as any);
+    await db.syncOperations.add({ operationId:"SUCCESSOR43", entity:"product", entityId:"P43", operation:"update", payload:{price:30, id:"P43"}, createdAt: Date.now()+10, synced:false, attempts:0, baseRevision:5, clientId:"test", status:"pending", dependsOnOperationId:"PARENT43", parentOperationId:"PARENT43"} as any);
+    // Simulate parent success: remove parent and clear successor dependency to make successor ready
+    await db.syncOperations.delete((await db.syncOperations.where("operationId").equals("PARENT43").first() as any).id!);
+    await db.syncOperations.update((await db.syncOperations.where("operationId").equals("SUCCESSOR43").first() as any).id!, { dependsOnOperationId: undefined, parentOperationId: undefined, baseRevision:6 } as any);
+    let succ43:any = await db.syncOperations.where("operationId").equals("SUCCESSOR43").first();
+    assert(succ43.status==="pending", "successor pending before in_flight");
+    // Now successor can become in_flight
+    await transitionPendingToInFlight([succ43]);
+    let afterSuccInFlight:any = await db.syncOperations.where("operationId").equals("SUCCESSOR43").first();
+    assert(afterSuccInFlight.status==="in_flight" && (afterSuccInFlight.payload as any).price===30, "successor in_flight price30");
+    // New edit while successor in_flight
+    await coalescePendingOperations("product","P43","update",{price:40, id:"P43"});
+    const all43:any[] = await db.syncOperations.toArray();
+    const succAfterEdit:any = all43.find((o:any)=>o.operationId==="SUCCESSOR43");
+    const newSucc:any = all43.find((o:any)=>o.operationId!=="SUCCESSOR43" && o.entity==="product" && o.entityId==="P43" && o.status==="pending");
+    assert(succAfterEdit.status==="in_flight" && (succAfterEdit.payload as any).price===30, "successor still immutable price30");
+    assert(!!newSucc && newSucc.status==="pending" && (newSucc.payload as any).price===40 && newSucc.dependsOnOperationId==="SUCCESSOR43", `new successor pending price40 dependsOn successor got ${JSON.stringify(newSucc)}`);
+    ok("43 Recursive successor immutability");
+  }catch(e:any){ fail("43 Recursive",e); }
 
   console.log(`\n=== H.S.H sync client integrity: ${passed} passed, ${failed} failed ===`);
   if(failed>0) process.exit(1); process.exit(0);

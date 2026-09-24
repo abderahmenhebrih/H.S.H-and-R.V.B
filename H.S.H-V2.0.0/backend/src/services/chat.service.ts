@@ -697,17 +697,32 @@ export async function toggleReaction(messageId: string, accountId: string) {
 }
 
 export async function pinMessage(conversationId: string, messageId: string, accountId: string) {
+  const msg: any = await MessageModel.findOne({ id: messageId, conversationId }).lean();
+  if (!msg) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
+  const now = Date.now();
+  // Atomic claim: push only if not already pinned and count < 3
+  const updated: any = await ConversationModel.findOneAndUpdate(
+    {
+      id: conversationId,
+      "participants.accountId": accountId,
+      "participants.leftAt": null,
+      "pinnedMessages.messageId": { $ne: messageId },
+      $expr: { $lt: [{ $size: { $ifNull: ["$pinnedMessages", []] } }, PIN_MAX] },
+    },
+    {
+      $push: { pinnedMessages: { messageId, pinnedBy: accountId, pinnedAt: now } },
+      $set: { updatedAt: now },
+    },
+    { new: true },
+  );
+  if (updated) return updated.toObject ? updated.toObject() : updated;
+  // Determine why it failed
   const conv: any = await ConversationModel.findOne({ id: conversationId });
   if (!conv) throw codeError("RVB_CONVERSATION_NOT_FOUND", 404);
   if (!isParticipant(conv, accountId)) throw codeError("RVB_FORBIDDEN", 403);
-  if ((conv.pinnedMessages as any[]).some((p: any) => p.messageId === messageId)) throw codeError("RVB_ALREADY_PINNED", 400);
-  if ((conv.pinnedMessages as any[]).length >= PIN_MAX) throw codeError("RVB_PIN_LIMIT", 400, "Max 3 pinned messages");
-  const msg: any = await MessageModel.findOne({ id: messageId, conversationId }).lean();
-  if (!msg) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
-  conv.pinnedMessages.push({ messageId, pinnedBy: accountId, pinnedAt: Date.now() });
-  conv.updatedAt = Date.now();
-  await conv.save();
-  return conv.toObject ? conv.toObject() : conv;
+  if ((conv.pinnedMessages as any[]).some((p: any) => p.messageId === messageId)) throw codeError("RVB_ALREADY_PINNED", 409);
+  if ((conv.pinnedMessages as any[]).length >= PIN_MAX) throw codeError("RVB_PIN_LIMIT", 409, "Max 3 pinned messages");
+  throw codeError("RVB_PIN_LIMIT", 409, "Max 3 pinned messages");
 }
 
 export async function unpinMessage(conversationId: string, messageId: string, accountId: string) {

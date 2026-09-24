@@ -127,14 +127,29 @@ export async function reviewCustomerOrder(id: string, status: "accepted" | "reje
   let savedOrder: any = null;
   try {
     await session.withTransaction(async () => {
-      const order: any = await CustomerOrderModel.findOne({ id }).session(session);
-      if (!order) throw codeError("RVB_ORDER_NOT_FOUND", 404);
-      if (order.status !== "under_review") throw codeError("RVB_ORDER_ALREADY_REVIEWED", 400);
+      const now = Date.now();
+      const claimed: any = await CustomerOrderModel.findOneAndUpdate(
+        { id, status: "under_review" },
+        { $set: { status, reviewedAt: now, reviewedBy: reviewerId, notes: notes || null, updatedAt: now } },
+        { session, new: true },
+      );
+      if (!claimed) {
+        const existing: any = await CustomerOrderModel.findOne({ id }).session(session);
+        if (!existing) throw codeError("RVB_ORDER_NOT_FOUND", 404);
+        throw codeError("RVB_ORDER_ALREADY_REVIEWED", 409);
+      }
+      const order: any = claimed;
       if (editedItems && editedItems.length > 0) {
         const normalized = validateItems(editedItems);
+        const authoritative: any[] = [];
         for (const it of normalized) {
           const prod: any = await ProductModel.findOne({ id: it.productId }).session(session);
           if (!prod) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
+          const authPrice = Number((prod as any).price);
+          if (!Number.isFinite(authPrice) || authPrice < 0) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product price invalid: ${it.productId}`);
+          const weightKg = Number(it.weightKg);
+          const totalLine = Math.round(weightKg * authPrice * 100) / 100;
+          authoritative.push({ productId: it.productId, quantity: it.quantity, weightKg, price: authPrice, total: totalLine });
           if (status === "accepted") {
             if ((Number(prod.quantity) || 0) < Number(it.quantity) || (Number(prod.weightKg) || 0) < Number(it.weightKg)) {
               throw codeError("RVB_INSUFFICIENT_STOCK", 400, `Insufficient stock for ${prod.name}`);
@@ -142,8 +157,8 @@ export async function reviewCustomerOrder(id: string, status: "accepted" | "reje
           }
         }
         order.originalItems = order.items;
-        order.items = normalized as any;
-        order.total = computeTotal(normalized);
+        order.items = authoritative as any;
+        order.total = computeTotal(authoritative);
       } else if (status === "accepted") {
         // Re-validate and recompute even without edits (covers Edit-then-Accept legacy and ensures server total)
         const existingNormalized = validateItems(order.items);

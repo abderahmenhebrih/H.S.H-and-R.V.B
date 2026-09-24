@@ -144,9 +144,18 @@ export async function reviewSupplierRequest(
   let savedReq: any = null;
   try {
     await session.withTransaction(async () => {
-      const req: any = await SupplierRequestModel.findOne({ id }).session(session);
-      if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
-      if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
+      const now = Date.now();
+      const claimed: any = await SupplierRequestModel.findOneAndUpdate(
+        { id, status: "under_review" },
+        { $set: { status, reviewedAt: now, reviewedBy: reviewerId, notes: notes?.trim() || null, updatedAt: now } },
+        { session, new: true },
+      );
+      if (!claimed) {
+        const existing: any = await SupplierRequestModel.findOne({ id }).session(session);
+        if (!existing) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
+        throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 409);
+      }
+      const req: any = claimed;
 
       if (edited && req.type === "new_supply" && (edited.items || edited.total !== undefined || edited.calculation !== undefined || edited.date !== undefined)) {
         if (!req.originalItems) {

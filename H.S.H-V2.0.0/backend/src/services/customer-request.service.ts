@@ -138,9 +138,18 @@ export async function reviewCustomerRequest(
   let savedReq: any = null;
   try {
     await session.withTransaction(async () => {
-      const req: any = await CustomerRequestModel.findOne({ id }).session(session);
-      if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
-      if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
+      const now = Date.now();
+      const claimed: any = await CustomerRequestModel.findOneAndUpdate(
+        { id, status: "under_review" },
+        { $set: { status, reviewedAt: now, reviewedBy: reviewerId, notes: notes?.trim() || null, updatedAt: now } },
+        { session, new: true },
+      );
+      if (!claimed) {
+        const existing: any = await CustomerRequestModel.findOne({ id }).session(session);
+        if (!existing) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
+        throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 409);
+      }
+      const req: any = claimed;
 
       if (edited && req.type === "insert_shipment" && (edited.items || edited.total !== undefined || edited.date !== undefined)) {
         if (!req.originalItems) {
@@ -149,12 +158,18 @@ export async function reviewCustomerRequest(
         }
         if (edited.items) {
           const normalized = validateItems(edited.items);
+          const authoritative: any[] = [];
           for (const it of normalized) {
             const prod: any = await ProductModel.findOne({ id: it.productId }).session(session);
             if (!prod) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product not found: ${it.productId}`);
+            const authPrice = Number((prod as any).price);
+            if (!Number.isFinite(authPrice) || authPrice < 0) throw codeError("RVB_PRODUCT_NOT_FOUND", 404, `Product price invalid: ${it.productId}`);
+            const weightKg = Number(it.weightKg);
+            const totalLine = Math.round(weightKg * authPrice * 100) / 100;
+            authoritative.push({ productId: it.productId, quantity: it.quantity, weightKg, price: authPrice, total: totalLine });
           }
-          req.items = normalized as any;
-          req.total = computeTotal(normalized);
+          req.items = authoritative as any;
+          req.total = computeTotal(authoritative);
         } else if (edited.total !== undefined) {
           const existingNormalized = validateItems(req.items);
           req.total = computeTotal(existingNormalized);

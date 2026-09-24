@@ -52,6 +52,12 @@ export async function createWorkerRequest(input: CreateWorkerRequestInput) {
   if (type === "discrepancy" && !description?.trim()) {
     throw codeError("RVB_DESCRIPTION_REQUIRED", 400);
   }
+  if (type === "discrepancy" && description && description.length > 2000) {
+    throw codeError("RVB_DESCRIPTION_TOO_LONG", 400, `description too long (${description.length} > 2000)`);
+  }
+  if (description !== undefined && description !== null && typeof description !== "string" && type === "discrepancy") {
+    throw codeError("RVB_DESCRIPTION_INVALID", 400, "description must be a string");
+  }
 
   const now = Date.now();
   const doc: any = {
@@ -111,9 +117,18 @@ export async function reviewWorkerRequest(id: string, status: "accepted" | "reje
   let savedReq: any = null;
   try {
     await session.withTransaction(async () => {
-      const req: any = await WorkerRequestModel.findOne({ id }).session(session);
-      if (!req) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
-      if (req.status !== "under_review") throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 400);
+      const now = Date.now();
+      const claimed: any = await WorkerRequestModel.findOneAndUpdate(
+        { id, status: "under_review" },
+        { $set: { status, reviewedAt: now, reviewedBy: reviewerId, notes: notes?.trim() || null, updatedAt: now } },
+        { session, new: true },
+      );
+      if (!claimed) {
+        const existing: any = await WorkerRequestModel.findOne({ id }).session(session);
+        if (!existing) throw codeError("RVB_REQUEST_NOT_FOUND", 404);
+        throw codeError("RVB_REQUEST_ALREADY_REVIEWED", 409);
+      }
+      const req: any = claimed;
 
       if (status === "accepted") {
         const worker: any = await WorkerModel.findOne({ id: req.workerId }).session(session);

@@ -67,6 +67,19 @@ function validateLinkCompatibility(role: string, entityType: string): boolean {
   return false;
 }
 
+function isDuplicateKeyError(err: any): boolean {
+  return err && (err.code === 11000 || err.code === "11000" || (err.message && String(err.message).includes("E11000")) || (err.name === "MongoServerError" && String(err.message).includes("duplicate")));
+}
+
+function mapDuplicateKeyError(err: any): any {
+  if (!isDuplicateKeyError(err)) return null;
+  const msg = String(err.message || "") + String(err.keyValue ? JSON.stringify(err.keyValue) : "") + String(err.keyPattern ? JSON.stringify(err.keyPattern) : "");
+  if (msg.includes("tag") || msg.includes("tag_1")) return codeError("RVB_TAG_ALREADY_EXISTS", 409);
+  if (msg.includes("linkedEntityType") || msg.includes("linkedEntityId") || msg.includes("linkedEntity")) return codeError("RVB_ENTITY_ALREADY_LINKED", 409);
+  // Default to tag if unclear but duplicate
+  return codeError("RVB_TAG_ALREADY_EXISTS", 409);
+}
+
 async function assertLinkedEntityExists(type: string, id: string) {
   let model: any = null;
   if (type === "worker") model = WorkerModel;
@@ -183,8 +196,14 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
     failedLoginAttempts: 0,
     lockedUntil: null,
   };
-  const created = await RvbAccountModel.create(doc);
-  return created.toObject ? created.toObject() : created;
+  try {
+    const created = await RvbAccountModel.create(doc);
+    return created.toObject ? created.toObject() : created;
+  } catch (err: any) {
+    const mapped = mapDuplicateKeyError(err);
+    if (mapped) throw mapped;
+    throw err;
+  }
 }
 
 export async function updateRvbAccount(id: string, input: any) {
@@ -304,7 +323,13 @@ export async function linkRvbAccount(accountId: string, entityId: string) {
   account.linkedEntityType = entityType;
   account.linkedEntityId = entityId;
   account.updatedAt = Date.now();
-  await account.save();
+  try {
+    await account.save();
+  } catch (err: any) {
+    const mapped = mapDuplicateKeyError(err);
+    if (mapped) throw mapped;
+    throw err;
+  }
   // Only write WorkerActivity when linkedEntityType==="worker" and event genuinely belongs to Worker history.
   // For other types use RvbActivity/recordActivity.
   if (entityType === "worker") {

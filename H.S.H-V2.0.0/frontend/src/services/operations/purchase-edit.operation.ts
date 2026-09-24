@@ -3,6 +3,7 @@ import { purchaseRepository } from "../../repositories/purchase.repository";
 import { supplierRepository } from "../../repositories/supplier.repository";
 import { productRepository } from "../../repositories/product.repository";
 import { runDatabaseTransaction } from "./database-transaction";
+import { roundMoney } from "../../lib/money";
 
 export class PurchaseEditOperation {
   async edit(input: {
@@ -31,8 +32,11 @@ export class PurchaseEditOperation {
         throw new Error("A purchase must contain at least one item.");
       }
 
-      if (input.total < 0) {
-        throw new Error("Purchase total cannot be negative.");
+      if (!Number.isFinite(input.total) || input.total < 0) {
+        throw new Error("Purchase total must be a finite number >= 0.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Purchase date must be a valid finite timestamp.");
       }
 
       const purchase = await purchaseRepository.getById(input.purchaseId);
@@ -46,6 +50,9 @@ export class PurchaseEditOperation {
       if (!oldSupplier) {
         throw new Error("Original supplier not found.");
       }
+      if (!Number.isFinite(oldSupplier.balance) || !Number.isFinite(purchase.total)) {
+        throw new Error("Supplier balance corrupted.");
+      }
 
       if (oldSupplier.balance < purchase.total) {
         throw new Error(
@@ -57,6 +64,9 @@ export class PurchaseEditOperation {
 
       if (!newSupplier) {
         throw new Error("Supplier not found.");
+      }
+      if (!Number.isFinite(newSupplier.balance)) {
+        throw new Error("Supplier balance corrupted.");
       }
 
       for (const item of purchase.items) {
@@ -76,6 +86,7 @@ export class PurchaseEditOperation {
         }
       }
 
+      let canonicalTotal = 0;
       for (const item of input.items) {
         if (!Number.isFinite(item.quantity) || !Number.isInteger(item.quantity) || item.quantity <= 0) {
           throw new Error(`Invalid item quantity: ${item.productId}`);
@@ -89,23 +100,31 @@ export class PurchaseEditOperation {
         if (!Number.isFinite(item.total) || item.total < 0) {
           throw new Error(`Invalid item total: ${item.productId}`);
         }
-        const expected = Math.round(item.weightKg * item.price * 100) / 100;
+        const expected = roundMoney(item.weightKg * item.price);
         if (Math.abs(item.total - expected) > 0.005) {
           throw new Error(`Item total mismatch for ${item.productId}: expected ${expected}, got ${item.total}`);
         }
+        canonicalTotal = roundMoney(canonicalTotal + expected);
 
         const product = await db.products.get(item.productId);
 
         if (!product) {
           throw new Error(`Product not found: ${item.productId}`);
         }
+        if (!Number.isFinite(product.quantity) || !Number.isFinite(product.weightKg)) {
+          throw new Error(`Product balance corrupted: ${item.productId}`);
+        }
+      }
+      if (Math.abs(input.total - canonicalTotal) > 0.005) {
+        throw new Error(`Purchase total mismatch: expected ${canonicalTotal}, got ${input.total}`);
       }
 
       const now = Date.now();
 
       // Reverse original supplier balance.
-      const restoredOldSupplierBalance =
-        oldSupplier.balance - purchase.total;
+      const restoredOldSupplierBalance = roundMoney(
+        oldSupplier.balance - purchase.total,
+      );
 
       await supplierRepository.update(purchase.supplierId, {
         balance: restoredOldSupplierBalance,
@@ -148,9 +167,12 @@ export class PurchaseEditOperation {
       if (!currentNewSupplier) {
         throw new Error("Supplier not found.");
       }
+      if (!Number.isFinite(currentNewSupplier.balance)) {
+        throw new Error("Supplier balance corrupted.");
+      }
 
       await supplierRepository.update(input.supplierId, {
-        balance: currentNewSupplier.balance + input.total,
+        balance: roundMoney(currentNewSupplier.balance + canonicalTotal),
         updatedAt: now,
       } as any, { queueSync: false } as any);
 
@@ -158,7 +180,7 @@ export class PurchaseEditOperation {
         supplierId: input.supplierId,
         date: input.date,
         items: input.items,
-        total: input.total,
+        total: canonicalTotal,
         calculation: input.calculation,
         updatedAt: now,
         syncStatus: "pending",

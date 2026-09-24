@@ -136,14 +136,9 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
             try { await incrementAttemptsAndSetError(match.id, r.error ?? r.message, true); } catch {}
           }
         } else {
-          // Retryable false? Actually terminal false means retryable true? For retryable (transient) we revert to pending
-          if (match?.id !== undefined) {
-            await incrementAttemptsAndSetError(match.id, r.error ?? r.message, false);
-            // revert in_flight to retrying so it will be retried before successor
-            try { await revertInFlightToPending(operationId, r.error ?? r.message, true); } catch {}
-          } else {
-            try { await revertInFlightToPending(operationId, r.error ?? r.message, true); } catch {}
-          }
+          // Retryable true -> revert in_flight to retrying (immutable), preserve successor
+          // Do NOT call incrementAttemptsAndSetError first: it would set pending and break retrying distinction
+          try { await revertInFlightToPending(operationId, r.error ?? r.message, true); } catch {}
         }
         // Log conflict if present
         if (r.conflict) {

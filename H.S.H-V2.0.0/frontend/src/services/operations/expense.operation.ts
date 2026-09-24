@@ -12,14 +12,20 @@ export class ExpenseOperation {
     note?: string;
   }) {
     return runDatabaseTransaction(async () => {
-      if (input.amount <= 0) {
-        throw new Error("Expense amount must be greater than zero.");
+      if (!Number.isFinite(input.amount) || input.amount <= 0) {
+        throw new Error("Expense amount must be a finite number greater than zero.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Expense date must be a valid finite timestamp.");
       }
 
       const account = await db.bankAccounts.get(input.accountId);
 
       if (!account) {
         throw new Error("Account not found.");
+      }
+      if (!Number.isFinite(account.balance)) {
+        throw new Error("Account balance corrupted.");
       }
 
       if (account.balance < input.amount) {

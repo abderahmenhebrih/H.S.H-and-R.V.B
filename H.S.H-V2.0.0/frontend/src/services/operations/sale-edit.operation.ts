@@ -3,6 +3,7 @@ import { saleRepository } from "../../repositories/sale.repository";
 import { customerRepository } from "../../repositories/customer.repository";
 import { productRepository } from "../../repositories/product.repository";
 import { runDatabaseTransaction } from "./database-transaction";
+import { roundMoney } from "../../lib/money";
 
 export class SaleEditOperation {
   async edit(input: {
@@ -23,8 +24,11 @@ export class SaleEditOperation {
         throw new Error("A sale must contain at least one item.");
       }
 
-      if (input.total < 0) {
-        throw new Error("Sale total cannot be negative.");
+      if (!Number.isFinite(input.total) || input.total < 0) {
+        throw new Error("Sale total must be a finite number >= 0.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Sale date must be a valid finite timestamp.");
       }
 
       const sale = await saleRepository.getById(input.saleId);
@@ -38,6 +42,9 @@ export class SaleEditOperation {
       if (!oldCustomer) {
         throw new Error("Original customer not found.");
       }
+      if (!Number.isFinite(oldCustomer.balance) || !Number.isFinite(sale.total)) {
+        throw new Error("Customer balance corrupted.");
+      }
 
       if (oldCustomer.balance < sale.total) {
         throw new Error(
@@ -50,6 +57,9 @@ export class SaleEditOperation {
       if (!newCustomer) {
         throw new Error("Customer not found.");
       }
+      if (!Number.isFinite(newCustomer.balance)) {
+        throw new Error("Customer balance corrupted.");
+      }
 
       // Validate original products.
       for (const item of sale.items) {
@@ -60,7 +70,8 @@ export class SaleEditOperation {
         }
       }
 
-      // Validate new sale - unified with CREATE
+      // Validate new sale - unified with CREATE (canonical total recomputation)
+      let canonicalTotal = 0;
       for (const item of input.items) {
         if (!Number.isFinite(item.quantity) || !Number.isInteger(item.quantity) || item.quantity <= 0) {
           throw new Error(`Invalid item quantity: ${item.productId}`);
@@ -74,10 +85,11 @@ export class SaleEditOperation {
         if (!Number.isFinite(item.total) || item.total < 0) {
           throw new Error(`Invalid item total: ${item.productId}`);
         }
-        const expected = Math.round(item.weightKg * item.price * 100) / 100;
+        const expected = roundMoney(item.weightKg * item.price);
         if (Math.abs(item.total - expected) > 0.005) {
           throw new Error(`Item total mismatch for ${item.productId}: expected ${expected}, got ${item.total}`);
         }
+        canonicalTotal = roundMoney(canonicalTotal + expected);
 
         const product = await db.products.get(item.productId);
 
@@ -107,12 +119,16 @@ export class SaleEditOperation {
           );
         }
       }
+      if (Math.abs(input.total - canonicalTotal) > 0.005) {
+        throw new Error(`Sale total mismatch: expected ${canonicalTotal}, got ${input.total}`);
+      }
 
       const now = Date.now();
 
       // Reverse old customer balance.
-      const restoredOldCustomerBalance =
-        oldCustomer.balance - sale.total;
+      const restoredOldCustomerBalance = roundMoney(
+        oldCustomer.balance - sale.total,
+      );
 
       await customerRepository.update(sale.customerId, {
         balance: restoredOldCustomerBalance,
@@ -170,18 +186,21 @@ export class SaleEditOperation {
         throw new Error("Customer not found.");
       }
 
+      if (!Number.isFinite(currentNewCustomer.balance)) {
+        throw new Error("Customer balance corrupted.");
+      }
       // Apply new customer balance.
       await customerRepository.update(input.customerId, {
-        balance: currentNewCustomer.balance + input.total,
+        balance: roundMoney(currentNewCustomer.balance + canonicalTotal),
         updatedAt: now,
       } as any, { queueSync: false } as any);
 
-      // Persist edited sale.
+      // Persist edited sale with canonical total.
       await saleRepository.update(input.saleId, {
         customerId: input.customerId,
         date: input.date,
         items: input.items,
-        total: input.total,
+        total: canonicalTotal,
         updatedAt: now,
         syncStatus: "pending",
       });

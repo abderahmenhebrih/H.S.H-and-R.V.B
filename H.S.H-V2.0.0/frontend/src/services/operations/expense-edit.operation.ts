@@ -13,8 +13,11 @@ export class ExpenseEditOperation {
     note?: string;
   }) {
     return runDatabaseTransaction(async () => {
-      if (input.amount <= 0) {
-        throw new Error("Expense amount must be greater than zero.");
+      if (!Number.isFinite(input.amount) || input.amount <= 0) {
+        throw new Error("Expense amount must be a finite number greater than zero.");
+      }
+      if (!Number.isFinite(input.date)) {
+        throw new Error("Expense date must be a valid finite timestamp.");
       }
 
       const expense = await expenseRepository.getById(input.expenseId);
@@ -28,18 +31,24 @@ export class ExpenseEditOperation {
       if (!oldAccount) {
         throw new Error("Original account not found.");
       }
+      if (!Number.isFinite(oldAccount.balance) || !Number.isFinite(expense.amount)) {
+        throw new Error("Account balance corrupted.");
+      }
 
       // Reverse original expense.
       await bankAccountRepository.update(expense.accountId, {
         balance: oldAccount.balance + expense.amount,
         updatedAt: Date.now(),
-      } as any);
+      } as any, { queueSync: false } as any);
 
       // Apply new expense.
       const newAccount = await db.bankAccounts.get(input.accountId);
 
       if (!newAccount) {
         throw new Error("Account not found.");
+      }
+      if (!Number.isFinite(newAccount.balance)) {
+        throw new Error("Account balance corrupted.");
       }
 
       if (newAccount.balance < input.amount) {

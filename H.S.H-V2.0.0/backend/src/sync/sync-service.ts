@@ -15,6 +15,7 @@ import { PurchaseModel } from "../models/purchase.model";
 import { PaymentModel } from "../models/payment.model";
 import { TransferModel } from "../models/transfer.model";
 import { ExpenseModel } from "../models/expense.model";
+import { TaskModel } from "../models/task.model";
 
 type SyncModel = {
   findOne: (filter: { id: string }) => Promise<any>;
@@ -44,6 +45,25 @@ async function getNextRevision(session?: any): Promise<number> {
     return 1;
   }
   return (doc as any).revision;
+}
+
+async function isTaskNameDuplicateUnfinished(
+  session: any,
+  trimmedName: string,
+  excludeId?: string,
+): Promise<boolean> {
+  // Only unfinished tasks (status !== "completed") participate. Trim + case-sensitive.
+  // Use JS filtering to ensure trimmed comparison and case-sensitive, and to handle missing status (defaults to pending).
+  const pending = await TaskModel.find({ status: { $ne: "completed" } })
+    .session(session)
+    .lean();
+  // Also need to consider tasks where status is undefined (not yet set) — they are unfinished and $ne: "completed" includes them, but to be safe also check all if needed
+  // For trimmed comparison, stored names are already trimmed via frontend, but we trim again for safety
+  return pending.some((t: any) => {
+    if (excludeId && String(t.id) === String(excludeId)) return false;
+    const storedTrimmed = String(t.name || "").trim();
+    return storedTrimmed === trimmedName;
+  });
 }
 
 export function isTransientError(error: unknown): boolean {
@@ -1680,6 +1700,29 @@ export async function processSyncOperation(
           );
           return;
         }
+        // Task name uniqueness: only unfinished (pending) tasks reserve name, trimmed + case-sensitive
+        if (operation.entity === "task") {
+          const rawName = (payload as any).name;
+          if (typeof rawName === "string") {
+            const trimmed = rawName.trim();
+            if (trimmed) {
+              const dup = await isTaskNameDuplicateUnfinished(session, trimmed);
+              if (dup) {
+                const err = "TASK_NAME_DUPLICATE";
+                await ProcessedSyncOperationModel.create(
+                  [{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }],
+                  { session },
+                );
+                result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+                return;
+              }
+            }
+          } else if (isNonEmptyString((payload as any).name) === false) {
+            // name is required for create, but validateHshPayload already handles, but for task we ensure trimmed not empty
+            // If payload has no name, the generic creation will still create, but Task requires name — let it fail via validation or model
+          }
+        }
+
         // No global conflict check for create (only entity-specific, but create has no existing)
         // Server-authoritative business transaction — apply derived effects atomically before creating transaction record
         if (["sale","purchase","payment","transfer"].includes(operation.entity)) {
@@ -1792,6 +1835,23 @@ export async function processSyncOperation(
               return;
             }
           }
+          // Task name uniqueness for upsert (existing) — only if resulting task will be unfinished
+          if (operation.entity === "task") {
+            const nameRaw = (payload as any).name;
+            const statusRaw = (payload as any).status;
+            const nextName = nameRaw !== undefined ? String(nameRaw).trim() : String((existingUpsert as any).name || "").trim();
+            const nextStatus = statusRaw !== undefined ? String(statusRaw) : String((existingUpsert as any).status || "pending");
+            const willBeUnfinished = nextStatus !== "completed";
+            if (willBeUnfinished && nextName) {
+              const dup = await isTaskNameDuplicateUnfinished(session, nextName, operation.entityId);
+              if (dup) {
+                const err = "TASK_NAME_DUPLICATE";
+                await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+                result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+                return;
+              }
+            }
+          }
           revision = await getNextRevision(session);
           const toSet: Record<string, unknown> = {
             ...payload,
@@ -1857,6 +1917,21 @@ export async function processSyncOperation(
               await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
               result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
               return;
+            }
+          }
+          if (operation.entity === "task") {
+            const rawName = (payload as any).name;
+            if (typeof rawName === "string") {
+              const trimmed = rawName.trim();
+              if (trimmed) {
+                const dup = await isTaskNameDuplicateUnfinished(session, trimmed);
+                if (dup) {
+                  const err = "TASK_NAME_DUPLICATE";
+                  await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+                  result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+                  return;
+                }
+              }
             }
           }
           revision = await getNextRevision(session);
@@ -1971,6 +2046,29 @@ export async function processSyncOperation(
             await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
             result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
             return;
+          }
+        }
+        // Task name uniqueness: only unfinished (pending) tasks reserve name, trimmed + case-sensitive, exclude self
+        if (operation.entity === "task") {
+          const nameRaw = (payload as any).name;
+          const statusRaw = (payload as any).status;
+          const nextName = nameRaw !== undefined ? String(nameRaw).trim() : String((existing as any).name || "").trim();
+          const nextStatus = statusRaw !== undefined ? String(statusRaw) : String((existing as any).status || "pending");
+          const willBeUnfinished = nextStatus !== "completed";
+          if (willBeUnfinished && nextName) {
+            const existingNameTrimmed = String((existing as any).name || "").trim();
+            const isNameChange = nameRaw !== undefined && nextName !== existingNameTrimmed;
+            const isBecomingUnfinished = String((existing as any).status || "pending") === "completed" && willBeUnfinished;
+            const shouldCheck = isNameChange || isBecomingUnfinished || nameRaw !== undefined;
+            if (shouldCheck) {
+              const dup = await isTaskNameDuplicateUnfinished(session, nextName, operation.entityId);
+              if (dup) {
+                const err = "TASK_NAME_DUPLICATE";
+                await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+                result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+                return;
+              }
+            }
           }
         }
         const existingRev = (existing as any).serverRevision ?? 0;

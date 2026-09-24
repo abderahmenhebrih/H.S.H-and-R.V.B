@@ -496,7 +496,7 @@ export default function TasksPage() {
     setCompleting(true);
     setCompleteError("");
     try {
-      await taskRepository.update(completeTarget.id, { status: "completed", completedAt: Date.now(), updatedAt: Date.now(), syncStatus: "pending" } as Partial<Task>);
+      await taskService.complete(completeTarget.id);
       await loadTasks();
       setSuccessMessage(t.taskCompletedSuccess);
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -530,7 +530,7 @@ export default function TasksPage() {
     setCompleting(true);
     setCompleteError("");
     try {
-      await taskRepository.update(completeTarget.id, { deadline: newTime, status: "pending", updatedAt: Date.now(), syncStatus: "pending" } as Partial<Task>);
+      await taskService.reschedule(completeTarget.id, newTime);
       await loadTasks();
       setSuccessMessage(t.taskRescheduledSuccess);
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -556,7 +556,7 @@ export default function TasksPage() {
     setError("");
     try {
       if (editingId) {
-        await taskRepository.update(editingId, { name: form.name.trim(), deadline, updatedAt: Date.now(), syncStatus: "pending" });
+        await taskService.update(editingId, { name: form.name.trim(), deadline });
       } else {
         await taskService.create({ name: form.name.trim(), deadline });
       }

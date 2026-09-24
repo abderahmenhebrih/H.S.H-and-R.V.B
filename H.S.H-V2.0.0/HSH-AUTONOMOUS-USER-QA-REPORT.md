@@ -1,7 +1,7 @@
 # H.S.H AUTONOMOUS USER QA REPORT
 
-**Date:** 2026-09-24T02:49:34.673Z
-**Git commit:** ba77575 023
+**Date:** 2026-09-24T03:16:33.507Z
+**Git commit:** 1536b35 024
 **Browser:** chromium (Chromium)
 **Playwright:** ^1.63.0
 **Frontend:** http://localhost:3000
@@ -13,20 +13,20 @@
 
 - **Total UI actions:** 28
 - **Pages visited:** /, /products, /customers, /suppliers, /accounts, /purchases, /sales, /payments, /workers, /vehicles, /tasks, /reports, /invoice, /notifications, /settings, /office (16)
-- **Records created:** 12
+- **Records created:** 15
 - **Records edited:** 1
 - **Records deleted:** 0
 - **Purchases performed:** 0
 - **Sales performed:** 0
 - **Payments performed:** 0
-- **Tasks performed:** 0
+- **Tasks performed:** 1
 - **Office files created:** 2
 - **Page errors:** 0
-- **Console errors (filtered):** 31
+- **Console errors (filtered):** 36
 - **Request failed:** 0
 - **HTTP errors (>=500):** 0
 
-## CONFIRMED BUGS (6)
+## CONFIRMED BUGS (7)
 
 
 ### HSH-AUTO-001 — HIGH
@@ -77,30 +77,30 @@ Call log:
 ### HSH-AUTO-002 — HIGH
 - **Route:** http://localhost:3000/customers
 - **Feature:** Customers
-- **Steps:** Create QA Customer Alpha xkyvs
+- **Steps:** Create QA Customer Alpha yimwt
 - **Expected:** Visible in list
 - **Actual:** Not visible after reload
-- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202603:47 amCustomer Ty
+- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202604:13 amCustomer Ty
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-002.png (if captured)
 
 
 ### HSH-AUTO-003 — HIGH
 - **Route:** http://localhost:3000/customers
 - **Feature:** Customers
-- **Steps:** Create QA Customer Beta xkyvs
+- **Steps:** Create QA Customer Beta yimwt
 - **Expected:** Visible in list
 - **Actual:** Not visible after reload
-- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202603:47 amCustomer Ty
+- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202604:13 amCustomer Ty
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-003.png (if captured)
 
 
 ### HSH-AUTO-004 — HIGH
 - **Route:** http://localhost:3000/customers
 - **Feature:** Customers
-- **Steps:** Create QA Customer Gamma xkyvs
+- **Steps:** Create QA Customer Gamma yimwt
 - **Expected:** Visible in list
 - **Actual:** Not visible after reload
-- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202603:48 amCustomer Ty
+- **Evidence:** Hebrih Slaughter HouseManagement SystemManagement DashboardMy OfficeProductsCustomersSuppliersAccountsPurchasesSalesPaymentsWorkersVehiclesTasksReportsInvoiceSettingsAccess RVBHebrih Slaughter HouseCustomersManage customer information, types, balances and history.Thu, 24 Sept 202604:14 amCustomer Ty
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-004.png (if captured)
 
 
@@ -194,7 +194,49 @@ Call log:
 - **Screenshot:** qa-results/latest/bugs/HSH-AUTO-006.png (if captured)
 
 
-**Count by severity:** BLOCKER: 0, CRITICAL: 0, HIGH: 6, MEDIUM: 0, LOW: 0
+### HSH-AUTO-007 — HIGH
+- **Route:** http://localhost:3000/tasks
+- **Feature:** Task duplicate invariant
+- **Steps:** Full
+- **Expected:** PASS
+- **Actual:** locator.click: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('text=QA Unique Task yimwt').first().locator('xpath=ancestor::article').first().getByRole('button', { name: /Modify/i }).first()[22m
+[2m    - locator resolved to <button type="button" title="Modify" aria-label="Modify QA Unique Task yimwt" class="page-module__UgkEVG__rowEditButton">…</button>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="page-module__UgkEVG__modalBackdrop">…</div> intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="page-module__UgkEVG__modalBackdrop">…</div> intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m      - waiting 100ms[22m
+[2m    29 × waiting for element to be visible, enabled and stable[22m
+[2m       - element is visible, enabled and stable[22m
+[2m       - scrolling into view if needed[22m
+[2m       - done scrolling[22m
+[2m       - <div class="page-module__UgkEVG__modalBackdrop">…</div> intercepts pointer events[22m
+[2m     - retrying click action[22m
+[2m       - waiting 500ms[22m
+
+- **Evidence:** locator.click: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('text=QA Unique Task yimwt').first().locator('xpath=ancestor::article').first().getByRole('button', { name: /Modify/i }).first()[22m
+[2m    - locator resolved to <button type="button" title="Modify" aria-label="Modify QA Unique Task yimwt" class="page-module__UgkEVG__rowEditButton">…</button>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - 
+- **Screenshot:** qa-results/latest/bugs/HSH-AUTO-007.png (if captured)
+
+
+**Count by severity:** BLOCKER: 0, CRITICAL: 0, HIGH: 7, MEDIUM: 0, LOW: 0
 
 ## POSSIBLE UPGRADES (2)
 
@@ -237,7 +279,8 @@ Call log:
 ## CONSOLE / NETWORK FINDINGS
 
 - **pageerror:** 0 
-- **console.error (filtered):** 31 
+- **console.error (filtered):** 36 
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/products
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/customers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/customers
@@ -259,16 +302,20 @@ Call log:
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/settings
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/office
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/office
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/tasks
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/tasks
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/tasks
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/tasks
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/tasks
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/settings
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/settings
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/accounts
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/customers
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/suppliers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/office
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/suppliers
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/suppliers
-  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/workers
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/sales
   - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/sales
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/office
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/purchases
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/products
+  - Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/products
 - **requestfailed:** 0 
 - **http >=500:** 0 
 

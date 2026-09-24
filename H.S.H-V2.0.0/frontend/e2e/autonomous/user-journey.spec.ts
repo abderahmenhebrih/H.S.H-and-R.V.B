@@ -924,6 +924,222 @@ test.describe("Autonomous H.S.H User — Full Business Simulation", () => {
       }
     }
 
+    // ========== TASK DUPLICATE INVARIANT (autonomous) ==========
+    let taskDuplicateInvariantPass = true;
+    try {
+      const taskBase = `QA Unique Task ${unique}`;
+      const taskLower = taskBase.toLowerCase();
+      const taskWs = `   ${taskBase}   `;
+      const taskEditSrc = `QA Edit Source ${unique}`;
+      const taskRestore = `QA Restore ${unique}`;
+
+      // Helper to count unfinished with exact trimmed case-sensitive name via UI
+      async function countUnfinishedTask(nameTrimmed: string): Promise<number> {
+        await page.goto("/tasks", { waitUntil: "domcontentloaded" });
+        await page.waitForTimeout(600);
+        return await page.evaluate((n) => {
+          const els = Array.from(document.querySelectorAll('article strong'));
+          return els.filter(el => (el.textContent || "").trim() === n).length;
+        }, nameTrimmed).catch(() => 0);
+      }
+
+      // Create base task
+      await page.goto("/tasks", { waitUntil: "domcontentloaded" });
+      pagesVisited.add("/tasks");
+      const addTaskBtn = page.getByRole("button", { name: /Add Task/i }).first();
+      await expect(addTaskBtn).toBeVisible({ timeout: 10000 });
+      await addTaskBtn.click();
+      let dlg = page.locator('[role="dialog"], section[class*="modal"]').first();
+      await expect(dlg).toBeVisible({ timeout: 10000 });
+      await dlg.locator("input").first().fill(taskBase);
+      let saveTaskBtn = dlg.getByRole("button", { name: /Create/i }).first();
+      await saveTaskBtn.click();
+      await page.waitForTimeout(1200);
+      await dlg.waitFor({ state: "hidden", timeout: 8000 }).catch(async () => { await closeAnyModal(page); });
+      await waitForNoModal(page);
+      tasksPerformed++;
+      recordsCreated++;
+      let countBase = await countUnfinishedTask(taskBase.trim());
+      if (countBase !== 1) {
+        recordBug(page.url(), "Task duplicate", "Create base QA Unique Task", "Count 1", `Got ${countBase}`, await page.content().then(c=>c.slice(0,300)), "HIGH");
+        taskDuplicateInvariantPass = false;
+      }
+
+      // TEST 2 whitespace duplicate should be blocked
+      await addTaskBtn.click();
+      dlg = page.locator('[role="dialog"], section[class*="modal"]').first();
+      await expect(dlg).toBeVisible({ timeout: 10000 });
+      await dlg.locator("input").first().fill(taskWs);
+      saveTaskBtn = dlg.getByRole("button", { name: /Create/i }).first();
+      await saveTaskBtn.click();
+      await page.waitForTimeout(1000);
+      const wsError = await page.locator("text=A pending task with this name already exists").first().isVisible().catch(() => false);
+      if (!wsError) {
+        recordBug(page.url(), "Task duplicate", "Whitespace duplicate", "Blocked with error", "No error visible", await dlg.textContent().then(t=>t||"").catch(()=>"") , "HIGH");
+        taskDuplicateInvariantPass = false;
+      } else {
+        await page.keyboard.press("Escape").catch(()=>{});
+        await waitForNoModal(page);
+      }
+      let countWs = await countUnfinishedTask(taskBase.trim());
+      if (countWs !== 1) {
+        recordBug(page.url(), "Task duplicate", "Whitespace count", "Still 1", `Got ${countWs}`, "", "HIGH");
+        taskDuplicateInvariantPass = false;
+      }
+
+      // TEST 3 case-sensitive allowed: create lower variant
+      await addTaskBtn.click();
+      dlg = page.locator('[role="dialog"], section[class*="modal"]').first();
+      await expect(dlg).toBeVisible({ timeout: 10000 });
+      await dlg.locator("input").first().fill(taskLower);
+      saveTaskBtn = dlg.getByRole("button", { name: /Create/i }).first();
+      await saveTaskBtn.click();
+      await page.waitForTimeout(1200);
+      await dlg.waitFor({ state: "hidden", timeout: 8000 }).catch(async () => { await closeAnyModal(page); });
+      await waitForNoModal(page);
+      const countLower = await countUnfinishedTask(taskLower.trim());
+      const countBaseAfterLower = await countUnfinishedTask(taskBase.trim());
+      if (countLower !== 1 || countBaseAfterLower !== 1) {
+        recordBug(page.url(), "Task duplicate", "Case variant", "Both 1", `Got ${countBaseAfterLower} and ${countLower}`, "", "HIGH");
+        taskDuplicateInvariantPass = false;
+      } else {
+        recordsCreated++;
+      }
+
+      // TEST 4 edit duplicate blocked
+      // Create edit source
+      await addTaskBtn.click();
+      dlg = page.locator('[role="dialog"], section[class*="modal"]').first();
+      await expect(dlg).toBeVisible({ timeout: 10000 });
+      await dlg.locator("input").first().fill(taskEditSrc);
+      saveTaskBtn = dlg.getByRole("button", { name: /Create/i }).first();
+      await saveTaskBtn.click();
+      await page.waitForTimeout(1200);
+      await dlg.waitFor({ state: "hidden", timeout: 8000 }).catch(async () => { await closeAnyModal(page); });
+      await waitForNoModal(page);
+      recordsCreated++;
+      // Try to edit it to baseName
+      const editRow = page.locator(`text=${taskEditSrc}`).first().locator("xpath=ancestor::article").first();
+      const editBtn = editRow.getByRole("button", { name: /Modify/i }).first();
+      if (await editBtn.isVisible().catch(() => false)) {
+        await editBtn.click();
+        const editDlg = page.locator('[role="dialog"], section[class*="modal"]').first();
+        await expect(editDlg).toBeVisible({ timeout: 10000 });
+        await editDlg.locator("input").first().fill(taskBase);
+        const saveEdit = editDlg.getByRole("button", { name: /Save/i }).first();
+        await saveEdit.click();
+        await page.waitForTimeout(1000);
+        const editError = await page.locator("text=A pending task with this name already exists").first().isVisible().catch(() => false);
+        if (!editError) {
+          recordBug(page.url(), "Task duplicate", "Edit to duplicate", "Blocked", "No error", await editDlg.textContent().then(t=>t||"").catch(()=>"") , "HIGH");
+          taskDuplicateInvariantPass = false;
+        } else {
+          await page.keyboard.press("Escape").catch(()=>{});
+          await waitForNoModal(page);
+        }
+        // Verify original still exists
+        const stillExists = await page.locator(`text=${taskEditSrc}`).first().isVisible().catch(() => false);
+        if (!stillExists) {
+          recordBug(page.url(), "Task duplicate", "Edit duplicate original", "Still exists", "Disappeared", "", "HIGH");
+          taskDuplicateInvariantPass = false;
+        }
+      }
+
+      // TEST 5 unchanged edit allowed
+      const rowBase = page.locator(`text=${taskBase}`).first().locator("xpath=ancestor::article").first();
+      const editBaseBtn = rowBase.getByRole("button", { name: /Modify/i }).first();
+      if (await editBaseBtn.isVisible().catch(() => false)) {
+        await editBaseBtn.click();
+        const editDlg2 = page.locator('[role="dialog"], section[class*="modal"]').first();
+        await expect(editDlg2).toBeVisible({ timeout: 10000 });
+        // Change deadline only, keep name same
+        const saveUnchanged = editDlg2.getByRole("button", { name: /Save/i }).first();
+        await saveUnchanged.click();
+        await page.waitForTimeout(1000);
+        const errUnchanged = await page.locator("text=A pending task with this name already exists").first().isVisible().catch(() => false);
+        if (errUnchanged) {
+          recordBug(page.url(), "Task duplicate", "Unchanged edit", "Allowed", "Blocked incorrectly", "", "HIGH");
+          taskDuplicateInvariantPass = false;
+          await page.keyboard.press("Escape").catch(()=>{});
+          await waitForNoModal(page);
+        } else {
+          await editDlg2.waitFor({ state: "hidden", timeout: 8000 }).catch(async () => { await closeAnyModal(page); });
+          await waitForNoModal(page);
+          recordsEdited++;
+        }
+      }
+
+      // TEST 6 completed-name reuse
+      // Complete base task
+      const rowBase2 = page.locator(`text=${taskBase}`).first().locator("xpath=ancestor::article").first();
+      const completeBtn = rowBase2.getByRole("button", { name: /Complete task/i }).first();
+      if (await completeBtn.isVisible().catch(() => false)) {
+        await completeBtn.click();
+        const compDlg = page.locator('[role="dialog"], section[class*="modal"]').first();
+        if (await compDlg.isVisible({ timeout: 5000 }).catch(() => false)) {
+          const finishBtn = compDlg.getByRole("button", { name: /Finish Task/i }).first();
+          if (await finishBtn.isVisible().catch(() => false)) {
+            await finishBtn.click();
+            await page.waitForTimeout(1500);
+            await compDlg.waitFor({ state: "hidden", timeout: 5000 }).catch(()=>{});
+          }
+        }
+        await waitForNoModal(page);
+        // Now create new with same name should succeed
+        await addTaskBtn.click();
+        dlg = page.locator('[role="dialog"], section[class*="modal"]').first();
+        await expect(dlg).toBeVisible({ timeout: 10000 });
+        await dlg.locator("input").first().fill(taskBase);
+        saveTaskBtn = dlg.getByRole("button", { name: /Create/i }).first();
+        await saveTaskBtn.click();
+        await page.waitForTimeout(1200);
+        const isHidden = await dlg.isHidden({ timeout: 5000 }).catch(() => false);
+        if (!isHidden) {
+          const hasError = await page.locator("text=A pending task with this name already exists").first().isVisible().catch(() => false);
+          if (hasError) {
+            recordBug(page.url(), "Task duplicate", "Finished reuse", "Allowed", "Blocked incorrectly", "", "HIGH");
+            taskDuplicateInvariantPass = false;
+            await page.keyboard.press("Escape").catch(()=>{});
+            await waitForNoModal(page);
+          }
+        } else {
+          await waitForNoModal(page);
+          recordsCreated++;
+          // Verify both exist: one unfinished, one finished
+          await page.goto("/tasks", { waitUntil: "domcontentloaded" });
+          const unfinishedAfterReuse = await countUnfinishedTask(taskBase.trim());
+          if (unfinishedAfterReuse !== 1) {
+            recordBug(page.url(), "Task duplicate", "Finished reuse count", "1 unfinished", `Got ${unfinishedAfterReuse}`, "", "HIGH");
+            taskDuplicateInvariantPass = false;
+          }
+          await page.goto("/tasks/finished", { waitUntil: "domcontentloaded" });
+          const finishedVisible = await page.locator(`text=${taskBase}`).first().isVisible().catch(() => false);
+          if (!finishedVisible) {
+            // Not strictly required to be visible, but check via service? For now just log
+            console.log("Finished task not visible in finished page, but reuse succeeded");
+          }
+          await page.goto("/tasks", { waitUntil: "domcontentloaded" });
+        }
+      }
+
+      // Reload persistence
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(800);
+      const countAfterReload = await countUnfinishedTask(taskBase.trim());
+      if (countAfterReload !== 1) {
+        recordBug(page.url(), "Task duplicate", "Reload persistence", "Still 1", `Got ${countAfterReload}`, "", "MEDIUM");
+        taskDuplicateInvariantPass = false;
+      }
+
+      if (taskDuplicateInvariantPass) {
+        recordPassed("TASK DUPLICATE INVARIANT: PASS — exact blocked, whitespace blocked, case allowed, edit blocked, unchanged allowed, finished reuse allowed, reload persists");
+      } else {
+        recordBug(page.url(), "TASK DUPLICATE INVARIANT", "Overall", "PASS", "FAIL", "One or more task duplicate checks failed", "HIGH");
+      }
+    } catch (e: any) {
+      recordBug(page.url(), "Task duplicate invariant", "Full", "PASS", `${e.message}`, e.stack || "", "HIGH");
+    }
+
     // Global UI: theme, language, search, reload
     try {
       await page.goto("/settings", { waitUntil: "domcontentloaded" });

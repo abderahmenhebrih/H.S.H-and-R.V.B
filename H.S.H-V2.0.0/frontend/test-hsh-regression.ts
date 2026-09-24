@@ -114,6 +114,42 @@ async function main() {
     ok("4 Office autosave flush (content + title)");
   } catch (e) { fail("4 autosave", e); }
 
+  // 4b Office partial update fix (BUG1) — content/linkedEntities without title must PASS, blank title must REJECT
+  try {
+    await resetDb();
+    const origTitle = "QA Office Document";
+    const f = await officeFileService.create({ type: "document", title: origTitle, content: getBlankDocumentContent() } as any);
+    const newContent = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Inserted HEBRIH" }]}] };
+    await officeFileService.update(f.id, { content: newContent as any });
+    const afterContent = await officeFileService.getById(f.id);
+    assert(afterContent?.title === origTitle, "partial content update must preserve title");
+    assert(JSON.stringify(afterContent?.content) === JSON.stringify(newContent), "content should update");
+    const linked: any = [{ entityType: "customer", entityId: "cust-1", labelSnapshot: "Cust" }];
+    await officeFileService.update(f.id, { linkedEntities: linked });
+    const afterLinked = await officeFileService.getById(f.id);
+    assert(afterLinked?.title === origTitle, "linkedEntities update must preserve title");
+    assert(afterLinked?.linkedEntities?.length === 1, "linkedEntities should be 1");
+    let threw = false;
+    try { await officeFileService.update(f.id, { title: "" } as any); } catch (e:any) { threw = true; assert(e.message.includes("Title required"), "blank title should be Title required"); }
+    assert(threw, "blank title should throw");
+    threw = false;
+    try { await officeFileService.update(f.id, { title: "   " } as any); } catch (e:any) { threw = true; assert(e.message.includes("Title required"), "whitespace should be Title required"); }
+    assert(threw, "whitespace title should throw");
+    threw = false;
+    try { await officeFileService.update(f.id, { title: "a".repeat(201) } as any); } catch (e:any) { threw = true; assert(e.message.includes("Title too long"), "too long"); }
+    assert(threw, ">200 should throw");
+    // oversized content
+    const big = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "x".repeat(6*1024*1024) }]}] };
+    threw = false;
+    try { await officeFileService.update(f.id, { content: big as any }); } catch (e:any) { threw = true; assert(e.message.includes("Content too large"), "oversized"); }
+    assert(threw, "oversized should throw");
+    // invalid type
+    threw = false;
+    try { await officeFileService.update(f.id, { type: "invalid" as any }); } catch (e:any) { threw = true; assert(e.message.includes("Invalid type"), "invalid type"); }
+    assert(threw, "invalid type should throw");
+    ok("4b Office partial update (content without title, linkedEntities, blank title rejection)");
+  } catch (e) { fail("4b Office partial update", e); }
+
   // 5 fallback complex workbook protection — ensure nested Univer snapshot not silently overwritten by flat fallback empty
   try {
     await resetDb();

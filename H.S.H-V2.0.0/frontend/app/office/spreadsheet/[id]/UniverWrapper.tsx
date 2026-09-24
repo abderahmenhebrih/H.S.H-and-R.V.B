@@ -385,6 +385,58 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
     async function mount() {
       const host = containerRef.current;
       if (!host) return;
+      // Guard: never initialize Univer with non-positive container dimensions
+      // This prevents "The column width is less than 0" from docs layout engine (pageWidth <= margins)
+      // Wait until host has valid positive finite width/height before creating Univer instance.
+      const MIN_WIDTH = 80;
+      const MIN_HEIGHT = 120;
+      const isValidSize = () => {
+        if (!host.isConnected) return false;
+        const rect = host.getBoundingClientRect();
+        const w = rect.width;
+        const h = rect.height;
+        if (!Number.isFinite(w) || !Number.isFinite(h)) return false;
+        if (w <= 0 || h <= 0) return false;
+        if (w < MIN_WIDTH || h < MIN_HEIGHT) return false;
+        const cs = window.getComputedStyle(host);
+        if (cs.display === "none" || cs.visibility === "hidden") return false;
+        return true;
+      };
+      if (!isValidSize()) {
+        await new Promise<void>((resolve) => {
+          let done = false;
+          let ro: ResizeObserver | null = null;
+          let timer: any = null;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            try { ro?.disconnect(); } catch {}
+            if (timer) clearTimeout(timer);
+            resolve();
+          };
+          ro = new ResizeObserver(() => {
+            if (isValidSize()) finish();
+          });
+          try { ro.observe(host); } catch { finish(); return; }
+          // Also observe documentElement for viewport resize that may affect host
+          try { ro.observe(document.documentElement); } catch {}
+          timer = setTimeout(() => finish(), 4000);
+          if (isValidSize()) finish();
+        });
+        if (cancelled) return;
+        if (!isValidSize()) {
+          const rect = host.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0 || !Number.isFinite(rect.width) || !Number.isFinite(rect.height)) {
+            console.warn("[UniverWrapper] container size still non-positive after wait, aborting Univer init to avoid negative column width", rect);
+            return;
+          }
+          // If size is finite but still below minimum, still abort to avoid negative column calculation
+          if (rect.width < MIN_WIDTH || rect.height < MIN_HEIGHT) {
+            console.warn("[UniverWrapper] container below minimum, aborting init", rect);
+            return;
+          }
+        }
+      }
       // Clear host
       host.innerHTML = "";
       const container = document.createElement("div");
@@ -394,6 +446,46 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
       hostRef.current = container;
 
       try {
+        // Patch Univer sheets-ui formula editor to prevent negative column width error
+        // Root cause: EditorDataSyncController._checkAndSetRenderStyleConfig sets pageSize.width to position.width
+        // even when position.width is 0 (hidden/focus/layout zero), causing DocumentSkeleton column.width <=0
+        // Fix: guard against non-positive width and keep Infinity fallback until valid measurement
+        try {
+          const sheetsUi: any = await import("@univerjs/sheets-ui");
+          for (const k of Object.keys(sheetsUi)) {
+            const Cls = sheetsUi[k];
+            if (Cls && Cls.prototype && typeof Cls.prototype._checkAndSetRenderStyleConfig === "function") {
+              const orig = Cls.prototype._checkAndSetRenderStyleConfig;
+              Cls.prototype._checkAndSetRenderStyleConfig = function(doc: any) {
+                try {
+                  const pos = this._formulaEditorManagerService?.getPosition?.();
+                  if (pos && (pos.width <= 0 || !Number.isFinite(pos.width) || pos.height <= 0 || !Number.isFinite(pos.height))) {
+                    return;
+                  }
+                } catch {}
+                return orig.call(this, doc);
+              };
+            }
+            if (Cls && Cls.prototype && typeof Cls.prototype.getPosition === "function" && typeof Cls.prototype.setPosition === "function") {
+              const origGet = Cls.prototype.getPosition;
+              const origSet = Cls.prototype.setPosition;
+              Cls.prototype.getPosition = function() {
+                const pos = origGet.call(this);
+                if (pos && (pos.width <= 0 || !Number.isFinite(pos.width) || pos.height <= 0)) return null;
+                return pos;
+              };
+              Cls.prototype.setPosition = function(p: any) {
+                if (p && (p.width <= 0 || !Number.isFinite(p.width) || p.height <= 0 || !Number.isFinite(p.height))) {
+                  return;
+                }
+                return origSet.call(this, p);
+              };
+            }
+          }
+        } catch (e) {
+          // patch optional, continue
+        }
+
         // Dynamically import Univer presets (avoid bundling if fails)
         const { createUniver, LocaleType, mergeLocales } = await import("@univerjs/presets");
         const { UniverSheetsCorePreset } = await import("@univerjs/preset-sheets-core");

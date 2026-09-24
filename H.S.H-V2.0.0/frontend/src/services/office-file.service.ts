@@ -67,19 +67,17 @@ export class OfficeFileService extends BaseService {
 
   async update(id: string, updates: Partial<OfficeFile>): Promise<void> {
     this.assertValidId(id, "OfficeFile");
-    if (updates.title !== undefined && (!updates.title || !updates.title.trim())) throw new Error("Title required");
-    if (updates.content !== undefined) {
-      const size = JSON.stringify(updates.content).length;
-      if (size > MAX_CONTENT_SIZE) throw new Error("Content too large");
-    }
-    if (updates.linkedEntities) validateOfficeFile({ linkedEntities: updates.linkedEntities } as any);
+    const existing = await officeFileRepository.getById(id);
+    if (!existing) throw new Error("File not found");
+    // Merge patch with existing to validate complete resulting file invariants
+    const next = { ...existing, ...updates } as OfficeFile;
+    validateOfficeFile(next as any);
     const toSave: any = { ...updates };
-    if (toSave.title) toSave.title = toSave.title.trim();
+    if (toSave.title !== undefined) toSave.title = toSave.title.trim();
     if (toSave.description !== undefined) toSave.description = toSave.description?.trim();
     // bump contentVersion if content changed
     if (updates.content !== undefined) {
-      const existing = await officeFileRepository.getById(id);
-      toSave.contentVersion = (existing?.contentVersion ?? 0) + 1;
+      toSave.contentVersion = (existing.contentVersion ?? 0) + 1;
     }
     await officeFileRepository.update(id, { ...toSave, updatedAt: Date.now(), syncStatus: "pending" });
   }

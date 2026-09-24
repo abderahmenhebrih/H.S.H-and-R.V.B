@@ -47,6 +47,12 @@ next-env.d.ts
 *~
 Thumbs.db
 
+# qa results — autonomous real-browser runs
+qa-results/
+test-results/
+playwright-report/
+playwright/.cache/
+
 # backups — HEBRIH manual backups must not ship
 *.before-*
 *.before_*

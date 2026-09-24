@@ -96,9 +96,6 @@ export default function DocumentEditorPage() {
     void load();
   }, [id, router]);
 
-  // Initial content for editor: if file.content is Tiptap JSON, use it, else blank
-  const initialContent = file?.content && typeof file.content==="object" && (file.content as any).type==="doc" ? file.content : { type:"doc", content:[{ type:"paragraph", content:[] }] };
-
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -112,9 +109,10 @@ export default function DocumentEditorPage() {
       TextStyle, Color,
       Placeholder.configure({ placeholder: language==="fr"?"Commencez à écrire...": language==="ar"?"ابدأ الكتابة...":"Start typing..." }),
     ],
-    content: initialContent,
+    content: { type:"doc", content:[{ type:"paragraph", content:[] }] },
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
+      if (!editor || (editor as any).isDestroyed) return;
       const json = editor.getJSON();
       pendingContentRef.current = json;
       // debounce save 800ms
@@ -129,17 +127,20 @@ export default function DocumentEditorPage() {
         } catch(e){ console.error(e); setStatus("offline"); }
       }, 800);
     },
-  }, [file?.id]); // recreate when file loads (but tiptap will handle)
+  });
 
-  // Keep editor content in sync when file loads initially
+  // Keep editor content in sync when file loads/changes - guards against null/destroyed editor (fixes crash: Cannot read properties of null reading 'commands')
   useEffect(() => {
-    if (editor && file && (file.content as any)?.type==="doc") {
+    if (!editor || (editor as any).isDestroyed || !file || (file.content as any)?.type!=="doc") return;
+    try {
       const current = editor.getJSON();
       const incoming = file.content as any;
-      // Simple check: if different, setContent (avoid loop by comparing stringified)
       if (JSON.stringify(current) !== JSON.stringify(incoming)) {
         editor.commands.setContent(incoming);
       }
+    } catch (e) {
+      // editor may be in transition/destroyed - ignore
+      console.warn("[document] setContent guard", e);
     }
   }, [file, editor]);
 

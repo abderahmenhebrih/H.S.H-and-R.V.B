@@ -15,7 +15,7 @@ export class PurchaseOperation {
       typeof purchaseService.create
     >[0]["calculation"];
   }) {
-    return runDatabaseTransaction(async () => {
+    const purchase = await runDatabaseTransaction(async () => {
       const supplier = await db.suppliers.get(input.supplierId);
 
       if (!supplier) {
@@ -90,14 +90,19 @@ export class PurchaseOperation {
         balance: roundMoney(supplier.balance + canonicalTotal),
       } as any, { queueSync: false } as any);
 
-      try {
-        const { notifySalePurchase } = await import("../notification-engine");
-        const settings: any = await (await import("../settings.service")).settingsService.get();
-        await notifySalePurchase({ id: purchase.id, type: "purchase", total: input.total, currency: settings?.currency ?? "DA" });
-      } catch {}
-
       return purchase;
-    });
+    }) as any;
+
+    // Post-commit notification — outside Dexie transaction to avoid "Transaction committed too early"
+    try {
+      const { notifySalePurchase } = await import("../notification-engine");
+      const settings: any = await (await import("../settings.service")).settingsService.get();
+      await notifySalePurchase({ id: (purchase as any).id, type: "purchase", total: (purchase as any).total, currency: settings?.currency ?? "DA" });
+    } catch {
+      // Notification failure must not affect committed purchase
+    }
+
+    return purchase;
   }
 }
 

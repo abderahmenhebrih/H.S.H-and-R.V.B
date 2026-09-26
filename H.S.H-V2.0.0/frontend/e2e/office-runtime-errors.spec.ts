@@ -28,160 +28,61 @@ test.describe("Office Runtime Errors — H.S.H MY OFFICE TWO-ERROR FIX", () => {
     return { consoleErrors, pageErrors, responseErrors };
   }
 
+  async function ensureRetailCustomerType(page) {
+    await page.goto("/settings?section=master-data", { waitUntil: "domcontentloaded" });
+    const customerTypes = page.getByText("Customer Types", { exact: true }).first();
+    await expect(customerTypes).toBeVisible({ timeout: 15000 });
+    await customerTypes.click();
+
+    const retail = page.getByText("Retail", { exact: true }).first();
+    if (!(await retail.isVisible())) {
+      const addInput = page.getByPlaceholder("Add customer type", { exact: true }).first();
+      await expect(addInput).toBeVisible({ timeout: 10000 });
+      await addInput.fill("Retail");
+      const addButton = addInput.locator("xpath=..").getByRole("button", { name: "Add", exact: true });
+      await expect(addButton).toBeEnabled();
+      await addButton.click();
+      await expect(retail).toBeVisible({ timeout: 10000 });
+    }
+
+    // Reopen the settings UI after reload to verify the visible change persisted.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const customerTypesAfterReload = page.getByText("Customer Types", { exact: true }).first();
+    await expect(customerTypesAfterReload).toBeVisible({ timeout: 15000 });
+    await customerTypesAfterReload.click();
+    await expect(page.getByText("Retail", { exact: true }).first()).toBeVisible({ timeout: 10000 });
+  }
+
   async function ensureBusinessEntities(page) {
     const unique = Date.now().toString(36).slice(-4);
-    // Ensure settings has at least Retail customer type so the Customer creation dropdown has options
-    try {
-      await page.goto("/", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(800);
-      await page.evaluate(async () => {
-        const dbName = "HebrihSlaughterHouse";
-        const now = Date.now();
-        await new Promise((resolve, reject) => {
-          const openReq = indexedDB.open(dbName);
-          openReq.onsuccess = () => {
-            const db = openReq.result;
-            try {
-              const tx = db.transaction(["settings"], "readwrite");
-              const store = tx.objectStore("settings");
-              const getReq = store.get("settings");
-              getReq.onsuccess = () => {
-                const existing = getReq.result;
-                const base = existing || { id: "settings", language: "en", currency: "DA", createdAt: now, updatedAt: now, syncStatus: "pending" };
-                const updated = {
-                  ...base,
-                  id: "settings",
-                  customerTypes: Array.isArray(base.customerTypes) && base.customerTypes.length > 0 ? base.customerTypes : ["Retail", "Wholesale", "Internal"],
-                  updatedAt: now,
-                };
-                store.put(updated);
-              };
-              tx.oncomplete = () => resolve(null);
-              tx.onerror = () => reject(tx.error);
-            } catch (e) { reject(e); }
-          };
-          openReq.onerror = () => reject(openReq.error);
-        });
-      });
-      await page.waitForTimeout(400);
-    } catch {}
-    // Create at least one QA Customer via UI — this is the most reliable way to guarantee HEBRIH dialog sees it
-    let customerCreated = false;
-    try {
-      await page.goto("/customers", { waitUntil: "domcontentloaded" });
-      await expect(page.locator("body")).toContainText(/Customers/i, { timeout: 10000 });
-      const addBtn = page.getByRole("button", { name: /Add Customer/i }).first();
-      await expect(addBtn).toBeVisible({ timeout: 10000 });
-      await addBtn.click();
-      const dlg = page.locator('[role="dialog"], section[class*="modal"]').first();
-      await expect(dlg).toBeVisible({ timeout: 10000 });
-      await dlg.locator("input").first().fill(`QA-CUST-${unique}`);
-      const phone = dlg.locator("input").nth(1);
-      if (await phone.isVisible().catch(()=>false)) await phone.fill("+213 123456");
-      // Select Retail type — robust handling for CustomDropdown
-      const typeTrigger = dlg.locator('button[aria-haspopup="listbox"]').first();
-      if (await typeTrigger.isVisible().catch(()=>false)) {
-        await typeTrigger.click();
-        await page.waitForTimeout(500);
-        const retailOpt = page.locator('[role="option"]:has-text("Retail")').first();
-        let optToClick = retailOpt;
-        if (!(await retailOpt.isVisible({ timeout: 2000 }).catch(()=>false))) {
-          optToClick = page.locator('[role="option"]').first();
-        }
-        if (await optToClick.isVisible({ timeout: 3000 }).catch(()=>false)) {
-          await optToClick.click();
-          await page.waitForTimeout(600);
-        } else {
-          await page.keyboard.press("Escape").catch(()=>{});
-        }
-        await page.waitForTimeout(300);
-      }
-      const saveBtn = dlg.getByRole("button", { name: /Save|Create|Add/i }).first();
-      await expect(saveBtn).toBeEnabled({ timeout: 5000 });
-      await saveBtn.click();
-      // Wait for dialog to close — if validation fails it will stay open
-      const hidden = await dlg.waitFor({ state: "hidden", timeout: 8000 }).then(()=>true).catch(()=>false);
-      if (!hidden) {
-        const errText = await dlg.textContent().catch(()=> "");
-        console.log(`Customer dialog still visible after save, err: ${errText.slice(0,300)}`);
-        // Retry type selection
-        const typeTrigger2 = dlg.locator('button[aria-haspopup="listbox"]').first();
-        if (await typeTrigger2.isVisible().catch(()=>false) && (await typeTrigger2.textContent()).includes("Select")) {
-          await typeTrigger2.click();
-          await page.waitForTimeout(500);
-          const retailOpt2 = page.locator('[role="option"]:has-text("Retail")').first();
-          if (await retailOpt2.isVisible({ timeout: 2000 }).catch(()=>false)) await retailOpt2.click();
-          await page.waitForTimeout(400);
-          const save2 = dlg.getByRole("button", { name: /Save|Create|Add/i }).first();
-          if (await save2.isEnabled().catch(()=>false)) await save2.click();
-          await dlg.waitFor({ state: "hidden", timeout: 5000 }).catch(async () => {
-            await page.keyboard.press("Escape").catch(()=>{});
-          });
-        } else {
-          await page.keyboard.press("Escape").catch(()=>{});
-        }
-        await page.waitForTimeout(500);
-      }
-      await page.waitForTimeout(800);
-      // Verify creation via UI list
-      const createdVisible = await page.locator(`text=QA-CUST-${unique}`).first().isVisible({ timeout: 5000 }).catch(()=>false);
-      if (createdVisible) {
-        console.log(`Seeded QA customer QA-CUST-${unique} via UI`);
-        customerCreated = true;
-      } else {
-        console.log(`UI customer QA-CUST-${unique} not visible after save, will fallback to IndexedDB`);
-      }
-    } catch (e) {
-      console.log(`UI customer creation failed for ${unique}`, e);
-    }
-    if (!customerCreated) {
-      console.log(`Fallback to IndexedDB for QA-CUST-${unique}`);
-      try {
-        await page.evaluate(async (uid) => {
-          const dbName = "HebrihSlaughterHouse";
-          const now = Date.now();
-          const customer = { id: `cust-${uid}-${Math.random().toString(36).slice(2,4)}`, name: `QA-CUST-${uid}`, phone: "+213 123456", type: "Retail", balance: 0, address: "Algiers", createdAt: now, updatedAt: now, syncStatus: "pending" };
-          await new Promise((resolve, reject) => {
-            const openReq = indexedDB.open(dbName);
-            openReq.onsuccess = () => {
-              const db = openReq.result;
-              const tx = db.transaction(["customers"], "readwrite");
-              tx.objectStore("customers").put(customer);
-              tx.oncomplete = () => resolve(null);
-              tx.onerror = () => reject(tx.error);
-            };
-            openReq.onerror = () => reject(openReq.error);
-          });
-        }, unique);
-        await page.waitForTimeout(500);
-      } catch {}
-    }
-    // Also seed supplier/worker/product via IndexedDB for completeness (not required for this HEBRIH test but useful for spreadsheet)
-    try {
-      await page.evaluate(async (uid) => {
-        const dbName = "HebrihSlaughterHouse";
-        const now = Date.now();
-        const makeId = (p) => `${p}-${uid}-${Math.random().toString(36).slice(2,4)}`;
-        const supplier = { id: makeId("sup"), name: `QA-SUP-${uid}`, phone: "+213 999111", balance: 0, createdAt: now, updatedAt: now, syncStatus: "pending" };
-        const product = { id: makeId("prod"), name: `QA-PROD-${uid}`, price: 100, quantity: 10, weightKg: 5, createdAt: now, updatedAt: now, syncStatus: "pending" };
-        const worker = { id: makeId("worker"), name: `QA-WORKER-${uid}`, position: "Butcher", startingSalary: 50000, monthlySalary: 5000, balance: 0, status: "active", phone: "+213 777", employmentDate: now, createdAt: now, updatedAt: now, syncStatus: "pending" };
-        await new Promise((resolve, reject) => {
-          const openReq = indexedDB.open(dbName);
-          openReq.onsuccess = () => {
-            const db = openReq.result;
-            try {
-              const tx = db.transaction(["suppliers","products","workers"], "readwrite");
-              tx.objectStore("suppliers").put(supplier);
-              tx.objectStore("products").put(product);
-              tx.objectStore("workers").put(worker);
-              tx.oncomplete = () => resolve(null);
-              tx.onerror = () => reject(tx.error);
-            } catch (e) { reject(e); }
-          };
-          openReq.onerror = () => reject(openReq.error);
-        });
-      }, unique);
-    } catch {}
+    const customerName = `QA-CUST-${unique}`;
+    await ensureRetailCustomerType(page);
+
+    await page.goto("/customers", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("body")).toContainText(/Customers/i, { timeout: 15000 });
+    const addButton = page.getByRole("button", { name: /Add Customer/i }).first();
+    await expect(addButton).toBeVisible({ timeout: 10000 });
+    await addButton.click();
+
+    const dialog = page.locator('[role="dialog"], section[class*="modal"]').first();
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await dialog.locator("input").first().fill(customerName);
+    await dialog.locator("input").nth(1).fill("+213 123456");
+
+    const typeTrigger = dialog.locator('button[aria-haspopup="listbox"]').first();
+    await expect(typeTrigger).toBeVisible({ timeout: 10000 });
+    await typeTrigger.click();
+    const retailOption = page.getByRole("option", { name: "Retail", exact: true }).first();
+    await expect(retailOption).toBeVisible({ timeout: 10000 });
+    await retailOption.click();
+    await expect(typeTrigger).toContainText("Retail");
+
+    const saveButton = dialog.getByRole("button", { name: /Create Customer|Save|Add/i }).first();
+    await expect(saveButton).toBeEnabled({ timeout: 5000 });
+    await saveButton.click();
+    await expect(dialog).toBeHidden({ timeout: 10000 });
+    await expect(page.getByText(customerName, { exact: true })).toBeVisible({ timeout: 10000 });
+
     return unique;
   }
 
@@ -191,7 +92,6 @@ test.describe("Office Runtime Errors — H.S.H MY OFFICE TWO-ERROR FIX", () => {
 
     // Seed business entities first and capture unique for verification
     const qaUnique = await ensureBusinessEntities(page);
-    const expectedInsertedValue = `QA-CUST-${qaUnique}`;
 
     // 1. Open My Office
     await page.goto("/office", { waitUntil: "domcontentloaded" });

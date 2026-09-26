@@ -212,7 +212,7 @@ f483d0b 028
 | Variable | Present | Syntactically Valid | Value (non-secret) | Old Root Path? | Notes |
 |---|---|---|---|---|---|
 | `PORT` | YES | YES | `5000` | NO | Backend expects frontend `NEXT_PUBLIC_API_URL` `5000`. |
-| `MONGODB_URI` | YES | YES | `<REDACTED>` len 90, starts `mongodb+srv://abderahmen:` | NO | Points to `cluster0.omxs0ia.mongodb.net/hebrih-slaughter-house` — normal development Atlas, **not memory**. |
+| `MONGODB_URI` | YES | YES | `<REDACTED>` len 90, starts `mongodb+srv://<REDACTED>` | NO | Points to `cluster0.omxs0ia.mongodb.net/hebrih-slaughter-house` — normal development Atlas, **not memory**. |
 | `MONGODB_DNS_SERVERS` | YES | YES | `192.168.100.1` | NO | Intended DNS restored after QA (per spec: not left with temporary `8.8.8.8` override). File correctly contains `192.168.100.1` (QA override was runtime `8.8.8.8,1.1.1.1` via `set MONGODB_DNS_SERVERS=... && npx tsx src/server.ts`, not file). **No accidental QA override persisted.** |
 | `CORS_ORIGIN` | YES | YES | `http://localhost:3000,http://localhost:8081` | NO | Covers H.S.H Web (3000) + Expo Web (8081). For mobile `8082` web export tests, runtime is started with `CORS_ORIGIN=...8081,8082` override (file retains `3000,8081`). Correct. |
 | `RVB_JWT_ACCESS_SECRET` | YES | YES | `<REDACTED>` len 130 hex (quoted) | NO | Valid hex, >=32 chars. |
@@ -226,7 +226,7 @@ f483d0b 028
 ### Backend `H.S.H-V2.0.0/backend/.env.example` (present, tracked)
 
 - `PORT=5000` correct.
-- `MONGODB_URI` placeholder `mongodb+srv://<username>:<password>@<cluster>.mongodb.net/hebrih-slaughter-house` correct (not secret).
+- `MONGODB_URI` placeholder `mongodb+srv://<REDACTED>` correct (not secret).
 - `CORS_ORIGIN=http://localhost:3000,http://localhost:8081` correct.
 - `RVB_JWT_*` placeholders `change-this-*` correct length warnings.
 - `SERVER_MODE=full` documented, `TRUST_PROXY=0`.
@@ -688,14 +688,14 @@ app/
 
 | Process | URI Source | Classification | Safe to Run Mutation Tests? |
 |---|---|---|---|
-| `H.S.H-V2.0.0/backend/src/server.ts` via `backend/.env` | `MONGODB_URI=mongodb+srv://abderahmen:abderahmen123@cluster0.omxs0ia.mongodb.net/hebrih-slaughter-house` + `MONGODB_DNS_SERVERS=192.168.100.1` | **normal/development Atlas** (`hebrih-slaughter-house`) — not QA isolated, not local, not memory | **NO** — Do NOT run `test-worker/supplier/customer.ts` or `seed-qa-*`/`reset-qa-*` without explicit isolation (would mutate real business data) |
+| `H.S.H-V2.0.0/backend/src/server.ts` via `backend/.env` | `MONGODB_URI=<REDACTED>
 | `backend/test-rvb-integrity.ts` | `MongoMemoryReplSet.create({replSet:{count:1}})` → `mongod.getUri()` (ephemeral) | **memory** | **YES** — does not touch Atlas; safe to run (but not done in this audit to keep DB untouched). |
 | `R.V.B-mobile/scripts/test-worker/supplier/customer.ts` (via `EXPO_PUBLIC_RVB_API_URL=http://localhost:5000` → `fetch(`${BASE}/api/rvb/...`)`) | Hits `localhost:5000` which proxies to whatever `backend/.env MONGODB_URI` points to → same Atlas as above | **normal/development Atlas** (indirect) | **NO** — same reason |
 | `backend/scripts/seed-qa-*.ts` etc. (via `process.env.MONGODB_URI`) | Same backend `.env` Atlas | **normal/development Atlas** | **NO** |
 
 **Conclusion:** Unless a **QA/test Atlas** (`cluster != hebrih-slaughter-house` or `mongodb://localhost`) or **memory** is explicitly configured, mutation tests are **NOT safe**. The audit correctly performed only `tsc`/`expo-doctor`/`export` static checks, not live DB mutations.
 
-**If mutation tests must be run:** Start backend with `MONGODB_URI=mongodb://localhost:27017/test-qa` or a dedicated test Atlas + `MONGODB_DNS_SERVERS=8.8.8.8,1.1.1.1` (as Phase 2 did for connectivity), then `npx tsx scripts/reset-qa-*` + `test-*` with `150ms` throttle + `61s` retry + `65s` between passes.
+**If mutation tests must be run:** Start backend with `MONGODB_URI=<REDACTED>
 
 ---
 

@@ -347,8 +347,12 @@ export default function SuppliersPage() {
         await supplierService.create(payload);
       }
 
+      // Close form immediately before reload
+      setShowForm(false);
+      setEditingId(null);
+      setForm(EMPTY_FORM);
+      setError("");
       await load();
-      closeForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save supplier.");
     } finally {

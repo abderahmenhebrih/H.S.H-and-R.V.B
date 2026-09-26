@@ -1140,7 +1140,7 @@ function SettingsPageInner() {
                       placeholder={t.addCustomerType}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettings({ ...settings, customerTypes: items })}
+                      onChange={(items) => updateSettingsPartial({ customerTypes: items })}
                     />
                   </SettingNavigationRow>
                   <SettingNavigationRow
@@ -1155,7 +1155,7 @@ function SettingsPageInner() {
                       placeholder={t.addWorkerPosition}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettings({ ...settings, workerPositions: items })}
+                      onChange={(items) => updateSettingsPartial({ workerPositions: items })}
                     />
                   </SettingNavigationRow>
                   <SettingNavigationRow
@@ -1170,7 +1170,7 @@ function SettingsPageInner() {
                       placeholder={t.addVehicleType}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettings({ ...settings, vehicleTypes: items })}
+                      onChange={(items) => updateSettingsPartial({ vehicleTypes: items })}
                     />
                   </SettingNavigationRow>
                   <SettingNavigationRow
@@ -1185,7 +1185,7 @@ function SettingsPageInner() {
                       placeholder={t.addExpenseType}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettings({ ...settings, expenseTypes: items })}
+                      onChange={(items) => updateSettingsPartial({ expenseTypes: items })}
                     />
                   </SettingNavigationRow>
                 </div>

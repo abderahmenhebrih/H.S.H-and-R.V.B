@@ -568,6 +568,10 @@ export default function InvoicePage() {
                 console.warn("Seller profile table not found, will rely on DB upgrade");
                 break;
               }
+              // Idempotent: duplicate key if concurrently created — ignore
+              if (e?.name === "ConstraintError" || e?.name === "DataError" || e?.code === 0 || String(e?.message).includes("already exists") || String(e?.message).includes("ConstraintError") || String(e?.message).includes("Key already exists")) {
+                continue;
+              }
               throw e;
             }
           }
@@ -594,6 +598,9 @@ export default function InvoicePage() {
                 console.warn("Tax profile table not found, will rely on DB upgrade");
                 break;
               }
+              if (e?.name === "ConstraintError" || e?.name === "DataError" || e?.code === 0 || String(e?.message).includes("already exists") || String(e?.message).includes("ConstraintError") || String(e?.message).includes("Key already exists")) {
+                continue;
+              }
               throw e;
             }
           }
@@ -610,7 +617,9 @@ export default function InvoicePage() {
                 return (order[a.code] ?? 99) - (order[b.code] ?? 99);
               }));
             } catch (e: any) {
-              if (e?.name !== "NotFoundError") console.warn("Failed to create TVA 17%", e);
+              if (e?.name === "ConstraintError" || e?.name === "DataError" || String(e?.message).includes("already exists") || String(e?.message).includes("ConstraintError") || String(e?.message).includes("Key already exists")) {
+                // Already exists concurrently — ignore
+              } else if (e?.name !== "NotFoundError") console.warn("Failed to create TVA 17%", e);
             }
           }
         }

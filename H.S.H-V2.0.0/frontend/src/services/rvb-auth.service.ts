@@ -11,6 +11,26 @@ const AUTH_BASE = `${API_BASE}/api/rvb/auth`;
 let memoryAccessToken: string | null = null;
 let pendingRefresh: Promise<{ accessToken: string; account: RvbSafeUser }> | null = null;
 
+const RVB_SESSION_HINT_KEY = "rvb_has_session";
+
+function hasSessionHint(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(RVB_SESSION_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function setSessionHint(): void {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(RVB_SESSION_HINT_KEY, "1");
+  } catch {}
+}
+function clearSessionHint(): void {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.removeItem(RVB_SESSION_HINT_KEY);
+  } catch {}
+}
+
 // Small subscription to allow authFetch to notify context when refresh fails
 type AuthFailureListener = () => void;
 const authFailureListeners = new Set<AuthFailureListener>();
@@ -89,17 +109,31 @@ export const rvbAuthService = {
     const data = await handleResponse<{ success: boolean; accessToken: string; refreshToken?: string; account: RvbSafeUser; mustChangePassword?: boolean }>(res);
     if (data.accessToken) setAccessToken(data.accessToken);
     // Intentionally ignore data.refreshToken — HttpOnly cookie holds it for web
+    // Set non-sensitive hint that a session may exist (for silent refresh gating, not token content)
+    setSessionHint();
     return { accessToken: data.accessToken, account: data.account, mustChangePassword: data.mustChangePassword };
   },
 
   async refresh(): Promise<{ accessToken: string; account: RvbSafeUser }> {
-    // Use deduped refresh
-    return getRefreshPromise();
+    // Gated refresh: do not attempt if no hint that a session may exist (prevents pointless 401 loop)
+    // Hint is non-sensitive local marker, not HttpOnly cookie content.
+    if (!getAccessToken() && !hasSessionHint()) {
+      throw Object.assign(new Error("RVB_NO_SESSION_HINT"), { code: "RVB_NO_SESSION_HINT", status: 401 });
+    }
+    const result = await getRefreshPromise();
+    // Refresh succeeded → ensure hint persists
+    setSessionHint();
+    return result;
   },
 
   // Direct refresh without dedup (used by context init with same dedup)
   async refreshSession(): Promise<{ accessToken: string; account: RvbSafeUser }> {
-    return getRefreshPromise();
+    if (!getAccessToken() && !hasSessionHint()) {
+      throw Object.assign(new Error("RVB_NO_SESSION_HINT"), { code: "RVB_NO_SESSION_HINT", status: 401 });
+    }
+    const result = await getRefreshPromise();
+    setSessionHint();
+    return result;
   },
 
   async logout(): Promise<void> {
@@ -117,6 +151,7 @@ export const rvbAuthService = {
       });
     } catch {}
     clearAccessToken();
+    clearSessionHint();
     pendingRefresh = null;
   },
 
@@ -255,7 +290,12 @@ export const rvbAuthService = {
 
   clearLocal() {
     clearAccessToken();
+    clearSessionHint();
     pendingRefresh = null;
+  },
+
+  hasSessionHint() {
+    return hasSessionHint();
   },
 
   _notifyAuthFailureForTest() {

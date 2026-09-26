@@ -14,9 +14,16 @@ test.describe("Tasks Unique Name Invariant — Real Browser", () => {
     page.on("console", (msg) => { if (msg.type() === "error") console.log("[console]", msg.text()); });
   });
 
+  async function waitForTaskList(page) {
+    const firstTaskRow = page.locator("article").first();
+    const emptyState = page.getByText(/No tasks yet|No tasks found/i).first();
+    await expect(firstTaskRow.or(emptyState)).toBeVisible({ timeout: 10000 });
+  }
+
   async function createTask(page, name: string, expectSuccess = true) {
     await page.goto("/tasks", { waitUntil: "domcontentloaded" });
     await expect(page.locator("body")).toContainText(/Tasks/i, { timeout: 10000 });
+    await waitForTaskList(page);
     const addBtn = page.getByRole("button", { name: /Add Task/i }).first();
     await expect(addBtn).toBeVisible({ timeout: 10000 });
     await addBtn.click();
@@ -27,30 +34,21 @@ test.describe("Tasks Unique Name Invariant — Real Browser", () => {
     // Deadline is second input via StyledDatePicker, but we keep default
     const saveBtn = dialog.getByRole("button", { name: /Create/i }).first();
     await saveBtn.click();
-    await page.waitForTimeout(1000);
-    const errorVisible = await dialog.locator("text=A pending task with this name already exists").first().isVisible().catch(() => false)
-      || await page.locator("text=A pending task with this name already exists").first().isVisible().catch(() => false);
-    const stillVisible = await dialog.isVisible({ timeout: 1000 }).catch(() => false);
+    const duplicateError = dialog.getByText("A pending task with this name already exists", { exact: false }).first();
     if (expectSuccess) {
-      // Should close and show in list
-      await expect(dialog).toBeHidden({ timeout: 5000 }).catch(() => {});
-      await expect(page.locator(`text=${name.trim()}`).first()).toBeVisible({ timeout: 10000 }).catch(async () => {
-        // Try reload
-        await page.reload({ waitUntil: "domcontentloaded" });
-        await expect(page.locator(`text=${name.trim()}`).first()).toBeVisible({ timeout: 10000 });
-      });
-      return { success: true, errorVisible };
-    } else {
-      // Should show error and not create second
-      return { success: !errorVisible ? false : false, errorVisible };
+      await expect(dialog).toBeHidden({ timeout: 10000 });
+      await expect(page.getByText(name.trim(), { exact: true })).toBeVisible({ timeout: 10000 });
+      return { success: true, errorVisible: false };
     }
+    await expect(duplicateError).toBeVisible({ timeout: 10000 });
+    return { success: false, errorVisible: true };
   }
 
   async function countUnfinishedWithName(page, trimmedName: string): Promise<number> {
     await page.goto("/tasks", { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(800);
+    await expect(page.locator("body")).toContainText(/Tasks/i, { timeout: 10000 });
+    await waitForTaskList(page);
     // Get all task rows and filter by exact trimmed case-sensitive name
-    const rows = page.locator('article').filter({ hasText: trimmedName });
     // More precise: get task name cells
     const taskNames = await page.locator('article strong').allTextContents().catch(() => []);
     // Count exact
@@ -100,15 +98,8 @@ test.describe("Tasks Unique Name Invariant — Real Browser", () => {
   });
 
   test("TEST 2 — whitespace duplicate blocked", async ({ page }) => {
-    // baseName already exists from previous test? But each test has fresh browser context + fresh QA DB? No, QA DB is shared across tests in same run (webServer single memory DB)
-    // However each test's browser context has fresh IndexedDB, but backend has previous tasks from previous test's creation (since backend not reset between tests)
-    // We use unique baseName per run, so whitespace variant should be tested against existing baseName
-    // First ensure baseName exists
-    await page.goto("/tasks", { waitUntil: "domcontentloaded" });
-    const exists = await page.locator(`text=${baseName.trim()}`).first().isVisible().catch(() => false);
-    if (!exists) {
-      await createTask(page, baseName, true);
-    }
+    // Playwright gives each test a fresh browser context and IndexedDB, so create the prerequisite here via UI.
+    await createTask(page, baseName, true);
     // Now try whitespace
     const addBtn = page.getByRole("button", { name: /Add Task/i }).first();
     await addBtn.click();
@@ -117,10 +108,10 @@ test.describe("Tasks Unique Name Invariant — Real Browser", () => {
     await dialog.locator("input").first().fill(whitespaceName);
     const saveBtn = dialog.getByRole("button", { name: /Create/i }).first();
     await saveBtn.click();
-    await page.waitForTimeout(1000);
-    const errorVisible = await page.locator("text=A pending task with this name already exists").first().isVisible().catch(() => false);
-    expect(errorVisible, "whitespace duplicate should be blocked").toBeTruthy();
-    await page.keyboard.press("Escape").catch(() => {});
+    const duplicateError = dialog.getByText("A pending task with this name already exists", { exact: false }).first();
+    await expect(duplicateError, "whitespace duplicate should be blocked").toBeVisible({ timeout: 10000 });
+    await dialog.getByRole("button", { name: /Cancel/i }).click();
+    await expect(dialog).toBeHidden({ timeout: 5000 });
     const count = await countUnfinishedWithName(page, baseName.trim());
     expect(count).toBe(1);
     console.log("TEST 2 PASS — whitespace duplicate blocked");

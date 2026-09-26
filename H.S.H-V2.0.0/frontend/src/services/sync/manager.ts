@@ -266,6 +266,16 @@ export async function syncCycle(): Promise<void> {
     console.log(`[sync] offline — deferred`);
     return;
   }
+  // Gate sync on auth hint — H.S.H works local-only without auth, do not make unauthenticated /api/sync requests
+  if (typeof window !== "undefined") {
+    try {
+      const hasHint = typeof localStorage !== "undefined" && localStorage.getItem("rvb_has_session") === "1";
+      if (!hasHint) {
+        setState("idle");
+        return;
+      }
+    } catch {}
+  }
   syncInProgress = true;
   setState("syncing");
   const promise = (async () => {

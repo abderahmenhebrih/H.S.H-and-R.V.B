@@ -12,7 +12,7 @@ export class SaleOperation {
     items: Parameters<typeof saleService.create>[0]["items"];
     total: number;
   }) {
-    return runDatabaseTransaction(async () => {
+    const sale = await runDatabaseTransaction(async () => {
       const customer = await db.customers.get(input.customerId);
 
       if (!customer) {
@@ -97,15 +97,21 @@ export class SaleOperation {
         balance: roundMoney(customer.balance + canonicalTotal),
       } as any, { queueSync: false } as any);
 
-      // Notification for sale (will sync, in-app only by default)
-      try {
-        const { notifySalePurchase } = await import("../notification-engine");
-        const settings: any = await (await import("../settings.service")).settingsService.get();
-        await notifySalePurchase({ id: sale.id, type: "sale", total: input.total, currency: settings?.currency ?? "DA" });
-      } catch {}
-
       return sale;
-    });
+    }) as any;
+
+    // Post-commit notification — must NOT run inside Dexie transaction
+    // to avoid "Transaction committed too early" (Dexie forbids awaiting
+    // non-Dexie async work like dynamic imports inside transaction).
+    try {
+      const { notifySalePurchase } = await import("../notification-engine");
+      const settings: any = await (await import("../settings.service")).settingsService.get();
+      await notifySalePurchase({ id: (sale as any).id, type: "sale", total: (sale as any).total, currency: settings?.currency ?? "DA" });
+    } catch {
+      // Notification failure must not rollback already-committed financial transaction
+    }
+
+    return sale;
   }
 }
 

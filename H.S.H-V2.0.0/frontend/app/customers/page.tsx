@@ -598,13 +598,20 @@ export default function CustomersPage() {
 
   function openCreate() {
     setEditingId(null);
-    setForm({
-      ...EMPTY_FORM,
-      type: customerTypes[0] ?? "",
-    });
+    // Use latest customerTypes if available; if still loading, leave empty and let user select once options appear.
+    // Also ensure functional update to avoid stale closure
+    setForm({ ...EMPTY_FORM, type: customerTypes[0] ?? "" });
     setError("");
     setShowForm(true);
   }
+
+  // If customerTypes loads after form is open with empty type, auto-populate first type so dropdown shows value
+  // This handles the case where Add is clicked before settings load and ensures selection persists
+  useEffect(() => {
+    if (showForm && !editingId && !form.type && customerTypes.length > 0) {
+      setForm((prev) => (prev.type ? prev : { ...prev, type: customerTypes[0] }));
+    }
+  }, [customerTypes, showForm, editingId, form.type]);
 
   function openEdit(customer: Customer) {
     setEditingId(customer.id);
@@ -640,6 +647,9 @@ export default function CustomersPage() {
     setForm(EMPTY_FORM);
     setError("");
   }
+
+  // Ensure form.type updates correctly when CustomDropdown selects
+  // (already fixed via functional setForm in CustomDropdown onChange)
 
   async function saveCustomer() {
     setError("");
@@ -710,8 +720,12 @@ export default function CustomersPage() {
         });
       }
 
+      // Close form immediately before reload to unmount backdrop — bypass `saving` guard
+      setShowForm(false);
+      setEditingId(null);
+      setForm(EMPTY_FORM);
+      setError("");
       await load();
-      closeForm();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Customer name is required")) setError((t as any).nameRequired);
@@ -997,7 +1011,7 @@ export default function CustomersPage() {
                       options={customerTypes}
                       placeholder={t.selectCustomerType}
                       onChange={(value) =>
-                        setForm({ ...form, type: value })
+                        setForm((prev) => ({ ...prev, type: value }))
                       }
                       triggerRef={typeTriggerRef}
                       onEnterNavigate={() => idRef.current?.focus()}

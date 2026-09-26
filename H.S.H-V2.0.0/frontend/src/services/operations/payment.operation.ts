@@ -16,7 +16,7 @@ export class PaymentOperation {
     date: number;
     note?: string;
   }) {
-    return runDatabaseTransaction(async () => {
+    const payment = await runDatabaseTransaction(async () => {
       if (!Number.isFinite(input.amount) || input.amount <= 0) {
         throw new Error("Payment amount must be a finite number greater than zero.");
       }
@@ -143,12 +143,18 @@ export class PaymentOperation {
       }
 
       const payment = await paymentService.create(input);
-      // Notification (local only, will sync)
+      return payment;
+    }) as any;
+
+    // Post-commit notification — outside Dexie transaction to avoid "Transaction committed too early"
+    // (Dexie forbids awaiting dynamic imports / non-Dexie async work inside transaction)
+    try {
+      const { notifyPayment } = await import("../notification-engine");
+      const settings: any = await (await import("../settings.service")).settingsService.get();
+      const currency = settings?.currency ?? "DA";
+      // Fetch entity name outside transaction (normal Dexie read, not in transaction)
+      let entityName: string | undefined;
       try {
-        const { notifyPayment } = await import("../notification-engine");
-        const settings: any = await (await import("../settings.service")).settingsService.get();
-        const currency = settings?.currency ?? "DA";
-        let entityName: string | undefined;
         if (input.entityType === "supplier") {
           const s = await db.suppliers.get(input.entityId);
           entityName = s?.name;
@@ -162,16 +168,18 @@ export class PaymentOperation {
           const e = await db.expenses.get(input.entityId);
           entityName = (e as any)?.name ?? (e as any)?.note;
         }
-        await notifyPayment({
-          paymentId: payment.id,
-          amount: input.amount,
-          currency,
-          entityName,
-          entityType: input.entityType,
-        });
       } catch {}
-      return payment;
-    });
+      await notifyPayment({
+        paymentId: (payment as any).id,
+        amount: input.amount,
+        currency,
+        entityName,
+        entityType: input.entityType,
+      });
+    } catch {
+      // Notification failure must not rollback committed payment
+    }
+    return payment;
   }
 }
 

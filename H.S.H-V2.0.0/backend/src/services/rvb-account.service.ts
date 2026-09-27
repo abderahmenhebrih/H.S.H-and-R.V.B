@@ -88,6 +88,7 @@ async function assertLinkedEntityExists(type: string, id: string) {
   else throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
   const doc = await (model as any).findOne({ id }).lean();
   if (!doc) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+  if (type === "worker" && doc.status !== "active") throw codeError("RVB_LINKED_ENTITY_INACTIVE", 409);
   return doc;
 }
 
@@ -189,6 +190,7 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
     onboardingStatus: input.onboardingStatus === "complete" ? "complete" : "pending",
     profilePicture: input.profilePicture || undefined,
     archivedAt: null,
+    linkedEntityLifecyclePriorStatus: null,
     lastLoginAt: null,
     passwordHash,
     mustChangePassword,
@@ -243,6 +245,7 @@ export async function archiveRvbAccount(id: string) {
   if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
   account.status = "archived";
   account.archivedAt = Date.now();
+  account.linkedEntityLifecyclePriorStatus = null;
   account.updatedAt = Date.now();
   await account.save();
   safeDisconnectAccount(account.id);
@@ -252,8 +255,12 @@ export async function archiveRvbAccount(id: string) {
 export async function reactivateRvbAccount(id: string) {
   const account: any = await RvbAccountModel.findOne({ id });
   if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+  if (account.linkedEntityType && account.linkedEntityId) {
+    await assertLinkedEntityExists(account.linkedEntityType, account.linkedEntityId);
+  }
   account.status = "active";
   account.archivedAt = null;
+  account.linkedEntityLifecyclePriorStatus = null;
   account.updatedAt = Date.now();
   await account.save();
   safeDisconnectAccount(account.id);
@@ -264,6 +271,7 @@ export async function disableRvbAccount(id: string) {
   const account: any = await RvbAccountModel.findOne({ id });
   if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
   account.status = "disabled";
+  account.linkedEntityLifecyclePriorStatus = null;
   account.updatedAt = Date.now();
   await account.save();
   safeDisconnectAccount(account.id);
@@ -299,6 +307,7 @@ export async function linkRvbAccount(accountId: string, entityId: string) {
     entityExists = !!worker;
     entityType = "worker";
     if (!worker) throw codeError("RVB_LINKED_ENTITY_NOT_FOUND", 404);
+    if ((worker as any).status !== "active") throw codeError("RVB_LINKED_ENTITY_INACTIVE", 409);
     const existingLink = await (RvbAccountModel as any).findOne({ linkedEntityType: "worker", linkedEntityId: entityId }).lean();
     if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
   } else if (account.role === "supplier") {
@@ -381,6 +390,7 @@ export async function unlinkRvbAccount(accountId: string) {
   if (!["worker", "supplier", "customer"].includes(entityType)) throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
   account.linkedEntityType = null;
   account.linkedEntityId = null;
+  account.linkedEntityLifecyclePriorStatus = null;
   account.updatedAt = Date.now();
   // Security: orphan portal account must not remain active
   if (previousRole === "worker" || previousRole === "supplier" || previousRole === "customer") {
@@ -428,12 +438,79 @@ export async function unlinkRvbAccount(accountId: string) {
   return account.toObject ? account.toObject() : account;
 }
 
+export type LinkedEntityLifecycleAction = "archive" | "restore" | "delete";
+
+/**
+ * Mirror H.S.H-owned entity lifecycle transitions onto the linked portal account.
+ * The optional Mongo session lets H.S.H sync commit the entity and access state atomically.
+ */
+export async function applyLinkedEntityLifecycleToRvbAccount(
+  type: string,
+  entityId: string,
+  action: LinkedEntityLifecycleAction,
+  session?: any,
+): Promise<string | null> {
+  if (!["worker", "supplier", "customer"].includes(type)) return null;
+  const query: any = (RvbAccountModel as any).findOne({ linkedEntityType: type, linkedEntityId: entityId });
+  if (session) query.session(session);
+  const account: any = await query;
+  if (!account) return null;
+
+  const now = Date.now();
+  let changed = false;
+  let disconnect = false;
+
+  if (action === "archive") {
+    if (account.linkedEntityLifecyclePriorStatus == null) {
+      account.linkedEntityLifecyclePriorStatus = account.status;
+      changed = true;
+    }
+    if (account.status === "active") {
+      account.status = "archived";
+      account.archivedAt = now;
+      disconnect = true;
+      changed = true;
+    }
+  } else if (action === "restore") {
+    if (account.linkedEntityLifecyclePriorStatus === "active" && account.status === "archived") {
+      account.status = "active";
+      account.archivedAt = null;
+      disconnect = true;
+      changed = true;
+    }
+    if (account.linkedEntityLifecyclePriorStatus != null) {
+      account.linkedEntityLifecyclePriorStatus = null;
+      changed = true;
+    }
+  } else {
+    if (account.status !== "disabled") {
+      account.status = "disabled";
+      account.archivedAt = null;
+      disconnect = true;
+      changed = true;
+    }
+    if (account.linkedEntityLifecyclePriorStatus != null) {
+      account.linkedEntityLifecyclePriorStatus = null;
+      changed = true;
+    }
+  }
+
+  if (!changed) return null;
+  account.updatedAt = now;
+  if (session) await account.save({ session });
+  else await account.save();
+
+  if (!session && disconnect) safeDisconnectAccount(account.id);
+  return disconnect ? account.id : null;
+}
+
 // Worker lifecycle: archive/reactivate with state preservation
 export async function archiveByLinkedEntity(type: string, entityId: string) {
   const account: any = await (RvbAccountModel as any).findOne({ linkedEntityType: type, linkedEntityId: entityId });
   if (!account) return null;
   // Only archive if currently active — preserve already disabled/archived intentional state
   if (account.status !== "active") return account;
+  account.linkedEntityLifecyclePriorStatus = "active";
   account.status = "archived";
   account.archivedAt = Date.now();
   account.updatedAt = Date.now();
@@ -482,8 +559,10 @@ export async function reactivateByLinkedEntity(type: string, entityId: string) {
   if (!account) return null;
   // Only reactivate if was archived (not disabled intentionally)
   if (account.status !== "archived") return account;
+  if (account.linkedEntityLifecyclePriorStatus && account.linkedEntityLifecyclePriorStatus !== "active") return account;
   account.status = "active";
   account.archivedAt = null;
+  account.linkedEntityLifecyclePriorStatus = null;
   account.updatedAt = Date.now();
   await account.save();
   safeDisconnectAccount(account.id);

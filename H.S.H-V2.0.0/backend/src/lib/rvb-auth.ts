@@ -60,7 +60,7 @@ export function parseExpiryToMs(ttl: string): number {
 export function toSafeRvbAccount(doc: any): any {
   if (!doc) return null;
   const obj = doc.toObject ? doc.toObject() : doc;
-  const { _id, __v, passwordHash, ...rest } = obj;
+  const { _id, __v, passwordHash, linkedEntityLifecyclePriorStatus, ...rest } = obj;
   // Also remove refresh hashes if somehow present
   const { refreshTokenHash, ...safe } = rest;
   // Ensure passwordHash not leaked

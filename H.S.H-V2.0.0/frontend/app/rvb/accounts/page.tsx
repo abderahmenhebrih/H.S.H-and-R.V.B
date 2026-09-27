@@ -87,7 +87,7 @@ const TR: Record<Language, any> = {
     actions: { archive: "Archive", reactivate: "Reactivate", disable: "Disable", cancel: "Cancel", close: "Close" },
     archiveConfirm: { title: "Archive Account", desc: "This account will be frozen and lose access until reactivated.", warning: "You can reactivate it later. History is preserved." },
     disableConfirm: { title: "Disable Account", desc: "This account will be blocked from access immediately.", warning: "Reactivation is manual. Use carefully." },
-     create: {
+    create: {
       title: "Create RVB Account",
       role: "Role",
       linkedEntity: "Linked Entity",
@@ -106,6 +106,9 @@ const TR: Record<Language, any> = {
       create: "Create Account",
       autoFilled: "Auto-filled from entity",
       noEntities: "No available entities — all are already linked.",
+      loadingEntities: "Loading available entities…",
+      linkableLoadError: "Could not load linkable entities. Check your connection or permissions, then retry.",
+      retry: "Retry",
     },
     validation: {
       tagRequired: "Tag is required",
@@ -124,6 +127,7 @@ const TR: Record<Language, any> = {
       RVB_ROLE_INVALID: "Invalid role",
       RVB_ENTITY_ALREADY_LINKED: "This entity already has an RVB account",
       RVB_ENTITY_ROLE_MISMATCH: "Role and entity type mismatch",
+      RVB_LINKED_ENTITY_INACTIVE: "Restore this H.S.H entity before granting portal access.",
       RVB_LINKED_ENTITY_NOT_FOUND: "Linked entity not found",
       RVB_LINKED_ENTITY_REQUIRED: "Linked entity is required for this role",
       RVB_ACCOUNT_NOT_FOUND: "Account not found",
@@ -163,9 +167,9 @@ const TR: Record<Language, any> = {
     actions: { archive: "Archiver", reactivate: "Réactiver", disable: "Désactiver", cancel: "Annuler", close: "Fermer" },
     archiveConfirm: { title: "Archiver le compte", desc: "Ce compte sera gelé et perdra l’accès jusqu’à réactivation.", warning: "Vous pourrez le réactiver plus tard. L’historique est conservé." },
     disableConfirm: { title: "Désactiver le compte", desc: "Ce compte sera bloqué immédiatement.", warning: "La réactivation est manuelle. Utilisez avec prudence." },
-    create: { title: "Créer un compte RVB", role: "Rôle", linkedEntity: "Entité liée", displayName: "Nom d’affichage", tag: "Tag", tagHint: "3–30 car. : lettres, chiffres, point, underscore. Stocké sans @.", password: "Mot de passe", confirmPassword: "Confirmer", passwordHint: "8–128 caractères, mot de passe temporaire communiqué hors app", show: "Afficher", hide: "Masquer", selectRole: "Sélectionner un rôle", selectEntity: "Sélectionner une entité", creating: "Création...", cancel: "Annuler", create: "Créer le compte", autoFilled: "Rempli automatiquement depuis l’entité", noEntities: "Aucune entité disponible — toutes sont déjà liées." },
+    create: { title: "Créer un compte RVB", role: "Rôle", linkedEntity: "Entité liée", displayName: "Nom d’affichage", tag: "Tag", tagHint: "3–30 car. : lettres, chiffres, point, underscore. Stocké sans @.", password: "Mot de passe", confirmPassword: "Confirmer", passwordHint: "8–128 caractères, mot de passe temporaire communiqué hors app", show: "Afficher", hide: "Masquer", selectRole: "Sélectionner un rôle", selectEntity: "Sélectionner une entité", creating: "Création...", cancel: "Annuler", create: "Créer le compte", autoFilled: "Rempli automatiquement depuis l’entité", noEntities: "Aucune entité disponible — toutes sont déjà liées.", loadingEntities: "Chargement des entités disponibles…", linkableLoadError: "Impossible de charger les entités associables. Vérifiez la connexion ou les autorisations, puis réessayez.", retry: "Réessayer" },
     validation: { tagRequired: "Tag requis", tagInvalid: "Tag invalide (3–30 car., a-z 0-9 . _ , commence par lettre/chiffre)", roleRequired: "Rôle requis", displayNameRequired: "Nom d’affichage requis", linkedRequired: "Entité liée requise pour ce rôle" },
-    errors: { RVB_TAG_REQUIRED: "Tag requis", RVB_TAG_INVALID: "Tag invalide", RVB_TAG_ALREADY_EXISTS: "Tag déjà existant", RVB_TAG_IMMUTABLE: "Tag immuable", RVB_FIELD_NOT_ALLOWED: "Champ non autorisé", RVB_DISPLAY_NAME_REQUIRED: "Nom d’affichage requis", RVB_ROLE_INVALID: "Rôle invalide", RVB_ENTITY_ALREADY_LINKED: "Cette entité a déjà un compte RVB", RVB_ENTITY_ROLE_MISMATCH: "Rôle et type d’entité incompatibles", RVB_LINKED_ENTITY_NOT_FOUND: "Entité liée introuvable", RVB_LINKED_ENTITY_REQUIRED: "Entité liée requise pour ce rôle", RVB_ACCOUNT_NOT_FOUND: "Compte introuvable", RVB_PASSWORD_REQUIRED: "Mot de passe requis", RVB_PASSWORD_TOO_SHORT: "Au moins 8 caractères", RVB_PASSWORD_TOO_LONG: "Au plus 128 caractères", RVB_PASSWORD_CONFIRM_MISMATCH: "Mots de passe différents", RVB_PASSWORD_ALREADY_SET: "Mot de passe déjà défini", RVB_PASSWORD_NOT_SET: "Mot de passe non défini", RVB_UNAUTHENTICATED: "Authentification requise", RVB_FORBIDDEN: "Permissions insuffisantes" },
+    errors: { RVB_TAG_REQUIRED: "Tag requis", RVB_TAG_INVALID: "Tag invalide", RVB_TAG_ALREADY_EXISTS: "Tag déjà existant", RVB_TAG_IMMUTABLE: "Tag immuable", RVB_FIELD_NOT_ALLOWED: "Champ non autorisé", RVB_DISPLAY_NAME_REQUIRED: "Nom d’affichage requis", RVB_ROLE_INVALID: "Rôle invalide", RVB_ENTITY_ALREADY_LINKED: "Cette entité a déjà un compte RVB", RVB_ENTITY_ROLE_MISMATCH: "Rôle et type d’entité incompatibles", RVB_LINKED_ENTITY_INACTIVE: "Restaurez cette entité H.S.H avant de lui donner un accès portail.", RVB_LINKED_ENTITY_NOT_FOUND: "Entité liée introuvable", RVB_LINKED_ENTITY_REQUIRED: "Entité liée requise pour ce rôle", RVB_ACCOUNT_NOT_FOUND: "Compte introuvable", RVB_PASSWORD_REQUIRED: "Mot de passe requis", RVB_PASSWORD_TOO_SHORT: "Au moins 8 caractères", RVB_PASSWORD_TOO_LONG: "Au plus 128 caractères", RVB_PASSWORD_CONFIRM_MISMATCH: "Mots de passe différents", RVB_PASSWORD_ALREADY_SET: "Mot de passe déjà défini", RVB_PASSWORD_NOT_SET: "Mot de passe non défini", RVB_UNAUTHENTICATED: "Authentification requise", RVB_FORBIDDEN: "Permissions insuffisantes" },
     search: "Rechercher des comptes",
     linkedNone: "—",
     setInitial: { title: "Définir le mot de passe initial", desc: "Définir un mot de passe temporaire. L’utilisateur doit le changer à la première connexion.", password: "Nouveau mot de passe", confirm: "Confirmer", hint: "8–128 caractères", cancel: "Annuler", confirmBtn: "Définir", setting: "Définition...", credentialsNotConfigured: "Identifiants non configurés", credentialsConfigured: "Identifiants configurés", mustChange: "Changement requis à la première connexion" },
@@ -193,9 +197,9 @@ const TR: Record<Language, any> = {
     actions: { archive: "أرشفة", reactivate: "إعادة التفعيل", disable: "تعطيل", cancel: "إلغاء", close: "إغلاق" },
     archiveConfirm: { title: "أرشفة الحساب", desc: "سيتم تجميد هذا الحساب وفقدان الوصول حتى إعادة التفعيل.", warning: "يمكنك إعادة تفعيله لاحقاً. السجل محفوظ." },
     disableConfirm: { title: "تعطيل الحساب", desc: "سيتم حظر هذا الحساب فوراً.", warning: "إعادة التفعيل يدوية. استخدم بحذر." },
-    create: { title: "إنشاء حساب RVB", role: "الدور", linkedEntity: "الجهة المرتبطة", displayName: "الاسم المعروض", tag: "المعرّف", tagHint: "3–30 حرف: أحرف، أرقام، نقطة، شرطة سفلية. يُخزّن بدون @.", password: "كلمة المرور", confirmPassword: "تأكيد كلمة المرور", passwordHint: "8–128 حرفاً، كلمة مرور مؤقتة تُتواصل خارج التطبيق", show: "إظهار", hide: "إخفاء", selectRole: "اختر الدور", selectEntity: "اختر الجهة", creating: "جارٍ الإنشاء...", cancel: "إلغاء", create: "إنشاء الحساب", autoFilled: "تعبئة تلقائية من الجهة", noEntities: "لا توجد جهات متاحة — جميعها مرتبطة بالفعل." },
+    create: { title: "إنشاء حساب RVB", role: "الدور", linkedEntity: "الجهة المرتبطة", displayName: "الاسم المعروض", tag: "المعرّف", tagHint: "3–30 حرف: أحرف، أرقام، نقطة، شرطة سفلية. يُخزّن بدون @.", password: "كلمة المرور", confirmPassword: "تأكيد كلمة المرور", passwordHint: "8–128 حرفاً، كلمة مرور مؤقتة تُتواصل خارج التطبيق", show: "إظهار", hide: "إخفاء", selectRole: "اختر الدور", selectEntity: "اختر الجهة", creating: "جارٍ الإنشاء...", cancel: "إلغاء", create: "إنشاء الحساب", autoFilled: "تعبئة تلقائية من الجهة", noEntities: "لا توجد جهات متاحة — جميعها مرتبطة بالفعل.", loadingEntities: "جارٍ تحميل الجهات المتاحة…", linkableLoadError: "تعذر تحميل الجهات القابلة للربط. تحقق من الاتصال أو الصلاحيات ثم أعد المحاولة.", retry: "إعادة المحاولة" },
     validation: { tagRequired: "المعرّف مطلوب", tagInvalid: "المعرّف غير صالح (3–30 حرف، a-z 0-9 . _ يبدأ بحرف/رقم)", roleRequired: "الدور مطلوب", displayNameRequired: "الاسم المعروض مطلوب", linkedRequired: "الجهة المرتبطة مطلوبة لهذا الدور" },
-    errors: { RVB_TAG_REQUIRED: "المعرّف مطلوب", RVB_TAG_INVALID: "المعرّف غير صالح", RVB_TAG_ALREADY_EXISTS: "المعرّف موجود مسبقاً", RVB_TAG_IMMUTABLE: "المعرّف غير قابل للتغيير", RVB_FIELD_NOT_ALLOWED: "حقل غير مسموح", RVB_DISPLAY_NAME_REQUIRED: "الاسم المعروض مطلوب", RVB_ROLE_INVALID: "دور غير صالح", RVB_ENTITY_ALREADY_LINKED: "هذه الجهة لديها حساب RVB بالفعل", RVB_ENTITY_ROLE_MISMATCH: "عدم تطابق الدور ونوع الجهة", RVB_LINKED_ENTITY_NOT_FOUND: "الجهة المرتبطة غير موجودة", RVB_LINKED_ENTITY_REQUIRED: "الجهة المرتبطة مطلوبة لهذا الدور", RVB_ACCOUNT_NOT_FOUND: "الحساب غير موجود", RVB_PASSWORD_REQUIRED: "كلمة المرور مطلوبة", RVB_PASSWORD_TOO_SHORT: "8 أحرف على الأقل", RVB_PASSWORD_TOO_LONG: "128 حرفاً على الأكثر", RVB_PASSWORD_CONFIRM_MISMATCH: "كلمتا المرور غير متطابقتين", RVB_PASSWORD_ALREADY_SET: "كلمة المرور مضبوطة مسبقاً", RVB_PASSWORD_NOT_SET: "كلمة المرور غير مضبوطة", RVB_UNAUTHENTICATED: "يلزم تسجيل الدخول", RVB_FORBIDDEN: "صلاحيات غير كافية" },
+    errors: { RVB_TAG_REQUIRED: "المعرّف مطلوب", RVB_TAG_INVALID: "المعرّف غير صالح", RVB_TAG_ALREADY_EXISTS: "المعرّف موجود مسبقاً", RVB_TAG_IMMUTABLE: "المعرّف غير قابل للتغيير", RVB_FIELD_NOT_ALLOWED: "حقل غير مسموح", RVB_DISPLAY_NAME_REQUIRED: "الاسم المعروض مطلوب", RVB_ROLE_INVALID: "دور غير صالح", RVB_ENTITY_ALREADY_LINKED: "هذه الجهة لديها حساب RVB بالفعل", RVB_ENTITY_ROLE_MISMATCH: "عدم تطابق الدور ونوع الجهة", RVB_LINKED_ENTITY_INACTIVE: "أعد تفعيل كيان H.S.H قبل منحه وصول البوابة.", RVB_LINKED_ENTITY_NOT_FOUND: "الجهة المرتبطة غير موجودة", RVB_LINKED_ENTITY_REQUIRED: "الجهة المرتبطة مطلوبة لهذا الدور", RVB_ACCOUNT_NOT_FOUND: "الحساب غير موجود", RVB_PASSWORD_REQUIRED: "كلمة المرور مطلوبة", RVB_PASSWORD_TOO_SHORT: "8 أحرف على الأقل", RVB_PASSWORD_TOO_LONG: "128 حرفاً على الأكثر", RVB_PASSWORD_CONFIRM_MISMATCH: "كلمتا المرور غير متطابقتين", RVB_PASSWORD_ALREADY_SET: "كلمة المرور مضبوطة مسبقاً", RVB_PASSWORD_NOT_SET: "كلمة المرور غير مضبوطة", RVB_UNAUTHENTICATED: "يلزم تسجيل الدخول", RVB_FORBIDDEN: "صلاحيات غير كافية" },
     search: "ابحث عن الحسابات",
     linkedNone: "—",
     setInitial: { title: "تعيين كلمة المرور الأولية", desc: "تعيين كلمة مرور مؤقتة. يجب على المستخدم تغييرها عند أول تسجيل دخول.", password: "كلمة المرور الجديدة", confirm: "تأكيد", hint: "8–128 حرفاً", cancel: "إلغاء", confirmBtn: "تعيين", setting: "جارٍ التعيين...", credentialsNotConfigured: "بيانات الاعتماد غير مضبوطة", credentialsConfigured: "بيانات الاعتماد مضبوطة", mustChange: "يجب التغيير عند أول دخول" },
@@ -256,6 +260,9 @@ function RvbAccountsInner() {
 
   // Entities - now fetched via backend linkable endpoint, not Dexie
   const [linkableEntities, setLinkableEntities] = useState<any[]>([]);
+  const [linkableLoading, setLinkableLoading] = useState(false);
+  const [linkableLoadFailed, setLinkableLoadFailed] = useState(false);
+  const [linkableRetryKey, setLinkableRetryKey] = useState(0);
 
   // Details
   const [detailsAccount, setDetailsAccount] = useState<RvbAccount | null>(null);
@@ -352,28 +359,24 @@ function RvbAccountsInner() {
     return { total, active, pending, archived };
   }, [accounts]);
 
-  // Fetch linkable entities from backend when role changes
+  // Fetch linkable entities through the account service so failures are distinguishable from an empty result.
   useEffect(() => {
-    if (!createRole || !["worker","supplier","customer"].includes(createRole)) { setLinkableEntities([]); return; }
+    if (!createRole || !["worker","supplier","customer"].includes(createRole)) {
+      setLinkableEntities([]);
+      setLinkableLoading(false);
+      setLinkableLoadFailed(false);
+      return;
+    }
     let cancelled = false;
-    (async () => {
-      try {
-        const { rvbAuthService } = await import("../../../src/services/rvb-auth.service");
-        const token = rvbAuthService.getAccessToken();
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
-        const res = await fetch(`${API_BASE}/api/rvb/accounts/linkable?type=${encodeURIComponent(createRole)}`, {
-          headers: { ...(token?{Authorization:`Bearer ${token}`}:{}) },
-          credentials: "include",
-          cache: "no-store",
-        });
-        const data = await res.json().catch(()=>({}));
-        if (!cancelled && res.ok && Array.isArray(data.entities)) {
-          setLinkableEntities(data.entities);
-        } else if (!cancelled) setLinkableEntities([]);
-      } catch { if (!cancelled) setLinkableEntities([]); }
-    })();
+    setLinkableEntities([]);
+    setLinkableLoading(true);
+    setLinkableLoadFailed(false);
+    void rvbAccountService.getLinkableEntities(createRole as "worker" | "supplier" | "customer")
+      .then((entities) => { if (!cancelled) setLinkableEntities(entities); })
+      .catch(() => { if (!cancelled) setLinkableLoadFailed(true); })
+      .finally(() => { if (!cancelled) setLinkableLoading(false); });
     return () => { cancelled = true; };
-  }, [createRole]);
+  }, [createRole, linkableRetryKey]);
 
   const entityOptions = useMemo(() => {
     if (!createRole) return [];
@@ -775,8 +778,16 @@ function RvbAccountsInner() {
                     options={entityOptions.length ? entityOptions : [{ value: "", label: t.create.selectEntity }]}
                     placeholder={t.create.selectEntity}
                     ariaLabel={t.create.linkedEntity}
+                    disabled={linkableLoading || linkableLoadFailed}
                   />
-                  {entityOptions.length === 0 && createRole ? <small className={styles.hint}>{t.create.noEntities}</small> : null}
+                  {linkableLoading ? <small className={styles.hint} aria-live="polite">{t.create.loadingEntities}</small> : null}
+                  {linkableLoadFailed ? (
+                    <div className={styles.formError} role="alert" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                      <span>{t.create.linkableLoadError}</span>
+                      <button type="button" className={styles.secondaryButton} onClick={() => setLinkableRetryKey((key) => key + 1)}>{t.create.retry}</button>
+                    </div>
+                  ) : null}
+                  {!linkableLoading && !linkableLoadFailed && entityOptions.length === 0 && createRole ? <small className={styles.hint}>{t.create.noEntities}</small> : null}
                 </div>
               )}
 

@@ -8,6 +8,7 @@ import { RvbActivityModel } from "../models/rvb-activity.model";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { allocateRevision } from "../sync/rvb-sync-helper";
+import { applyLinkedEntityLifecycleToRvbAccount } from "../services/rvb-account.service";
 
 const router = Router();
 
@@ -332,10 +333,12 @@ router.delete("/:id", async (req: RvbAuthRequest, res) => {
 
     const session = await mongoose.startSession();
     let revision: number | null = null;
+    let accountToDisconnect: string | null = null;
     try {
       await session.withTransaction(async () => {
         revision = await allocateRevision(session);
         await SupplierModel.deleteOne({ id }).session(session);
+        accountToDisconnect = await applyLinkedEntityLifecycleToRvbAccount("supplier", id, "delete", session);
         const { SyncChangeModel } = await import("../models/sync-change.model");
         await SyncChangeModel.create(
           [
@@ -355,6 +358,12 @@ router.delete("/:id", async (req: RvbAuthRequest, res) => {
       });
     } finally {
       await session.endSession();
+    }
+    if (accountToDisconnect) {
+      try {
+        const { disconnectRvbAccount } = await import("../lib/chat-socket");
+        disconnectRvbAccount(accountToDisconnect);
+      } catch {}
     }
 
     try {

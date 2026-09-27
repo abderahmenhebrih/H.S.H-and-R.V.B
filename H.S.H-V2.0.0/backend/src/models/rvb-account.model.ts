@@ -23,6 +23,7 @@ const rvbAccountSchema = new Schema(
       default: null,
     },
     linkedEntityId: { type: String, required: false, default: null },
+    linkedEntityLifecyclePriorStatus: { type: String, enum: ["active", "archived", "disabled"], required: false, default: null },
     status: {
       type: String,
       enum: ["active", "archived", "disabled"],

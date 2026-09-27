@@ -16,6 +16,7 @@ import { PaymentModel } from "../models/payment.model";
 import { TransferModel } from "../models/transfer.model";
 import { ExpenseModel } from "../models/expense.model";
 import { TaskModel } from "../models/task.model";
+import { applyLinkedEntityLifecycleToRvbAccount } from "../services/rvb-account.service";
 
 type SyncModel = {
   findOne: (filter: { id: string }) => Promise<any>;
@@ -129,6 +130,13 @@ export const HSH_SYNC_ENTITIES = new Set<string>([
   "incomingInvoice",
   "officeFile",
 ]);
+
+function linkedPortalLifecycleAction(entity: string, before: unknown, after: unknown): "archive" | "restore" | null {
+  if (!HSH_SYNC_ENTITIES.has(entity) || !["worker", "supplier", "customer"].includes(entity)) return null;
+  if (before === "active" && after === "archived") return "archive";
+  if (before === "archived" && after === "active") return "restore";
+  return null;
+}
 
 function isNonEmptyString(v: unknown): boolean {
   return typeof v === "string" && v.trim().length > 0;
@@ -1588,6 +1596,7 @@ export async function processSyncOperation(
   let conflict = false;
   let revision: number | undefined;
   let canonical: any = undefined;
+  const rvbAccountsToDisconnect = new Set<string>();
 
   // Use MongoDB transaction for atomic business + change log + idempotency
   const session = await mongoose.startSession();
@@ -1865,6 +1874,11 @@ export async function processSyncOperation(
           await (model as any).updateOne({ id: operation.entityId }, { $set: toSet }, { session, runValidators: true } as any);
           const updated = await (model as any).findOne({ id: operation.entityId }).session(session as any);
           canonical = updated ?? { ...existingUpsert, ...toSet, id: operation.entityId };
+          const lifecycleAction = linkedPortalLifecycleAction(operation.entity, (existingUpsert as any).status, (canonical as any).status);
+          if (lifecycleAction) {
+            const accountId = await applyLinkedEntityLifecycleToRvbAccount(operation.entity, operation.entityId, lifecycleAction, session);
+            if (accountId) rvbAccountsToDisconnect.add(accountId);
+          }
           await SyncChangeModel.create(
             [
               {
@@ -2130,6 +2144,11 @@ export async function processSyncOperation(
         await (model as any).updateOne({ id: operation.entityId }, { $set: toSet }, { session, runValidators: true } as any);
         const updated = await (model as any).findOne({ id: operation.entityId }).session(session as any);
         canonical = updated ?? { ...existing, ...toSet, id: operation.entityId };
+        const lifecycleAction = linkedPortalLifecycleAction(operation.entity, (existing as any).status, (canonical as any).status);
+        if (lifecycleAction) {
+          const accountId = await applyLinkedEntityLifecycleToRvbAccount(operation.entity, operation.entityId, lifecycleAction, session);
+          if (accountId) rvbAccountsToDisconnect.add(accountId);
+        }
         await SyncChangeModel.create(
           [
             {
@@ -2229,6 +2248,10 @@ export async function processSyncOperation(
           }
         }
         revision = await getNextRevision(session);
+        if (HSH_SYNC_ENTITIES.has(operation.entity) && ["worker", "supplier", "customer"].includes(operation.entity)) {
+          const accountId = await applyLinkedEntityLifecycleToRvbAccount(operation.entity, operation.entityId, "delete", session);
+          if (accountId) rvbAccountsToDisconnect.add(accountId);
+        }
         await (model as any).deleteOne({ id: operation.entityId }, { session });
         await SyncChangeModel.create(
           [
@@ -2277,7 +2300,16 @@ export async function processSyncOperation(
 
       throw new Error("Unsupported sync operation.");
     });
-    if (result) return result;
+    const completedResult = result as SyncOperationResult | null;
+    if (completedResult) {
+      if (completedResult.success && rvbAccountsToDisconnect.size > 0) {
+        try {
+          const { disconnectRvbAccount } = await import("../lib/chat-socket");
+          for (const accountId of rvbAccountsToDisconnect) disconnectRvbAccount(accountId);
+        } catch {}
+      }
+      return completedResult;
+    }
     throw new Error("Transaction did not produce result");
   } catch (error) {
     let errMsg = error instanceof Error ? error.message : "Unknown sync error";

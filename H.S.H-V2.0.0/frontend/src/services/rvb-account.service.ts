@@ -1,6 +1,6 @@
 "use client";
 
-import type { RvbAccount } from "../types/rvb/rvb-account";
+import type { RvbAccount, RvbLinkedEntityType } from "../types/rvb/rvb-account";
 import { rvbAuthService } from "./rvb-auth.service";
 
 const API_BASE =
@@ -39,6 +39,13 @@ export type CreateRvbAccountPayload = {
   confirmPassword?: string;
 };
 
+export type RvbLinkableEntity = {
+  id: string;
+  name: string;
+  phone?: string;
+  type: RvbLinkedEntityType;
+};
+
 export const rvbAccountService = {
   async getAll(): Promise<RvbAccount[]> {
     const res = await fetch(ACCOUNTS_BASE, { method: "GET", cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
@@ -50,6 +57,24 @@ export const rvbAccountService = {
     const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
     return data.account;
+  },
+
+  async getLinkableEntities(type: RvbLinkedEntityType, search = ""): Promise<RvbLinkableEntity[]> {
+    const query = new URLSearchParams({ type });
+    if (search.trim()) query.set("search", search.trim());
+    const res = await fetch(`${ACCOUNTS_BASE}/linkable?${query.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: { ...getAuthHeaders() },
+      credentials: "include",
+    });
+    const data = await handleResponse<{ success: boolean; entities?: RvbLinkableEntity[] }>(res);
+    if (!Array.isArray(data.entities)) {
+      const err: any = new Error("RVB_LINKABLE_RESPONSE_INVALID");
+      err.code = "RVB_LINKABLE_RESPONSE_INVALID";
+      throw err;
+    }
+    return data.entities;
   },
 
   async create(payload: CreateRvbAccountPayload): Promise<RvbAccount> {

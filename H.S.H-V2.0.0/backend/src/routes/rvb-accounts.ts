@@ -30,6 +30,7 @@ function handleError(res: any, err: any) {
     "RVB_DISPLAY_NAME_REQUIRED",
     "RVB_ROLE_INVALID",
     "RVB_ENTITY_ROLE_MISMATCH",
+    "RVB_LINKED_ENTITY_INACTIVE",
     "RVB_LINKED_ENTITY_NOT_FOUND",
     "RVB_LINKED_ENTITY_REQUIRED",
     "RVB_ENTITY_ALREADY_LINKED",
@@ -98,7 +99,7 @@ router.get("/linkable", async (req, res) => {
     const linked = await RvbAccountModel.find({ linkedEntityType: normalizedType, linkedEntityId: { $ne: null } } as any).lean();
     const linkedIds = new Set(linked.map((a: any) => a.linkedEntityId).filter(Boolean));
 
-    const filter: any = {};
+    const filter: any = normalizedType === "worker" ? { status: "active" } : {};
     if (search && typeof search === "string" && search.trim()) {
       const s = search.trim();
       filter.name = { $regex: s, $options: "i" };

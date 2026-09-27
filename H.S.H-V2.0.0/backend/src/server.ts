@@ -86,8 +86,11 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 import { rateLimit, ipKey } from "./middleware/rateLimiter";
 // Unauthenticated: IP-based is correct
-app.use("/api/rvb/auth/login", rateLimit({ windowMs: 60 * 1000, max: 20, key: ipKey, code: "RVB_RATE_LIMIT" }));
-app.use("/api/rvb/auth/refresh", rateLimit({ windowMs: 60 * 1000, max: 60, key: ipKey }));
+// The isolated Chromium QA server signs in each role in one run; keep the production limit unchanged.
+const rvbLoginRateLimit = process.env.QA_ISOLATED === "true" ? 200 : 20;
+const rvbRefreshRateLimit = process.env.QA_ISOLATED === "true" ? 300 : 60;
+app.use("/api/rvb/auth/login", rateLimit({ windowMs: 60 * 1000, max: rvbLoginRateLimit, key: ipKey, code: "RVB_RATE_LIMIT" }));
+app.use("/api/rvb/auth/refresh", rateLimit({ windowMs: 60 * 1000, max: rvbRefreshRateLimit, key: ipKey }));
 // Authenticated routes rate limiters are applied AFTER requireRvbAuth inside their routers
 // to ensure req.rvbUser.accountId is available (per-account, with IP fallback)
 

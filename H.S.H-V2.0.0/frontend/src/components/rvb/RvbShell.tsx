@@ -400,6 +400,10 @@ export default function RvbShell({
     { icon: Search, key: "directory" as any, label: (t.nav as any).search || (t.nav as any).directory, path: "/rvb/directory" },
     { icon: SettingsIcon, key: "settings" as any, label: (t.nav as any).settings, path: "/rvb/settings" },
   ];
+  const supervisorNav: NavItem[] = [
+    ...portalNav,
+    RVB_NAVIGATION.find((item) => item.key === "customers")!,
+  ];
   const visibleNav = (() => {
     if (!user) {
       return RVB_NAVIGATION.filter((item) => {
@@ -408,6 +412,7 @@ export default function RvbShell({
       });
     }
     if (isManager) return RVB_NAVIGATION;
+    if (isSupervisor) return supervisorNav;
     if (isSecondary) return portalNav;
     // fallback: hide accounts for non-manager
     return RVB_NAVIGATION.filter((item) => {

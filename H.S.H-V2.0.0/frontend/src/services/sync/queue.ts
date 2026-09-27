@@ -474,8 +474,9 @@ export async function pruneOldSyncedOperations(keepLast = 100): Promise<void> {
 }
 
 export async function getPendingSyncCount(): Promise<number> {
-  return db.syncOperations.where("synced").equals(0 as any).count().catch(async () => {
-    const all = await db.syncOperations.toArray();
-    return all.filter((o) => !o.synced).length;
-  });
+  // NOTE: do not query the boolean `synced` index with .equals() — booleans are
+  // not valid IndexedDB keys (equals(0) matches nothing, equals(false) throws
+  // DataError). Filter in JS like the other helpers in this file.
+  const all = await db.syncOperations.toArray();
+  return all.filter((o) => !o.synced).length;
 }

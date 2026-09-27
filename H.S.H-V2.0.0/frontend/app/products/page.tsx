@@ -729,7 +729,7 @@ export default function ProductsPage() {
                     <span className={styles.tdQuantity}>{product.quantity}</span>
 
                     <span className={styles.tdWeight}>
-                      {product.weightKg.toFixed(2)}
+                      {(Number(product.weightKg) || 0).toFixed(2)}
                     </span>
 
                     <span className={styles.tdActions}>

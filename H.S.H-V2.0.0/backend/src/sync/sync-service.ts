@@ -1022,10 +1022,20 @@ export function validateHshPayload(
       break;
     }
     case "product": {
+      const nameRaw: any = (payload as any).name;
       const priceRaw: any = (payload as any).price;
       const qtyRaw: any = (payload as any).quantity;
       const weightRaw: any = (payload as any).weightKg ?? (payload as any).weight;
       const balanceRaw: any = (payload as any).balance; // not used but generic
+      // PBS-BUG-025: creating a product requires its client-owned fields up front
+      // so omission is decided here instead of leaking raw Mongoose text later.
+      // Create-only: partial updates and upsert-existing inherit stored values.
+      if (operation === "create") {
+        if (!isNonEmptyString(nameRaw)) return "PRODUCT_NAME_REQUIRED";
+        if (priceRaw === undefined || priceRaw === null) return "PRODUCT_PRICE_REQUIRED";
+        if (qtyRaw === undefined || qtyRaw === null) return "PRODUCT_QUANTITY_REQUIRED";
+        if (weightRaw === undefined || weightRaw === null) return "PRODUCT_WEIGHT_REQUIRED";
+      }
       if (priceRaw !== undefined && priceRaw !== null) {
         const n = toFiniteNumber(priceRaw);
         if (!Number.isFinite(n) || n < 0) return "PRODUCT_PRICE_INVALID";
@@ -1043,7 +1053,19 @@ export function validateHshPayload(
     }
     case "customer":
     case "supplier": {
+      const nameRaw: any = (payload as any).name;
+      const phoneRaw: any = (payload as any).phone;
+      const typeRaw: any = (payload as any).type;
       const balanceRaw: any = (payload as any).balance;
+      // PBS-BUG-025: creating a customer/supplier requires its client-owned
+      // fields up front (same create-only scoping as product: partial updates
+      // and upsert-existing inherit stored values).
+      if (operation === "create") {
+        if (!isNonEmptyString(nameRaw)) return entity === "customer" ? "CUSTOMER_NAME_REQUIRED" : "SUPPLIER_NAME_REQUIRED";
+        if (!isNonEmptyString(phoneRaw)) return entity === "customer" ? "CUSTOMER_PHONE_REQUIRED" : "SUPPLIER_PHONE_REQUIRED";
+        if (entity === "customer" && !isNonEmptyString(typeRaw)) return "CUSTOMER_TYPE_REQUIRED";
+        if (balanceRaw === undefined || balanceRaw === null) return entity === "customer" ? "CUSTOMER_BALANCE_REQUIRED" : "SUPPLIER_BALANCE_REQUIRED";
+      }
       if (balanceRaw !== undefined && balanceRaw !== null) {
         const n = toFiniteNumber(balanceRaw);
         if (!Number.isFinite(n)) return entity === "customer" ? "CUSTOMER_BALANCE_INVALID" : "SUPPLIER_BALANCE_INVALID";
@@ -1051,8 +1073,19 @@ export function validateHshPayload(
       break;
     }
     case "bankAccount": {
+      const typeRaw: any = (payload as any).type;
+      const nameRaw: any = (payload as any).name;
       const initRaw: any = (payload as any).initialBalance;
       const balRaw: any = (payload as any).balance;
+      // PBS-BUG-025: creating a bank account requires its client-owned fields up
+      // front (create-only scoping: partial updates and upsert-existing inherit
+      // stored values).
+      if (operation === "create") {
+        if (!isNonEmptyString(typeRaw)) return "BANK_ACCOUNT_TYPE_REQUIRED";
+        if (!isNonEmptyString(nameRaw)) return "BANK_ACCOUNT_NAME_REQUIRED";
+        if (initRaw === undefined || initRaw === null) return "BANK_ACCOUNT_INITIAL_BALANCE_REQUIRED";
+        if (balRaw === undefined || balRaw === null) return "BANK_ACCOUNT_BALANCE_REQUIRED";
+      }
       if (initRaw !== undefined && initRaw !== null) {
         const n = toFiniteNumber(initRaw);
         if (!Number.isFinite(n)) return "BANK_ACCOUNT_BALANCE_INVALID";
@@ -1064,11 +1097,28 @@ export function validateHshPayload(
       break;
     }
     case "worker": {
+      const nameRaw: any = (payload as any).name;
+      const phoneRaw: any = (payload as any).phone;
+      const positionRaw: any = (payload as any).position;
+      const statusRaw: any = (payload as any).status;
       const startRaw: any = (payload as any).startingSalary;
       const monthlyRaw: any = (payload as any).monthlySalary;
       const balRaw: any = (payload as any).balance;
       const birthRaw: any = (payload as any).birthDate;
       const empRaw: any = (payload as any).employmentDate;
+      // PBS-BUG-025: creating a worker requires its client-owned fields up front
+      // (create-only scoping: partial updates and upsert-existing inherit
+      // stored values).
+      if (operation === "create") {
+        if (!isNonEmptyString(nameRaw)) return "WORKER_NAME_REQUIRED";
+        if (!isNonEmptyString(phoneRaw)) return "WORKER_PHONE_REQUIRED";
+        if (!isNonEmptyString(positionRaw)) return "WORKER_POSITION_REQUIRED";
+        if (!isNonEmptyString(statusRaw)) return "WORKER_STATUS_REQUIRED";
+        if (empRaw === undefined || empRaw === null) return "WORKER_EMPLOYMENT_DATE_REQUIRED";
+        if (startRaw === undefined || startRaw === null) return "WORKER_STARTING_SALARY_REQUIRED";
+        if (monthlyRaw === undefined || monthlyRaw === null) return "WORKER_MONTHLY_SALARY_REQUIRED";
+        if (balRaw === undefined || balRaw === null) return "WORKER_BALANCE_REQUIRED";
+      }
       if (startRaw !== undefined && startRaw !== null) {
         const n = toFiniteNumber(startRaw);
         if (!Number.isFinite(n) || n < 0) return "WORKER_SALARY_INVALID";
@@ -1093,6 +1143,14 @@ export function validateHshPayload(
     }
     case "vehicle": {
       // No numeric business invariants beyond generic finite check; payload mainly strings
+      // PBS-BUG-025: creating a vehicle still requires its client-owned identity
+      // fields up front (create-only scoping: partial updates and
+      // upsert-existing inherit stored values).
+      if (operation === "create") {
+        if (!isNonEmptyString((payload as any).name)) return "VEHICLE_NAME_REQUIRED";
+        if (!isNonEmptyString((payload as any).registrationNumber)) return "VEHICLE_REGISTRATION_REQUIRED";
+        if (!isNonEmptyString((payload as any).type)) return "VEHICLE_TYPE_REQUIRED";
+      }
       break;
     }
     case "incomingInvoice": {
@@ -1995,7 +2053,21 @@ export async function processSyncOperation(
           // rules, deterministically). Upsert-existing is unaffected: it returns
           // through the candidate-merge path above, which inherits the stored
           // entityType.
-          if (operation.entity === "payment") {
+          // PBS-BUG-025: same upsert-missing reasoning for the generic entities
+          // with create-level presence gates (product, customer, supplier,
+          // bankAccount, worker, vehicle). Their branches contain no
+          // create-vs-upsert-dependent checks besides the new presence gates,
+          // so re-running as "create" adds exactly those requirements.
+          // incomingInvoice (026) and all other entities are untouched.
+          if (
+            operation.entity === "payment" ||
+            operation.entity === "product" ||
+            operation.entity === "customer" ||
+            operation.entity === "supplier" ||
+            operation.entity === "bankAccount" ||
+            operation.entity === "worker" ||
+            operation.entity === "vehicle"
+          ) {
             const createErr = validateHshPayload(operation.entity, payload as Record<string, unknown>, "create");
             if (createErr) {
               await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: createErr, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });

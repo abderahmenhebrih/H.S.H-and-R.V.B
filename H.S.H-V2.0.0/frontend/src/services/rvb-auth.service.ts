@@ -136,6 +136,19 @@ export const rvbAuthService = {
     return result;
   },
 
+  // PBS-BUG-029: explicit cookie-probe restore for RVB-surface bootstrap only.
+  // Same shared refresh promise as refresh(); differs ONLY by skipping the
+  // no-hint pre-network refusal. The hint stays an optimization (not proof of
+  // session absence): a valid HttpOnly cookie must be recoverable when entering
+  // RVB even if the hint disappeared. Default refresh() keeps the quiet gate
+  // for callers that must not probe (global HSH mounts). Success re-sets the
+  // hint through the existing path.
+  async restoreSessionFromCookie(): Promise<{ accessToken: string; account: RvbSafeUser }> {
+    const result = await getRefreshPromise();
+    setSessionHint();
+    return result;
+  },
+
   async logout(): Promise<void> {
     const accessToken = getAccessToken();
     try {

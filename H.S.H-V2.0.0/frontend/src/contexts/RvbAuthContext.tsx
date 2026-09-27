@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { rvbAuthService, type RvbSafeUser } from "../services/rvb-auth.service";
 
 type RvbAuthState = {
@@ -20,6 +21,7 @@ const Ctx = createContext<RvbAuthState | null>(null);
 export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<RvbSafeUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
 
   const loadMe = useCallback(async () => {
     // Access token is memory-only: on full refresh it is null — restore via HttpOnly refresh cookie
@@ -34,9 +36,16 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
         // access expired, fall through to refresh
       }
     }
-    // No token or me failed → attempt silent refresh using HttpOnly cookie
+    // No token or me failed → attempt silent refresh using HttpOnly cookie.
+    // PBS-BUG-029: on the RVB surface allow ONE explicit cookie probe even when
+    // the local hint is absent (hint is an optimization, not proof of absence).
+    // Ordinary HSH routes keep the gated refresh() so unauthenticated pages
+    // stay quiet with zero refresh traffic.
+    const onRvbSurface = pathname === "/rvb" || pathname.startsWith("/rvb/");
     try {
-      const refreshed = await rvbAuthService.refresh();
+      const refreshed = onRvbSurface
+        ? await rvbAuthService.restoreSessionFromCookie()
+        : await rvbAuthService.refresh();
       setUser(refreshed.account);
     } catch {
       rvbAuthService.clearLocal();
@@ -44,7 +53,7 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pathname]);
 
   useEffect(() => { void loadMe(); }, [loadMe]);
 

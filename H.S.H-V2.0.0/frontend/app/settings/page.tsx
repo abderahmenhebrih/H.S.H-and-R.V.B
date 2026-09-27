@@ -497,6 +497,16 @@ function SettingsPageInner() {
   const pathname = usePathname();
 
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  // PBS-BUG-017: synchronous mirror of the latest settings for concurrency-safe
+  // partial updates. Written synchronously wherever `settings` state is set and
+  // re-synced after every commit by the mirror effect below, so
+  // `updateSettingsPartial` never needs an impure state updater and never reads
+  // a stale render closure. This ref is never persisted and never dispatches.
+  const settingsRef = useRef<AppSettings>(DEFAULT_SETTINGS);
+  // PBS-BUG-017: serialization chain for settings persistence. Each queued
+  // snapshot is saved strictly in request order, so an older save can never
+  // complete after (and clobber) a newer one.
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
   const [dark, setDark] = useState(() => {
     try {
       if (typeof window !== "undefined") return getSavedTheme() === "dark";
@@ -524,6 +534,14 @@ function SettingsPageInner() {
 
   const t = TRANSLATIONS[settings.language];
 
+  // PBS-BUG-017: backstop mirror sync. Writes the ref only -- never persists,
+  // never dispatches -- so the ref always matches the latest committed state
+  // before any discrete user event handler (which flushes passive effects first)
+  // can call `updateSettingsPartial`.
+  useEffect(() => {
+    settingsRef.current = settings;
+  });
+
   useEffect(() => {
     const readTheme = () => {
       setDark(getSavedTheme() === "dark");
@@ -546,6 +564,7 @@ function SettingsPageInner() {
         expenseTypes: stored.expenseTypes ?? [],
       };
       setSettings(normalized);
+      settingsRef.current = normalized;
       document.documentElement.lang = normalized.language;
       document.documentElement.dir = getDirection(normalized.language);
     } else {
@@ -629,21 +648,41 @@ function SettingsPageInner() {
       });
   }
 
-  function updateSettingsPartial(partial: Partial<AppSettings>) {
-    setSettings((prev) => {
-      const next = { ...prev, ...partial } as AppSettings;
-      document.documentElement.lang = next.language;
-      document.documentElement.dir = getDirection(next.language);
-      settingsService
-        .save(next)
-        .then(() => {
-          window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
-        })
-        .catch((error) => {
-          console.error("Failed to save settings:", error);
-        });
-      return next;
+  // PBS-BUG-017: persists one committed settings snapshot, then notifies the app.
+  // Runs exclusively on the serialization chain (see `queueSettingsPersistence`),
+  // never inside a React state updater.
+  async function persistSettingsSnapshot(nextSettings: AppSettings): Promise<void> {
+    await settingsService.save(nextSettings);
+    window.dispatchEvent(
+      new CustomEvent(SETTINGS_EVENT, {
+        detail: nextSettings,
+      })
+    );
+  }
+
+  // PBS-BUG-017: queues a snapshot for persistence strictly in request order.
+  // The chain never stays rejected, so one failed save cannot block later ones;
+  // each failure is logged exactly once and (as before) dispatches no event.
+  function queueSettingsPersistence(nextSettings: AppSettings): void {
+    const previous = saveChainRef.current.catch(() => {});
+    const current = previous.then(() => persistSettingsSnapshot(nextSettings));
+    saveChainRef.current = current.catch(() => {});
+    current.catch((error) => {
+      console.error("Failed to save settings:", error);
     });
+  }
+
+  function updateSettingsPartial(partial: Partial<AppSettings>) {
+    // PBS-BUG-017: pure state update -- no save, no dispatch, no DOM write inside
+    // an updater. `settingsRef` is synchronously advanced here (and mirrors the
+    // latest committed state everywhere else), so rapid successive partials chain
+    // without loss and without a stale render closure.
+    const next = { ...settingsRef.current, ...partial } as AppSettings;
+    settingsRef.current = next;
+    setSettings(next);
+    document.documentElement.lang = next.language;
+    document.documentElement.dir = getDirection(next.language);
+    queueSettingsPersistence(next);
   }
 
   function toggleRow(key: string) {
@@ -681,6 +720,7 @@ function SettingsPageInner() {
           : { ...settings, currency: pendingChange.newValue };
       await settingsService.save(nextSettings);
       setSettings(nextSettings);
+      settingsRef.current = nextSettings;
       document.documentElement.lang = nextSettings.language;
       document.documentElement.dir = getDirection(nextSettings.language);
       window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: nextSettings }));

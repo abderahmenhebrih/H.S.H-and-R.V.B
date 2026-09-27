@@ -300,6 +300,15 @@ async function checkStaleCrossClient(
   return true;
 }
 
+// PBS-BUG-023: HSH sync owns ONLY channel-"hsh" notifications. An existing
+// document from another channel must be treated as absent for HSH purposes:
+// never mutated, never converted, never deleted through this path. Callers use
+// the established generic "Entity not found." outcome (no new error code).
+function isHshOwnedNotification(entity: string, existing: any): boolean {
+  if (entity !== "notification" || !existing) return true;
+  return (existing as any).channel === "hsh";
+}
+
 async function handleSaleCreate(session: any, payload: Record<string, unknown>, clientId: string): Promise<string | null> {
   const items: any[] = (payload as any).items;
   const customerId = String((payload as any).customerId);
@@ -1703,6 +1712,17 @@ export async function processSyncOperation(
           }
         }
         const existing = await (model as any).findOne({ id: operation.entityId }).session(session as any);
+        // PBS-BUG-023: an existing non-HSH notification is not an HSH document --
+        // do not report it as "already exists" success; treat as absent.
+        if (!isHshOwnedNotification(operation.entity, existing)) {
+          const err = "Entity not found.";
+          await ProcessedSyncOperationModel.create(
+            [{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }],
+            { session },
+          );
+          result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+          return;
+        }
         if (existing) {
           const existingRevision = (existing as any).serverRevision ?? 0;
           canonical = existing;
@@ -1833,6 +1853,14 @@ export async function processSyncOperation(
 
       if (operation.operation === "upsert") {
         const existingUpsert: any = await (model as any).findOne({ id: operation.entityId }).session(session as any);
+        // PBS-BUG-023: never treat an existing non-HSH notification as an HSH
+        // upsert target (no mutation, no conversion, no duplicate).
+        if (!isHshOwnedNotification(operation.entity, existingUpsert)) {
+          const err = "Entity not found.";
+          await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+          result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+          return;
+        }
         if (existingUpsert) {
           // INVOICE_IMMUTABLE: reject generic mutations on ISSUED/CANCELLED and DRAFT->ISSUED/CANCELLED transitions
           if (operation.entity === "invoice") {
@@ -2073,6 +2101,39 @@ export async function processSyncOperation(
           );
           return;
         }
+        // PBS-BUG-023: an existing non-HSH notification must not be updated
+        // (and must not be converted to "hsh") through HSH sync.
+        if (!isHshOwnedNotification(operation.entity, existing)) {
+          const err = "Entity not found.";
+          result = {
+            operationId: opId,
+            entity: operation.entity,
+            entityId: operation.entityId,
+            operation: operation.operation,
+            success: false,
+            message: err,
+            error: err,
+            retryable: false,
+          };
+          // Only record terminal failure for update-not-found (terminal)
+          await ProcessedSyncOperationModel.create(
+            [
+              {
+                operationId: opId,
+                entity: operation.entity,
+                entityId: operation.entityId,
+                operation: operation.operation,
+                success: false,
+                error: err,
+                retryable: false,
+                processedAt: new Date(),
+                clientId: operation.clientId,
+              },
+            ],
+            { session },
+          );
+          return;
+        }
         // INVOICE_IMMUTABLE checks
         if (operation.entity === "invoice") {
           const srvStatus = (existing as any).status;
@@ -2225,6 +2286,14 @@ export async function processSyncOperation(
 
       if (operation.operation === "delete") {
         const existing: any = await (model as any).findOne({ id: operation.entityId }).session(session as any);
+        // PBS-BUG-023: an existing non-HSH notification must not be deleted (and
+        // must not generate a delete change) through HSH sync.
+        if (!isHshOwnedNotification(operation.entity, existing)) {
+          const err = "Entity not found.";
+          await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: err, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+          result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: err, error: err, retryable: false };
+          return;
+        }
         if (existing) {
           const existingRev = (existing as any).serverRevision ?? 0;
           if (operation.baseRevision !== undefined && operation.baseRevision < existingRev) {
@@ -2288,7 +2357,15 @@ export async function processSyncOperation(
               entity: operation.entity,
               entityId: operation.entityId,
               operation: "delete",
-              payload: undefined,
+              // PBS-BUG-023: notification deletes carry their channel so the HSH
+              // feed can filter them later; `existing` is in scope above and (for
+              // notifications) is guaranteed HSH-owned by the guard. Frontend
+              // delete application ignores payloads (apply.ts), and Mixed schema
+              // needs no model change. Other entities stay payload-less.
+              payload:
+                operation.entity === "notification" && existing
+                  ? { channel: (existing as any).channel }
+                  : undefined,
               changedAt: new Date(),
               sourceClientId: operation.clientId,
               operationId: opId,
@@ -2417,6 +2494,12 @@ export async function getChangesAfter(
         if (route && route.startsWith("/rvb")) return false;
         if (src && /^(worker-request:|supplier-request:|customer-request:|customer-order:|chat:)/.test(src)) return false;
       }
+      // PBS-BUG-023: channel-unknown notification deletes (legacy payload-less
+      // rows) are excluded -- an unknown channel must not leak as HSH. Current
+      // HSH deletes carry {channel:"hsh"} and RVB deletes never reach the feed
+      // (rejected before recording), so only legacy rows hit this rule.
+      // Non-notification payload-less deletes are unaffected.
+      if (c.operation === "delete" && (!payload || typeof payload !== "object" || !(payload as any).channel)) return false;
       // otherwise keep (hsh)
     }
     return true;

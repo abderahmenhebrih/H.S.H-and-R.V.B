@@ -2,7 +2,6 @@ import {
   getPendingSyncOperations,
   getReadyPendingSyncOperations,
   markSyncOperationAsSyncedByOperationId,
-  incrementAttemptsAndSetError,
   getOrCreateClientId,
   deleteSyncedOperations,
   getServerRevision,
@@ -114,6 +113,14 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
       throw new Error(`Sync request failed with status ${response.status}: ${text}`);
     }
     const result = (await response.json()) as SyncResponse;
+    // PBS-BUG-008: batch-level terminal reconciliation state. Per-result terminal
+    // bookkeeping stays inside the loop below, but the expensive authoritative
+    // bootstrap/snapshot reconciliation runs exactly once per response (see below).
+    let batchNeedsSnapshot = false;
+    const batchTerminalOps: Array<{ operationId: string; matchId?: number }> = [];
+    // PBS-BUG-008 correction: numeric Dexie row ids (not operationId) — a legacy queue
+    // row may lack a usable operationId yet still be rebased by the terminal helper.
+    const batchTerminalSuccessorRowIds: number[] = [];
     for (const r of result.results) {
       allResults.push(r);
       if (!r.success) {
@@ -128,13 +135,31 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
             const { getServerRevision: getRev } = await import("./queue");
             // For retryable false, need to transition in_flight to terminal and rebase successors
             const currentRev = await getRev().catch(()=>0);
+            // PBS-BUG-008 correction: capture successor ROW IDS before the helper runs,
+            // using the helper's own successor domain exactly (queue.ts
+            // revertInFlightToTerminalAndRebaseSuccessors): linked rows plus ALL
+            // unsynced non-in_flight same-entity rows — no status==="pending"
+            // requirement, no link-absence requirement — so the shared post-loop
+            // reconciliation can rebase every helper-touched row to the authoritative
+            // bootstrap revision instead of this pre-snapshot cursor.
+            try {
+              const queued = await db.syncOperations.toArray();
+              for (const o of queued as any[]) {
+                if (o.synced || o.operationId === operationId) continue;
+                const st = (o as any).status;
+                const linked = (o as any).dependsOnOperationId === operationId || (o as any).parentOperationId === operationId;
+                const sameEntity = o.entity === r.entity && o.entityId === r.entityId;
+                if ((linked || sameEntity) && !o.synced && st !== "in_flight") {
+                  if (typeof o.id === "number" && !batchTerminalSuccessorRowIds.includes(o.id)) batchTerminalSuccessorRowIds.push(o.id);
+                }
+              }
+            } catch {}
             // Use dedicated terminal+rebase helper
             await revertInFlightToTerminalAndRebaseSuccessors(operationId, r.error ?? r.message, currentRev);
           } catch {}
-          // Also need to increment attempts for parent already done in helper, but ensure terminal marking
-          if (match?.id !== undefined) {
-            try { await incrementAttemptsAndSetError(match.id, r.error ?? r.message, true); } catch {}
-          }
+          // NOTE (PBS-BUG-007): do NOT call incrementAttemptsAndSetError here — the
+          // helper above already marks terminal, sets lastError, and increments
+          // attempts exactly once. A second call would double-count attempts.
         } else {
           // Retryable true -> revert in_flight to retrying (immutable), preserve successor
           // Do NOT call incrementAttemptsAndSetError first: it would set pending and break retrying distinction
@@ -175,24 +200,13 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
               }
             }
             // For business terminal (any op) or any terminal update/delete, fetch canonical snapshot and apply preserving pending locals.
+            // PBS-BUG-008: defer the authoritative bootstrap/snapshot — it runs exactly
+            // once after the loop for the whole batch (see below). Terminal rows stay
+            // until then; applySnapshot's pendingSet excludes terminal rows whether
+            // present or deleted, so protection semantics are unchanged.
             const shouldFetchSnapshot = isTerminalBusiness || isTerminalUpdateDelete;
-            if (shouldFetchSnapshot) {
-              try {
-                const bootstrap = await fetchBootstrap();
-                const { applySnapshot } = await import("./apply");
-                await applySnapshot(bootstrap.snapshot, bootstrap.currentRevision);
-              } catch (reconcileErr) {
-                console.warn(`[sync] reconcile after terminal ${r.entity} ${r.operation} failed`, reconcileErr);
-              }
-            }
-            // Delete terminal sync operation so it doesn't remain as ghost pending (after snapshot applied)
-            // But for in_flight we already marked terminal via helper, ensure deleted if needed after reconciliation
-            const opInFlight = await db.syncOperations.where("operationId").equals(operationId).first().catch(()=>null);
-            if (opInFlight?.id !== undefined) {
-              try { await db.syncOperations.delete(opInFlight.id); } catch {}
-            } else if (match?.id !== undefined) {
-              try { await db.syncOperations.delete(match.id); } catch {}
-            }
+            if (shouldFetchSnapshot) batchNeedsSnapshot = true;
+            batchTerminalOps.push({ operationId, matchId: match?.id });
           } catch {}
         } else if (isTerminal && isBusiness) {
           // Fallback delete terminal business op if not covered above
@@ -258,6 +272,47 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
           }
         } catch {}
       }
+    }
+    // PBS-BUG-008: single shared terminal reconciliation per response (previously one
+    // fetchBootstrap + applySnapshot per terminal result inside the loop above).
+    let sharedBootstrapRevision: number | undefined;
+    if (batchNeedsSnapshot) {
+      try {
+        const bootstrap = await fetchBootstrap();
+        const { applySnapshot } = await import("./apply");
+        await applySnapshot(bootstrap.snapshot, bootstrap.currentRevision);
+        sharedBootstrapRevision = bootstrap.currentRevision;
+      } catch (reconcileErr) {
+        console.warn(`[sync] shared reconcile after terminal results failed`, reconcileErr);
+      }
+    }
+    // Rebase captured successors to the authoritative post-snapshot revision. The
+    // in-loop helper rebased them to the older pre-snapshot cursor, which would go
+    // stale and cause avoidable conflict churn on the next push. Rows are reloaded
+    // by numeric id; rows that have since become synced/terminal/in_flight are not
+    // pending future pushes, so their revision is left alone.
+    if (sharedBootstrapRevision !== undefined && batchTerminalSuccessorRowIds.length > 0) {
+      for (const succRowId of batchTerminalSuccessorRowIds) {
+        try {
+          const row: any = await db.syncOperations.get(succRowId);
+          if (!row || row.synced) continue;
+          const st = (row as any).status;
+          if (st === "terminal" || st === "in_flight") continue;
+          await db.syncOperations.update(row.id!, { baseRevision: sharedBootstrapRevision } as any);
+        } catch {}
+      }
+    }
+    // Delete consumed terminal outbox rows after reconciliation (same order as before:
+    // snapshot first, cleanup second; terminal rows excluded from pendingSet either way).
+    for (const term of batchTerminalOps) {
+      try {
+        const opInFlight = await db.syncOperations.where("operationId").equals(term.operationId).first().catch(()=>null);
+        if (opInFlight?.id !== undefined) {
+          try { await db.syncOperations.delete(opInFlight.id); } catch {}
+        } else if (term.matchId !== undefined) {
+          try { await db.syncOperations.delete(term.matchId); } catch {}
+        }
+      } catch {}
     }
     // Apply canonical entity without queuing (must use remote context)
     for (const r of result.results) {

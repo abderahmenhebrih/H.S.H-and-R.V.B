@@ -456,8 +456,9 @@ export async function markTerminal(id: number, error: string): Promise<void> {
 }
 
 export async function deleteSyncedOperations(): Promise<void> {
-  await db.syncOperations.where("synced").equals(1 as any).delete();
-  // Dexie boolean handling - fallback
+  // NOTE: do not query the boolean `synced` index with .equals() — booleans are
+  // not valid IndexedDB keys (equals(1) matches nothing, equals(true) throws
+  // DataError). Filter in JS like the other helpers in this file.
   const all = await db.syncOperations.toArray();
   const syncedIds = all.filter((o) => o.synced).map((o) => o.id!);
   if (syncedIds.length) await db.syncOperations.bulkDelete(syncedIds);

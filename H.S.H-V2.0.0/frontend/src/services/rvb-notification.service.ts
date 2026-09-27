@@ -32,15 +32,15 @@ export const rvbNotificationService = {
     if (params.page) qs.set("page", String(params.page));
     if (params.limit) qs.set("limit", String(params.limit));
     const url = qs.toString() ? `${BASE}?${qs.toString()}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     return handleRes<{ success: boolean; notifications: any[]; total: number; page: number; limit: number; totalPages: number; unreadCount: number; archivedCount: number }>(res);
   },
   async count() {
-    const res = await fetch(`${BASE}/count`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}/count`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     return handleRes<{ success: boolean; unreadCount: number; archivedCount: number }>(res);
   },
   async markRead(id: string, unread = false) {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/read`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/read`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ unread }),
@@ -49,7 +49,7 @@ export const rvbNotificationService = {
     return handleRes<any>(res);
   },
   async archive(id: string, archived = true) {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/archive`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/archive`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ archived }),
@@ -58,7 +58,7 @@ export const rvbNotificationService = {
     return handleRes<any>(res);
   },
   async restore(id: string) {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/restore`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/restore`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       credentials: "include",
@@ -66,7 +66,7 @@ export const rvbNotificationService = {
     return handleRes<any>(res);
   },
   async markAllRead() {
-    const res = await fetch(`${BASE}/mark-all-read`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/mark-all-read`, {
       method: "POST",
       headers: { ...getAuthHeaders() },
       credentials: "include",
@@ -74,7 +74,7 @@ export const rvbNotificationService = {
     return handleRes<any>(res);
   },
   async bulk(ids: string[], action: "read" | "unread" | "archive" | "restore") {
-    const res = await fetch(`${BASE}/bulk`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/bulk`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ ids, action }),

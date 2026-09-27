@@ -41,12 +41,12 @@ export type SupplierRequest = {
 export const supplierRequestService = {
   async list(supplierId?: string): Promise<SupplierRequest[]> {
     const url = supplierId ? `${BASE}?supplierId=${encodeURIComponent(supplierId)}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; requests: SupplierRequest[] }>(res);
     return data.requests || [];
   },
   async create(input: { supplierId: string; type: "new_supply" | "discrepancy"; items?: any[]; total?: number; calculation?: any; date?: number; description?: string }): Promise<SupplierRequest> {
-    const res = await fetch(BASE, {
+    const res = await rvbAuthService.authFetch(BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(input),
@@ -56,7 +56,7 @@ export const supplierRequestService = {
     return data.request;
   },
   async review(id: string, status: "accepted" | "rejected", notes?: string): Promise<SupplierRequest> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/review`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ status, notes }),

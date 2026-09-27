@@ -93,17 +93,17 @@ export const rvbRequestService = {
     if (params.page) qs.set("page", String(params.page));
     if (params.limit) qs.set("limit", String(params.limit));
     const url = qs.toString() ? `${BASE}?${qs.toString()}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<RvbRequestsResponse>(res);
     return data;
   },
   async getDetail(source: string, id: string): Promise<RvbRequestDetail> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(source)}/${encodeURIComponent(id)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(source)}/${encodeURIComponent(id)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; request: RvbRequestDetail }>(res);
     return data.request;
   },
   async review(source: string, id: string, status: "accepted" | "rejected", notes?: string, edited?: { items?: any[]; total?: number; calculation?: any; date?: number }): Promise<any> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(source)}/${encodeURIComponent(id)}/review`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(source)}/${encodeURIComponent(id)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ status, notes, ...edited }),

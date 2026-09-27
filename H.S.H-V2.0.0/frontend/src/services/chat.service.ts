@@ -65,17 +65,17 @@ export const chatService = {
     if (category && category !== "all") qs.set("category", category);
     if (search) qs.set("search", search);
     const url = qs.toString() ? `${BASE}?${qs.toString()}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; conversations: Conversation[] }>(res);
     return data.conversations || [];
   },
   async get(id: string): Promise<Conversation> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; conversation: Conversation }>(res);
     return data.conversation;
   },
   async createDM(otherAccountId: string): Promise<Conversation> {
-    const res = await fetch(`${BASE}/dm`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/dm`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ otherAccountId }),
@@ -85,7 +85,7 @@ export const chatService = {
     return data.conversation;
   },
   async createGroup(input: { name: string; avatar?: string | null; memberIds: string[] }): Promise<Conversation> {
-    const res = await fetch(`${BASE}/group`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/group`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(input),
@@ -95,11 +95,11 @@ export const chatService = {
     return data.conversation;
   },
   async leave(id: string): Promise<any> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/leave`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/leave`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
     return handleResponse(res);
   },
   async updateGroup(id: string, patch: { name?: string; avatar?: string | null; addMemberIds?: string[]; removeMemberIds?: string[] }): Promise<Conversation> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(patch),
@@ -114,12 +114,12 @@ export const chatService = {
     if (opts.limit) qs.set("limit", String(opts.limit));
     if (opts.search) qs.set("search", opts.search);
     const url = qs.toString() ? `${BASE}/${encodeURIComponent(conversationId)}/messages?${qs.toString()}` : `${BASE}/${encodeURIComponent(conversationId)}/messages`;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; messages: Message[] }>(res);
     return data.messages || [];
   },
   async sendMessage(conversationId: string, content: string, replyToMessageId?: string | null, reminderMinutes?: number | null): Promise<Message> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(conversationId)}/messages`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ content, replyToMessageId, reminderMinutes }),
@@ -129,7 +129,7 @@ export const chatService = {
     return data.message;
   },
   async editMessage(messageId: string, content: string): Promise<Message> {
-    const res = await fetch(`${BASE}/messages/${encodeURIComponent(messageId)}`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/messages/${encodeURIComponent(messageId)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ content }),
@@ -139,7 +139,7 @@ export const chatService = {
     return data.message;
   },
   async deleteMessage(messageId: string): Promise<Message> {
-    const res = await fetch(`${BASE}/messages/${encodeURIComponent(messageId)}`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/messages/${encodeURIComponent(messageId)}`, {
       method: "DELETE",
       headers: { ...getAuthHeaders() },
       credentials: "include",
@@ -148,12 +148,12 @@ export const chatService = {
     return data.message;
   },
   async getAudit(messageId: string): Promise<{ message: any; audits: any[] }> {
-    const res = await fetch(`${BASE}/messages/${encodeURIComponent(messageId)}/audit`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}/messages/${encodeURIComponent(messageId)}/audit`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; message: any; audits: any[] }>(res);
     return { message: data.message, audits: data.audits };
   },
   async toggleReaction(messageId: string): Promise<Message> {
-    const res = await fetch(`${BASE}/messages/${encodeURIComponent(messageId)}/reaction`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/messages/${encodeURIComponent(messageId)}/reaction`, {
       method: "POST",
       headers: { ...getAuthHeaders() },
       credentials: "include",
@@ -162,7 +162,7 @@ export const chatService = {
     return data.message;
   },
   async pin(conversationId: string, messageId: string): Promise<Conversation> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(conversationId)}/pin`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(conversationId)}/pin`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ messageId }),
@@ -172,7 +172,7 @@ export const chatService = {
     return data.conversation;
   },
   async unpin(conversationId: string, messageId: string): Promise<Conversation> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(conversationId)}/unpin`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(conversationId)}/unpin`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ messageId }),
@@ -182,7 +182,7 @@ export const chatService = {
     return data.conversation;
   },
   async markRead(conversationId: string, upToMessageId?: string): Promise<any> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(conversationId)}/read`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(conversationId)}/read`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ upToMessageId }),
@@ -191,7 +191,7 @@ export const chatService = {
     return handleResponse(res);
   },
   async getUnreadCounts(): Promise<Record<string, number>> {
-    const res = await fetch(`${BASE}/unread/counts`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}/unread/counts`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; counts: Record<string, number> }>(res);
     return data.counts || {};
   },

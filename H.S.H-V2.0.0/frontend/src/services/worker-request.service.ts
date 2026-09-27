@@ -45,12 +45,12 @@ export type WorkerRequest = {
 export const workerRequestService = {
   async list(workerId?: string): Promise<WorkerRequest[]> {
     const url = workerId ? `${BASE}?workerId=${encodeURIComponent(workerId)}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; requests: WorkerRequest[] }>(res);
     return data.requests || [];
   },
   async create(input: { workerId: string; type: "payment" | "loan" | "discrepancy"; amount?: number; description?: string }): Promise<WorkerRequest> {
-    const res = await fetch(BASE, {
+    const res = await rvbAuthService.authFetch(BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(input),
@@ -60,7 +60,7 @@ export const workerRequestService = {
     return data.request;
   },
   async review(id: string, status: "accepted" | "rejected", notes?: string): Promise<WorkerRequest> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/review`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ status, notes }),

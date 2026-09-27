@@ -44,12 +44,12 @@ export type CustomerRequest = {
 export const customerRequestService = {
   async list(customerId?: string): Promise<CustomerRequest[]> {
     const url = customerId ? `${BASE}?customerId=${encodeURIComponent(customerId)}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; requests: CustomerRequest[] }>(res);
     return data.requests || [];
   },
   async create(input: { customerId: string; type: "insert_shipment" | "discrepancy"; items?: any[]; total?: number; date?: number; description?: string }): Promise<CustomerRequest> {
-    const res = await fetch(BASE, {
+    const res = await rvbAuthService.authFetch(BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(input),
@@ -59,7 +59,7 @@ export const customerRequestService = {
     return data.request;
   },
   async review(id: string, status: "accepted" | "rejected", notes?: string, edited?: { items?: any[]; total?: number; date?: number }): Promise<CustomerRequest> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/review`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ status, notes, ...edited }),

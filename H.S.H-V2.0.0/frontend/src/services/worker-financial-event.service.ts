@@ -37,12 +37,12 @@ export type WorkerFinancialEvent = {
 
 export const workerFinancialEventService = {
   async list(workerId: string): Promise<WorkerFinancialEvent[]> {
-    const res = await fetch(`${BASE}?workerId=${encodeURIComponent(workerId)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}?workerId=${encodeURIComponent(workerId)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; events: WorkerFinancialEvent[] }>(res);
     return data.events || [];
   },
   async create(input: { workerId: string; type: "bonus" | "absence" | "salary" | "loan" | "adjustment"; amount: number; note?: string }): Promise<any> {
-    const res = await fetch(BASE, {
+    const res = await rvbAuthService.authFetch(BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(input),

@@ -157,7 +157,7 @@ export const rvbAuthService = {
 
   async me(): Promise<RvbSafeUser> {
     const token = getAccessToken();
-    const res = await fetch(`${AUTH_BASE}/me`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/me`, {
       method: "GET",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",
@@ -169,7 +169,7 @@ export const rvbAuthService = {
 
   async changePassword(payload: { currentPassword: string; newPassword: string; confirmPassword: string }): Promise<{ accessToken?: string; account: RvbSafeUser }> {
     const token = getAccessToken();
-    const res = await fetch(`${AUTH_BASE}/change-password`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/change-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -186,7 +186,7 @@ export const rvbAuthService = {
 
   async onboarding(profilePicture: string): Promise<RvbSafeUser> {
     const token = getAccessToken();
-    const res = await fetch(`${AUTH_BASE}/onboarding`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/onboarding`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -201,7 +201,7 @@ export const rvbAuthService = {
 
   async updateProfile(payload: { displayName?: string; profilePicture?: string | null }): Promise<RvbSafeUser> {
     const token = getAccessToken();
-    const res = await fetch(`${AUTH_BASE}/profile`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/profile`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -216,7 +216,7 @@ export const rvbAuthService = {
 
   async getPreferences(): Promise<{ notifications: Record<string, boolean>; ui?: { language?: string; theme?: string } }> {
     const token = getAccessToken();
-    const res = await fetch(`${AUTH_BASE}/preferences`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/preferences`, {
       method: "GET",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",
@@ -235,7 +235,7 @@ export const rvbAuthService = {
     } else {
       body = { notifications: prefs };
     }
-    const res = await fetch(`${AUTH_BASE}/preferences`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/preferences`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -250,7 +250,7 @@ export const rvbAuthService = {
 
   async getSessions(): Promise<{ sessions: any[]; currentSessionId: string }> {
     const token = getAccessToken();
-    const res = await fetch(`${AUTH_BASE}/sessions`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/sessions`, {
       method: "GET",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",
@@ -262,7 +262,7 @@ export const rvbAuthService = {
 
   async revokeOtherSessions(): Promise<void> {
     const token = getAccessToken();
-    const res = await fetch(`${AUTH_BASE}/sessions/revoke-others`, {
+    const res = await rvbAuthService.authFetch(`${AUTH_BASE}/sessions/revoke-others`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",

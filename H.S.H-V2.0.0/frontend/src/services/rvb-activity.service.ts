@@ -28,7 +28,7 @@ export const rvbActivityService = {
     if (params.page) qs.set("page", String(params.page));
     if (params.limit) qs.set("limit", String(params.limit));
     const url = qs.toString() ? `${BASE}?${qs.toString()}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     return handleRes<{ success: boolean; activities: any[]; total: number; page: number; limit: number; totalPages: number }>(res);
   },
 };

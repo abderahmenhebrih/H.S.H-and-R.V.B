@@ -42,12 +42,12 @@ export const customerOrderService = {
     if (filter?.customerId) params.set("customerId", filter.customerId);
     if (filter?.status) params.set("status", filter.status);
     const url = params.toString() ? `${BASE}?${params.toString()}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; orders: CustomerOrder[] }>(res);
     return data.orders || [];
   },
   async create(input: { customerId?: string; items: any[]; total: number; notes?: string }): Promise<CustomerOrder> {
-    const res = await fetch(BASE, {
+    const res = await rvbAuthService.authFetch(BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(input),
@@ -57,7 +57,7 @@ export const customerOrderService = {
     return data.order;
   },
   async review(id: string, status: "accepted" | "rejected", items?: any[], notes?: string): Promise<CustomerOrder> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/review`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ status, items, notes }),
@@ -67,7 +67,7 @@ export const customerOrderService = {
     return data.order;
   },
   async cancel(id: string): Promise<CustomerOrder> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}/cancel`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}/cancel`, {
       method: "POST",
       headers: { ...getAuthHeaders() },
       credentials: "include",
@@ -76,7 +76,7 @@ export const customerOrderService = {
     return data.order;
   },
   async edit(id: string, items: any[], notes?: string): Promise<CustomerOrder> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, {
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ items, notes }),

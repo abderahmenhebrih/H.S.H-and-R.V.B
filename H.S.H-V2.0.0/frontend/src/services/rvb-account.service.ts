@@ -48,13 +48,13 @@ export type RvbLinkableEntity = {
 
 export const rvbAccountService = {
   async getAll(): Promise<RvbAccount[]> {
-    const res = await fetch(ACCOUNTS_BASE, { method: "GET", cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(ACCOUNTS_BASE, { method: "GET", cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; accounts: RvbAccount[] }>(res);
     return data.accounts || [];
   },
 
   async getById(id: string): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
     return data.account;
   },
@@ -62,7 +62,7 @@ export const rvbAccountService = {
   async getLinkableEntities(type: RvbLinkedEntityType, search = ""): Promise<RvbLinkableEntity[]> {
     const query = new URLSearchParams({ type });
     if (search.trim()) query.set("search", search.trim());
-    const res = await fetch(`${ACCOUNTS_BASE}/linkable?${query.toString()}`, {
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/linkable?${query.toString()}`, {
       method: "GET",
       cache: "no-store",
       headers: { ...getAuthHeaders() },
@@ -78,7 +78,7 @@ export const rvbAccountService = {
   },
 
   async create(payload: CreateRvbAccountPayload): Promise<RvbAccount> {
-    const res = await fetch(ACCOUNTS_BASE, {
+    const res = await rvbAuthService.authFetch(ACCOUNTS_BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(payload),
@@ -89,7 +89,7 @@ export const rvbAccountService = {
   },
 
   async update(id: string, payload: Partial<CreateRvbAccountPayload>): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}`, {
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(payload),
@@ -100,25 +100,25 @@ export const rvbAccountService = {
   },
 
   async archive(id: string): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/archive`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/archive`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
     return data.account;
   },
 
   async reactivate(id: string): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/reactivate`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/reactivate`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
     return data.account;
   },
 
   async disable(id: string): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/disable`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/disable`, { method: "POST", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; account: RvbAccount }>(res);
     return data.account;
   },
 
   async setInitialPassword(id: string, password: string, confirmPassword: string): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/set-initial-password`, {
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/set-initial-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ password, confirmPassword }),
@@ -129,7 +129,7 @@ export const rvbAccountService = {
   },
 
   async linkToWorker(accountId: string, workerId: string): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(accountId)}/link`, {
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(accountId)}/link`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ workerId }),
@@ -140,7 +140,7 @@ export const rvbAccountService = {
   },
 
   async unlink(accountId: string): Promise<RvbAccount> {
-    const res = await fetch(`${ACCOUNTS_BASE}/${encodeURIComponent(accountId)}/unlink`, {
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(accountId)}/unlink`, {
       method: "POST",
       headers: { ...getAuthHeaders() },
       credentials: "include",

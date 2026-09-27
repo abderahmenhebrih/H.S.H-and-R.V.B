@@ -36,7 +36,7 @@ export type WorkerActivity = {
 export const workerActivityService = {
   async list(workerId?: string): Promise<WorkerActivity[]> {
     const url = workerId ? `${BASE}?workerId=${encodeURIComponent(workerId)}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; activities: WorkerActivity[] }>(res);
     return data.activities || [];
   },

@@ -34,11 +34,11 @@ export const rvbDirectoryService = {
     if (params.page) qs.set("page", String(params.page));
     if (params.limit) qs.set("limit", String(params.limit));
     const url = qs.toString() ? `${BASE}?${qs.toString()}` : BASE;
-    const res = await fetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(url, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     return handleResponse<DirectoryListResponse>(res);
   },
   async getProfile(accountId: string): Promise<DirectoryProfile> {
-    const res = await fetch(`${BASE}/${encodeURIComponent(accountId)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(accountId)}`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const data = await handleResponse<{ success: boolean; account: DirectoryProfile }>(res);
     return data.account;
   },

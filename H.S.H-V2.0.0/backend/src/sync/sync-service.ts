@@ -1434,6 +1434,34 @@ export async function processSyncOperation(
     }
   }
 
+  // PBS-BUG-022: unify the legacy `weight` item alias into canonical `weightKg`
+  // for sale/purchase BEFORE validation, business handlers, and persistence
+  // consume the payload. Validation already accepts the alias (with `weightKg`
+  // winning when both are present), but the create handlers aggregate only
+  // `weightKg`, so an un-normalized alias passed validation and then computed
+  // NaN stock math while defeating the insufficient-stock check. Normalizing
+  // here covers create/upsert/update candidates and persisted documents
+  // uniformly. The caller's object is untouched: `payload` above is already a
+  // shallow clone, and items are re-created (never mutated in place); the
+  // legacy `weight` key itself is left for Mongoose strict-schema stripping.
+  if (operation.entity === "sale" || operation.entity === "purchase") {
+    const p: any = payload;
+    if (Array.isArray(p.items)) {
+      p.items = p.items.map((it: any) => {
+        if (
+          it != null &&
+          typeof it === "object" &&
+          !Array.isArray(it) &&
+          (it as any).weightKg === undefined &&
+          (it as any).weight !== undefined
+        ) {
+          return { ...(it as any), weightKg: (it as any).weight };
+        }
+        return it;
+      });
+    }
+  }
+
   // Size safety for Office files (several MB per file, documented limit)
   if (operation.entity === "officeFile") {
     try {

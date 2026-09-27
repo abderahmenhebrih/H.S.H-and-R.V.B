@@ -230,10 +230,22 @@ async function withCrossTabLock(task: () => Promise<void>): Promise<boolean> {
   // Prefer navigator.locks if available (automatically released on crash/tab close)
   const nav: any = typeof navigator !== "undefined" ? (navigator as any) : undefined;
   if (nav?.locks?.request) {
-    await nav.locks.request("hebrih-hsh-sync", async () => {
-      await task();
-    });
-    return true;
+    // PBS-BUG-012: non-blocking acquisition mirroring the fallback lease below.
+    // ifAvailable:true => callback receives null when another tab holds the lock;
+    // that tab's work is authoritative, so skip immediately (return false) instead
+    // of queueing behind its full push/pull cycle. Never steal; never fall through
+    // to the fallback lease when Web Locks is supported (two systems must not both
+    // authorize concurrent sync). Task errors propagate exactly as before.
+    const acquired = await nav.locks.request(
+      "hebrih-hsh-sync",
+      { ifAvailable: true },
+      async (lock: unknown) => {
+        if (!lock) return false;
+        await task();
+        return true;
+      },
+    );
+    return acquired === true;
   }
   // Fallback: IndexedDB lease via syncMeta with owner + heartbeat (crash-safe via TTL)
   const ownerId = getTabOwnerId();
@@ -324,9 +336,21 @@ export async function syncCycle(): Promise<void> {
   return promise;
 }
 
+// PBS-BUG-013: single debounce handle for local-mutation triggers (see triggerSync).
+let triggerSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function triggerSync(): void {
-  // Debounce slightly, but trigger promptly after local mutation
-  setTimeout(() => {
+  // PBS-BUG-013: trailing-edge debounce for local-mutation triggers. A burst of
+  // rapid mutations must settle into ONE deferred attempt 500ms after the final
+  // trigger — not one timer per trigger. Running-cycle dedup stays solely with
+  // syncInProgress/syncPromise below; this handle covers only waiting timers.
+  if (triggerSyncTimer !== null) {
+    clearTimeout(triggerSyncTimer);
+  }
+  triggerSyncTimer = setTimeout(() => {
+    // Clear BEFORE invoking syncCycle so a mutation arriving during a running
+    // cycle can schedule the next deferred attempt.
+    triggerSyncTimer = null;
     syncCycle().catch(() => {});
   }, 500);
 }

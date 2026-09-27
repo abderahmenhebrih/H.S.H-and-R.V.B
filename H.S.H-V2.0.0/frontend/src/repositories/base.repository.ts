@@ -20,6 +20,18 @@ function triggerSync() {
 
 type SourceOption = { source?: "local" | "remote"; serverRevision?: number; queueSync?: boolean };
 
+// PBS-BUG-002: whether this exact entity/id has its own upload waiting in the
+// outbox. Matches PBS-BUG-010's active-intent domain: same entity+entityId,
+// !synced, status !== "terminal" (pending/retrying/in_flight/legacy-unset count;
+// synced/terminal do not). NEVER consults entity syncStatus. Read-only: callers
+// must not create/modify/coalesce outbox rows based on this.
+async function hasActiveDirectOutbox(entityName: SyncEntity, entityId: string): Promise<boolean> {
+  const all = await db.syncOperations.toArray();
+  return all.some(
+    (o) => o.entity === entityName && o.entityId === entityId && !o.synced && (o as any).status !== "terminal",
+  );
+}
+
 export class BaseRepository<T extends { id: string } & { syncStatus?: string; lastSyncedAt?: number; serverRevision?: number; updatedAt?: number }> {
   constructor(
     protected readonly table: Table<T, string>,
@@ -71,9 +83,12 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
           await db.transaction("rw", this.table, db.syncOperations, db.syncMeta, doCreate);
         }
       } else if (entityName && !queueSync) {
-        // Local optimistic derived mutation — do not queue sync, just update Dexie
-        // Keep pending status so UI reflects optimistic, but server will canonicalize via authoritative transaction
-        (toStore as any).syncStatus = "pending";
+        // Local optimistic derived mutation — do not queue sync, just update Dexie.
+        // PBS-BUG-002: no independent entity upload exists, so the row is "synced"
+        // (the authoritative parent business op carries the pending intent, and
+        // PBS-BUG-010 protects this row from conflicting pulls via that parent).
+        // Do NOT set lastSyncedAt: never independently server-confirmed.
+        (toStore as any).syncStatus = "synced";
         (toStore as any).updatedAt = (toStore as any).updatedAt ?? now;
         await this.table.add(toStore);
       } else {
@@ -97,9 +112,10 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
     const queueSync = opts.queueSync ?? true;
     if (source === "local") {
       const now = Date.now();
-      const mergedChanges: any = { ...changes, updatedAt: now, syncStatus: queueSync ? "pending" : "pending" };
+      const baseChanges: any = { ...changes, updatedAt: now };
       const entityName = this.entityName;
       if (entityName && queueSync) {
+        const mergedChanges: any = { ...baseChanges, syncStatus: "pending" };
         let baseRevision = 0;
         let clientId = "unknown";
         try {
@@ -136,9 +152,26 @@ export class BaseRepository<T extends { id: string } & { syncStatus?: string; la
           await db.transaction("rw", this.table, db.syncOperations, db.syncMeta, doUpdate);
         }
       } else if (entityName && !queueSync) {
-        await this.table.update(id, mergedChanges);
+        // PBS-BUG-002: this mutation itself has no independent upload. Mark "synced"
+        // UNLESS an active direct outbox operation for this exact entity/id is still
+        // queued (then the row genuinely awaits upload and stays "pending"). This also
+        // heals stale "pending" left by the old behavior when no direct intent exists.
+        // Read-only w.r.t. the outbox: never creates/modifies/coalesces rows here.
+        // Never consults entity syncStatus and never the parent business op (see
+        // PBS-BUG-010 coupling: protection follows outbox intent, status follows
+        // direct upload state).
+        const doLocalUpdate = async () => {
+          const hasActive = await hasActiveDirectOutbox(entityName, id);
+          await this.table.update(id, { ...baseChanges, syncStatus: hasActive ? "pending" : "synced" });
+        };
+        const currentTxLocal: any = (await import("dexie")).default.currentTransaction;
+        if (currentTxLocal) {
+          await doLocalUpdate();
+        } else {
+          await db.transaction("rw", this.table, db.syncOperations, doLocalUpdate);
+        }
       } else {
-        await this.table.update(id, mergedChanges);
+        await this.table.update(id, { ...baseChanges, syncStatus: "pending" });
       }
       if (queueSync) triggerSync();
     } else {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 import type { DependencyList } from "react";
 
 export function useDbSync(callback: () => void | Promise<void>, _deps: DependencyList = []) {
@@ -9,24 +9,21 @@ export function useDbSync(callback: () => void | Promise<void>, _deps: Dependenc
   // re-subscribing, so these values are intentionally not used as effect deps.
   void _deps;
 
-  // PBS-BUG-015: mirror the latest callback so the single stable listener below
-  // always invokes current logic without teardown/re-add. Assigned in an effect
-  // (not during render) to satisfy the project's refs-during-render lint rule;
-  // React flushes passive effects before the next dispatched browser/task event,
-  // so steady-state delivery is latest-callback. (Render-time assignment would
-  // narrow the window marginally further but violates lint; churn elimination —
-  // the deterministic defect — is identical either way.)
-  const callbackRef = useRef(callback);
-  useEffect(() => {
-    callbackRef.current = callback;
+  // PBS-BUG-015 correction 1: Effect Event always invokes the latest COMMITTED
+  // callback — no passive-effect mirror lag. The stable browser listener below
+  // therefore delivers current-commit logic with zero teardown/re-add, closing
+  // both the churn and the commit-to-passive stale window. Async/error semantics
+  // are byte-identical to the previous handler (try/catch + swallowed rejections).
+  const onDbSync = useEffectEvent(() => {
+    try {
+      const res = callback();
+      if (res instanceof Promise) res.catch(() => {});
+    } catch {}
   });
 
   useEffect(() => {
     const handler = () => {
-      try {
-        const res = callbackRef.current();
-        if (res instanceof Promise) res.catch(() => {});
-      } catch {}
+      onDbSync();
     };
     window.addEventListener("hebrih-db-synced", handler);
     return () => {

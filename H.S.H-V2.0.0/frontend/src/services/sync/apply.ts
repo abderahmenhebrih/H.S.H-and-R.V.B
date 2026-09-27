@@ -55,11 +55,6 @@ function emitDbSyncEvent(changes: SyncChange[]) {
   } catch {}
 }
 
-async function hasPendingOperation(entity: string, entityId: string): Promise<boolean> {
-  const all = await db.syncOperations.toArray();
-  return all.some((o) => o.entity === entity && o.entityId === entityId && !o.synced && (o as any).status !== "terminal");
-}
-
 export async function applyRemoteChanges(changes: SyncChange[]): Promise<void> {
   if (changes.length === 0) return;
   // Ensure sorted by revision
@@ -72,16 +67,51 @@ export async function applyRemoteChanges(changes: SyncChange[]): Promise<void> {
 
   const syncTables = getAllSyncTables();
   // Deduplicate to avoid Dexie duplicate-table error when combining with meta tables
-  const remoteTables = [...new Set([...syncTables, db.syncMeta])];
+  // PBS-BUG-010: include syncOperations so the pending-protection set below is built
+  // from a transactionally consistent outbox view (single scan, no N+1 queries).
+  const remoteTables = [...new Set([...syncTables, db.syncMeta, db.syncOperations])];
   await runAsRemote(async () => {
     await db.transaction(
       "rw",
       remoteTables,
       async () => {
+        // PBS-BUG-010: protect records with active local sync intent, derived from
+        // actual outbox operations — NEVER from entity syncStatus (PBS-BUG-002 stays
+        // open: queueSync:false derived rows carry syncStatus:"pending" with no outbox
+        // row and must still accept canonical server changes). Mirrors applySnapshot:
+        // direct entity:id keys for every unsynced non-terminal op (in_flight included),
+        // extended with business-derived affected keys for active sale/purchase/payment/
+        // transfer operations.
+        const allOps = await db.syncOperations.toArray();
+        const pendingSet = new Set<string>(
+          allOps
+            .filter((o: any) => !o.synced && o.status !== "terminal")
+            .map((o) => `${o.entity}:${o.entityId}`),
+        );
+        const businessEntities = new Set(["sale", "purchase", "payment", "transfer"]);
+        for (const op of allOps) {
+          if (!businessEntities.has((op as any).entity)) continue;
+          if ((op as any).synced) continue;
+          if ((op as any).status === "terminal") continue;
+          let localEntity: any = null;
+          try {
+            const entityTable = getTable((op as any).entity);
+            if (entityTable) localEntity = await entityTable.get((op as any).entityId);
+          } catch {}
+          const affected = collectBusinessAffectedKeys(op as any, localEntity);
+          for (const k of affected) pendingSet.add(k);
+        }
         for (const change of toApply) {
           // Direct table ops without going through applyRemoteChange's runAsRemote (already in remote context)
           const table = getTable(change.entity);
           if (!table) continue;
+          // PBS-BUG-010: never overwrite or delete optimistic local state that still
+          // has active outbox intent. The local op will later succeed (authoritative
+          // state follows) or fail into existing reconciliation. Skipped revisions
+          // still advance the cursor below: the revision was seen and deliberately
+          // fenced, not failed (PBS-BUG-011 untouched).
+          const changeKey = `${change.entity}:${change.entityId}`;
+          if (pendingSet.has(changeKey)) continue;
           if (change.operation === "delete") {
             await table.delete(change.entityId);
           } else {

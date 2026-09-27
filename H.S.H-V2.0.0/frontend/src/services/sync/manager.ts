@@ -115,6 +115,15 @@ async function pullPhase(): Promise<void> {
           hasMore = true;
           continue;
         }
+        // PBS-BUG-014: empty probe means no further changes exist, so converge the
+        // cursor to the authoritative revision now instead of re-fetching from the
+        // old cursor on the next cycle. Monotonic only: never move backwards.
+        // (Non-empty probes must NOT persist here — those revisions still have to
+        // be applied through the normal loop above.)
+        if (check.currentRevision > after) {
+          await setServerRevision(check.currentRevision);
+          after = check.currentRevision;
+        }
       }
       hasMore = false;
     } catch (e) {

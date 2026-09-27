@@ -971,6 +971,14 @@ export function validateHshPayload(
         if (!isNonEmptyString(entityIdRaw)) return "PAYMENT_ENTITY_INVALID";
         if (!isNonEmptyString(accountIdRaw)) return "PAYMENT_ACCOUNT_INVALID";
       }
+      // PBS-BUG-024: creating a payment requires entityType up front, using the
+      // same PAYMENT_TYPE_INVALID code as the present-but-invalid path below
+      // (consistent with missing entityId/accountId above). Omission is therefore
+      // decided at the validation layer instead of leaking to the handler
+      // (String(undefined)) or Mongoose model text. Create-only: partial updates
+      // and upsert-existing inherit the stored entityType via candidate merge
+      // and must keep working, so this is never a blanket requirement.
+      if (operation === "create" && !isNonEmptyString(entityTypeRaw)) return "PAYMENT_TYPE_INVALID";
       if (amountRaw !== undefined && amountRaw !== null) {
         const amount = toFiniteNumber(amountRaw);
         if (!Number.isFinite(amount) || amount <= 0) return "PAYMENT_AMOUNT_INVALID";
@@ -1980,6 +1988,21 @@ export async function processSyncOperation(
           };
           return;
         } else {
+          // PBS-BUG-024: upsert-missing behaves as create -- a payment persisted
+          // here needs a valid entityType before model validation can leak raw
+          // Mongoose text. Re-running create-level validation adds exactly that
+          // requirement (all other create checks already passed under upsert
+          // rules, deterministically). Upsert-existing is unaffected: it returns
+          // through the candidate-merge path above, which inherits the stored
+          // entityType.
+          if (operation.entity === "payment") {
+            const createErr = validateHshPayload(operation.entity, payload as Record<string, unknown>, "create");
+            if (createErr) {
+              await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: createErr, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
+              result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: createErr, error: createErr, retryable: false };
+              return;
+            }
+          }
           if (operation.entity === "invoice") {
             const st2 = (payload as any).status;
             if (st2 && st2 !== "DRAFT") {

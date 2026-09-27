@@ -16,6 +16,7 @@ import { PaymentModel } from "../models/payment.model";
 import { TransferModel } from "../models/transfer.model";
 import { ExpenseModel } from "../models/expense.model";
 import { TaskModel } from "../models/task.model";
+import { SettingsModel } from "../models/settings.model";
 import { applyLinkedEntityLifecycleToRvbAccount } from "../services/rvb-account.service";
 
 type SyncModel = {
@@ -1327,6 +1328,27 @@ export function validateHshPayload(
   return null;
 }
 
+// PBS-BUG-026: currency fallback shared by incomingInvoice sync ingress paths.
+// Mirrors POST /api/invoices/incoming exactly: explicit non-blank payload value
+// wins (validated separately); otherwise document default, then global setting,
+// then "DA". Each candidate must be a non-blank member of ["DA", "€", "$"].
+// Read-only (SettingsModel only); no HTTP side effects.
+async function resolveIncomingInvoiceCurrency(payloadCurrency: unknown): Promise<string> {
+  const allowed = ["DA", "€", "$"];
+  const explicit = payloadCurrency != null ? String(payloadCurrency).trim() : "";
+  if (explicit !== "") return explicit;
+  let settings: any = null;
+  try {
+    settings = await SettingsModel.findOne({ id: "settings" }).lean();
+    if (!settings) settings = await SettingsModel.findOne({}).lean();
+  } catch {}
+  const candidates = [settings?.invoiceDocumentDefaults?.defaultCurrency, settings?.currency, "DA"];
+  for (const cand of candidates) {
+    if (typeof cand === "string" && cand.trim() !== "" && allowed.includes(cand.trim())) return cand.trim();
+  }
+  return "DA";
+}
+
 export async function validateIncomingInvoiceSync(payload: Record<string, unknown>, operation: SyncRequestOperation): Promise<string | null> {
   // Only validate create/upsert/update for incomingInvoice
   if (payload == null || typeof payload !== "object") return "INCOMING_AMOUNT_INVALID";
@@ -1505,6 +1527,37 @@ export async function processSyncOperation(
       if (trimmedNum) {
         p.supplierInvoiceNumber = trimmedNum;
         p.supplierInvoiceNumberNormalized = trimmedNum.toLowerCase();
+      }
+    }
+    // PBS-BUG-026: unify the remaining validator-accepted aliases into canonical
+    // fields BEFORE validation/persistence consume the payload. Canonical wins
+    // (mirrors the validator ?? chains: fill only when canonical is
+    // null/undefined and the alias is present). Unconditional across operations:
+    // a partial update carrying only `date`/`total` means to move the canonical
+    // field, and the validator already blesses those shapes. Legacy keys are
+    // kept for Mongoose strict-schema stripping (same as `number` above).
+    if ((p.invoiceDate === undefined || p.invoiceDate === null) && p.date !== undefined && p.date !== null) {
+      p.invoiceDate = p.date;
+    }
+    const htMissing = p.amountHT === undefined || p.amountHT === null;
+    const ttcMissing = p.amountTTC === undefined || p.amountTTC === null;
+    if ((htMissing || ttcMissing) && p.total !== undefined && p.total !== null) {
+      if (htMissing) p.amountHT = p.total;
+      if (ttcMissing) p.amountTTC = p.total;
+    }
+    // Mirror the validator's amountTTC-falls-back-to-amountHT resolution (and
+    // the HTTP route's effectiveAmountTTC), so persistence matches validation.
+    if ((p.amountTTC === undefined || p.amountTTC === null) && p.amountHT !== undefined && p.amountHT !== null) {
+      p.amountTTC = p.amountHT;
+    }
+    // PBS-BUG-026: currency fallback with exact HTTP-route semantics, for
+    // creates here (upsert-missing is handled at its own branch below; partial
+    // updates/upsert-existing must retain stored currency, so they are never
+    // filled).
+    if (operation.operation === "create") {
+      const cur = p.currencyCode;
+      if (cur === undefined || cur === null || String(cur).trim() === "") {
+        p.currencyCode = await resolveIncomingInvoiceCurrency(cur);
       }
     }
   }
@@ -2073,6 +2126,17 @@ export async function processSyncOperation(
               await ProcessedSyncOperationModel.create([{ operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, error: createErr, retryable: false, processedAt: new Date(), clientId: operation.clientId }], { session });
               result = { operationId: opId, entity: operation.entity, entityId: operation.entityId, operation: operation.operation, success: false, message: createErr, error: createErr, retryable: false };
               return;
+            }
+          }
+          // PBS-BUG-026: upsert-missing behaves as create for currency as well --
+          // a missing currencyCode here must receive the same HTTP-route fallback
+          // applied at ingress for creates (partial updates/upsert-existing keep
+          // stored currency because this branch is unreachable when a doc exists).
+          if (operation.entity === "incomingInvoice") {
+            const p: any = payload;
+            const cur = p.currencyCode;
+            if (cur === undefined || cur === null || String(cur).trim() === "") {
+              p.currencyCode = await resolveIncomingInvoiceCurrency(cur);
             }
           }
           if (operation.entity === "invoice") {

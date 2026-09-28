@@ -16,7 +16,7 @@ export const rvbPortalService = {
     return d.worker;
   },
   async getWorkerFinancial(): Promise<any[]> {
-    const r = await rvbAuthService.authFetch(`${BASE}/worker/financial`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const r = await rvbAuthService.authFetch(`${BASE}/worker/financial-events`, { cache: "no-store", headers: { ...getAuthHeaders() }, credentials: "include" });
     const d = await handleRes<{ success: boolean; events: any[] }>(r);
     return d.events || [];
   },

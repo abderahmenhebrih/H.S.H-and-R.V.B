@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { rvbAuthService, type RvbSafeUser } from "../services/rvb-auth.service";
+import { rvbAuthService, isTerminalRvbAuthError, type RvbSafeUser } from "../services/rvb-auth.service";
 
 type RvbAuthState = {
   user: RvbSafeUser | null;
@@ -47,9 +47,16 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
         ? await rvbAuthService.restoreSessionFromCookie()
         : await rvbAuthService.refresh();
       setUser(refreshed.account);
-    } catch {
-      rvbAuthService.clearLocal();
-      setUser(null);
+    } catch (e) {
+      // PBS-BUG-030: destroy local session state ONLY on positive server
+      // evidence the session is terminal (see isTerminalRvbAuthError).
+      // Transient bootstrap failures (network/5xx) preserve the hint, the
+      // HttpOnly cookie, and any already-known user so a later retry/reload
+      // can recover. Cold bootstrap simply stays user === null.
+      if (isTerminalRvbAuthError(e)) {
+        rvbAuthService.clearLocal();
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -70,6 +77,9 @@ export function RvbAuthProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   useEffect(() => {
+    // PBS-BUG-030: authFetch notifies ONLY after a terminal refresh failure
+    // (classification happens before notifyAuthFailure), so an unconditional
+    // clear here remains correct. Transient refresh failures never notify.
     const unsub = rvbAuthService.subscribeAuthFailure(() => {
       rvbAuthService.clearLocal();
       setUser(null);

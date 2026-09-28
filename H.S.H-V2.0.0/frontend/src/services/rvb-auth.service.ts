@@ -31,6 +31,44 @@ function clearSessionHint(): void {
   } catch {}
 }
 
+// PBS-BUG-030: source-authoritative terminal-vs-transient classifier.
+// Local authentication/session state (hint + known user) may be destroyed
+// automatically ONLY on positive server evidence that the current session can
+// no longer be used. A temporary inability to verify the session (network
+// failure, timeout, 5xx, rate limit, unrecognized error) MUST NOT destroy it.
+//
+// Terminal set derived from CURRENT backend contracts (routes/rvb-auth.ts +
+// middleware/rvb-auth.ts, proven by PBS-BUG-030 runtime matrix):
+//   POST /api/rvb/auth/refresh -> 401 RVB_REFRESH_REQUIRED (no cookie)
+//                              401 RVB_TOKEN_INVALID (malformed / revoked /
+//                                  unknown / disabled / archived / deleted)
+//                              401 RVB_TOKEN_EXPIRED (expired DB session)
+//   requireRvbAuth (/me, ...)  -> 401 RVB_TOKEN_INVALID (bad access token)
+//                              401 RVB_SESSION_REVOKED (revoked/expired session)
+//                              401 RVB_UNAUTHENTICATED (no token / no account)
+//                              403 RVB_ACCOUNT_ARCHIVED / RVB_ACCOUNT_DISABLED
+//                              404 RVB_ACCOUNT_NOT_FOUND (defensive: the /me
+//                                  handler emits it; middleware 401 fires first)
+// Deliberately NOT terminal: 5xx, network errors, 429 RVB_RATE_LIMIT,
+// 403 RVB_FORBIDDEN (role authorization — session itself is still valid),
+// RVB_NO_SESSION_HINT (client-side gate, not server evidence), and any
+// unrecognized code (UNKNOWN defaults to preservation).
+const TERMINAL_RVB_AUTH_CODES = new Set([
+  "RVB_TOKEN_INVALID",
+  "RVB_TOKEN_EXPIRED",
+  "RVB_SESSION_REVOKED",
+  "RVB_REFRESH_REQUIRED",
+  "RVB_UNAUTHENTICATED",
+  "RVB_ACCOUNT_ARCHIVED",
+  "RVB_ACCOUNT_DISABLED",
+  "RVB_ACCOUNT_NOT_FOUND",
+]);
+
+export function isTerminalRvbAuthError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  return typeof code === "string" && TERMINAL_RVB_AUTH_CODES.has(code);
+}
+
 // Small subscription to allow authFetch to notify context when refresh fails
 type AuthFailureListener = () => void;
 const authFailureListeners = new Set<AuthFailureListener>();
@@ -294,9 +332,16 @@ export const rvbAuthService = {
       const refreshed = await getRefreshPromise();
       const retryHeaders: any = { ...(init?.headers as any), Authorization: `Bearer ${refreshed.accessToken}` };
       return fetch(input, { ...init, headers: retryHeaders, credentials: "include" as any });
-    } catch {
+    } catch (e) {
+      // PBS-BUG-030: the just-used access token was rejected with 401, so drop
+      // the cached copy. But only terminal refresh failures (server positively
+      // proved the session is dead) may destroy durable session state via
+      // notifyAuthFailure. Transient failures surface as the original 401 so
+      // the caller fails without logging the user out.
       clearAccessToken();
-      notifyAuthFailure();
+      if (isTerminalRvbAuthError(e)) {
+        notifyAuthFailure();
+      }
       return res;
     }
   },

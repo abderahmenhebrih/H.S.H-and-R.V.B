@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Search } from "lucide-react";
 import AppShell from "../../src/components/layout/AppShell";
@@ -45,12 +45,17 @@ function formatTime(ts: number, lang: string): string {
   }
 }
 
-// PBS-BUG-038: page-local latest-load-wins guard. A plain (non-ref) instance
-// held in state so handlers can read it without ref-access lint hazards.
-// Only the newest generation may commit; stale completions are dropped.
+// PBS-BUG-038 (GIORNO REVIEW REVISION): page-local latest-load-wins guard.
+// A plain (non-ref) instance held in state so handlers can read it without
+// ref-access lint hazards. Only the newest generation may commit; stale
+// completions are dropped. activate() restores mounted=true on every REAL
+// effect setup so React StrictMode setup->cleanup->setup replay ends ACTIVE
+// (cleanup invalidate() bumps seq, so pre-replay generations stay stale).
 type NotifLoadGuard = {
   next: () => number;
   isCurrent: (seq: number) => boolean;
+  isActive: () => boolean;
+  activate: () => void;
   invalidate: () => void;
 };
 
@@ -59,6 +64,10 @@ function createNotifLoadGuard(): NotifLoadGuard {
   return {
     next: () => ++state.seq,
     isCurrent: (seq: number) => seq === state.seq && state.mounted,
+    isActive: () => state.mounted,
+    activate: () => {
+      state.mounted = true;
+    },
     invalidate: () => {
       state.mounted = false;
       state.seq++;
@@ -82,15 +91,34 @@ export default function NotificationsPage() {
   const [notifGuard] = useState(createNotifLoadGuard);
 
   useEffect(() => {
+    notifGuard.activate();
     return () => {
       notifGuard.invalidate();
     };
   }, [notifGuard]);
 
+  // PBS-BUG-038 REVISION 2 (stale-closure freshness): current-view holder.
+  // Every render publishes its committed filter/search here; async
+  // continuations (mark handlers resumed after later renders) consult the
+  // holder AFTER awaits instead of their stale render closure, so generation
+  // order tracks latest UI state. Layout effect keeps it synchronous with
+  // commit (before paint / before pending async continuations resume).
+  const currentViewRef = useRef({ filter, search });
+
+  useLayoutEffect(() => {
+    currentViewRef.current = { filter, search };
+  });
+
+  // PBS-BUG-038 REVISION 2: plain loader reading the CURRENT committed view
+  // from the holder (fresh effect calls and stale async continuations alike).
+  // Entry is guarded by isActive() so a post-unmount continuation performs no
+  // loading work (R38); commits remain generation-guarded as before.
   async function load() {
+    if (!notifGuard.isActive()) return;
+    const view = currentViewRef.current;
     const seq = notifGuard.next();
-    const activeFilter = filter;
-    const activeSearch = search;
+    const activeFilter = view.filter;
+    const activeSearch = view.search;
     setLoading(true);
     try {
       if (activeFilter === "unread") {
@@ -109,6 +137,28 @@ export default function NotificationsPage() {
         setLoading(false);
       }
     }
+  }
+
+  // PBS-BUG-038 REVISION 2: the marked-row patch consults the CURRENT
+  // committed filter (not the clicking render's) and refuses post-unmount
+  // work. Read-back value still comes from the persisted store.
+  async function patchMarked(id: string) {
+    if (!notifGuard.isActive()) return;
+    const persisted = await notificationService
+      .getById(id)
+      .catch(() => undefined);
+    if (!notifGuard.isActive()) return;
+    const readAt = persisted?.readAt;
+    if (!readAt) return;
+    const activeFilter = currentViewRef.current.filter;
+    setNotifications((prev) => {
+      const patched = prev.map((item) =>
+        item.id === id ? { ...item, readAt } : item,
+      );
+      return activeFilter === "unread"
+        ? patched.filter((item) => !item.readAt)
+        : patched;
+    });
   }
 
   useEffect(() => {
@@ -147,10 +197,19 @@ export default function NotificationsPage() {
   }
 
   async function handleMarkRead(n: Notification) {
-    // PBS-BUG-038: persist first; then race-safe local reconciliation BEFORE
-    // navigating, so a routed mark-read cannot leave stale unread state
-    // behind. A refresh failure never blocks navigation nor fabricates data.
-    if (!n.readAt) await notificationService.markAsRead(n.id);
+    // PBS-BUG-038 (GIORNO REVIEW REVISION R3/M2 + REVISION 2 freshness):
+    // persist first; then reconcile via CURRENT-view channels (patchMarked +
+    // load consult the holder synced to the latest committed filter/search,
+    // so a filter/search change during the mark cannot poison this stale
+    // continuation). Navigation never depends on a possibly-superseded load
+    // alone. No optimistic update: the patch runs only after persistence
+    // succeeds (using the persisted readAt value read back from the service),
+    // and a mark failure leaves state untouched. A refresh failure never
+    // blocks navigation nor fabricates data.
+    if (!n.readAt) {
+      await notificationService.markAsRead(n.id);
+      await patchMarked(n.id);
+    }
     await load().catch(() => {});
     if (n.route) router.push(n.route);
   }

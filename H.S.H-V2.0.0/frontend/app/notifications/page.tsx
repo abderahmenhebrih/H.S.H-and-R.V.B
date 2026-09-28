@@ -45,6 +45,27 @@ function formatTime(ts: number, lang: string): string {
   }
 }
 
+// PBS-BUG-038: page-local latest-load-wins guard. A plain (non-ref) instance
+// held in state so handlers can read it without ref-access lint hazards.
+// Only the newest generation may commit; stale completions are dropped.
+type NotifLoadGuard = {
+  next: () => number;
+  isCurrent: (seq: number) => boolean;
+  invalidate: () => void;
+};
+
+function createNotifLoadGuard(): NotifLoadGuard {
+  const state = { seq: 0, mounted: true };
+  return {
+    next: () => ++state.seq,
+    isCurrent: (seq: number) => seq === state.seq && state.mounted,
+    invalidate: () => {
+      state.mounted = false;
+      state.seq++;
+    },
+  };
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -53,19 +74,42 @@ export default function NotificationsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  // PBS-BUG-038: latest-load-wins generation guard + unmount safety.
+  // filter/search are captured once per load (coherent snapshot); only the
+  // newest generation may commit notifications/loading. Stale completions
+  // return without writing state. Covers effect, useDbSync, manual refresh,
+  // and mark-read reconciliation loads.
+  const [notifGuard] = useState(createNotifLoadGuard);
+
+  useEffect(() => {
+    return () => {
+      notifGuard.invalidate();
+    };
+  }, [notifGuard]);
+
+  async function load() {
+    const seq = notifGuard.next();
+    const activeFilter = filter;
+    const activeSearch = search;
     setLoading(true);
-    if (filter === "unread") {
-      const all = await notificationService.getFiltered({ type: "all", search: search || undefined });
-      setNotifications(all.filter((n) => !n.readAt));
-    } else {
-      // Normalize legacy "tasks" to correct type "task"
-      const typeParam = filter === "tasks" ? "task" : filter;
-      const all = await notificationService.getFiltered({ type: typeParam, search: search || undefined });
-      setNotifications(all);
+    try {
+      if (activeFilter === "unread") {
+        const all = await notificationService.getFiltered({ type: "all", search: activeSearch || undefined });
+        if (!notifGuard.isCurrent(seq)) return;
+        setNotifications(all.filter((n) => !n.readAt));
+      } else {
+        // Normalize legacy "tasks" to correct type "task"
+        const typeParam = activeFilter === "tasks" ? "task" : activeFilter;
+        const all = await notificationService.getFiltered({ type: typeParam, search: activeSearch || undefined });
+        if (!notifGuard.isCurrent(seq)) return;
+        setNotifications(all);
+      }
+    } finally {
+      if (notifGuard.isCurrent(seq)) {
+        setLoading(false);
+      }
     }
-    setLoading(false);
-  };
+  }
 
   useEffect(() => {
     settingsService.get().then((s) => {
@@ -97,16 +141,19 @@ export default function NotificationsPage() {
     return en;
   };
 
-  const handleMarkAllRead = async () => {
+  async function handleMarkAllRead() {
     await notificationService.markAllAsRead();
     await load();
-  };
+  }
 
-  const handleMarkRead = async (n: Notification) => {
+  async function handleMarkRead(n: Notification) {
+    // PBS-BUG-038: persist first; then race-safe local reconciliation BEFORE
+    // navigating, so a routed mark-read cannot leave stale unread state
+    // behind. A refresh failure never blocks navigation nor fabricates data.
     if (!n.readAt) await notificationService.markAsRead(n.id);
+    await load().catch(() => {});
     if (n.route) router.push(n.route);
-    else await load();
-  };
+  }
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 

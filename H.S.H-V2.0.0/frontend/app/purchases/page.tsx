@@ -441,17 +441,60 @@ export default function PurchasesPage() {
     }
   }
 
+  // PBS-BUG-038: one-time cached migration promise. The single selectedDate
+  // lifecycle below awaits it, so mount performs exactly ONE logical initial
+  // purchase load (no separate migration-effect + date-effect double load).
+  // Rejected migrations resolve silently here; the date load still proceeds,
+  // matching the combined pre-fix behavior (effect 2 loaded even if effect 1
+  // migration failed).
+  const migrationPromiseRef = useRef<Promise<void> | null>(null);
+
+  // PBS-BUG-038: latest-date-wins generation guard + unmount safety. Only the
+  // newest load may commit purchases/loading/error; stale overlaps return
+  // without writing state. The cleanup invalidates via the captured state
+  // object (not via ref access in cleanup).
+  const purchaseLoadStateRef = useRef({ seq: 0, mounted: true });
+
+  useEffect(() => {
+    const state = purchaseLoadStateRef.current;
+    state.mounted = true;
+    return () => {
+      state.mounted = false;
+      state.seq++;
+    };
+  }, []);
+
+  function getMigrationPromise(): Promise<void> {
+    if (!migrationPromiseRef.current) {
+      migrationPromiseRef.current = purchaseService
+        .migrateLegacyPurchases()
+        .catch(() => {});
+    }
+    return migrationPromiseRef.current;
+  }
+
   async function loadPurchasesForDate(date: Date) {
+    const state = purchaseLoadStateRef.current;
+    const seq = ++state.seq;
     setLoading(true);
     setError("");
     try {
+      await getMigrationPromise();
+      if (seq !== state.seq) return;
+      if (!state.mounted) return;
       const { start, end } = getDayBounds(date);
       const loadedPurchases = await purchaseService.getByDateRange(start, end);
+      if (seq !== state.seq) return;
+      if (!state.mounted) return;
       setPurchases(loadedPurchases);
     } catch {
+      if (seq !== state.seq) return;
+      if (!state.mounted) return;
       setError(t.failedLoad);
     } finally {
-      setLoading(false);
+      if (seq === state.seq && state.mounted) {
+        setLoading(false);
+      }
     }
   }
 
@@ -470,16 +513,10 @@ export default function PurchasesPage() {
     };
   }, []);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        await purchaseService.migrateLegacyPurchases();
-        await loadPurchasesForDate(selectedDate);
-      } catch {}
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // PBS-BUG-038: single selected-date loading lifecycle. The one-time
+  // migration above is awaited inside loadPurchasesForDate, so this ONE
+  // effect covers mount + every date change with exactly one logical load.
+  // (Pre-fix a second mount-only effect duplicated the initial load.)
   useEffect(() => {
     void loadPurchasesForDate(selectedDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps

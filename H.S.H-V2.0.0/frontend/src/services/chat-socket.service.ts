@@ -106,6 +106,13 @@ export function connectChatSocket(): Socket | null {
     try { socket.disconnect(); } catch {}
     socket = null;
   }
+  // PBS-BUG-035-REVISION: a deliberately created Socket starts a NEW
+  // user-visible connection episode (fresh mount, navigation, explicit retry).
+  // A previous episode's transient failure (500/network) must not poison it:
+  // reset the same-state loop guard so this episode gets ONE fresh attempt.
+  // Same-instance repeats stay bounded by failedRecoveryKey (manager emits no
+  // auto-retry for middleware rejections; identical manual repeats stop).
+  failedRecoveryKey = null;
   socket = io(API_BASE, {
     path: "/api/rvb/chats/socket",
     auth: { token },

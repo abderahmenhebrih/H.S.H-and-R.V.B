@@ -252,6 +252,28 @@ export default function Dashboard() {
 
   const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
   const isDesktopCollapsed = !desktopSidebarExpanded;
+
+  // Input-modality tracking: pointer focus must not pin the sidebar open,
+  // keyboard (Tab/arrows) focus must keep it expanded until focus leaves.
+  const lastInputRef = useRef<"pointer" | "keyboard">("pointer");
+
+  useEffect(() => {
+    const markPointer = () => {
+      lastInputRef.current = "pointer";
+    };
+    const markKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Tab" || event.key.startsWith("Arrow")) {
+        lastInputRef.current = "keyboard";
+      }
+    };
+    window.addEventListener("pointerdown", markPointer, { passive: true });
+    window.addEventListener("keydown", markKeyboard);
+    return () => {
+      window.removeEventListener("pointerdown", markPointer);
+      window.removeEventListener("keydown", markKeyboard);
+    };
+  }, []);
+
   const sidebarNavRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
 
   const [overviewPeriod, setOverviewPeriod] = useState<OverviewPeriod>("week");
@@ -507,12 +529,20 @@ export default function Dashboard() {
       )}
 
       <aside
-        className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""} ${
+        className={`${styles.sidebar} ${styles.sidebarCompact} ${sidebarOpen ? styles.sidebarOpen : ""} ${
           isDesktopCollapsed ? styles.sidebarCollapsed : ""
         }`}
         onMouseEnter={() => setSidebarHovered(true)}
         onMouseLeave={() => setSidebarHovered(false)}
-        onFocus={() => setSidebarFocused(true)}
+        onPointerDown={() => {
+          lastInputRef.current = "pointer";
+          setSidebarFocused(false);
+        }}
+        onFocus={() => {
+          if (lastInputRef.current === "keyboard") {
+            setSidebarFocused(true);
+          }
+        }}
         onBlur={(event) => {
           if (
             !event.currentTarget.contains(
@@ -591,6 +621,33 @@ export default function Dashboard() {
         </nav>
 
         <div className={styles.sidebarFooter}>
+          <div className={styles.sidebarUtilityRow}>
+            <span className={styles.sidebarUtilityBell}>
+              <HshNotificationBell language={settings.language} dark={dark} />
+            </span>
+            <button
+              type="button"
+              className={styles.sidebarUtilityButton}
+              onClick={() => setDark((current) => !current)}
+              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+              title={dark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {dark ? (
+                <Sun size={18} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Moon size={18} strokeWidth={2} aria-hidden="true" />
+              )}
+            </button>
+            <button
+              type="button"
+              className={styles.sidebarUtilityButton}
+              onClick={openSettings}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </div>
           <div className={styles.navItemWrap}>
             <button
               type="button"
@@ -651,6 +708,7 @@ export default function Dashboard() {
             onToggleTheme={() => setDark((current) => !current)}
             language={settings.language}
             settingsHref="/settings"
+            showUtilities={false}
             notificationBell={<HshNotificationBell language={settings.language} dark={dark} />}
           />
 

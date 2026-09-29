@@ -13,6 +13,7 @@ type Props = {
   language?: "en" | "fr" | "ar";
   settingsHref?: string;
   notificationBell?: React.ReactNode;
+  showUtilities?: boolean;
 };
 
 export default function CompactHeader({
@@ -23,6 +24,7 @@ export default function CompactHeader({
   language = "en",
   settingsHref = "/settings",
   notificationBell,
+  showUtilities = true,
 }: Props) {
   const router = useRouter();
 
@@ -42,31 +44,35 @@ export default function CompactHeader({
       <div className={styles.right}>
         <DateTimeDisplay language={language} />
 
-        {notificationBell ?? null}
+        {showUtilities && (
+          <>
+            {notificationBell ?? null}
 
-        <button
-          type="button"
-          className={styles.iconButton}
-          onClick={onToggleTheme}
-          aria-label="Toggle theme"
-          title={dark ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {dark ? (
-            <Sun size={18} strokeWidth={2} aria-hidden="true" />
-          ) : (
-            <Moon size={18} strokeWidth={2} aria-hidden="true" />
-          )}
-        </button>
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={onToggleTheme}
+              aria-label="Toggle theme"
+              title={dark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {dark ? (
+                <Sun size={18} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Moon size={18} strokeWidth={2} aria-hidden="true" />
+              )}
+            </button>
 
-        <button
-          type="button"
-          className={styles.iconButton}
-          onClick={() => router.push(settingsHref)}
-          aria-label="Settings"
-          title="Settings"
-        >
-          <Settings size={18} strokeWidth={2} aria-hidden="true" />
-        </button>
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => router.push(settingsHref)}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

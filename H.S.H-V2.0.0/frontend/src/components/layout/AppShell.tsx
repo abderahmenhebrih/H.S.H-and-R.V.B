@@ -413,6 +413,27 @@ export default function AppShell({
   const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
   const isDesktopCollapsed = !desktopSidebarExpanded;
 
+  // Input-modality tracking: pointer focus must not pin the sidebar open,
+  // keyboard (Tab/arrows) focus must keep it expanded until focus leaves.
+  const lastInputRef = useRef<"pointer" | "keyboard">("pointer");
+
+  useEffect(() => {
+    const markPointer = () => {
+      lastInputRef.current = "pointer";
+    };
+    const markKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Tab" || event.key.startsWith("Arrow")) {
+        lastInputRef.current = "keyboard";
+      }
+    };
+    window.addEventListener("pointerdown", markPointer, { passive: true });
+    window.addEventListener("keydown", markKeyboard);
+    return () => {
+      window.removeEventListener("pointerdown", markPointer);
+      window.removeEventListener("keydown", markKeyboard);
+    };
+  }, []);
+
   const [settings, setSettings] =
     useState<Settings>(DEFAULT_SETTINGS);
 
@@ -620,12 +641,20 @@ export default function AppShell({
       )}
 
       <aside
-        className={`${dashboardStyles.sidebar} ${
+        className={`${dashboardStyles.sidebar} ${dashboardStyles.sidebarCompact} ${
           sidebarOpen ? dashboardStyles.sidebarOpen : ""
         } ${isDesktopCollapsed ? dashboardStyles.sidebarCollapsed : ""}`}
         onMouseEnter={() => setSidebarHovered(true)}
         onMouseLeave={() => setSidebarHovered(false)}
-        onFocus={() => setSidebarFocused(true)}
+        onPointerDown={() => {
+          lastInputRef.current = "pointer";
+          setSidebarFocused(false);
+        }}
+        onFocus={() => {
+          if (lastInputRef.current === "keyboard") {
+            setSidebarFocused(true);
+          }
+        }}
         onBlur={(event) => {
           if (
             !event.currentTarget.contains(
@@ -677,6 +706,33 @@ export default function AppShell({
         </nav>
 
         <div className={dashboardStyles.sidebarFooter}>
+          <div className={dashboardStyles.sidebarUtilityRow}>
+            <span className={dashboardStyles.sidebarUtilityBell}>
+              <HshNotificationBell language={settings.language} dark={dark} />
+            </span>
+            <button
+              type="button"
+              className={dashboardStyles.sidebarUtilityButton}
+              onClick={toggleTheme}
+              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+              title={dark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {dark ? (
+                <Sun size={18} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Moon size={18} strokeWidth={2} aria-hidden="true" />
+              )}
+            </button>
+            <button
+              type="button"
+              className={dashboardStyles.sidebarUtilityButton}
+              onClick={() => navigate("/settings")}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </div>
           <div className={dashboardStyles.navItemWrap}>
             <button
               type="button"
@@ -737,6 +793,7 @@ export default function AppShell({
             onToggleTheme={toggleTheme}
             language={settings.language}
             settingsHref="/settings"
+            showUtilities={false}
             notificationBell={<HshNotificationBell language={settings.language} dark={dark} />}
           />
 

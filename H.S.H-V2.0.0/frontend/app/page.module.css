@@ -75,6 +75,31 @@
   flex: 0 0 76px;
 }
 
+/* HSH compact sidebar (AppShell + dashboard only).
+   RVB keeps the base widths below. */
+.sidebarCompact {
+  width: 210px;
+  flex: 0 0 210px;
+}
+
+.sidebarCompact.sidebarCollapsed {
+  width: 76px;
+  flex: 0 0 76px;
+}
+
+.sidebarCompact .sidebarBrand {
+  padding: 18px 12px;
+}
+
+.sidebarCompact .sidebarItem {
+  padding: 0 12px;
+  gap: 12px;
+}
+
+.sidebarCompact .sidebarFooter {
+  padding: 14px 12px;
+}
+
 .sidebarCollapsed .sidebarBrand {
   flex-direction: column;
   justify-content: center;
@@ -351,11 +376,189 @@
 .sidebarFooter {
   padding: 16px 18px;
 
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+
   border-top: 1px solid var(--border);
 }
 
 .themeDark .sidebarFooter {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* =========================
+   SIDEBAR UTILITY BAR (HSH)
+   Segmented icon-only bar: notifications / theme / settings.
+   Full footer width, matching Access RVB alignment.
+========================= */
+
+.sidebarUtilityRow {
+  width: 100%;
+  height: 46px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  padding: 2px;
+  gap: 0;
+
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+.sidebarUtilityRow > * + * {
+  border-inline-start: 1px solid var(--border);
+}
+
+.sidebarUtilityButton {
+  width: 100%;
+  height: 100%;
+
+  display: grid;
+  place-items: center;
+
+  border: 0;
+  border-radius: 7px;
+
+  background: transparent;
+  color: var(--text);
+
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebarUtilityButton:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.sidebarUtilityButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.themeDark .sidebarUtilityButton {
+  background: transparent;
+  color: var(--text);
+}
+
+.themeDark .sidebarUtilityButton:hover {
+  background: var(--panel-elevated);
+  color: var(--text);
+}
+
+.sidebarUtilityButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Bell wrapper: fill the cell (bell owns its own CSS module). */
+.sidebarUtilityBell {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebarUtilityBell > div {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebarUtilityBell button {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.sidebarUtilityBell button:hover {
+  background: var(--panel-hover);
+  border-color: transparent;
+}
+
+.sidebarUtilityBell button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Collapsed desktop (~76px): stack utility group above Access RVB. */
+.sidebarCollapsed .sidebarFooter {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Collapsed desktop: larger centered segmented group, no individual boxes.
+   Strict minmax tracks + zeroed child minimums so every cell stays inside. */
+.sidebarCollapsed .sidebarUtilityRow {
+  width: 64px;
+  height: 36px;
+  /* Parent footer centers via align-items:center; auto margins would
+     left-align on negative free space, so keep them at zero. */
+  margin-inline: 0;
+  padding: 2px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  justify-items: stretch;
+  gap: 0;
+  border-radius: 10px;
+}
+
+.sidebarCollapsed .sidebarUtilityButton {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  border-radius: 7px;
+}
+
+.sidebarCollapsed .sidebarUtilityButton svg {
+  width: 13px;
+  height: 13px;
+}
+
+.sidebarCollapsed .sidebarUtilityBell {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.sidebarCollapsed .sidebarUtilityBell > div {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.sidebarCollapsed .sidebarUtilityBell button {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  border-radius: 7px;
+}
+
+.sidebarCollapsed .sidebarUtilityBell button svg {
+  width: 13px;
+  height: 13px;
 }
 
 .databaseStatus {
@@ -1059,6 +1262,11 @@
     flex-basis: 220px;
   }
 
+  .sidebarCompact {
+    width: 200px;
+    flex-basis: 200px;
+  }
+
   .sidebar.sidebarCollapsed {
     width: 76px;
     flex-basis: 76px;
@@ -1079,6 +1287,11 @@
   .sidebar {
     width: 210px;
     flex-basis: 210px;
+  }
+
+  .sidebarCompact {
+    width: 190px;
+    flex-basis: 190px;
   }
 
   .sidebar.sidebarCollapsed {
@@ -1214,7 +1427,10 @@
      Tooltips are desktop-only to avoid duplicates beside visible labels. */
   .sidebarCollapsed .sidebarFooter {
     padding: 16px 18px;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
   }
 
   .sidebarCollapsed .sidebarFooter .navItemWrap {
@@ -1233,6 +1449,81 @@
 
   .sidebarCollapsed .onlineButtonLabel {
     display: inline;
+  }
+
+  /* Mobile drawer: utility row stays horizontal with touch-friendly targets.
+     The segmented-group styling is removed; individual buttons return. */
+  .sidebarCollapsed .sidebarUtilityRow {
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    margin-inline: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    gap: 10px;
+  }
+
+  .sidebarCollapsed .sidebarUtilityRow > * + * {
+    border: 0;
+  }
+
+.sidebarCollapsed .sidebarUtilityRow > * + * {
+  border-inline-start: 0;
+}
+
+.sidebarCollapsed .sidebarUtilityButton {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--panel);
+  }
+
+  .sidebarCollapsed .sidebarUtilityButton:hover {
+    background: var(--panel-hover);
+    border-color: var(--border-strong);
+  }
+
+  .sidebarCollapsed .sidebarUtilityButton svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .sidebarCollapsed .sidebarUtilityBell {
+    display: inline-flex;
+    width: auto;
+    height: auto;
+  }
+
+  .sidebarCollapsed .sidebarUtilityBell > div {
+    display: inline-flex;
+    width: auto;
+    height: auto;
+  }
+
+  .sidebarCollapsed .sidebarUtilityBell button {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--panel);
+  }
+
+  .sidebarCollapsed .sidebarUtilityBell button:hover {
+    background: var(--panel-hover);
+    border-color: var(--border-strong);
+  }
+
+  .sidebarCollapsed .sidebarUtilityBell button svg {
+    width: 18px;
+    height: 18px;
   }
 
   /* Mobile drawer also restores the full RVB current-user area. */
@@ -1390,6 +1681,11 @@
   .sidebar {
     width: 290px;
     flex-basis: 290px;
+  }
+
+  .sidebarCompact {
+    width: 230px;
+    flex-basis: 230px;
   }
 
   .sidebarBrand {

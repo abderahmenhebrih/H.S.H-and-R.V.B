@@ -6,8 +6,6 @@ import {
   Banknote,
   BarChart3,
   BriefcaseBusiness,
-  ChevronLeft,
-  ChevronRight,
   ClipboardCheck,
   FileText,
   LayoutDashboard,
@@ -406,7 +404,14 @@ export default function AppShell({
   const [dark, setDark] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Desktop hover/focus expand — ephemeral, never persisted.
+  // Desktop sidebar is collapsed unless hovered or keyboard-focused.
+  // Mobile drawer remains controlled solely by `sidebarOpen` via CSS.
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [sidebarFocused, setSidebarFocused] = useState(false);
+
+  const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
+  const isDesktopCollapsed = !desktopSidebarExpanded;
 
   const [settings, setSettings] =
     useState<Settings>(DEFAULT_SETTINGS);
@@ -432,10 +437,6 @@ export default function AppShell({
       const savedTheme = getSavedTheme();
       setDark(savedTheme === "dark");
       setThemeReady(true);
-    } catch {}
-    try {
-      const savedCollapsed = localStorage.getItem("hebrih-sidebar-collapsed") === "true";
-      setSidebarCollapsed(savedCollapsed);
     } catch {}
   }, []);
 
@@ -504,20 +505,6 @@ export default function AppShell({
   }, []);
 
   const sidebarNavRef = useRef<HTMLDivElement>(null);
-
-  // Desktop collapsed preference — persisted, separate from mobile open
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "hebrih-sidebar-collapsed",
-        String(sidebarCollapsed)
-      );
-    } catch {}
-  }, [sidebarCollapsed]);
-
-  function toggleSidebarCollapsed() {
-    setSidebarCollapsed((prev) => !prev);
-  }
 
   // Preserve sidebar scroll position across remounts (per-page AppShell would otherwise reset to 0)
   useEffect(() => {
@@ -635,39 +622,27 @@ export default function AppShell({
       <aside
         className={`${dashboardStyles.sidebar} ${
           sidebarOpen ? dashboardStyles.sidebarOpen : ""
-        } ${sidebarCollapsed ? dashboardStyles.sidebarCollapsed : ""}`}
+        } ${isDesktopCollapsed ? dashboardStyles.sidebarCollapsed : ""}`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+        onFocus={() => setSidebarFocused(true)}
+        onBlur={(event) => {
+          if (
+            !event.currentTarget.contains(
+              event.relatedTarget as Node | null
+            )
+          ) {
+            setSidebarFocused(false);
+          }
+        }}
       >
-<div className={dashboardStyles.sidebarBrand}>
+        <div className={dashboardStyles.sidebarBrand}>
           <div className={dashboardStyles.brandLogo}>
             <img src="/chicken.jpg" alt="Hebrih logo" />
           </div>
           <div className={dashboardStyles.sidebarBrandContent}>
             <div className={dashboardStyles.sidebarBrandTitleRow}>
               <span className={dashboardStyles.sidebarBrandTitle}>{t.brand}</span>
-              <button
-                type="button"
-                className={dashboardStyles.sidebarCollapseButton}
-                onClick={toggleSidebarCollapsed}
-                aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-                aria-expanded={!sidebarCollapsed}
-                title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-              >
-                {(() => {
-                  const isRtl = getDirection(settings.language) === "rtl";
-                  if (sidebarCollapsed) {
-                    return isRtl ? (
-                      <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-                    ) : (
-                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-                    );
-                  }
-                  return isRtl ? (
-                    <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-                  ) : (
-                    <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-                  );
-                })()}
-              </button>
             </div>
             <span className={dashboardStyles.sidebarBrandSubtitle}>{t.system}</span>
           </div>
@@ -685,14 +660,14 @@ export default function AppShell({
                 }`}
                 onClick={() => navigate(path)}
                 aria-label={navLabels[key]}
-                title={sidebarCollapsed ? navLabels[key] : undefined}
+                title={isDesktopCollapsed ? navLabels[key] : undefined}
               >
                 <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
                   <Icon size={18} strokeWidth={2} />
                 </span>
-                {!sidebarCollapsed && <span>{navLabels[key]}</span>}
+                <span className={dashboardStyles.sidebarLabel}>{navLabels[key]}</span>
               </button>
-              {sidebarCollapsed && (
+              {isDesktopCollapsed && (
                 <span className={dashboardStyles.tooltip} role="tooltip">
                   {navLabels[key]}
                 </span>
@@ -702,34 +677,25 @@ export default function AppShell({
         </nav>
 
         <div className={dashboardStyles.sidebarFooter}>
-          {sidebarCollapsed ? (
-            <div className={dashboardStyles.navItemWrap}>
-              <button
-                type="button"
-                className={`${dashboardStyles.onlineButtonCollapsed} ${activePage === "online" ? dashboardStyles.activeOnline : ""}`}
-                onClick={handleSwitchToRvb}
-                aria-label={t.onlineAccess}
-                title={t.onlineAccess}
-              >
-                <Store size={18} strokeWidth={2} aria-hidden="true" />
-              </button>
-              <span className={dashboardStyles.tooltip} role="tooltip">
-                {t.onlineAccess}
-              </span>
-            </div>
-          ) : (
+          <div className={dashboardStyles.navItemWrap}>
             <button
               type="button"
               className={`${dashboardStyles.onlineButton} ${activePage === "online" ? dashboardStyles.activeOnline : ""}`}
               onClick={handleSwitchToRvb}
               aria-label={t.onlineAccess}
+              title={isDesktopCollapsed ? t.onlineAccess : undefined}
             >
               <span className={dashboardStyles.onlineButtonIcon} aria-hidden="true">
                 <Store size={18} strokeWidth={2} />
               </span>
               <span className={dashboardStyles.onlineButtonLabel}>{t.onlineAccess}</span>
             </button>
-          )}
+            {isDesktopCollapsed && (
+              <span className={dashboardStyles.tooltip} role="tooltip">
+                {t.onlineAccess}
+              </span>
+            )}
+          </div>
         </div>
       </aside>
 

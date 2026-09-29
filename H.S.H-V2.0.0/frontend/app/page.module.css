@@ -89,17 +89,9 @@
   align-items: center;
 }
 
-.sidebarCollapsed .sidebarBrandTitleRow {
-  justify-content: center;
-}
-
 .sidebarCollapsed .sidebarBrandTitle,
 .sidebarCollapsed .sidebarBrandSubtitle {
   display: none;
-}
-
-.sidebarCollapsed .sidebarCollapseButton {
-  margin-inline: auto;
 }
 
 .sidebarCollapsed .sidebarNav {
@@ -217,9 +209,7 @@
 
 .sidebarBrandTitleRow {
   width: 100%;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: block;
 }
 
 .sidebarBrandTitle {
@@ -251,45 +241,6 @@
 
 .themeDark .sidebarBrandSubtitle {
   color: #8a9aa6;
-}
-
-.sidebarCollapseButton {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  border: 1px solid var(--border);
-  border-radius: 8px;
-
-  background: var(--panel-hover);
-  color: var(--muted);
-
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.sidebarCollapseButton:hover {
-  background: var(--panel);
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-
-.themeDark .sidebarCollapseButton,
-:global([class*="themeDark"]) .sidebarCollapseButton {
-  background: var(--panel-hover);
-  border-color: var(--border);
-  color: var(--muted);
-}
-
-.themeDark .sidebarCollapseButton:hover,
-:global([class*="themeDark"]) .sidebarCollapseButton:hover {
-  background: var(--panel-elevated);
-  border-color: var(--accent);
-  color: var(--text);
 }
 
 .brandLogo {
@@ -558,12 +509,28 @@
 /* ensure collapsed footer centers the button */
 .sidebarCollapsed .sidebarFooter .navItemWrap {
   justify-content: center;
+  width: 100%;
 }
 
 .sidebarCollapsed .sidebarFooter {
   padding: 12px 8px;
   display: flex;
   justify-content: center;
+}
+
+/* Desktop collapsed: single onlineButton renders icon-only.
+   Mobile override below restores the full button. */
+.sidebarCollapsed .onlineButton {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+  margin-inline: auto;
+}
+
+.sidebarCollapsed .onlineButtonLabel {
+  display: none;
 }
 
 /* =========================
@@ -1162,16 +1129,12 @@
   }
 
   .sidebarCollapsed .sidebarBrandTitleRow {
-    justify-content: flex-start;
+    display: block;
   }
 
   .sidebarCollapsed .sidebarBrandTitle,
   .sidebarCollapsed .sidebarBrandSubtitle {
     display: block;
-  }
-
-  .sidebarCollapsed .sidebarCollapseButton {
-    margin-inline: 0;
   }
 
   .sidebarCollapsed .sidebarNav {
@@ -1217,6 +1180,36 @@
 
   .sidebarCollapsed .sidebarDivider {
     width: 100%;
+  }
+
+  /* Mobile drawer always shows full labels + full RVB button,
+     even when the desktop-collapsed class is present.
+     Tooltips are desktop-only to avoid duplicates beside visible labels. */
+  .sidebarCollapsed .sidebarFooter {
+    padding: 16px 18px;
+    display: block;
+  }
+
+  .sidebarCollapsed .sidebarFooter .navItemWrap {
+    justify-content: stretch;
+  }
+
+  .sidebarCollapsed .onlineButton {
+    width: 100%;
+    height: auto;
+    min-height: 44px;
+    padding: 10px 12px;
+    justify-content: flex-start;
+    gap: 10px;
+    margin-inline: 0;
+  }
+
+  .sidebarCollapsed .onlineButtonLabel {
+    display: inline;
+  }
+
+  .tooltip {
+    display: none;
   }
 
   .overlay {

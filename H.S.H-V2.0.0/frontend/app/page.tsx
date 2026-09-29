@@ -39,8 +39,6 @@ import {
   Banknote,
   BarChart3,
   CarFront,
-  ChevronLeft,
-  ChevronRight,
   ClipboardCheck,
   ChevronDown,
   FileText,
@@ -248,7 +246,12 @@ export default function Dashboard() {
   const [dark, setDark] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Desktop hover/focus expand — ephemeral, never persisted. Matches AppShell.
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [sidebarFocused, setSidebarFocused] = useState(false);
+
+  const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
+  const isDesktopCollapsed = !desktopSidebarExpanded;
   const sidebarNavRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
 
   const [overviewPeriod, setOverviewPeriod] = useState<OverviewPeriod>("week");
@@ -298,26 +301,6 @@ export default function Dashboard() {
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("hebrih-sidebar-collapsed") === "true";
-      setSidebarCollapsed(saved);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "hebrih-sidebar-collapsed",
-        String(sidebarCollapsed)
-      );
-    } catch {}
-  }, [sidebarCollapsed]);
-
-  function toggleSidebarCollapsed() {
-    setSidebarCollapsed((prev) => !prev);
-  }
 
   useEffect(() => {
     async function loadSettings() {
@@ -525,8 +508,20 @@ export default function Dashboard() {
 
       <aside
         className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""} ${
-          sidebarCollapsed ? styles.sidebarCollapsed : ""
+          isDesktopCollapsed ? styles.sidebarCollapsed : ""
         }`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+        onFocus={() => setSidebarFocused(true)}
+        onBlur={(event) => {
+          if (
+            !event.currentTarget.contains(
+              event.relatedTarget as Node | null
+            )
+          ) {
+            setSidebarFocused(false);
+          }
+        }}
       >
         <div className={styles.sidebarBrand}>
           <div className={styles.brandLogo}>
@@ -538,39 +533,6 @@ export default function Dashboard() {
               <span className={styles.sidebarBrandTitle}>
                 Hebrih Slaughter House
               </span>
-
-              <button
-                type="button"
-                className={styles.sidebarCollapseButton}
-                onClick={toggleSidebarCollapsed}
-                aria-label={
-                  sidebarCollapsed
-                    ? "Expand navigation"
-                    : "Collapse navigation"
-                }
-                aria-expanded={!sidebarCollapsed}
-                title={
-                  sidebarCollapsed
-                    ? "Expand navigation"
-                    : "Collapse navigation"
-                }
-              >
-                {(() => {
-                  const isRtl = getDirection(settings.language) === "rtl";
-                  if (sidebarCollapsed) {
-                    return isRtl ? (
-                      <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-                    ) : (
-                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-                    );
-                  }
-                  return isRtl ? (
-                    <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-                  ) : (
-                    <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-                  );
-                })()}
-              </button>
             </div>
 
             <span className={styles.sidebarBrandSubtitle}>
@@ -612,14 +574,14 @@ export default function Dashboard() {
                   }
                 }}
                 aria-label={navLabels[key]}
-                title={sidebarCollapsed ? navLabels[key] : undefined}
+                title={isDesktopCollapsed ? navLabels[key] : undefined}
               >
                 <span className={styles.sidebarIcon} aria-hidden="true">
                   <Icon size={18} strokeWidth={2} />
                 </span>
-                {!sidebarCollapsed && <span className={styles.sidebarLabel}>{navLabels[key]}</span>}
+                <span className={styles.sidebarLabel}>{navLabels[key]}</span>
               </button>
-              {sidebarCollapsed && (
+              {isDesktopCollapsed && (
                 <span className={styles.tooltip} role="tooltip">
                   {navLabels[key]}
                 </span>
@@ -629,34 +591,25 @@ export default function Dashboard() {
         </nav>
 
         <div className={styles.sidebarFooter}>
-          {sidebarCollapsed ? (
-            <div className={styles.navItemWrap}>
-              <button
-                type="button"
-                className={styles.onlineButtonCollapsed}
-                onClick={handleSwitchToRvb}
-                aria-label={t.onlineAccess}
-                title={t.onlineAccess}
-              >
-                <Store size={18} strokeWidth={2} aria-hidden="true" />
-              </button>
-              <span className={styles.tooltip} role="tooltip">
-                {t.onlineAccess}
-              </span>
-            </div>
-          ) : (
+          <div className={styles.navItemWrap}>
             <button
               type="button"
               className={styles.onlineButton}
               onClick={handleSwitchToRvb}
               aria-label={t.onlineAccess}
+              title={isDesktopCollapsed ? t.onlineAccess : undefined}
             >
               <span className={styles.onlineButtonIcon} aria-hidden="true">
                 <Store size={18} strokeWidth={2} />
               </span>
-              <span>{t.onlineAccess}</span>
+              <span className={styles.onlineButtonLabel}>{t.onlineAccess}</span>
             </button>
-          )}
+            {isDesktopCollapsed && (
+              <span className={styles.tooltip} role="tooltip">
+                {t.onlineAccess}
+              </span>
+            )}
+          </div>
         </div>
       </aside>
 

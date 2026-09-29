@@ -6,6 +6,8 @@ import AppShell from "../../src/components/layout/AppShell";
 import StyledSelect from "../../src/components/common/StyledSelect";
 import ProtectedDeleteModal from "../../src/components/common/ProtectedDeleteModal";
 import {
+  CircleCheck,
+  Clock,
   FileText,
   Table2,
   Star,
@@ -17,11 +19,7 @@ import {
   ArchiveRestore,
   Trash2,
   Pencil,
-  FilePlus,
-  LayoutGrid,
-  Clock,
   FileStack,
-  FolderArchive,
   Sparkles,
 } from "lucide-react";
 import { officeFileService, getBlankDocumentContent, getBlankSpreadsheetContent, getLocalizedSheetName } from "../../src/services/office-file.service";
@@ -46,7 +44,10 @@ function getRequiredEntityKind(templateId: string | null): "customer" | "supplie
 const T = {
   en: {
     title: "Workspace",
+    heading: "My Office",
     subtitle: "Documents, spreadsheets and business templates.",
+    synced: "Synced",
+    syncPending: "Sync pending",
     new: "New",
     import: "Import",
     search: "Search files...",
@@ -100,7 +101,10 @@ const T = {
   },
   fr: {
     title: "Espace de travail",
+    heading: "Mon Bureau",
     subtitle: "Documents, tableurs et modèles d'entreprise.",
+    synced: "Synchronisé",
+    syncPending: "Synchronisation en attente",
     new: "Nouveau",
     import: "Importer",
     search: "Rechercher...",
@@ -154,7 +158,10 @@ const T = {
   },
   ar: {
     title: "مساحة العمل",
+    heading: "مكتبي",
     subtitle: "المستندات وجداول البيانات والقوالب المهنية.",
+    synced: "تمت المزامنة",
+    syncPending: "المزامنة معلقة",
     new: "جديد",
     import: "استيراد",
     search: "بحث...",
@@ -337,6 +344,17 @@ export default function OfficePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(()=>{ if(!toast) return; const id=setTimeout(()=>setToast(null), 3000); return ()=>clearTimeout(id); }, [toast]);
 
+  // Hydration-safe localized date label (date only, no time).
+  const [todayLabel, setTodayLabel] = useState("");
+  useEffect(() => {
+    try {
+      const locale = language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB";
+      setTodayLabel(new Date().toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" } as any));
+    } catch {
+      setTodayLabel(new Date().toDateString());
+    }
+  }, [language]);
+
   const t = T[language];
   const dir = getDirection(language);
 
@@ -421,10 +439,11 @@ export default function OfficePage() {
   const archived = useMemo(() => filtered.filter((f)=> !!f.isArchived), [filtered]);
   const favorites = useMemo(() => filtered.filter((f)=> !!f.isFavorite && !f.isArchived), [filtered]);
 
-  const kpis = {
-    docs: docs.length,
-    sheets: sheets.length,
+  const tabCounts: Record<Tab, number> = {
     recent: recentFiles.length,
+    documents: docs.length,
+    spreadsheets: sheets.length,
+    templates: TEMPLATE_DEFS.length,
     archived: archived.length,
   };
 
@@ -619,20 +638,25 @@ export default function OfficePage() {
   };
 
   return (
-    <AppShell activePage="office">
+    <AppShell activePage="office" showHeader={false}>
       <main className={styles.officePage} dir={dir}>
         <div className={styles.officeHeader}>
-          <div className={styles.officeHeaderLeft}>
-            <h1>{t.title}</h1>
-            <p>{t.subtitle}</p>
-          </div>
-          <div className={styles.officeHeaderRight}>
-            <div className={styles.searchField}>
-              <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
-              <input className={styles.searchInput} type="text" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder={t.search} aria-label={t.search} />
+          <div className={styles.officeBrand}>
+            <div className={styles.officeLogo}>
+              <img src="/chicken.jpg" alt="" />
             </div>
+            <div className={styles.officeTitle}>
+              <h1>{t.heading}</h1>
+              {todayLabel ? <span className={styles.officeDate}>{todayLabel}</span> : null}
+            </div>
+          </div>
+          <div className={styles.searchField}>
+            <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
+            <input className={styles.searchInput} type="text" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder={t.search} aria-label={t.search} />
+          </div>
+          <div className={styles.officeHeaderActions}>
             <div style={{ position:"relative" }} ref={newMenuRef}>
-              <button type="button" className={styles.primaryBtn} onClick={()=>setShowNewMenu((v)=>!v)}>
+              <button type="button" className={styles.primaryBtn} onClick={()=>setShowNewMenu((v)=>!v)} aria-haspopup="menu" aria-expanded={showNewMenu}>
                 <Plus size={16} strokeWidth={2} aria-hidden="true" /> {t.new}
               </button>
               {showNewMenu && (
@@ -650,24 +674,16 @@ export default function OfficePage() {
           </div>
         </div>
 
-        <div className={styles.kpiGrid}>
-          <div className={styles.kpiCard}><div className={styles.kpiIcon}><FileText size={18} strokeWidth={2} aria-hidden="true" /></div><div className={styles.kpiText}><strong>{String(kpis.docs)}</strong><span>{t.documents}</span></div></div>
-          <div className={styles.kpiCard}><div className={styles.kpiIcon}><Table2 size={18} strokeWidth={2} aria-hidden="true" /></div><div className={styles.kpiText}><strong>{String(kpis.sheets)}</strong><span>{t.spreadsheets}</span></div></div>
-          <div className={styles.kpiCard}><div className={styles.kpiIcon}><Clock size={18} strokeWidth={2} aria-hidden="true" /></div><div className={styles.kpiText}><strong>{String(kpis.recent)}</strong><span>{t.recent}</span></div></div>
-          <div className={styles.kpiCard}><div className={styles.kpiIcon}><FolderArchive size={18} strokeWidth={2} aria-hidden="true" /></div><div className={styles.kpiText}><strong>{String(kpis.archived)}</strong><span>{t.archived}</span></div></div>
-        </div>
-
         <div className={styles.tabBar} role="tablist">
-          {[
-            { id:"recent", label:t.recent, icon: Clock },
-            { id:"documents", label:t.documents, icon: FileText },
-            { id:"spreadsheets", label:t.spreadsheets, icon: Table2 },
-            { id:"templates", label:t.templates, icon: Sparkles },
-            { id:"archived", label:t.archived, icon: FolderArchive },
-          ].map((tb)=>{
-            const Icon = tb.icon as any;
+          {([
+            { id:"recent", label:t.recent },
+            { id:"documents", label:t.documents },
+            { id:"spreadsheets", label:t.spreadsheets },
+            { id:"templates", label:t.templates },
+            { id:"archived", label:t.archived },
+          ] as Array<{ id: Tab; label: string }>).map((tb)=>{
             const active = tab===tb.id;
-            return <button key={tb.id} type="button" role="tab" aria-selected={active} className={`${styles.tab} ${active? styles.tabActive:""}`} onClick={()=>setTab(tb.id as Tab)}><Icon size={16} strokeWidth={2} aria-hidden="true" />{tb.label}</button>;
+            return <button key={tb.id} type="button" role="tab" aria-selected={active} className={`${styles.tab} ${active? styles.tabActive:""}`} onClick={()=>setTab(tb.id)}>{tb.label}<span className={styles.tabCount} aria-hidden="true">{tabCounts[tb.id]}</span></button>;
           })}
         </div>
 
@@ -780,38 +796,36 @@ export default function OfficePage() {
   );
 }
 
-function FileCard({ file, t, language, onOpen, onRename, onDuplicate, onArchive, onDelete, onFavorite, formatDate, isArchivedView }: { file: OfficeFile; t:any; language:Language; onOpen:()=>void; onRename:()=>void; onDuplicate:()=>void; onArchive:()=>void; onDelete:()=>void; onFavorite:()=>void; formatDate:(n:number)=>string; isArchivedView?:boolean }) {
+function FileCard({ file, t, onOpen, onRename, onDuplicate, onArchive, onDelete, onFavorite, formatDate, isArchivedView }: { file: OfficeFile; t:any; language:Language; onOpen:()=>void; onRename:()=>void; onDuplicate:()=>void; onArchive:()=>void; onDelete:()=>void; onFavorite:()=>void; formatDate:(n:number)=>string; isArchivedView?:boolean }) {
+  const pending = file.syncStatus === "pending";
   return (
     <div className={`${styles.fileCard} ${file.isArchived ? styles.fileCardArchived : ""}`}>
-      <div className={styles.fileCardHeader}>
-        <div className={styles.fileIcon} aria-hidden="true">
-          {file.type==="document" ? <FileText size={20} strokeWidth={2} /> : <Table2 size={20} strokeWidth={2} />}
-        </div>
-        <div className={styles.fileInfo}>
-          <strong title={file.title}>{file.title}</strong>
-          <div className={styles.fileMeta}>
-            <span>{file.type==="document" ? "DOC" : "XLS"} · {formatDate(file.updatedAt)}</span>
-            {file.syncStatus==="pending" && <span className={styles.badge} title={language==="fr"?"Synchronisation en attente": language==="ar"?"مزامنة معلقة":"Sync pending"} aria-label={language==="fr"?"Synchronisation en attente": language==="ar"?"مزامنة معلقة":"Sync pending"}>Sync</span>}
-            {file.isFavorite && <span className={`${styles.badge} ${styles.badgeFavorite}`} title={t.favorite} aria-label={t.favorite}><Star size={10} strokeWidth={2} aria-hidden="true" /></span>}
-          </div>
-        </div>
-        <button type="button" className={styles.iconBtn} onClick={onFavorite} aria-label={file.isFavorite? t.unfavorite : t.favorite} title={file.isFavorite? t.unfavorite : t.favorite}>
-          <Star size={14} strokeWidth={2} fill={file.isFavorite? "currentColor" : "none"} aria-hidden="true" />
-        </button>
+      <div className={styles.fileIcon} aria-hidden="true">
+        {file.type==="document" ? <FileText size={20} strokeWidth={2} /> : <Table2 size={20} strokeWidth={2} />}
       </div>
-      {file.linkedEntities && file.linkedEntities.length>0 && (
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-          {file.linkedEntities.slice(0,2).map((le,idx)=>(
-            <span key={idx} className={styles.linkedChip}>{le.entityType}: {le.labelSnapshot.slice(0,30)}</span>
-          ))}
+      <div className={styles.fileInfo}>
+        <strong title={file.title}>{file.title}</strong>
+        <div className={styles.fileMeta}>
+          <span>{file.type==="document" ? "DOC" : "XLS"} · {formatDate(file.updatedAt)}</span>
+          {pending ? (
+            <span className={`${styles.badge} ${styles.badgePending}`} title={t.syncPending} aria-label={t.syncPending}><Clock size={12} strokeWidth={2} aria-hidden="true" />{t.syncPending}</span>
+          ) : (
+            <span className={`${styles.badge} ${styles.badgeSynced}`} title={t.synced} aria-label={t.synced}><CircleCheck size={12} strokeWidth={2} aria-hidden="true" />{t.synced}</span>
+          )}
+          {file.isFavorite && <span className={`${styles.badge} ${styles.badgeFavorite}`} title={t.favorite} aria-label={t.favorite}><Star size={10} strokeWidth={2} aria-hidden="true" /></span>}
         </div>
-      )}
-      <div className={styles.fileActions}>
-        <button type="button" className={styles.primaryBtn} style={{ minHeight:30, padding:"0 10px", fontSize:12 }} onClick={onOpen}>{isArchivedView ? t.restore : t.open}</button>
-        {!isArchivedView && <button type="button" className={styles.iconBtn} onClick={onRename} aria-label={t.rename} title={t.rename}><Pencil size={14} strokeWidth={2} aria-hidden="true" /></button>}
-        <button type="button" className={styles.iconBtn} onClick={onDuplicate} aria-label={t.duplicate} title={t.duplicate}><Copy size={14} strokeWidth={2} aria-hidden="true" /></button>
-        <button type="button" className={styles.iconBtn} onClick={onArchive} aria-label={isArchivedView? t.restore : t.archive} title={isArchivedView? t.restore : t.archive}>{isArchivedView? <ArchiveRestore size={14} strokeWidth={2} aria-hidden="true" /> : <Archive size={14} strokeWidth={2} aria-hidden="true" />}</button>
-        <button type="button" className={`${styles.iconBtn} ${styles.iconBtnDanger}`} onClick={onDelete} aria-label={t.delete} title={t.delete}><Trash2 size={14} strokeWidth={2} aria-hidden="true" /></button>
+      </div>
+      <div className={styles.fileRowRight}>
+        <div className={styles.fileActions}>
+          <button type="button" className={styles.primaryBtn} onClick={onOpen}>{isArchivedView ? t.restore : t.open}</button>
+          <button type="button" className={styles.iconBtn} onClick={onFavorite} aria-label={file.isFavorite? t.unfavorite : t.favorite} title={file.isFavorite? t.unfavorite : t.favorite}>
+            <Star size={14} strokeWidth={2} fill={file.isFavorite? "currentColor" : "none"} aria-hidden="true" />
+          </button>
+          {!isArchivedView && <button type="button" className={styles.iconBtn} onClick={onRename} aria-label={t.rename} title={t.rename}><Pencil size={14} strokeWidth={2} aria-hidden="true" /></button>}
+          <button type="button" className={styles.iconBtn} onClick={onDuplicate} aria-label={t.duplicate} title={t.duplicate}><Copy size={14} strokeWidth={2} aria-hidden="true" /></button>
+          <button type="button" className={styles.iconBtn} onClick={onArchive} aria-label={isArchivedView? t.restore : t.archive} title={isArchivedView? t.restore : t.archive}>{isArchivedView? <ArchiveRestore size={14} strokeWidth={2} aria-hidden="true" /> : <Archive size={14} strokeWidth={2} aria-hidden="true" />}</button>
+          <button type="button" className={`${styles.iconBtn} ${styles.iconBtnDanger}`} onClick={onDelete} aria-label={t.delete} title={t.delete}><Trash2 size={14} strokeWidth={2} aria-hidden="true" /></button>
+        </div>
       </div>
     </div>
   );

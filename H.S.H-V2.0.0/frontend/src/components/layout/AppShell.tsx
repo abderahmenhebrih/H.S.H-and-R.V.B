@@ -395,9 +395,11 @@ const translations = {
 export default function AppShell({
   children,
   activePage,
+  showHeader = true,
 }: {
   children: React.ReactNode;
   activePage: ActivePage;
+  showHeader?: boolean;
 }) {
   const router = useRouter();
 
@@ -786,16 +788,18 @@ export default function AppShell({
         </header>
 
         <div className={dashboardStyles.content}>
-          <CompactHeader
-            title={heroTitle[activePage]}
-            description={heroDescription[activePage]}
-            dark={dark}
-            onToggleTheme={toggleTheme}
-            language={settings.language}
-            settingsHref="/settings"
-            showUtilities={false}
-            notificationBell={<HshNotificationBell language={settings.language} dark={dark} />}
-          />
+          {showHeader && (
+            <CompactHeader
+              title={heroTitle[activePage]}
+              description={heroDescription[activePage]}
+              dark={dark}
+              onToggleTheme={toggleTheme}
+              language={settings.language}
+              settingsHref="/settings"
+              showUtilities={false}
+              notificationBell={<HshNotificationBell language={settings.language} dark={dark} />}
+            />
+          )}
 
           {children}
         </div>

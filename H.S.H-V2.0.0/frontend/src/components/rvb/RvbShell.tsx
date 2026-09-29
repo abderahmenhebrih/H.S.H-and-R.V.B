@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
-  ChevronLeft,
-  ChevronRight,
   Factory,
   Inbox,
   LayoutDashboard,
@@ -200,7 +198,12 @@ export default function RvbShell({
   const [dark, setDark] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Desktop hover/focus expand — ephemeral, never persisted. Matches AppShell.
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [sidebarFocused, setSidebarFocused] = useState(false);
+
+  const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
+  const isDesktopCollapsed = !desktopSidebarExpanded;
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
@@ -209,16 +212,12 @@ export default function RvbShell({
 
   const sidebarNavRef = useRef<HTMLDivElement>(null);
 
-  // Theme + collapsed + settings shared
+  // Theme + settings shared (sidebar hover state is ephemeral, never persisted)
   useEffect(() => {
     try {
       const savedTheme = getSavedTheme();
       setDark(savedTheme === "dark");
       setThemeReady(true);
-    } catch {}
-    try {
-      const savedCollapsed = localStorage.getItem("hebrih-rvb-sidebar-collapsed") === "true";
-      setSidebarCollapsed(savedCollapsed);
     } catch {}
   }, []);
 
@@ -271,16 +270,6 @@ export default function RvbShell({
       window.removeEventListener("storage", readTheme);
     };
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("hebrih-rvb-sidebar-collapsed", String(sidebarCollapsed));
-    } catch {}
-  }, [sidebarCollapsed]);
-
-  function toggleSidebarCollapsed() {
-    setSidebarCollapsed((prev) => !prev);
-  }
 
   // Preserve scroll with independent key
   useEffect(() => {
@@ -442,42 +431,30 @@ export default function RvbShell({
       <aside
         className={`${dashboardStyles.sidebar} ${
           sidebarOpen ? dashboardStyles.sidebarOpen : ""
-        } ${sidebarCollapsed ? dashboardStyles.sidebarCollapsed : ""}`}
+        } ${isDesktopCollapsed ? dashboardStyles.sidebarCollapsed : ""}`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+        onFocus={() => setSidebarFocused(true)}
+        onBlur={(event) => {
+          if (
+            !event.currentTarget.contains(
+              event.relatedTarget as Node | null
+            )
+          ) {
+            setSidebarFocused(false);
+          }
+        }}
       >
         <div
           className={dashboardStyles.sidebarBrand}
-          title={sidebarCollapsed ? (t as any).rvbBrandName ?? t.brand : undefined}
+          title={isDesktopCollapsed ? (t as any).rvbBrandName ?? t.brand : undefined}
         >
-          <div className={dashboardStyles.brandLogo} title={sidebarCollapsed ? (t as any).rvbBrandName ?? t.brand : undefined}>
+          <div className={dashboardStyles.brandLogo} title={isDesktopCollapsed ? (t as any).rvbBrandName ?? t.brand : undefined}>
             <img src="/chicken.jpg" alt="RVB logo" />
           </div>
           <div className={dashboardStyles.sidebarBrandContent}>
             <div className={dashboardStyles.sidebarBrandTitleRow}>
               <span className={dashboardStyles.sidebarBrandTitle}>{(t as any).rvbBrandName ?? t.brand}</span>
-              <button
-                type="button"
-                className={dashboardStyles.sidebarCollapseButton}
-                onClick={toggleSidebarCollapsed}
-                aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-                aria-expanded={!sidebarCollapsed}
-                title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-              >
-                {(() => {
-                  const isRtl = getDirection(settings.language) === "rtl";
-                  if (sidebarCollapsed) {
-                    return isRtl ? (
-                      <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-                    ) : (
-                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-                    );
-                  }
-                  return isRtl ? (
-                    <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-                  ) : (
-                    <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-                  );
-                })()}
-              </button>
             </div>
             <span className={dashboardStyles.sidebarBrandSubtitle}>{(t as any).rvbAbbreviation ?? "RVB"}</span>
           </div>
@@ -517,20 +494,20 @@ export default function RvbShell({
                 }`}
                 onClick={() => navigate(path)}
                 aria-label={displayLabel}
-                title={sidebarCollapsed ? displayLabel : undefined}
+                title={isDesktopCollapsed ? displayLabel : undefined}
               >
                 <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
                   <Icon size={18} strokeWidth={2} />
                 </span>
-                {!sidebarCollapsed && <span style={{ flex: 1 }}>{displayLabel}</span>}
-                {!sidebarCollapsed && key === "notifications" && notifUnread > 0 && (
+                <span className={dashboardStyles.sidebarLabel} style={{ flex: 1 }}>{displayLabel}</span>
+                {!isDesktopCollapsed && key === "notifications" && notifUnread > 0 && (
                   <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
                 )}
-                {sidebarCollapsed && key === "notifications" && notifUnread > 0 && (
+                {isDesktopCollapsed && key === "notifications" && notifUnread > 0 && (
                   <span style={{ position: "absolute", top: 4, insetInlineEnd: 6, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#B93A42", color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center", lineHeight: 1 }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
                 )}
               </button>
-              {sidebarCollapsed && (
+              {isDesktopCollapsed && (
                 <span className={dashboardStyles.tooltip} role="tooltip">
                   {displayLabel}
                 </span>
@@ -540,11 +517,11 @@ export default function RvbShell({
           })}
         </nav>
 
-        {/* Current user area */}
+        {/* Current user area — details always rendered; CSS hides them on desktop-collapsed and restores on mobile */}
         {user && (
           <div
+            className={dashboardStyles.rvbUserArea}
             style={{
-              padding: sidebarCollapsed ? "12px 8px" : "12px 14px",
               borderTop: "1px solid var(--border)",
               display: "flex",
               alignItems: "center",
@@ -563,56 +540,44 @@ export default function RvbShell({
             >
               {user.profilePicture ? <img src={user.profilePicture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (user.displayName?.slice(0,2).toUpperCase() || "?")}
             </span>
-            {!sidebarCollapsed && (
-              <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                <strong style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.displayName}</strong>
-                <small style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{user.tag} · {user.role}</small>
-              </span>
-            )}
-            {!sidebarCollapsed && (
-              <button
-                type="button"
-                onClick={async () => { await logout(); router.replace("/rvb/login"); }}
-                title="Sign Out"
-                aria-label="Sign Out"
-                style={{ width: 32, height: 32, display: "grid", placeItems: "center", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--muted)", cursor: "pointer", flex: "0 0 32px" }}
-              >
-                <LogOut size={14} strokeWidth={2} />
-              </button>
-            )}
+            <span className={dashboardStyles.rvbUserDetails} style={{ minWidth: 0, flex: 1, flexDirection: "column", gap: 1 }}>
+              <strong style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.displayName}</strong>
+              <small style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{user.tag} · {user.role}</small>
+            </span>
+            <button
+              type="button"
+              className={dashboardStyles.rvbSignOut}
+              onClick={async () => { await logout(); router.replace("/rvb/login"); }}
+              title="Sign Out"
+              aria-label="Sign Out"
+              style={{ width: 32, height: 32, placeItems: "center", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--muted)", cursor: "pointer", flex: "0 0 32px" }}
+            >
+              <LogOut size={14} strokeWidth={2} />
+            </button>
           </div>
         )}
 
         {(user?.role === "manager" || user?.role === "admin") && (
           <div className={dashboardStyles.sidebarFooter}>
-            {sidebarCollapsed ? (
-              <div className={dashboardStyles.navItemWrap}>
-                <button
-                  type="button"
-                  className={dashboardStyles.onlineButtonCollapsed}
-                  onClick={handleSwitchToHsh}
-                  aria-label={t.switchToHsh}
-                  title={t.switchToHsh}
-                >
-                  <Factory size={18} strokeWidth={2} aria-hidden="true" />
-                </button>
-                <span className={dashboardStyles.tooltip} role="tooltip">
-                  {t.switchToHsh}
-                </span>
-              </div>
-            ) : (
+            <div className={dashboardStyles.navItemWrap}>
               <button
                 type="button"
                 className={dashboardStyles.onlineButton}
                 onClick={handleSwitchToHsh}
                 aria-label={t.switchToHsh}
+                title={isDesktopCollapsed ? t.switchToHsh : undefined}
               >
                 <span className={dashboardStyles.onlineButtonIcon} aria-hidden="true">
                   <Factory size={18} strokeWidth={2} />
                 </span>
-                <span>{t.switchToHsh}</span>
+                <span className={dashboardStyles.onlineButtonLabel}>{t.switchToHsh}</span>
               </button>
-            )}
+              {isDesktopCollapsed && (
+                <span className={dashboardStyles.tooltip} role="tooltip">
+                  {t.switchToHsh}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </aside>

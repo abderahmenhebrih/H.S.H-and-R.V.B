@@ -534,6 +534,33 @@
 }
 
 /* =========================
+   RVB CURRENT-USER AREA
+   Always rendered; hidden on desktop-collapsed, restored on mobile.
+========================= */
+
+.rvbUserArea {
+  padding: 12px 14px;
+}
+
+.rvbUserDetails {
+  display: flex;
+}
+
+.rvbSignOut {
+  display: grid;
+}
+
+.sidebarCollapsed .rvbUserArea {
+  padding: 12px 8px;
+  justify-content: center;
+}
+
+.sidebarCollapsed .rvbUserDetails,
+.sidebarCollapsed .rvbSignOut {
+  display: none;
+}
+
+/* =========================
    MAIN
 ========================= */
 
@@ -1206,6 +1233,20 @@
 
   .sidebarCollapsed .onlineButtonLabel {
     display: inline;
+  }
+
+  /* Mobile drawer also restores the full RVB current-user area. */
+  .sidebarCollapsed .rvbUserArea {
+    padding: 12px 14px;
+    justify-content: flex-start;
+  }
+
+  .sidebarCollapsed .rvbUserDetails {
+    display: flex;
+  }
+
+  .sidebarCollapsed .rvbSignOut {
+    display: grid;
   }
 
   .tooltip {

@@ -5,12 +5,154 @@
   gap: 18px;
 }
 
+.productsPage {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  color: var(--text);
+}
+
+/* Unified Products header — single card: brand / search / sort / add */
+.productsHeader {
+  display: grid;
+  grid-template-columns: minmax(300px, 350px) minmax(320px, 1fr) 150px 170px;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 15px var(--shadow);
+}
+
+.productsHeaderBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.productsLogo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+}
+
+.productsLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.productsTitle {
+  min-width: 0;
+}
+
+.productsTitle h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.productsTitle p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.productsPage .productsHeader .searchBox {
+  min-height: 56px;
+  height: 56px;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-inline: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.productsPage .productsHeader .searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.productsPage .productsHeader .searchBox .searchIcon {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.productsPage .productsHeader .searchBox .searchIcon svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* Canonical header search input — beats globals.css input:not() (0,2,1)
+   without !important. The input owns no surface of its own. */
+.productsPage .productsHeader .searchBox input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.productsPage .productsHeader .searchBox input::placeholder {
+  color: var(--muted);
+}
+
+.productsPage .productsHeader .sortDropdown {
+  min-width: 0;
+  width: 100%;
+}
+
+.productsPage .productsHeader .sortTrigger {
+  height: 56px;
+  min-height: 56px;
+}
+
+.productsPage .productsHeader .primaryButton {
+  min-height: 56px;
+  width: 100%;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 /* Summary cards — compact, matched to app tokens */
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 20px;
 }
 
 .summaryCard {
@@ -113,30 +255,6 @@
   text-wrap: balance;
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 18px;
-  margin-bottom: 15px;
-}
-
-.countBadge {
-  min-width: 126px;
-  min-height: 48px;
-  padding: 0 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 800;
-}
-
 .searchBox {
   min-height: 48px;
   display: flex;
@@ -156,20 +274,6 @@
   line-height: 1;
 }
 
-.searchBox input {
-  width: 100%;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-}
-
-.searchBox input::placeholder {
-  color: var(--subtle);
-}
-
 .errorBanner,
 .formError {
   padding: 13px 16px;
@@ -186,23 +290,6 @@
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--panel);
-}
-
-.sectionHeader {
-  min-height: 78px;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  border-bottom: 1px solid var(--border);
-}
-
-.sectionHeader h2 {
-  margin: 0;
-  color: var(--text);
-  font-size: 21px;
-  font-weight: 850;
 }
 
 .primaryButton,
@@ -243,15 +330,6 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
-}
-
-/* Toolbar — search + sort + add */
-.toolbarActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .sortDropdown {
@@ -550,33 +628,44 @@ html[dir="rtl"] .sortOption {
   }
 }
 
+@media (max-width: 1000px) {
+  .productsHeader {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .productsHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .productsHeader .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  .productsHeader .sortDropdown,
+  .productsHeader .primaryButton {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .summaryGrid {
     grid-template-columns: 1fr;
   }
 
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .productsHeader {
+    grid-template-columns: 1fr;
+    padding: 16px;
   }
 
-  .toolbarActions {
+  .productsHeader .sortDropdown,
+  .productsHeader .primaryButton {
     width: 100%;
-  }
-
-  .toolbarActions .primaryButton {
-    flex: 1;
   }
 
   .tableHeader,
   .tableRow {
     grid-template-columns: 1fr 90px 80px 80px 100px;
     min-width: 520px;
-  }
-
-  .tableFooter {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 
@@ -599,11 +688,6 @@ html[dir="rtl"] .sortOption {
 
 :global(.themeDark) .tableRow:hover {
   background: var(--panel-hover);
-}
-
-:global(.themeDark) .tableFooter {
-  background: var(--panel);
-  border-color: var(--border);
 }
 
 /* RTL */
@@ -916,7 +1000,6 @@ html[dir="rtl"] .tableRow {
 }
 
 /* Dark mode */
-:global(.themeDark) .countBadge,
 :global(.themeDark) .searchBox,
 :global(.themeDark) .productsSection,
 :global(.themeDark) .statePanel,
@@ -927,11 +1010,6 @@ html[dir="rtl"] .tableRow {
   color: var(--text);
 }
 
-:global(.themeDark) .sectionHeader {
-  border-color: var(--border);
-}
-
-:global(.themeDark) .sectionHeader h2,
 :global(.themeDark) .statePanel h2,
 :global(.themeDark) .modalHeader h2,
 :global(.themeDark) .deleteModal h2,
@@ -953,7 +1031,6 @@ html[dir="rtl"] .tableRow {
   border-color: var(--danger-ring);
 }
 
-:global(.themeDark) .searchBox input,
 :global(.themeDark) .form input,
 :global(.themeDark) .form textarea {
   color: var(--text);
@@ -961,7 +1038,19 @@ html[dir="rtl"] .tableRow {
   border-color: var(--border);
 }
 
-:global(.themeDark) .searchBox input::placeholder {
+:global(.themeDark) .productsPage .productsHeader .searchBox {
+  border-color: var(--border);
+  background: var(--panel);
+}
+
+:global(.themeDark) .productsPage .productsHeader .searchBox input {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text);
+}
+
+:global(.themeDark) .productsPage .productsHeader .searchBox input::placeholder {
   color: var(--subtle);
 }
 
@@ -970,25 +1059,6 @@ html[dir="rtl"] .tableRow {
 }
 
 @media (max-width: 760px) {
-  .toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .countBadge {
-    min-height: 52px;
-    justify-content: flex-start;
-  }
-
-  .sectionHeader {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 18px;
-  }
-
-  .sectionHeader .primaryButton {
-    width: 100%;
-  }
-
   .formGrid {
     grid-template-columns: 1fr;
   }
@@ -1021,10 +1091,10 @@ html[dir="rtl"] .tableRow {
    PRODUCTS - SPACING + THEME FIX
    ========================================================= */
 
-/* Keep clear separation between toolbar and content */
+/* Keep clear separation between header/cards and content */
 .statePanel,
 .productsSection {
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 /* Light mode */
@@ -1079,13 +1149,6 @@ html[dir="rtl"] .tableRow {
 }
 
 /* Same toolbar geometry as Customers */
-.productsPage .toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 15px;
-}
-
 .productsPage .searchBox {
   min-width: 0;
   flex: 1;
@@ -1096,20 +1159,6 @@ html[dir="rtl"] .tableRow {
   border-radius: 11px;
   background: var(--panel);
   box-shadow: 0 2px 7px rgba(0, 0, 0, .035);
-}
-
-.productsPage .countBadge {
-  height: 48px;
-  min-height: 48px;
-  min-width: auto;
-  padding: 0 15px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: var(--panel);
-  color: var(--muted, var(--muted));
-  font-size: 16px;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 /* Main Products surface follows the global theme */
@@ -1156,55 +1205,9 @@ html[dir="rtl"] .tableRow {
 }
 
 /* Product section */
-.productsPage .sectionHeader {
-  min-height: 52px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-hover);
-  color: var(--muted);
-}
-
-/* Product cards use the active theme rather than fixed white */
-.productsPage .productCard {
-  background: var(--panel);
-  color: var(--text);
-  border-color: var(--border);
-}
-
-.productsPage .dataItem {
-  background: var(--panel-hover);
-}
-
-.productsPage .cardIdentity h3,
-.productsPage .dataItem strong {
-  color: var(--text);
-}
-
-.productsPage .cardIdentity p,
-.productsPage .dataItem span,
-.productsPage .cardHint {
-  color: var(--muted);
-}
-
-/* Keep RTL/LTR behavior identical to Customers */
-@media (max-width: 600px) {
-  .productsPage .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .productsPage .countBadge {
-    justify-content: center;
-  }
-}
 /* =========================================================
    PRODUCTS - FINAL SPACING + MODAL THEME FIX
    ========================================================= */
-
-/* Match the locked Customers spacing */
-.productsPage .toolbar {
-  margin-top: 18px;
-  margin-bottom: 15px;
-}
 
 /* =========================================================
    LIGHT MODE - MODAL
@@ -1339,16 +1342,6 @@ html[dir="rtl"] .tableRow {
 :global(.themeDark) .productsPage .modalBackdrop {
   background: rgba(3, 8, 13, .78);
 }
-/* =========================================================
-   PRODUCTS - FINAL SPACING + MODAL THEME FIX
-   ========================================================= */
-
-/* Match the locked Customers spacing */
-.productsPage .toolbar {
-  margin-top: 18px;
-  margin-bottom: 15px;
-}
-
 /* =========================================================
    LIGHT MODE - MODAL
    ========================================================= */

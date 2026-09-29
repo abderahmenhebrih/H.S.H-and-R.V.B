@@ -58,6 +58,8 @@ const EMPTY_FORM: FormState = {
 
 const TRANSLATIONS = {
   en: {
+    title: "Products",
+    subtitle: "Manage products, inventory quantities, pricing and weights.",
     search: "Search products...",
     searchPlaceholder: "Search products by name, description...",
     product: "Product",
@@ -136,6 +138,8 @@ const TRANSLATIONS = {
   },
 
   fr: {
+    title: "Produits",
+    subtitle: "Gérer les produits, les quantités en stock, les prix et les poids.",
     search: "Rechercher des produits...",
     searchPlaceholder: "Rechercher par nom, description...",
     product: "Produit",
@@ -214,6 +218,8 @@ const TRANSLATIONS = {
   },
 
   ar: {
+    title: "المنتجات",
+    subtitle: "إدارة المنتجات وكميات المخزون والأسعار والأوزان.",
     search: "البحث عن المنتجات...",
     searchPlaceholder: "البحث بالاسم أو الوصف...",
     product: "السلعة",
@@ -565,8 +571,48 @@ export default function ProductsPage() {
   }
 
   return (
-    <AppShell activePage="products">
+    <AppShell activePage="products" showHeader={false}>
       <main className={styles.productsPage}>
+        {/* Unified Products header */}
+        <section className={styles.productsHeader}>
+          <div className={styles.productsHeaderBrand}>
+            <div className={styles.productsLogo}>
+              <img src="/chicken.jpg" alt="" />
+            </div>
+            <div className={styles.productsTitle}>
+              <h1>{t.title}</h1>
+              <p>{t.subtitle}</p>
+            </div>
+          </div>
+
+          <div className={styles.searchBox}>
+            <span className={styles.searchIcon} aria-hidden="true">
+              <Search size={18} strokeWidth={2} aria-hidden="true" />
+            </span>
+
+            <input
+              type="search"
+              value={search}
+              onChange={(event) =>
+                setSearch(event.target.value)
+              }
+              placeholder={t.searchPlaceholder}
+              aria-label={t.search}
+            />
+          </div>
+
+          <SortDropdown value={sortBy} onChange={setSortBy} t={t} />
+
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={openCreate}
+          >
+            <Plus size={16} strokeWidth={2} aria-hidden="true" />
+            {t.addProduct}
+          </button>
+        </section>
+
         {/* Summary Cards */}
         <section className={styles.summaryGrid}>
           <div className={styles.summaryCard}>
@@ -615,38 +661,6 @@ export default function ProductsPage() {
               <strong className={styles.summaryValue}>{lowStockCount}</strong>
               <small className={styles.summarySub}>{t.lowStockSub}</small>
             </div>
-          </div>
-        </section>
-
-        {/* Toolbar */}
-        <section className={styles.toolbar}>
-          <div className={styles.searchBox}>
-            <span className={styles.searchIcon} aria-hidden="true">
-              <Search size={18} strokeWidth={2} aria-hidden="true" />
-            </span>
-
-            <input
-              type="search"
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder={t.searchPlaceholder}
-              aria-label={t.search}
-            />
-          </div>
-
-          <div className={styles.toolbarActions}>
-            <SortDropdown value={sortBy} onChange={setSortBy} t={t} />
-
-            <button
-              type="button"
-              className={styles.primaryButton}
-              onClick={openCreate}
-            >
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addProduct}
-            </button>
           </div>
         </section>
 

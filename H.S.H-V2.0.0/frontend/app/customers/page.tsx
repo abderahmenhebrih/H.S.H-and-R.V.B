@@ -272,6 +272,8 @@ function FilterDropdown({
 
 const TRANSLATIONS = {
   en: {
+    title: "Customers",
+    subtitle: "Manage customer information, types, balances and history.",
     search: "Search customers...",
     searchPlaceholder: "Search customers by name, phone, or type...",
     customerCount: "customer",
@@ -341,6 +343,8 @@ const TRANSLATIONS = {
   },
 
   fr: {
+    title: "Clients",
+    subtitle: "Gérer les informations clients, les types, les soldes et l’historique.",
     search: "Rechercher des clients...",
     searchPlaceholder: "Rechercher par nom, téléphone ou type...",
     customerCount: "client",
@@ -410,6 +414,8 @@ const TRANSLATIONS = {
   },
 
   ar: {
+    title: "العملاء",
+    subtitle: "إدارة معلومات العملاء والأنواع والأرصدة والسجل.",
     search: "البحث عن العملاء...",
     searchPlaceholder: "البحث بالاسم أو الهاتف أو النوع...",
     customerCount: "عميل",
@@ -768,9 +774,46 @@ export default function CustomersPage() {
   }
 
   return (
-    <AppShell activePage="customers">
+    <AppShell activePage="customers" showHeader={false}>
       <main className={styles.customersPage}>
         <div className={styles.customersShell}>
+          {/* Unified Customers header */}
+          <section className={styles.customersHeader}>
+            <div className={styles.customersHeaderBrand}>
+              <div className={styles.customersLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.customersTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.search}
+              />
+            </div>
+
+            <FilterDropdown
+              value={filterType}
+              options={customerTypes}
+              placeholder={t.allTypes}
+              onChange={setFilterType}
+            />
+
+            <button type="button" className={styles.primaryButton} onClick={openCreate}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addCustomer}
+            </button>
+          </section>
+
           {/* KPI Cards — matched to Products */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -816,33 +859,6 @@ export default function CustomersPage() {
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar — search + filter + add */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label={t.search}
-              />
-            </div>
-
-            <FilterDropdown
-              value={filterType}
-              options={customerTypes}
-              placeholder={t.allTypes}
-              onChange={setFilterType}
-            />
-
-            <button type="button" className={styles.primaryButton} onClick={openCreate}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addCustomer}
-            </button>
           </section>
 
           {error && <div className={styles.errorBanner}>{error}</div>}

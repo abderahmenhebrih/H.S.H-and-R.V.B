@@ -6,6 +6,7 @@ import styles from "./page.module.css";
 import { useDbSync } from "../../src/hooks/useDbSync";
 
 import { settingsService } from "../../src/services/settings.service";
+import { rvbUiPreferencesService } from "../../src/services/rvb-ui-preferences.service";
 import { productService } from "../../src/services/product.service";
 import { injuryEquationService } from "../../src/services/injury-equation.service";
 import {
@@ -13,6 +14,7 @@ import {
   DEFAULT_SETTINGS,
   getDirection,
   resolveNavigationStyle,
+  resolveRvbNavigationStyle,
 } from "../../src/lib/settings";
 import { getSavedTheme, applyTheme } from "../../src/lib/theme";
 import {
@@ -566,6 +568,7 @@ function SettingsPageInner() {
         ...stored,
         expenseTypes: stored.expenseTypes ?? [],
         navigationStyle: resolveNavigationStyle(stored.navigationStyle),
+        rvbNavigationStyle: resolveRvbNavigationStyle(stored.rvbNavigationStyle),
       };
       setSettings(normalized);
       settingsRef.current = normalized;
@@ -1174,6 +1177,22 @@ function SettingsPageInner() {
                   language={settings.language}
                   value={resolveNavigationStyle(settings.navigationStyle)}
                   onChange={(style: NavigationStyle) => updateSettingsPartial({ navigationStyle: style })}
+                />
+                <div style={{ height: 20 }} aria-hidden="true" />
+                <NavigationStyleSelector
+                  language={settings.language}
+                  variant="rvb"
+                  value={resolveRvbNavigationStyle(settings.rvbNavigationStyle)}
+                  onChange={(style: NavigationStyle) => {
+                    // Instant card feedback + Dexie coherence via the canonical
+                    // partial path; authoritative RVB persistence (account /
+                    // local fallback) + live RvbShell switch via the RVB
+                    // preferences service event.
+                    updateSettingsPartial({ rvbNavigationStyle: style });
+                    rvbUiPreferencesService.setRvbNavigationStyle(style).catch((error) => {
+                      console.error("Failed to save RVB navigation style:", error);
+                    });
+                  }}
                 />
               </>
             ) : activeSection === "master-data" ? (

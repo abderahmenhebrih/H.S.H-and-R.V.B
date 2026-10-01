@@ -13,7 +13,7 @@ type CardStrings = {
   floatingDesc: string;
 };
 
-const TR: Record<Language, CardStrings> = {
+const TR_HSH: Record<Language, CardStrings> = {
   en: {
     title: "Navigation Style",
     desc: "Choose how you navigate through the application.",
@@ -44,10 +44,39 @@ type Props = {
   language: Language;
   value: NavigationStyle;
   onChange: (style: NavigationStyle) => void;
+  variant?: "hsh" | "rvb";
 };
 
-export default function NavigationStyleSelector({ language, value, onChange }: Props) {
-  const t = TR[language] ?? TR.en;
+const TR_RVB: Record<Language, CardStrings> = {
+  en: {
+    title: "RVB Navigation Style",
+    desc: "Choose how you navigate through the RVB portal.",
+    classic: "Classic Sidebar",
+    classicDesc: "Expandable RVB navigation sidebar",
+    floating: "Floating Bubbles",
+    floatingDesc: "Movable radial RVB navigation",
+  },
+  fr: {
+    title: "Style de navigation RVB",
+    desc: "Choisissez comment naviguer dans le portail RVB.",
+    classic: "Barre latérale",
+    classicDesc: "Barre de navigation RVB extensible",
+    floating: "Bulles flottantes",
+    floatingDesc: "Navigation radiale RVB déplaçable",
+  },
+  ar: {
+    title: "نمط التنقل RVB",
+    desc: "اختر طريقة التنقل في بوابة RVB.",
+    classic: "الشريط الجانبي",
+    classicDesc: "شريط تنقل RVB قابل للتوسيع",
+    floating: "فقاعات عائمة",
+    floatingDesc: "تنقل دائري RVB قابل للتحريك",
+  },
+};
+
+export default function NavigationStyleSelector({ language, value, onChange, variant = "hsh" }: Props) {
+  const table = variant === "rvb" ? TR_RVB : TR_HSH;
+  const t = table[language] ?? table.en;
 
   return (
     <div className={themeStyles.section}>

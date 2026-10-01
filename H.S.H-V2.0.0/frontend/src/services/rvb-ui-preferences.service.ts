@@ -2,12 +2,13 @@
 
 import { rvbAuthService } from "./rvb-auth.service";
 import { rvbConfigService } from "./rvb-config.service";
-import { DEFAULT_SETTINGS, getDirection } from "../lib/settings";
-import type { Settings, Language, Currency } from "../types/settings/settings";
+import { DEFAULT_SETTINGS, getDirection, resolveRvbNavigationStyle } from "../lib/settings";
+import type { Settings, Language, Currency, NavigationStyle } from "../types/settings/settings";
 import { getSavedTheme, applyTheme } from "../lib/theme";
 
 export const RVB_UI_PREFERENCES_EVENT = "rvb-ui-preferences-change";
 export const RVB_LANGUAGE_STORAGE_KEY = "rvb-ui-language";
+export const RVB_NAVIGATION_STYLE_STORAGE_KEY = "rvb-ui-navigation-style";
 
 function getLocalLanguage(): Language {
   try {
@@ -47,6 +48,36 @@ function isValidLanguage(v: any): v is Language {
 }
 function isValidTheme(v: any): boolean {
   return v === "light" || v === "dark";
+}
+
+function getLocalNavigationStyle(): NavigationStyle {
+  try {
+    if (typeof window !== "undefined") {
+      const v = localStorage.getItem(RVB_NAVIGATION_STYLE_STORAGE_KEY);
+      if (v === "classic" || v === "floating") return v;
+    }
+  } catch {}
+  return "classic";
+}
+
+function setLocalNavigationStyleStorage(style: NavigationStyle) {
+  try {
+    if (typeof window !== "undefined") localStorage.setItem(RVB_NAVIGATION_STYLE_STORAGE_KEY, style);
+  } catch {}
+}
+
+async function getEffectiveNavigationStyle(): Promise<NavigationStyle> {
+  const local = getLocalNavigationStyle();
+  try {
+    const token = rvbAuthService.getAccessToken();
+    if (!token) return local;
+    const prefs = await rvbAuthService.getPreferences().catch(() => null);
+    const uiNav = (prefs as any)?.ui?.rvbNavigationStyle;
+    if (uiNav === "classic" || uiNav === "floating") return uiNav;
+    return local;
+  } catch {
+    return local;
+  }
 }
 
 /**
@@ -168,6 +199,7 @@ export const rvbUiPreferencesService = {
       workerPositions,
       vehicleTypes,
       expenseTypes,
+      rvbNavigationStyle: await getEffectiveNavigationStyle(),
     };
     return settings;
   },
@@ -201,5 +233,25 @@ export const rvbUiPreferencesService = {
     setLocalLanguageStorage(lang);
     applyDocumentLanguage(lang);
     this.getPresentationSettings().then((s) => dispatchRvbPreferences(s)).catch(() => {});
+  },
+
+  /** Independent RVB navigation style ("classic" | "floating").
+   *  Authoritative in account ui.rvbNavigationStyle when authenticated,
+   *  localStorage fallback otherwise (same pattern as RVB language).
+   *  Dispatches RVB_UI_PREFERENCES_EVENT so RvbShell switches live.
+   */
+  async setRvbNavigationStyle(style: NavigationStyle): Promise<void> {
+    const next = resolveRvbNavigationStyle(style);
+    const token = rvbAuthService.getAccessToken();
+    if (token) {
+      try {
+        await rvbAuthService.updatePreferences({ ui: { rvbNavigationStyle: next } } as any);
+      } catch {
+        // fall through to local persistence
+      }
+    }
+    setLocalNavigationStyleStorage(next);
+    const settings = await this.getPresentationSettings();
+    dispatchRvbPreferences(settings);
   },
 };

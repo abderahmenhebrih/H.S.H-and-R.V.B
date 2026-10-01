@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  ChevronDown,
+  ClipboardList,
   Factory,
   Inbox,
   LayoutDashboard,
@@ -29,11 +31,14 @@ import WorkspaceTransition from "./WorkspaceTransition";
 import {
   DEFAULT_SETTINGS,
   getDirection,
+  resolveRvbNavigationStyle,
 } from "../../lib/settings";
 import type { Settings } from "../../types/settings/settings";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
 import { getSavedTheme, applyTheme } from "../../lib/theme";
 import { useRvbAuth } from "../../contexts/RvbAuthContext";
+import FloatingNav from "../layout/FloatingNav";
+import type { FloatingNavEntry } from "../layout/FloatingNav";
 
 export type RvbActivePage =
   | "dashboard"
@@ -87,10 +92,14 @@ const translations = {
       directory: "Directory",
       search: "Search",
       settings: "Settings",
+      people: "People",
+      operations: "Operations",
     },
     brand: "RVB",
     brandSub: "Le Royaume des Viandes Blanches",
     subtitle: "The Kingdom of White Meat",
+    openMenu: "Open navigation",
+    closeMenu: "Close navigation",
     rvbBrandName: "The Kingdom of White Meat",
     rvbAbbreviation: "RVB",
     switchToHsh: "Access HSH",
@@ -125,10 +134,14 @@ const translations = {
       directory: "Annuaire",
       search: "Recherche",
       settings: "Paramètres",
+      people: "Personnes",
+      operations: "Opérations",
     },
     brand: "RVB",
     brandSub: "Le Royaume des Viandes Blanches",
     subtitle: "Le Royaume des Viandes Blanches",
+    openMenu: "Ouvrir la navigation",
+    closeMenu: "Fermer la navigation",
     rvbBrandName: "Le royaume des viandes blanches",
     rvbAbbreviation: "RVB",
     switchToHsh: "Accéder à HSH",
@@ -163,10 +176,14 @@ const translations = {
       directory: "الدليل",
       search: "البحث",
       settings: "الإعدادات",
+      people: "الأشخاص",
+      operations: "العمليات",
     },
     brand: "RVB",
     brandSub: "مملكة اللحوم البيضاء",
     subtitle: "مملكة اللحوم البيضاء",
+    openMenu: "فتح قائمة التنقل",
+    closeMenu: "إغلاق قائمة التنقل",
     rvbBrandName: "مملكة اللحوم البيضاء",
     rvbAbbreviation: "RVB",
     switchToHsh: "الدخول إلى HSH",
@@ -376,7 +393,30 @@ export default function RvbShell({
     directory: (t.nav as any).directory,
     search: (t.nav as any).search,
     settings: (t.nav as any).settings,
+    people: (t.nav as any).people,
+    operations: (t.nav as any).operations,
   };
+
+  // Grouped classic sidebar partition (canonical paths only — portal
+  // query-path items never match, so secondary portal navigation stays
+  // flat exactly as today). Filters apply on top of the role-filtered
+  // visibleNav, so no role can gain a route through grouping.
+  const RVB_PEOPLE_PATHS = ["/rvb/accounts", "/rvb/workers", "/rvb/suppliers", "/rvb/customers"];
+  const RVB_OPERATIONS_PATHS = ["/rvb/orders", "/rvb/requests", "/rvb/chats"];
+  type RvbNavGroup = "people" | "operations";
+
+  // Collapsible nav groups. Accordion: opening one closes the other.
+  // The group holding the active page starts open. Deterministic from
+  // props — hydration-safe.
+  const [rvbOpenGroup, setRvbOpenGroup] = useState<RvbNavGroup | null>(() => {
+    if (["accounts", "workers", "suppliers", "customers"].includes(activePage)) return "people";
+    if (["orders", "requests", "chats"].includes(activePage)) return "operations";
+    return null;
+  });
+
+  function toggleRvbGroup(group: RvbNavGroup) {
+    setRvbOpenGroup((current) => (current === group ? null : group));
+  }
 
   // Role-aware navigation per spec 35
   const isManager = user?.role === "manager" || user?.role === "admin";
@@ -412,6 +452,209 @@ export default function RvbShell({
     });
   })();
 
+  // Single canonical RVB navigation-mode decision. Exactly one navigation
+  // UI is ever mounted. Deterministic from settings state (default
+  // "classic") — hydration-safe; the stored preference arrives via the
+  // RVB preferences effect + event subscription above. Independent from
+  // the HSH navigationStyle preference.
+  const rvbNavigationStyle = resolveRvbNavigationStyle(settings.rvbNavigationStyle);
+
+  // Active-route logic shared by classic + floating (extracted unchanged
+  // from the classic item renderer, including the portal query matching).
+  function isRvbItemActive(item: NavItem): boolean {
+    const { key, path } = item;
+    if (isSecondary) {
+      // portal mode: check path match
+      if (typeof window !== "undefined") {
+        const cur = window.location.pathname + window.location.search;
+        if (cur === path) return true;
+        // fallback to activePage mapping
+        if (key === "dashboard" && activePage === "dashboard") return path === "/rvb";
+        if (key === "directory" && activePage === "directory") return path === "/rvb/directory";
+        if (key === "settings" && activePage === "settings") return path === "/rvb/settings";
+        if (key === "chats" && activePage === "chats") {
+          return cur.includes(path.split("?")[0]) && cur.includes(path.split("?")[1] || "");
+        }
+      }
+      return activePage === key && (path === "/rvb" ? activePage === "dashboard" : true);
+    }
+    return activePage === key;
+  }
+
+  const rvbTopItems = visibleNav.filter(
+    (item) => !RVB_PEOPLE_PATHS.includes(item.path) && !RVB_OPERATIONS_PATHS.includes(item.path),
+  );
+  const rvbPeopleItems = visibleNav.filter((item) => RVB_PEOPLE_PATHS.includes(item.path));
+  const rvbOperationsItems = visibleNav.filter((item) => RVB_OPERATIONS_PATHS.includes(item.path));
+
+  function rvbDisplayLabel(item: NavItem): string {
+    return (item.label as string) || (navLabels as any)[item.key] || String(item.key);
+  }
+
+  // Floating radial entries reuse canonical icons/routes/labels.
+  function rvbFanEntry(item: NavItem, keyOverride?: string): FloatingNavEntry {
+    return {
+      key: keyOverride ?? String(item.key),
+      label: rvbDisplayLabel(item),
+      path: item.path,
+      icon: item.icon,
+    };
+  }
+
+  function rvbFanEntries(items: readonly NavItem[]): FloatingNavEntry[] {
+    return items.map((item) => rvbFanEntry(item));
+  }
+
+  function findRvbItem(path: string): NavItem | undefined {
+    return visibleNav.find((item) => item.path === path);
+  }
+
+  // Floating root composition adapts to the role-filtered inventory so no
+  // role ever loses a destination: managers get Control Center + Directory
+  // + People/Operations groups; portal roles get profile + search + a Chats
+  // group and a single-item group (Settings, or People for supervisors —
+  // settings stays one tap away via the settings orbit for everyone).
+  const rvbFloatConfig = (() => {
+    const canSeeHsh = user?.role === "manager" || user?.role === "admin";
+    if (isSupervisor || isSecondary) {
+      const profile = findRvbItem("/rvb");
+      const search = findRvbItem("/rvb/directory");
+      const mainChats = findRvbItem("/rvb/chats?category=main");
+      const secondaryChats = findRvbItem("/rvb/chats?category=secondary");
+      const settingsPortal = findRvbItem("/rvb/settings");
+      const customersCanonical = findRvbItem("/rvb/customers");
+      const chatsChildren = [mainChats, secondaryChats]
+        .filter((item): item is NavItem => !!item)
+        .map((item, index) => rvbFanEntry(item, index === 0 ? "chats-main" : "chats-secondary"));
+      const opsChildren = isSupervisor && customersCanonical
+        ? [rvbFanEntry(customersCanonical)]
+        : settingsPortal
+          ? [rvbFanEntry(settingsPortal)]
+          : [];
+      return {
+        dashboardEntry: profile ? rvbFanEntry(profile) : rvbFanEntry(RVB_NAVIGATION[0]),
+        officeEntry: search ? rvbFanEntry(search) : rvbFanEntry(RVB_NAVIGATION[9]),
+        managementLabel: navLabels.chats,
+        managementItems: chatsChildren,
+        operationsLabel: isSupervisor ? navLabels.people : navLabels.settings,
+        operationsItems: opsChildren,
+        canSeeHsh,
+      };
+    }
+    const dashboardCanonical = findRvbItem("/rvb") ?? RVB_NAVIGATION[0];
+    const directoryCanonical = findRvbItem("/rvb/directory") ?? RVB_NAVIGATION[9];
+    const notificationsCanonical = findRvbItem("/rvb/notifications");
+    return {
+      dashboardEntry: rvbFanEntry(dashboardCanonical),
+      officeEntry: rvbFanEntry(directoryCanonical),
+      managementLabel: navLabels.people,
+      managementItems: rvbFanEntries(rvbPeopleItems),
+      operationsLabel: navLabels.operations,
+      operationsItems: [
+        ...rvbFanEntries(rvbOperationsItems),
+        ...(notificationsCanonical ? [rvbFanEntry(notificationsCanonical)] : []),
+      ],
+      canSeeHsh,
+    };
+  })();
+
+  async function handleRvbSignOut() {
+    try { await logout(); } catch {}
+    router.replace("/rvb/login");
+  }
+
+  // Classic sidebar item renderer (markup identical to the previous flat
+  // list, including the notifications badge + collapsed tooltips).
+  function renderRvbNavItem(item: NavItem, extraClass = "") {
+    const Icon = item.icon;
+    const displayLabel = rvbDisplayLabel(item);
+    const isActive = isRvbItemActive(item);
+    const uniqueKey = `${item.key}-${item.path}`;
+    return (
+      <div key={uniqueKey} className={dashboardStyles.navItemWrap}>
+        <button
+          type="button"
+          className={`${dashboardStyles.sidebarItem} ${extraClass} ${
+            isActive ? dashboardStyles.active : ""
+          }`}
+          onClick={() => navigate(item.path)}
+          aria-label={displayLabel}
+          title={isDesktopCollapsed ? displayLabel : undefined}
+        >
+          <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
+            <Icon size={18} strokeWidth={2} />
+          </span>
+          <span className={dashboardStyles.sidebarLabel} style={{ flex: 1 }}>{displayLabel}</span>
+          {!isDesktopCollapsed && item.key === "notifications" && notifUnread > 0 && (
+            <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
+          )}
+          {isDesktopCollapsed && item.key === "notifications" && notifUnread > 0 && (
+            <span style={{ position: "absolute", top: 4, insetInlineEnd: 6, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#B93A42", color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center", lineHeight: 1 }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
+          )}
+        </button>
+        {isDesktopCollapsed && (
+          <span className={dashboardStyles.tooltip} role="tooltip">
+            {displayLabel}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Collapsible group renderer. Groups with zero visible children render
+  // nothing — role filtering can never be widened by grouping.
+  function renderRvbGroup(
+    group: RvbNavGroup,
+    label: string,
+    GroupIcon: LucideIcon,
+    items: NavItem[],
+    groupId: string,
+  ) {
+    if (items.length === 0) return null;
+    const isOpen = rvbOpenGroup === group;
+    const isActive = items.some((item) => isRvbItemActive(item));
+    return (
+      <>
+        <div className={dashboardStyles.navItemWrap}>
+          <button
+            type="button"
+            className={`${dashboardStyles.sidebarItem} ${
+              isActive ? dashboardStyles.navGroupButtonActive : ""
+            }`}
+            onClick={() => toggleRvbGroup(group)}
+            aria-expanded={isOpen}
+            aria-controls={groupId}
+            aria-label={label}
+            title={isDesktopCollapsed ? label : undefined}
+          >
+            <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
+              <GroupIcon size={18} strokeWidth={2} />
+            </span>
+            <span className={dashboardStyles.sidebarLabel}>{label}</span>
+            <span
+              className={`${dashboardStyles.navGroupChevron} ${
+                isOpen ? dashboardStyles.navGroupChevronOpen : ""
+              }`}
+              aria-hidden="true"
+            >
+              <ChevronDown size={16} strokeWidth={2} />
+            </span>
+          </button>
+          {isDesktopCollapsed && (
+            <span className={dashboardStyles.tooltip} role="tooltip">
+              {label}
+            </span>
+          )}
+        </div>
+        {isOpen && (
+          <div id={groupId} className={dashboardStyles.navGroupChildren}>
+            {items.map((item) => renderRvbNavItem(item, dashboardStyles.navGroupChild))}
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <div
       className={`${dashboardStyles.dashboard} ${
@@ -420,6 +663,8 @@ export default function RvbShell({
     >
       <WorkspaceTransition visible={transitionVisible} target={transitionTarget} language={settings.language} />
 
+      {rvbNavigationStyle === "classic" ? (
+      <>
       {sidebarOpen && (
         <button
           className={dashboardStyles.overlay}
@@ -463,58 +708,9 @@ export default function RvbShell({
         <div className={dashboardStyles.sidebarDivider} />
 
         <nav ref={sidebarNavRef} className={dashboardStyles.sidebarNav}>
-          {visibleNav.map(({ icon: Icon, key, path, label }) => {
-            const displayLabel = (label as string) || (navLabels as any)[key] || key;
-            // Determine active: for portal chats differentiate by query
-            const isActive = (() => {
-              if (isSecondary) {
-                // portal mode: check path match
-                if (typeof window !== "undefined") {
-                  const cur = window.location.pathname + window.location.search;
-                  if (cur === path) return true;
-                  // fallback to activePage mapping
-                  if (key === "dashboard" && activePage === "dashboard") return path === "/rvb";
-                  if (key === "directory" && activePage === "directory") return path === "/rvb/directory";
-                  if (key === "settings" && activePage === "settings") return path === "/rvb/settings";
-                  if (key === "chats" && activePage === "chats") {
-                    return cur.includes(path.split("?")[0]) && cur.includes(path.split("?")[1] || "");
-                  }
-                }
-                return activePage === key && (path === "/rvb" ? activePage === "dashboard" : true);
-              }
-              return activePage === key;
-            })();
-            const uniqueKey = `${key}-${path}`;
-            return (
-            <div key={uniqueKey} className={dashboardStyles.navItemWrap}>
-              <button
-                type="button"
-                className={`${dashboardStyles.sidebarItem} ${
-                  isActive ? dashboardStyles.active : ""
-                }`}
-                onClick={() => navigate(path)}
-                aria-label={displayLabel}
-                title={isDesktopCollapsed ? displayLabel : undefined}
-              >
-                <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
-                  <Icon size={18} strokeWidth={2} />
-                </span>
-                <span className={dashboardStyles.sidebarLabel} style={{ flex: 1 }}>{displayLabel}</span>
-                {!isDesktopCollapsed && key === "notifications" && notifUnread > 0 && (
-                  <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
-                )}
-                {isDesktopCollapsed && key === "notifications" && notifUnread > 0 && (
-                  <span style={{ position: "absolute", top: 4, insetInlineEnd: 6, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#B93A42", color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center", lineHeight: 1 }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
-                )}
-              </button>
-              {isDesktopCollapsed && (
-                <span className={dashboardStyles.tooltip} role="tooltip">
-                  {displayLabel}
-                </span>
-              )}
-            </div>
-            );
-          })}
+          {rvbTopItems.map((item) => renderRvbNavItem(item))}
+          {renderRvbGroup("people", navLabels.people, Users, rvbPeopleItems, "people-rvb-group")}
+          {renderRvbGroup("operations", navLabels.operations, ClipboardList, rvbOperationsItems, "operations-rvb-group")}
         </nav>
 
         {/* Current user area — details always rendered; CSS hides them on desktop-collapsed and restores on mobile */}
@@ -581,17 +777,43 @@ export default function RvbShell({
           </div>
         )}
       </aside>
+      </>
+      ) : (
+      <FloatingNav
+        activeKey={activePage}
+        dashboardEntry={rvbFloatConfig.dashboardEntry}
+        officeEntry={rvbFloatConfig.officeEntry}
+        managementLabel={rvbFloatConfig.managementLabel}
+        operationsLabel={rvbFloatConfig.operationsLabel}
+        managementItems={rvbFloatConfig.managementItems}
+        operationsItems={rvbFloatConfig.operationsItems}
+        openMenuLabel={t.openMenu}
+        closeMenuLabel={t.closeMenu}
+        onNavigate={navigate}
+        dark={dark}
+        onToggleTheme={toggleTheme}
+        themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
+        onOpenSettings={() => navigate("/rvb/settings")}
+        settingsLabel={navLabels.settings}
+        onAccessRvb={rvbFloatConfig.canSeeHsh ? handleSwitchToHsh : handleRvbSignOut}
+        rvbLabel={rvbFloatConfig.canSeeHsh ? t.switchToHsh : "Sign Out"}
+        utilityActionIcon={rvbFloatConfig.canSeeHsh ? "hsh" : "signout"}
+        bell={<RvbNotificationBell language={settings.language} dark={dark} />}
+      />
+      )}
 
       <section className={dashboardStyles.mainContent}>
         <header className={dashboardStyles.mobileHeader}>
-          <button
-            type="button"
-            className={dashboardStyles.menuButton}
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
+          {rvbNavigationStyle === "classic" && (
+            <button
+              type="button"
+              className={dashboardStyles.menuButton}
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          )}
 
           <div className={dashboardStyles.mobileBrand}>
             <img src="/chicken.jpg" alt="" />

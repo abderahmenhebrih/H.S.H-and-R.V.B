@@ -5,6 +5,8 @@ import {
   Boxes,
   ChevronDown,
   ClipboardList,
+  Factory,
+  LogOut,
   Menu,
   Moon,
   Settings as SettingsIcon,
@@ -43,6 +45,10 @@ type FloatingNavProps = {
   settingsLabel: string;
   onAccessRvb: () => void;
   rvbLabel: string;
+  // Fourth utility orbit icon. HSH always uses the default "rvb" (Store);
+  // RVB floating passes "hsh" (Access HSH, manager/admin) or "signout".
+  // Optional with HSH default — HSH rendering is unchanged.
+  utilityActionIcon?: "rvb" | "hsh" | "signout";
   bell: React.ReactNode;
 };
 
@@ -720,6 +726,7 @@ export default function FloatingNav({
   settingsLabel,
   onAccessRvb,
   rvbLabel,
+  utilityActionIcon = "rvb",
   bell,
 }: FloatingNavProps) {
   const [open, setOpen] = useState(false);
@@ -930,7 +937,7 @@ export default function FloatingNav({
     { kind: "bell", slot: "root-u-bell", stagger: 4 },
     { kind: "orbit", slot: "root-u-theme", label: themeLabel, stagger: 5, onSelect: () => { closeAll(); onToggleTheme(); }, content: dark ? "sun" : "moon" },
     { kind: "orbit", slot: "root-u-settings", label: settingsLabel, stagger: 6, onSelect: () => { closeAll(); onOpenSettings(); }, content: "settings" },
-    { kind: "orbit", slot: "root-u-rvb", label: rvbLabel, stagger: 7, onSelect: () => { closeAll(); onAccessRvb(); }, content: "rvb" },
+    { kind: "orbit", slot: "root-u-rvb", label: rvbLabel, stagger: 7, onSelect: () => { closeAll(); onAccessRvb(); }, content: utilityActionIcon },
   ];
 
   const rootPillW = compact ? 132 : 186;
@@ -1205,10 +1212,15 @@ export default function FloatingNav({
     });
   }
 
+  // Shared radial engine: "sun"/"moon"/"settings"/"rvb" serve HSH.
+  // "hsh" (Access HSH) and "signout" serve RVB floating mode only —
+  // HSH never passes them, so HSH rendering is unchanged.
   function renderUtilityContent(node: Extract<FanNode, { kind: "orbit" }>) {
     if (node.content === "sun") return <Sun size={18} strokeWidth={2} aria-hidden="true" />;
     if (node.content === "moon") return <Moon size={18} strokeWidth={2} aria-hidden="true" />;
     if (node.content === "settings") return <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />;
+    if (node.content === "hsh") return <Factory size={18} strokeWidth={2} aria-hidden="true" />;
+    if (node.content === "signout") return <LogOut size={18} strokeWidth={2} aria-hidden="true" />;
     return <Store size={18} strokeWidth={2} aria-hidden="true" />;
   }
 

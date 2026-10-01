@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import { useDbSync } from "../src/hooks/useDbSync";
@@ -17,6 +17,7 @@ import {
   DEFAULT_SETTINGS,
   formatCurrency,
   getDirection,
+  resolveNavigationStyle,
 } from "../src/lib/settings";
 import type { Settings } from "../src/types/settings/settings";
 import CompactHeader from "../src/components/layout/CompactHeader";
@@ -38,10 +39,8 @@ import {
   ArrowRight,
   Banknote,
   BarChart3,
-  Boxes,
   CarFront,
   ClipboardCheck,
-  ClipboardList,
   ChevronDown,
   FileText,
   Info,
@@ -51,11 +50,9 @@ import {
   Moon,
   Package,
   Receipt,
-  Settings as SettingsIcon,
   ShoppingBag,
   ShoppingCart,
   Sun,
-  Store,
   TrendingUp,
   Truck,
   Users,
@@ -69,7 +66,9 @@ import {
   OPERATIONS_KEYS,
   navGroupForKey,
 } from "../src/lib/navigation";
-import type { NavGroupKey } from "../src/lib/navigation";
+import FloatingNav from "../src/components/layout/FloatingNav";
+import type { FloatingNavEntry } from "../src/components/layout/FloatingNav";
+import ClassicSidebar from "../src/components/layout/ClassicSidebar";
 
 // Dashboard now consumes canonical navigation to prevent drift with AppShell
 type SidebarItem = { icon: LucideIcon; key: string };
@@ -111,6 +110,8 @@ const translations = {
     description: "Central management workspace for inventory, sales, purchases, finances and workforce operations.",
     operational: "System operational",
     onlineAccess: "Access RVB",
+    openMenu: "Open navigation",
+    closeMenu: "Close navigation",
     management: "Management",
     operations: "Operations",
     database: "Local database ready",
@@ -165,6 +166,8 @@ const translations = {
     description: "Espace central de gestion des stocks, ventes, achats, finances et personnel.",
     operational: "Système opérationnel",
     onlineAccess: "Accéder à RVB",
+    openMenu: "Ouvrir la navigation",
+    closeMenu: "Fermer la navigation",
     management: "Gestion",
     operations: "Opérations",
     database: "Base de données locale prête",
@@ -219,6 +222,8 @@ const translations = {
     description: "مساحة مركزية لإدارة المخزون والمبيعات والمشتريات والمالية والعمال.",
     operational: "النظام يعمل",
     onlineAccess: "الدخول إلى RVB",
+    openMenu: "فتح قائمة التنقل",
+    closeMenu: "إغلاق قائمة التنقل",
     management: "الإدارة",
     operations: "العمليات",
     database: "قاعدة البيانات المحلية جاهزة",
@@ -278,36 +283,6 @@ export default function Dashboard() {
 
   const [dark, setDark] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Desktop hover/focus expand — ephemeral, never persisted. Matches AppShell.
-  const [sidebarHovered, setSidebarHovered] = useState(false);
-  const [sidebarFocused, setSidebarFocused] = useState(false);
-
-  const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
-  const isDesktopCollapsed = !desktopSidebarExpanded;
-
-  // Input-modality tracking: pointer focus must not pin the sidebar open,
-  // keyboard (Tab/arrows) focus must keep it expanded until focus leaves.
-  const lastInputRef = useRef<"pointer" | "keyboard">("pointer");
-
-  useEffect(() => {
-    const markPointer = () => {
-      lastInputRef.current = "pointer";
-    };
-    const markKeyboard = (event: KeyboardEvent) => {
-      if (event.key === "Tab" || event.key.startsWith("Arrow")) {
-        lastInputRef.current = "keyboard";
-      }
-    };
-    window.addEventListener("pointerdown", markPointer, { passive: true });
-    window.addEventListener("keydown", markKeyboard);
-    return () => {
-      window.removeEventListener("pointerdown", markPointer);
-      window.removeEventListener("keydown", markKeyboard);
-    };
-  }, []);
-
-  const sidebarNavRef = useRef<HTMLElement>(null) as React.RefObject<HTMLElement>;
 
   const [overviewPeriod, setOverviewPeriod] = useState<OverviewPeriod>("week");
   const [overviewData, setOverviewData] = useState<OverviewBucket[]>([]);
@@ -317,6 +292,10 @@ export default function Dashboard() {
 
   const [transitionVisible, setTransitionVisible] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<"rvb" | "hsh">("rvb");
+
+  // Mobile drawer for Classic Sidebar mode. Deterministic initial
+  // (closed) — hydration-safe; FloatingNav mode never uses it.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -335,27 +314,12 @@ export default function Dashboard() {
     try { sessionStorage.setItem("hebrih-transition-target", "rvb"); } catch {}
     setTransitionTarget("rvb");
     setTransitionVisible(true);
+    setSidebarOpen(false);
     setTimeout(() => {
-      setSidebarOpen(false);
       router.push("/rvb");
     }, 420);
     setTimeout(() => setTransitionVisible(false), 2200);
   }
-
-  useEffect(() => {
-    const el = sidebarNavRef.current as unknown as HTMLDivElement | null;
-    if (!el) return;
-    const saved = sessionStorage.getItem("hebrih-sidebar-scrollTop");
-    if (saved) {
-      const top = parseInt(saved, 10);
-      if (!Number.isNaN(top)) el.scrollTop = top;
-    }
-    const onScroll = () => {
-      sessionStorage.setItem("hebrih-sidebar-scrollTop", String(el.scrollTop));
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     async function loadSettings() {
@@ -513,38 +477,22 @@ export default function Dashboard() {
   const t: Translation = translations[settings.language];
 
 
-  // Dashboard is the top-level page: no group starts open.
-  const [openGroup, setOpenGroup] = useState<NavGroupKey | null>(null);
-
-  function toggleGroup(group: NavGroupKey) {
-    setOpenGroup((current) => (current === group ? null : group));
+  // Floating fan entries reuse canonical icons/routes/labels — unchanged.
+  function fanEntry(key: string): FloatingNavEntry {
+    const item = sidebarItems.find((entry) => entry.key === key) ?? sidebarItems[0];
+    return {
+      key,
+      label: navLabels[key] ?? key,
+      path: dashboardRoutes[key] ?? "/",
+      icon: item.icon,
+    };
   }
 
-  const topSidebarItems = sidebarItems.filter(
-    (item) => item.key === "dashboard" || item.key === "office",
-  );
-  // Settings lives only in the footer utility row — never as a nav item.
-  const bottomSidebarItems = sidebarItems.filter(
-    (item) =>
-      item.key !== "dashboard" &&
-      item.key !== "office" &&
-      item.key !== "settings" &&
-      navGroupForKey(item.key) === null,
-  );
-
-  function orderedGroupItems(keys: readonly string[]) {
-    return sidebarItems.filter((item) => keys.includes(item.key)).sort(
-      (a, b) => keys.indexOf(a.key) - keys.indexOf(b.key),
-    );
+  function fanEntries(keys: readonly string[]): FloatingNavEntry[] {
+    return keys.map((key) => fanEntry(key));
   }
-
-  const managementItems = orderedGroupItems(MANAGEMENT_KEYS);
-  const operationsItems = orderedGroupItems(OPERATIONS_KEYS);
-
-  const groupLabels = { management: t.management, operations: t.operations };
 
   function navigateSidebar(route: string) {
-    setSidebarOpen(false);
     router.push(route, { scroll: false });
   }
 
@@ -580,6 +528,26 @@ export default function Dashboard() {
     }
   }
 
+  // Same canonical navigation-mode decision as AppShell. Exactly one
+  // navigation UI is ever mounted. Deterministic from settings state
+  // (default "floating") — hydration-safe; the stored preference arrives
+  // via the settings effect + SETTINGS_EVENT subscription above.
+  const navigationStyle = resolveNavigationStyle(settings.navigationStyle);
+
+  // Classic sidebar partition mirrors AppShell: dashboard + office stay
+  // top-level, settings lives only in the footer utility row.
+  // FloatingNavEntry is structurally identical to ClassicSidebarItem
+  // ({ key, label, path, icon }), so fanEntries feeds both modes.
+  const bottomSidebarItems = sidebarItems
+    .filter(
+      (item) =>
+        item.key !== "dashboard" &&
+        item.key !== "office" &&
+        item.key !== "settings" &&
+        navGroupForKey(item.key) === null,
+    )
+    .map((item) => fanEntry(item.key));
+
   return (
     <main
       className={`${styles.dashboard} ${
@@ -588,284 +556,64 @@ export default function Dashboard() {
     >
       <WorkspaceTransition visible={transitionVisible} target={transitionTarget} language={settings.language} />
 
-      {sidebarOpen && (
-        <button
-          className={styles.overlay}
-          aria-label="Close menu"
-          onClick={() => setSidebarOpen(false)}
+      {navigationStyle === "classic" ? (
+        <ClassicSidebar
+          activeKey="dashboard"
+          topItems={[fanEntry("dashboard"), fanEntry("office")]}
+          managementLabel={t.management}
+          managementItems={fanEntries(MANAGEMENT_KEYS)}
+          operationsLabel={t.operations}
+          operationsItems={fanEntries(OPERATIONS_KEYS)}
+          bottomItems={bottomSidebarItems}
+          brand={t.title}
+          systemLabel={t.database}
+          onlineAccessLabel={t.onlineAccess}
+          drawerOpen={sidebarOpen}
+          onCloseDrawer={() => setSidebarOpen(false)}
+          onNavigate={navigateSidebar}
+          onOpenRvb={handleSwitchToRvb}
+          dark={dark}
+          onToggleTheme={() => setDark((current) => !current)}
+          themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
+          settingsLabel={t.settings}
+          onOpenSettings={openSettings}
+          bell={<HshNotificationBell language={settings.language} dark={dark} />}
         />
+      ) : (
+      <FloatingNav
+        activeKey="dashboard"
+        dashboardEntry={fanEntry("dashboard")}
+        officeEntry={fanEntry("office")}
+        managementLabel={t.management}
+        operationsLabel={t.operations}
+        managementItems={fanEntries(MANAGEMENT_KEYS)}
+        operationsItems={fanEntries(OPERATIONS_KEYS)}
+        openMenuLabel={t.openMenu}
+        closeMenuLabel={t.closeMenu}
+        onNavigate={navigateSidebar}
+        dark={dark}
+        onToggleTheme={() => setDark((current) => !current)}
+        themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
+        onOpenSettings={openSettings}
+        settingsLabel={t.settings}
+        onAccessRvb={handleSwitchToRvb}
+        rvbLabel={t.onlineAccess}
+        bell={<HshNotificationBell language={settings.language} dark={dark} />}
+      />
       )}
-
-      <aside
-        className={`${styles.sidebar} ${styles.sidebarCompact} ${sidebarOpen ? styles.sidebarOpen : ""} ${
-          isDesktopCollapsed ? styles.sidebarCollapsed : ""
-        }`}
-        onMouseEnter={() => setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}
-        onPointerDown={() => {
-          lastInputRef.current = "pointer";
-          setSidebarFocused(false);
-        }}
-        onFocus={() => {
-          if (lastInputRef.current === "keyboard") {
-            setSidebarFocused(true);
-          }
-        }}
-        onBlur={(event) => {
-          if (
-            !event.currentTarget.contains(
-              event.relatedTarget as Node | null
-            )
-          ) {
-            setSidebarFocused(false);
-          }
-        }}
-      >
-        <div className={styles.sidebarBrand}>
-          <div className={styles.brandLogo}>
-            <img src="/chicken.jpg" alt="Hebrih logo" />
-          </div>
-
-          <div className={styles.sidebarBrandContent}>
-            <div className={styles.sidebarBrandTitleRow}>
-              <span className={styles.sidebarBrandTitle}>
-                Hebrih Slaughter House
-              </span>
-            </div>
-
-            <span className={styles.sidebarBrandSubtitle}>
-              Management System
-            </span>
-          </div>
-        </div>
-
-        <div className={styles.sidebarDivider} />
-
-        <nav ref={sidebarNavRef as any} className={styles.sidebarNav}>
-          {topSidebarItems.map(({ icon: Icon, key }, index) => (
-            <div key={key} className={styles.navItemWrap}>
-              <button
-                type="button"
-                className={`${styles.sidebarItem} ${index === 0 ? styles.active : ""}`}
-                onClick={() => navigateSidebar(dashboardRoutes[key])}
-                aria-label={navLabels[key]}
-                title={isDesktopCollapsed ? navLabels[key] : undefined}
-              >
-                <span className={styles.sidebarIcon} aria-hidden="true">
-                  <Icon size={18} strokeWidth={2} />
-                </span>
-                <span className={styles.sidebarLabel}>{navLabels[key]}</span>
-              </button>
-              {isDesktopCollapsed && (
-                <span className={styles.tooltip} role="tooltip">
-                  {navLabels[key]}
-                </span>
-              )}
-            </div>
-          ))}
-
-          {/* Management group */}
-          <div className={styles.navItemWrap}>
-            <button
-              type="button"
-              className={styles.sidebarItem}
-              onClick={() => toggleGroup("management")}
-              aria-expanded={openGroup === "management"}
-              aria-controls="management-sidebar-group"
-              aria-label={groupLabels.management}
-              title={isDesktopCollapsed ? groupLabels.management : undefined}
-            >
-              <span className={styles.sidebarIcon} aria-hidden="true">
-                <Boxes size={18} strokeWidth={2} />
-              </span>
-              <span className={styles.sidebarLabel}>{groupLabels.management}</span>
-              <span
-                className={`${styles.navGroupChevron} ${
-                  openGroup === "management" ? styles.navGroupChevronOpen : ""
-                }`}
-                aria-hidden="true"
-              >
-                <ChevronDown size={16} strokeWidth={2} />
-              </span>
-            </button>
-            {isDesktopCollapsed && (
-              <span className={styles.tooltip} role="tooltip">
-                {groupLabels.management}
-              </span>
-            )}
-          </div>
-          {openGroup === "management" && (
-            <div
-              id="management-sidebar-group"
-              className={styles.navGroupChildren}
-            >
-              {managementItems.map(({ icon: Icon, key }) => (
-                <div key={key} className={styles.navItemWrap}>
-                  <button
-                    type="button"
-                    className={`${styles.sidebarItem} ${styles.navGroupChild}`}
-                    onClick={() => navigateSidebar(dashboardRoutes[key])}
-                    aria-label={navLabels[key]}
-                    title={isDesktopCollapsed ? navLabels[key] : undefined}
-                  >
-                    <span className={styles.sidebarIcon} aria-hidden="true">
-                      <Icon size={18} strokeWidth={2} />
-                    </span>
-                    <span className={styles.sidebarLabel}>{navLabels[key]}</span>
-                  </button>
-                  {isDesktopCollapsed && (
-                    <span className={styles.tooltip} role="tooltip">
-                      {navLabels[key]}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Operations group */}
-          <div className={styles.navItemWrap}>
-            <button
-              type="button"
-              className={styles.sidebarItem}
-              onClick={() => toggleGroup("operations")}
-              aria-expanded={openGroup === "operations"}
-              aria-controls="operations-sidebar-group"
-              aria-label={groupLabels.operations}
-              title={isDesktopCollapsed ? groupLabels.operations : undefined}
-            >
-              <span className={styles.sidebarIcon} aria-hidden="true">
-                <ClipboardList size={18} strokeWidth={2} />
-              </span>
-              <span className={styles.sidebarLabel}>{groupLabels.operations}</span>
-              <span
-                className={`${styles.navGroupChevron} ${
-                  openGroup === "operations" ? styles.navGroupChevronOpen : ""
-                }`}
-                aria-hidden="true"
-              >
-                <ChevronDown size={16} strokeWidth={2} />
-              </span>
-            </button>
-            {isDesktopCollapsed && (
-              <span className={styles.tooltip} role="tooltip">
-                {groupLabels.operations}
-              </span>
-            )}
-          </div>
-          {openGroup === "operations" && (
-            <div
-              id="operations-sidebar-group"
-              className={styles.navGroupChildren}
-            >
-              {operationsItems.map(({ icon: Icon, key }) => (
-                <div key={key} className={styles.navItemWrap}>
-                  <button
-                    type="button"
-                    className={`${styles.sidebarItem} ${styles.navGroupChild}`}
-                    onClick={() => navigateSidebar(dashboardRoutes[key])}
-                    aria-label={navLabels[key]}
-                    title={isDesktopCollapsed ? navLabels[key] : undefined}
-                  >
-                    <span className={styles.sidebarIcon} aria-hidden="true">
-                      <Icon size={18} strokeWidth={2} />
-                    </span>
-                    <span className={styles.sidebarLabel}>{navLabels[key]}</span>
-                  </button>
-                  {isDesktopCollapsed && (
-                    <span className={styles.tooltip} role="tooltip">
-                      {navLabels[key]}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {bottomSidebarItems.map(({ icon: Icon, key }) => (
-            <div key={key} className={styles.navItemWrap}>
-              <button
-                type="button"
-                className={styles.sidebarItem}
-                onClick={() => navigateSidebar(dashboardRoutes[key])}
-                aria-label={navLabels[key]}
-                title={isDesktopCollapsed ? navLabels[key] : undefined}
-              >
-                <span className={styles.sidebarIcon} aria-hidden="true">
-                  <Icon size={18} strokeWidth={2} />
-                </span>
-                <span className={styles.sidebarLabel}>{navLabels[key]}</span>
-              </button>
-              {isDesktopCollapsed && (
-                <span className={styles.tooltip} role="tooltip">
-                  {navLabels[key]}
-                </span>
-              )}
-            </div>
-          ))}
-        </nav>
-
-        <div className={styles.sidebarFooter}>
-          <div className={styles.sidebarUtilityRow}>
-            <span className={styles.sidebarUtilityBell}>
-              <HshNotificationBell language={settings.language} dark={dark} />
-            </span>
-            <button
-              type="button"
-              className={styles.sidebarUtilityButton}
-              onClick={() => setDark((current) => !current)}
-              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-              title={dark ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {dark ? (
-                <Sun size={18} strokeWidth={2} aria-hidden="true" />
-              ) : (
-                <Moon size={18} strokeWidth={2} aria-hidden="true" />
-              )}
-            </button>
-            <button
-              type="button"
-              className={styles.sidebarUtilityButton}
-              onClick={openSettings}
-              aria-label="Settings"
-              title="Settings"
-            >
-              <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </div>
-          <div className={styles.navItemWrap}>
-            <button
-              type="button"
-              className={styles.onlineButton}
-              onClick={handleSwitchToRvb}
-              aria-label={t.onlineAccess}
-              title={isDesktopCollapsed ? t.onlineAccess : undefined}
-            >
-              <span className={styles.onlineButtonIcon} aria-hidden="true">
-                <Store size={18} strokeWidth={2} />
-              </span>
-              <span className={styles.onlineButtonLabel}>{t.onlineAccess}</span>
-            </button>
-            {isDesktopCollapsed && (
-              <span className={styles.tooltip} role="tooltip">
-                {t.onlineAccess}
-              </span>
-            )}
-          </div>
-        </div>
-      </aside>
 
       <section className={styles.mainContent}>
         <header className={styles.mobileHeader}>
-          <button
-            type="button"
-            className={styles.menuButton}
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-
+          {navigationStyle === "classic" && (
+            <button
+              type="button"
+              className={styles.menuButton}
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          )}
           <div className={styles.mobileBrand}>
             <img src="/chicken.jpg" alt="" />
             <span>{t.title}</span>

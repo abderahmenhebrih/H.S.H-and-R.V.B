@@ -1,4 +1,4 @@
-import type { Settings, Language, Currency } from "../types/settings/settings";
+import type { Settings, Language, Currency, NavigationStyle } from "../types/settings/settings";
 
 export const SETTINGS_EVENT = "hebrih-settings-change";
 
@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: Settings = {
   workerPositions: [],
   vehicleTypes: [],
   expenseTypes: [],
+  navigationStyle: "floating",
   notifications: {
     inAppEnabled: true,
     desktopEnabled: false,
@@ -38,6 +39,10 @@ export function formatCurrency(
 
 export function getDirection(language: Language): "ltr" | "rtl" {
   return language === "ar" ? "rtl" : "ltr";
+}
+
+export function resolveNavigationStyle(value: unknown): NavigationStyle {
+  return value === "classic" ? "classic" : "floating";
 }
 
 export function getLanguageName(language: Language): string {

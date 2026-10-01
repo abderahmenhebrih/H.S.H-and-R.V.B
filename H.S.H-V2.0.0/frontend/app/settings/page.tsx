@@ -12,6 +12,7 @@ import {
   SETTINGS_EVENT,
   DEFAULT_SETTINGS,
   getDirection,
+  resolveNavigationStyle,
 } from "../../src/lib/settings";
 import { getSavedTheme, applyTheme } from "../../src/lib/theme";
 import {
@@ -55,11 +56,13 @@ import type { LucideIcon } from "lucide-react";
 import DateTimeDisplay from "../../src/components/common/DateTimeDisplay";
 import StyledSelect from "../../src/components/common/StyledSelect";
 import ThemeAppearanceSelector from "../../src/components/settings/ThemeAppearanceSelector";
+import NavigationStyleSelector from "../../src/components/settings/NavigationStyleSelector";
 
 import type {
   Settings as AppSettings,
   Language,
   Currency,
+  NavigationStyle,
 } from "../../src/types/settings/settings";
 
 const TRANSLATIONS = {
@@ -562,6 +565,7 @@ function SettingsPageInner() {
         ...DEFAULT_SETTINGS,
         ...stored,
         expenseTypes: stored.expenseTypes ?? [],
+        navigationStyle: resolveNavigationStyle(stored.navigationStyle),
       };
       setSettings(normalized);
       settingsRef.current = normalized;
@@ -773,7 +777,7 @@ function SettingsPageInner() {
     return [
       { key: "language", section: "general" as SectionId, title: t.language, description: t.languageDescription, keywords: "language langue اللغة general" },
       { key: "currency", section: "general" as SectionId, title: t.currency, description: t.currencyDescription, keywords: "currency devise عملة general" },
-      { key: "appearance", section: "appearance" as SectionId, title: appearanceLabel, description: "appearance theme thème المظهر", keywords: "appearance theme dark light thème clair sombre المظهر" },
+      { key: "appearance", section: "appearance" as SectionId, title: appearanceLabel, description: "appearance theme thème المظهر", keywords: "appearance theme dark light navigation sidebar floating bubbles thème clair sombre المظهر تنقل" },
       { key: "customerTypes", section: "master-data" as SectionId, title: t.customerTypes, description: t.customerTypesDescription, keywords: "customer client عميل master data" },
       { key: "workerPositions", section: "master-data" as SectionId, title: t.workerPositions, description: t.workerPositionsDescription, keywords: "worker position poste عامل master data" },
       { key: "vehicleTypes", section: "master-data" as SectionId, title: t.vehicleTypes, description: t.vehicleTypesDescription, keywords: "vehicle voiture مركبة master data" },
@@ -1163,7 +1167,15 @@ function SettingsPageInner() {
                 </div>
               </>
             ) : activeSection === "appearance" ? (
-              <ThemeAppearanceSelector language={settings.language} dark={dark} onThemeChange={(v) => setDark(v === "dark")} />
+              <>
+                <ThemeAppearanceSelector language={settings.language} dark={dark} onThemeChange={(v) => setDark(v === "dark")} />
+                <div style={{ height: 20 }} aria-hidden="true" />
+                <NavigationStyleSelector
+                  language={settings.language}
+                  value={resolveNavigationStyle(settings.navigationStyle)}
+                  onChange={(style: NavigationStyle) => updateSettingsPartial({ navigationStyle: style })}
+                />
+              </>
             ) : activeSection === "master-data" ? (
               <>
                 <h2 className={styles.sectionHeading}>{t.sectionMasterData}</h2>

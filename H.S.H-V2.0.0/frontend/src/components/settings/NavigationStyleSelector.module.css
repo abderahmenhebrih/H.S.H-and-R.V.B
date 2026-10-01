@@ -1,0 +1,175 @@
+/* Navigation-style preview frames. Card chrome (grid, outline, check
+   badge, hover) is shared with ThemeAppearanceSelector so both pickers
+   speak the same visual language. Preview art follows the live app theme
+   via --panel/--border/--accent tokens. */
+
+.previewFrame {
+  flex: 1;
+  min-height: 84px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  background: var(--panel);
+}
+
+/* ---- classic sidebar mock ---- */
+.miniSidebar {
+  flex: 0 0 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 5px;
+  border-inline-end: 1px solid var(--border);
+  background: var(--panel-hover);
+}
+
+.miniLogo {
+  height: 10px;
+  width: 60%;
+  margin: 0 auto 3px;
+  border-radius: 5px;
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.miniRow {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--border-strong);
+  opacity: 0.55;
+}
+
+.miniRowActive {
+  background: var(--accent);
+  opacity: 1;
+  height: 8px;
+}
+
+.miniRowChild {
+  margin-inline-start: 10px;
+  height: 6px;
+}
+
+.miniFooter {
+  margin-top: auto;
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.miniFooter i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  opacity: 0.7;
+}
+
+.miniFooter i:first-child {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.miniMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+
+.miniLine {
+  height: 6px;
+  width: 52%;
+  border-radius: 4px;
+  background: var(--border-strong);
+  opacity: 0.65;
+}
+
+.miniBlock {
+  flex: 1;
+  min-height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-hover);
+}
+
+/* ---- floating bubbles mock ---- */
+.orbitField {
+  position: relative;
+  flex: 1;
+  min-height: 84px;
+}
+
+.orbitLauncher {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 2px 8px var(--accent-ring);
+  transform: translate(-50%, -50%);
+}
+
+.orbitPill {
+  position: absolute;
+  height: 10px;
+  width: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.orbitTop {
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%);
+}
+
+.orbitBottom {
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+}
+
+.orbitLeft {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.orbitRight {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.orbitDot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.orbitDotA {
+  left: 22%;
+  top: 18%;
+}
+
+.orbitDotB {
+  right: 22%;
+  top: 18%;
+}
+
+.orbitDotC {
+  left: 22%;
+  bottom: 18%;
+}

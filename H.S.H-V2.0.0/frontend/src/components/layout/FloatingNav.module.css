@@ -1,0 +1,329 @@
+/* HSH free-dock radial / fan speed-dial navigation.
+   Pure overlay: fixed positioning, transparent containers, zero layout impact.
+   Node coordinates are computed in JS from live viewport geometry. */
+
+.root {
+  position: fixed;
+  width: 60px;
+  height: 60px;
+  z-index: 800;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  touch-action: none;
+  transition:
+    left 0.18s ease,
+    top 0.18s ease;
+}
+
+.rootDragging {
+  transition: none;
+}
+
+/* Outside-click layer with a whisper of dimming: page stays clearly
+   visible, but the open fan reads unmistakably above it. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  border: 0;
+  padding: 0;
+  background: rgba(46, 32, 18, 0.1);
+  cursor: default;
+  animation: backdropFade 0.2s ease;
+}
+
+:global([class*="themeDark"]) .backdrop {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+@keyframes backdropFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Draggable launcher circle. */
+.launcher {
+  position: relative;
+  z-index: 2;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 8px 24px var(--accent-ring);
+  cursor: grab;
+  touch-action: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.launcher:hover {
+  transform: scale(1.06);
+}
+
+.launcher:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.launcherDragging {
+  cursor: grabbing;
+  transform: scale(1.08);
+}
+
+.launcherIcon {
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* Transparent positioning field for the fan nodes. */
+.fan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---- shared node states (center-anchored, symmetric everywhere) ---- */
+.pill,
+.orbit,
+.orbitAnchor {
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.7);
+  transition:
+    opacity 0.16s ease,
+    transform 0.18s ease,
+    visibility 0s linear 0.2s;
+}
+
+.pill[data-shown="1"],
+.orbit[data-shown="1"],
+.orbitAnchor[data-shown="1"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+  transition:
+    opacity 0.2s ease,
+    transform 0.22s ease,
+    visibility 0s;
+  transition-delay: calc(var(--fan-index, 0) * 28ms), calc(var(--fan-index, 0) * 28ms), 0s;
+}
+
+.root:not(.rootOpen) .pill,
+.root:not(.rootOpen) .orbit,
+.root:not(.rootOpen) .orbitAnchor {
+  transition-delay: 0ms;
+}
+
+/* ---- labeled floating pills ----
+   Width comes from the radial solver (inline style) so layout math
+   and paint can never drift; ellipsis handles longer labels. */
+.pill {
+  height: 46px;
+  padding: 0 16px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow:
+    0 14px 34px rgba(62, 44, 28, 0.2),
+    0 2px 8px rgba(62, 44, 28, 0.12);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+html[dir="rtl"] .pill {
+  padding: 0 12px 0 16px;
+}
+
+:global([class*="themeDark"]) .pill {
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.pill:hover {
+  border-color: var(--accent);
+  background: var(--panel-hover);
+}
+
+.pill:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.pillIcon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.pillLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: start;
+}
+
+/* Solid filled selected states — never transparent. */
+.pill.pillActive,
+.pill.pillActive:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 10px 26px var(--accent-ring);
+}
+
+.pill.pillActive .pillIcon,
+.pill.pillActive:hover .pillIcon {
+  color: #fff;
+}
+
+.pill.pillGroupActive,
+.pill.pillGroupActive:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.pill.pillGroupActive .pillIcon,
+.pill.pillGroupActive:hover .pillIcon,
+.pill.pillGroupActive .groupChevron,
+.pill.pillGroupActive:hover .groupChevron {
+  color: #fff;
+}
+
+.pillOpen {
+  border-color: var(--accent);
+}
+
+.groupChevron {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 0.18s ease;
+}
+
+.groupChevronOpen {
+  transform: rotate(180deg);
+}
+
+.childPill {
+  height: 42px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ---- small utility orbit nodes ---- */
+.orbit,
+.orbitAnchor {
+  width: 40px;
+  height: 40px;
+}
+
+.orbit {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow:
+    0 10px 24px rgba(62, 44, 28, 0.16),
+    0 2px 6px rgba(62, 44, 28, 0.1);
+  cursor: pointer;
+  font: inherit;
+}
+
+:global([class*="themeDark"]) .orbit {
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.orbit:hover {
+  border-color: var(--accent);
+}
+
+.orbit:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.orbitIcon,
+.bellWrap {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.orbitAnchor {
+  display: grid;
+  place-items: center;
+}
+
+/* ---- compact touch sizes on small screens ---- */
+@media (max-width: 700px) {
+  .root {
+    width: 56px;
+    height: 56px;
+  }
+
+  .launcher {
+    width: 56px;
+    height: 56px;
+  }
+
+  .pill {
+    height: 44px;
+    font-size: 13px;
+  }
+
+  .childPill {
+    height: 44px;
+  }
+
+  .orbit,
+  .orbitAnchor {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root,
+  .pill,
+  .orbit,
+  .orbitAnchor,
+  .launcher {
+    animation: none;
+    transition-duration: 0.01ms;
+  }
+
+  .launcher:hover {
+    transform: none;
+  }
+}

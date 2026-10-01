@@ -2,6 +2,8 @@ export type Language = "ar" | "fr" | "en";
 
 export type Currency = "DA" | "€" | "$";
 
+export type NavigationStyle = "classic" | "floating";
+
 export interface NotificationPreferences {
   inAppEnabled?: boolean;
   desktopEnabled?: boolean;
@@ -38,6 +40,7 @@ export interface Settings {
   workerPositions: string[];
   vehicleTypes: string[];
   expenseTypes: string[];
+  navigationStyle?: NavigationStyle;
   notifications?: NotificationPreferences;
   invoicePaymentMethods?: PaymentMethodConfig[];
   invoiceDocumentDefaults?: InvoiceDocumentDefaults;

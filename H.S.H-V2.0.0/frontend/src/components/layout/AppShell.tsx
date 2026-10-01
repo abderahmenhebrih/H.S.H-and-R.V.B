@@ -584,10 +584,12 @@ export default function AppShell({
   const topNavItems = navigation.filter(
     (item) => item.key === "dashboard" || item.key === "office",
   );
+  // Settings lives only in the footer utility row — never as a nav item.
   const bottomNavItems = navigation.filter(
     (item) =>
       item.key !== "dashboard" &&
       item.key !== "office" &&
+      item.key !== "settings" &&
       navGroupForKey(item.key) === null,
   );
 

@@ -523,10 +523,12 @@ export default function Dashboard() {
   const topSidebarItems = sidebarItems.filter(
     (item) => item.key === "dashboard" || item.key === "office",
   );
+  // Settings lives only in the footer utility row — never as a nav item.
   const bottomSidebarItems = sidebarItems.filter(
     (item) =>
       item.key !== "dashboard" &&
       item.key !== "office" &&
+      item.key !== "settings" &&
       navGroupForKey(item.key) === null,
   );
 

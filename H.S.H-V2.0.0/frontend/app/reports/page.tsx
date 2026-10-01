@@ -449,6 +449,14 @@ export default function ReportsPage() {
     router.push(`/reports/print-preview?${params.toString()}`);
   }
 
+  // Exit the Reports entry flow: /reports has no useful state once the
+  // Periodic Reports modal is dismissed, so Cancel returns to the
+  // Management Dashboard. replace() keeps the cancelled /reports
+  // entry out of history so Back does not reopen a blank screen.
+  function cancelReports() {
+    router.replace("/");
+  }
+
   function handlePrintAll() {
     if (hasInvalidDate) {
       setReportFeedback(language === "ar" ? "تاريخ غير صالح" : language === "fr" ? "Date invalide" : "Invalid date range");
@@ -842,7 +850,7 @@ export default function ReportsPage() {
               </div>
 
               <div className={styles.modalActions}>
-                <button type="button" className={styles.cancelButton} onClick={() => { setShowDatePopup(false); setApplied(false); }}>{t.cancel}</button>
+                <button type="button" className={styles.cancelButton} onClick={cancelReports}>{t.cancel}</button>
                 <button type="button" className={styles.primaryButton} onClick={() => { setShowDatePopup(false); setApplied(true); }}>{t.apply}</button>
               </div>
             </section>

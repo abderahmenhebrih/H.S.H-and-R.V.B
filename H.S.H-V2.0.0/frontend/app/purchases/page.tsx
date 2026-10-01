@@ -774,6 +774,7 @@ export default function PurchasesPage() {
       <main className={styles.purchasesPage}>
         <div className={styles.purchasesShell}>
           {/* Unified Purchases header — brand / search / date / calculate / add */}
+          <div className={styles.headerContainer}>
           <section className={styles.purchasesHeader}>
             <div className={styles.purchasesHeaderBrand}>
               <div className={styles.purchasesLogo}>
@@ -832,6 +833,7 @@ export default function PurchasesPage() {
               {t.addPurchase}
             </button>
           </section>
+          </div>
 
           {/* KPI Cards — RED→YELLOW→RED→YELLOW */}
           <section className={styles.summaryGrid}>

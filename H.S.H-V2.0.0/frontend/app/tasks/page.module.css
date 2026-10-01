@@ -16,18 +16,51 @@
 }
 
 /* Unified Tasks header — single card: brand / search / filter / finished / add */
-.tasksHeader {
-  display: grid;
-  grid-template-columns: minmax(260px, 300px) minmax(220px, 1fr) 170px 160px 150px;
-  align-items: center;
-  gap: 16px;
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: tasksHeader;
   min-width: 0;
   max-width: 100%;
+}
+
+.tasksHeader {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(220px, 1fr) minmax(140px, 170px) auto auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.tasksHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — mirrors the <=1200px viewport treatment
+   but keyed to real header width. Banded above mobile. */
+@container tasksHeader (min-width: 601px) and (max-width: 1180px) {
+  .tasksHeader {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tasksPage .tasksHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .tasksPage .tasksHeader .searchBox {
+    grid-column: 1 / -1;
+  }
 }
 
 .tasksHeaderBrand {
@@ -142,6 +175,8 @@
 .tasksPage .tasksHeader .secondaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }

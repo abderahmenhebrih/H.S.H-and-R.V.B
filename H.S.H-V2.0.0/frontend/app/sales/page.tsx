@@ -633,6 +633,7 @@ export default function SalesPage() {
       <main className={styles.salesPage}>
         <div className={styles.salesShell}>
           {/* Unified Sales header — brand / search / date / add */}
+          <div className={styles.headerContainer}>
           <section className={styles.salesHeader}>
             <div className={styles.salesHeaderBrand}>
               <div className={styles.salesLogo}>
@@ -682,6 +683,7 @@ export default function SalesPage() {
               {t.addSale}
             </button>
           </section>
+          </div>
 
           {/* KPI Cards — RED→YELLOW→RED→YELLOW (same sequence as Purchases) */}
           <section className={styles.summaryGrid}>

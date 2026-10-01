@@ -685,6 +685,7 @@ export default function AccountsPage() {
       <main className={styles.accountsPage}>
         <div className={styles.accountsShell}>
           {/* Unified Accounts header — brand / search / transfer / add */}
+          <div className={styles.headerContainer}>
           <section className={styles.accountsHeader}>
             <div className={styles.accountsHeaderBrand}>
               <div className={styles.accountsLogo}>
@@ -718,6 +719,7 @@ export default function AccountsPage() {
               {t.addAccount}
             </button>
           </section>
+          </div>
 
           {/* KPI Cards — RED→YELLOW→RED→YELLOW */}
           <section className={styles.summaryGrid}>

@@ -571,6 +571,7 @@ export default function VehiclesPage() {
       <main className={styles.vehiclesPage}>
         <div className={styles.vehiclesShell}>
           {/* Unified Vehicles header — brand / search / type filter / add */}
+          <div className={styles.headerContainer}>
           <section className={styles.vehiclesHeader}>
             <div className={styles.vehiclesHeaderBrand}>
               <div className={styles.vehiclesLogo}>
@@ -602,6 +603,7 @@ export default function VehiclesPage() {
               {t.addVehicle}
             </button>
           </section>
+          </div>
 
           {/* Summary Cards */}
           <section className={styles.summaryGrid}>

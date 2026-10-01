@@ -16,18 +16,52 @@
 }
 
 /* Unified Vehicles header — single card: brand / search / type filter / add */
-.vehiclesHeader {
-  display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(240px, 1fr) 180px 170px;
-  align-items: center;
-  gap: 16px;
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: vehiclesHeader;
   min-width: 0;
   max-width: 100%;
+}
+
+.vehiclesHeader {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(240px, 1fr) minmax(140px, 180px) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.vehiclesHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — reflow WITHIN the same card:
+   row 1 brand, row 2 search / type filter / add. Banded above
+   mobile so the <=600px single-column viewport rule keeps authority. */
+@container vehiclesHeader (min-width: 601px) and (max-width: 1080px) {
+  .vehiclesHeader {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) auto;
+  }
+
+  .vehiclesPage .vehiclesHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .vehiclesPage .vehiclesHeader .searchBox {
+    grid-column: auto;
+  }
 }
 
 .vehiclesHeaderBrand {
@@ -135,6 +169,8 @@
 .vehiclesPage .vehiclesHeader .primaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }

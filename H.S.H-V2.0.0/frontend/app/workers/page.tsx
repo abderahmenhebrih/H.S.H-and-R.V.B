@@ -609,6 +609,7 @@ export default function WorkersPage() {
       <main className={styles.workersPage}>
         <div className={styles.workersShell}>
           {/* Unified Workers header — brand / search / position filter / add */}
+          <div className={styles.headerContainer}>
           <section className={styles.workersHeader}>
             <div className={styles.workersHeaderBrand}>
               <div className={styles.workersLogo}>
@@ -640,6 +641,7 @@ export default function WorkersPage() {
               {t.addWorker}
             </button>
           </section>
+          </div>
 
           {/* Summary Cards */}
           <section className={styles.summaryGrid}>

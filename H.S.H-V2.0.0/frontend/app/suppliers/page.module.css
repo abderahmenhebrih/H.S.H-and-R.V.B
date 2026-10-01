@@ -16,18 +16,51 @@
 }
 
 /* Unified Suppliers header — single card: brand / search / add */
-.suppliersHeader {
-  display: grid;
-  grid-template-columns: minmax(300px, 340px) minmax(280px, 1fr) 180px;
-  align-items: center;
-  gap: 16px;
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: suppliersHeader;
   min-width: 0;
   max-width: 100%;
+}
+
+.suppliersHeader {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(240px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.suppliersHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — reflow WITHIN the same card.
+   Banded above mobile so the <=600px single-column rule keeps authority. */
+@container suppliersHeader (min-width: 601px) and (max-width: 1080px) {
+  .suppliersHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .suppliersPage .suppliersHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .suppliersPage .suppliersHeader .searchBox {
+    grid-column: 1 / -1;
+  }
 }
 
 .suppliersHeaderBrand {
@@ -125,6 +158,8 @@
 .suppliersPage .suppliersHeader .primaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }

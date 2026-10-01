@@ -778,6 +778,7 @@ export default function CustomersPage() {
       <main className={styles.customersPage}>
         <div className={styles.customersShell}>
           {/* Unified Customers header */}
+          <div className={styles.headerContainer}>
           <section className={styles.customersHeader}>
             <div className={styles.customersHeaderBrand}>
               <div className={styles.customersLogo}>
@@ -813,6 +814,7 @@ export default function CustomersPage() {
               {t.addCustomer}
             </button>
           </section>
+          </div>
 
           {/* KPI Cards — matched to Products */}
           <section className={styles.summaryGrid}>

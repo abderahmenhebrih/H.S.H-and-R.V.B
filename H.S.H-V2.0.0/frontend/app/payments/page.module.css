@@ -17,9 +17,19 @@
 
 /* Unified Payments header — single card: brand / search / date / contextual actions / add.
    Worker tab renders two extra actions; controls wrap inside the same card below ~1200px. */
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: paymentsHeader;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .paymentsHeader {
   display: grid;
-  grid-template-columns: minmax(280px, 310px) minmax(420px, 1fr) 190px 160px;
+  grid-template-columns: minmax(280px, 310px) minmax(420px, 1fr) 190px auto;
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -31,6 +41,33 @@
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.paymentsHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — mirrors the <=1200px viewport treatment
+   but keyed to real header width. Banded above mobile. */
+@container paymentsHeader (min-width: 601px) and (max-width: 1300px) {
+  .paymentsHeader {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .paymentsPage .paymentsHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .paymentsPage .paymentsHeader .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  .paymentsPage .paymentsHeaderWorker > :nth-child(4),
+  .paymentsPage .paymentsHeaderWorker > :nth-child(5) {
+    grid-column: auto;
+    grid-row: auto;
+  }
 }
 
 /* Worker tab: same 4-column tracks so Search stays dominant.
@@ -154,6 +191,8 @@
 .paymentsPage .paymentsHeader .secondaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }

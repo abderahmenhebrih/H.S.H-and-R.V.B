@@ -16,18 +16,52 @@
 }
 
 /* Unified Accounts header — single card: brand / search / transfer / add */
-.accountsHeader {
-  display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(240px, 1fr) 130px 160px;
-  align-items: center;
-  gap: 16px;
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: accountsHeader;
   min-width: 0;
   max-width: 100%;
+}
+
+.accountsHeader {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(240px, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.accountsHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — reflow WITHIN the same card:
+   row 1 brand, row 2 search, row 3 transfer / add. Banded above
+   mobile so the <=600px single-column viewport rule keeps authority. */
+@container accountsHeader (min-width: 601px) and (max-width: 1080px) {
+  .accountsHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .accountsPage .accountsHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .accountsPage .accountsHeader .searchBox {
+    grid-column: 1 / -1;
+  }
 }
 
 .accountsHeaderBrand {
@@ -126,6 +160,8 @@
 .accountsPage .accountsHeader .secondaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }

@@ -15,19 +15,54 @@
   gap: 22px;
 }
 
-/* Unified Customers header — single card: brand / search / filter / add */
-.customersHeader {
-  display: grid;
-  grid-template-columns: minmax(300px, 350px) minmax(320px, 1fr) 190px 170px;
-  align-items: center;
-  gap: 16px;
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: customersHeader;
   min-width: 0;
   max-width: 100%;
+}
+
+/* Unified Customers header — single card: brand / search / filter / add.
+   Fluid tracks: no rigid minimums, children shrink safely. */
+.customersHeader {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(260px, 1fr) minmax(140px, 180px) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.customersHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — reflow WITHIN the same card:
+   row 1 brand, row 2 search / type filter / add. Banded above mobile
+   so the <=600px single-column viewport rule keeps authority. */
+@container customersHeader (min-width: 601px) and (max-width: 1080px) {
+  .customersHeader {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) auto;
+  }
+
+  .customersPage .customersHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .customersPage .customersHeader .searchBox {
+    grid-column: auto;
+  }
 }
 
 .customersHeaderBrand {
@@ -135,6 +170,8 @@
 .customersPage .customersHeader .primaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }

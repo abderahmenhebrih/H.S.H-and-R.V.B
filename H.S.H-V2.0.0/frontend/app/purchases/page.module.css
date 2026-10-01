@@ -15,19 +15,54 @@
   gap: 22px;
 }
 
-/* Unified Purchases header — single card: brand / search / date / calculate / add */
-.purchasesHeader {
-  display: grid;
-  grid-template-columns: minmax(270px, 300px) minmax(220px, 1fr) 150px 120px 160px;
-  align-items: center;
-  gap: 16px;
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: purchasesHeader;
   min-width: 0;
   max-width: 100%;
+}
+
+/* Unified Purchases header — single card: brand / search / date / calculate / add.
+   Fluid tracks: no rigid minimums, children shrink safely. */
+.purchasesHeader {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(220px, 1fr) minmax(140px, 150px) minmax(100px, 120px) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.purchasesHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — reflow WITHIN the same card:
+   row 1 brand, row 2 search, row 3 date / calculate / add.
+   Banded above mobile so the <=600px single-column rule keeps authority. */
+@container purchasesHeader (min-width: 601px) and (max-width: 1180px) {
+  .purchasesHeader {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 170px) auto;
+  }
+
+  .purchasesPage .purchasesHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .purchasesPage .purchasesHeader .searchBox {
+    grid-column: 1 / -1;
+  }
 }
 
 .purchasesHeaderBrand {
@@ -138,6 +173,8 @@
 .purchasesPage .purchasesHeader .secondaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }

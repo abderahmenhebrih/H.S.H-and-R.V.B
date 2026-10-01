@@ -754,6 +754,7 @@ export default function PaymentsPage() {
       <main className={styles.paymentsPage}>
         <div className={styles.paymentsShell}>
           {/* Unified Payments header — brand / search / date / contextual actions / add */}
+          <div className={styles.headerContainer}>
           <section className={activeTab === "worker" ? `${styles.paymentsHeader} ${styles.paymentsHeaderWorker}` : styles.paymentsHeader}>
             <div className={styles.paymentsHeaderBrand}>
               <div className={styles.paymentsLogo}>
@@ -810,6 +811,7 @@ export default function PaymentsPage() {
               {t.add}
             </button>
           </section>
+          </div>
 
           {/* Category Tabs */}
           <nav className={styles.categoryTabs} aria-label="Payment categories">

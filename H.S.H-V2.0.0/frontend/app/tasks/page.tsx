@@ -602,6 +602,7 @@ export default function TasksPage() {
       <main className={styles.tasksPage}>
         <div className={styles.tasksShell}>
           {/* Unified Tasks header — brand / search / status filter / finished / add */}
+          <div className={styles.headerContainer}>
           <section className={styles.tasksHeader}>
             <div className={styles.tasksHeaderBrand}>
               <div className={styles.tasksLogo}>
@@ -648,6 +649,7 @@ export default function TasksPage() {
               {t.addTask}
             </button>
           </section>
+          </div>
 
           {/* Summary Cards — 5 in one row */}
           <section className={styles.summaryGrid}>

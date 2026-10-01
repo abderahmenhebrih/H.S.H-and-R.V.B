@@ -393,6 +393,7 @@ export default function SuppliersPage() {
       <main className={styles.suppliersPage}>
         <div className={styles.suppliersShell}>
           {/* Unified Suppliers header — brand / search / add */}
+          <div className={styles.headerContainer}>
           <section className={styles.suppliersHeader}>
             <div className={styles.suppliersHeaderBrand}>
               <div className={styles.suppliersLogo}>
@@ -421,8 +422,8 @@ export default function SuppliersPage() {
               {t.addSupplier}
             </button>
           </section>
+          </div>
 
-          {/* KPI Cards — RED→YELLOW→RED→YELLOW */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
               <div className={`${styles.summaryIcon} ${styles.iconSuppliers}`}>

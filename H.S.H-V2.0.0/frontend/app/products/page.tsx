@@ -574,7 +574,8 @@ export default function ProductsPage() {
     <AppShell activePage="products" showHeader={false}>
       <main className={styles.productsPage}>
         {/* Unified Products header */}
-        <section className={styles.productsHeader}>
+        <div className={styles.headerContainer}>
+          <section className={styles.productsHeader}>
           <div className={styles.productsHeaderBrand}>
             <div className={styles.productsLogo}>
               <img src="/chicken.jpg" alt="" />
@@ -608,10 +609,11 @@ export default function ProductsPage() {
             className={styles.primaryButton}
             onClick={openCreate}
           >
-            <Plus size={16} strokeWidth={2} aria-hidden="true" />
-            {t.addProduct}
-          </button>
-        </section>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addProduct}
+            </button>
+          </section>
+        </div>
 
         {/* Summary Cards */}
         <section className={styles.summaryGrid}>

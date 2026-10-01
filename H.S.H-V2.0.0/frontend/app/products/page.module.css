@@ -14,19 +14,54 @@
   color: var(--text);
 }
 
-/* Unified Products header — single card: brand / search / sort / add */
-.productsHeader {
-  display: grid;
-  grid-template-columns: minmax(300px, 350px) minmax(320px, 1fr) 150px 170px;
-  align-items: center;
-  gap: 16px;
+/* Header container query host — reacts to ACTUAL available width
+   (sidebar 76px collapsed / ~210px expanded), not viewport width.
+   Scoped to the header only: fixed modals elsewhere are unaffected. */
+.headerContainer {
+  container-type: inline-size;
+  container-name: productsHeader;
   min-width: 0;
   max-width: 100%;
+}
+
+/* Unified Products header — single card: brand / search / sort / add.
+   Fluid tracks: no rigid minimums, children shrink safely. */
+.productsHeader {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(260px, 1fr) minmax(140px, 170px) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 4px 15px var(--shadow);
+}
+
+.productsHeader > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Compact container state — reflow WITHIN the same card:
+   row 1 brand, row 2 search / sort / add. Banded above mobile
+   so the <=600px single-column viewport rule keeps authority. */
+@container productsHeader (min-width: 601px) and (max-width: 1080px) {
+  .productsHeader {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) auto;
+  }
+
+  .productsPage .productsHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .productsPage .productsHeader .searchBox {
+    grid-column: auto;
+  }
 }
 
 .productsHeaderBrand {
@@ -144,6 +179,8 @@
 .productsPage .productsHeader .primaryButton {
   min-height: 56px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 13px;
   white-space: nowrap;
 }
@@ -438,6 +475,7 @@ html[dir="rtl"] .sortOption {
 
 /* Table — professional management table */
 .tableContainer {
+  max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }

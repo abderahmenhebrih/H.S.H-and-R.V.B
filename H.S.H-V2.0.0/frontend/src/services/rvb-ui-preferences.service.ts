@@ -2,13 +2,17 @@
 
 import { rvbAuthService } from "./rvb-auth.service";
 import { rvbConfigService } from "./rvb-config.service";
-import { DEFAULT_SETTINGS, getDirection, resolveRvbNavigationStyle } from "../lib/settings";
+import { DEFAULT_SETTINGS, getDirection, resolveNavigationStyle } from "../lib/settings";
 import type { Settings, Language, Currency, NavigationStyle } from "../types/settings/settings";
 import { getSavedTheme, applyTheme } from "../lib/theme";
 
 export const RVB_UI_PREFERENCES_EVENT = "rvb-ui-preferences-change";
 export const RVB_LANGUAGE_STORAGE_KEY = "rvb-ui-language";
 export const RVB_NAVIGATION_STYLE_STORAGE_KEY = "rvb-ui-navigation-style";
+
+function isValidNavigationStyle(v: any): v is NavigationStyle {
+  return v === "classic" || v === "floating";
+}
 
 function getLocalLanguage(): Language {
   try {
@@ -53,11 +57,13 @@ function isValidTheme(v: any): boolean {
 function getLocalNavigationStyle(): NavigationStyle {
   try {
     if (typeof window !== "undefined") {
-      const v = localStorage.getItem(RVB_NAVIGATION_STYLE_STORAGE_KEY);
-      if (v === "classic" || v === "floating") return v;
+      // Same key historically stored the RVB-specific value; canonical
+      // values are identical ("classic" | "floating"), so stored values
+      // carry over and resolve through the shared resolver.
+      return resolveNavigationStyle(localStorage.getItem(RVB_NAVIGATION_STYLE_STORAGE_KEY));
     }
   } catch {}
-  return "classic";
+  return resolveNavigationStyle(undefined);
 }
 
 function setLocalNavigationStyleStorage(style: NavigationStyle) {
@@ -72,8 +78,10 @@ async function getEffectiveNavigationStyle(): Promise<NavigationStyle> {
     const token = rvbAuthService.getAccessToken();
     if (!token) return local;
     const prefs = await rvbAuthService.getPreferences().catch(() => null);
-    const uiNav = (prefs as any)?.ui?.rvbNavigationStyle;
-    if (uiNav === "classic" || uiNav === "floating") return uiNav;
+    const ui = (prefs as any)?.ui;
+    // Canonical field first; legacy RVB-specific field migrates once.
+    if (isValidNavigationStyle(ui?.navigationStyle)) return ui.navigationStyle;
+    if (isValidNavigationStyle(ui?.rvbNavigationStyle)) return ui.rvbNavigationStyle;
     return local;
   } catch {
     return local;
@@ -199,7 +207,7 @@ export const rvbUiPreferencesService = {
       workerPositions,
       vehicleTypes,
       expenseTypes,
-      rvbNavigationStyle: await getEffectiveNavigationStyle(),
+      navigationStyle: await getEffectiveNavigationStyle(),
     };
     return settings;
   },
@@ -235,17 +243,19 @@ export const rvbUiPreferencesService = {
     this.getPresentationSettings().then((s) => dispatchRvbPreferences(s)).catch(() => {});
   },
 
-  /** Independent RVB navigation style ("classic" | "floating").
-   *  Authoritative in account ui.rvbNavigationStyle when authenticated,
-   *  localStorage fallback otherwise (same pattern as RVB language).
-   *  Dispatches RVB_UI_PREFERENCES_EVENT so RvbShell switches live.
+  /** Shared global navigation style ("classic" | "floating"), same
+   *  canonical preference HSH uses. Authoritative in account
+   *  ui.navigationStyle when authenticated (legacy ui.rvbNavigationStyle
+   *  migrates on read), localStorage fallback otherwise (same pattern as
+   *  RVB language). Dispatches RVB_UI_PREFERENCES_EVENT so RvbShell
+   *  switches live.
    */
   async setRvbNavigationStyle(style: NavigationStyle): Promise<void> {
-    const next = resolveRvbNavigationStyle(style);
+    const next = resolveNavigationStyle(style);
     const token = rvbAuthService.getAccessToken();
     if (token) {
       try {
-        await rvbAuthService.updatePreferences({ ui: { rvbNavigationStyle: next } } as any);
+        await rvbAuthService.updatePreferences({ ui: { navigationStyle: next } } as any);
       } catch {
         // fall through to local persistence
       }

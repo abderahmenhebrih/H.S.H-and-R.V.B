@@ -10,9 +10,6 @@ export const DEFAULT_SETTINGS: Settings = {
   vehicleTypes: [],
   expenseTypes: [],
   navigationStyle: "floating",
-  // RVB default stays classic (existing users keep their sidebar).
-  // HSH ignores this field entirely.
-  rvbNavigationStyle: "classic",
   notifications: {
     inAppEnabled: true,
     desktopEnabled: false,
@@ -46,10 +43,6 @@ export function getDirection(language: Language): "ltr" | "rtl" {
 
 export function resolveNavigationStyle(value: unknown): NavigationStyle {
   return value === "classic" ? "classic" : "floating";
-}
-
-export function resolveRvbNavigationStyle(value: unknown): NavigationStyle {
-  return value === "floating" ? "floating" : "classic";
 }
 
 export function getLanguageName(language: Language): string {

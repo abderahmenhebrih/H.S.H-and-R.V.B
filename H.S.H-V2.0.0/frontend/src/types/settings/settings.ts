@@ -41,7 +41,6 @@ export interface Settings {
   vehicleTypes: string[];
   expenseTypes: string[];
   navigationStyle?: NavigationStyle;
-  rvbNavigationStyle?: NavigationStyle;
   notifications?: NotificationPreferences;
   invoicePaymentMethods?: PaymentMethodConfig[];
   invoiceDocumentDefaults?: InvoiceDocumentDefaults;

@@ -13,10 +13,10 @@ type CardStrings = {
   floatingDesc: string;
 };
 
-const TR_HSH: Record<Language, CardStrings> = {
+const TR: Record<Language, CardStrings> = {
   en: {
     title: "Navigation Style",
-    desc: "Choose how you navigate through the application.",
+    desc: "Choose how you navigate through HSH and RVB.",
     classic: "Classic Sidebar",
     classicDesc: "Expandable navigation sidebar",
     floating: "Floating Bubbles",
@@ -24,7 +24,7 @@ const TR_HSH: Record<Language, CardStrings> = {
   },
   fr: {
     title: "Style de navigation",
-    desc: "Choisissez comment naviguer dans l'application.",
+    desc: "Choisissez comment naviguer dans HSH et RVB.",
     classic: "Barre latérale",
     classicDesc: "Barre de navigation extensible",
     floating: "Bulles flottantes",
@@ -32,7 +32,7 @@ const TR_HSH: Record<Language, CardStrings> = {
   },
   ar: {
     title: "نمط التنقل",
-    desc: "اختر طريقة التنقل في التطبيق.",
+    desc: "اختر طريقة التنقل في HSH و RVB.",
     classic: "الشريط الجانبي",
     classicDesc: "شريط تنقل قابل للتوسيع",
     floating: "فقاعات عائمة",
@@ -44,39 +44,10 @@ type Props = {
   language: Language;
   value: NavigationStyle;
   onChange: (style: NavigationStyle) => void;
-  variant?: "hsh" | "rvb";
 };
 
-const TR_RVB: Record<Language, CardStrings> = {
-  en: {
-    title: "RVB Navigation Style",
-    desc: "Choose how you navigate through the RVB portal.",
-    classic: "Classic Sidebar",
-    classicDesc: "Expandable RVB navigation sidebar",
-    floating: "Floating Bubbles",
-    floatingDesc: "Movable radial RVB navigation",
-  },
-  fr: {
-    title: "Style de navigation RVB",
-    desc: "Choisissez comment naviguer dans le portail RVB.",
-    classic: "Barre latérale",
-    classicDesc: "Barre de navigation RVB extensible",
-    floating: "Bulles flottantes",
-    floatingDesc: "Navigation radiale RVB déplaçable",
-  },
-  ar: {
-    title: "نمط التنقل RVB",
-    desc: "اختر طريقة التنقل في بوابة RVB.",
-    classic: "الشريط الجانبي",
-    classicDesc: "شريط تنقل RVB قابل للتوسيع",
-    floating: "فقاعات عائمة",
-    floatingDesc: "تنقل دائري RVB قابل للتحريك",
-  },
-};
-
-export default function NavigationStyleSelector({ language, value, onChange, variant = "hsh" }: Props) {
-  const table = variant === "rvb" ? TR_RVB : TR_HSH;
-  const t = table[language] ?? table.en;
+export default function NavigationStyleSelector({ language, value, onChange }: Props) {
+  const t = TR[language] ?? TR.en;
 
   return (
     <div className={themeStyles.section}>

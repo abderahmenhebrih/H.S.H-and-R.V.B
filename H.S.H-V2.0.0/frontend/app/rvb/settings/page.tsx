@@ -5,12 +5,14 @@ import RvbShell from "../../../src/components/rvb/RvbShell";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
-import { DEFAULT_SETTINGS, getDirection } from "../../../src/lib/settings";
-import type { Settings, Language, Currency } from "../../../src/types/settings/settings";
+import { DEFAULT_SETTINGS, getDirection, resolveNavigationStyle, SETTINGS_EVENT } from "../../../src/lib/settings";
+import type { Settings, Language, Currency, NavigationStyle } from "../../../src/types/settings/settings";
 import { getSavedTheme, applyTheme } from "../../../src/lib/theme";
 import { rvbAuthService } from "../../../src/services/rvb-auth.service";
+import { settingsService } from "../../../src/services/settings.service";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import ThemeAppearanceSelector from "../../../src/components/settings/ThemeAppearanceSelector";
+import NavigationStyleSelector from "../../../src/components/settings/NavigationStyleSelector";
 import { Settings as SettingsIcon, Globe, Palette, Bell, Shield, Info, Sun, Moon, LogOut, KeyRound, Image as ImageIcon, Check, X, Eye, EyeOff, Monitor } from "lucide-react";
 import styles from "./page.module.css";
 
@@ -542,7 +544,26 @@ function SettingsInner() {
             )}
 
             {active === "appearance" && (
-              <ThemeAppearanceSelector language={lang} dark={dark} onThemeChange={(v) => setDark(v === "dark")} />
+              <>
+                <ThemeAppearanceSelector language={lang} dark={dark} onThemeChange={(v) => setDark(v === "dark")} />
+                <div style={{ height: 20 }} aria-hidden="true" />
+                <NavigationStyleSelector
+                  language={lang}
+                  value={resolveNavigationStyle(settings.navigationStyle)}
+                  onChange={(style: NavigationStyle) => {
+                    // Same global preference HSH uses: update local state,
+                    // mirror to Dexie for HSH coherence + SETTINGS_EVENT for
+                    // HSH shells, and persist authoritatively via the RVB
+                    // preferences service (account/local + RVB event for
+                    // RvbShell). No reload needed anywhere.
+                    const next: Settings = { ...settings, navigationStyle: style };
+                    setSettings(next);
+                    settingsService.save(next).catch(() => {});
+                    window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
+                    rvbUiPreferencesService.setRvbNavigationStyle(style).catch(() => {});
+                  }}
+                />
+              </>
             )}
 
             {active === "notifications" && (

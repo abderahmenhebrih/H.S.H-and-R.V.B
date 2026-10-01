@@ -14,7 +14,6 @@ import {
   DEFAULT_SETTINGS,
   getDirection,
   resolveNavigationStyle,
-  resolveRvbNavigationStyle,
 } from "../../src/lib/settings";
 import { getSavedTheme, applyTheme } from "../../src/lib/theme";
 import {
@@ -563,17 +562,24 @@ function SettingsPageInner() {
   const loadSettings = async () => {
     const stored = await settingsService.get();
     if (stored) {
+      // One-time migration: legacy rows may carry only the obsolete
+      // rvbNavigationStyle field — adopt it, then drop it going forward.
+      const { rvbNavigationStyle: _legacyNav, ...storedRest } = stored as AppSettings & {
+        rvbNavigationStyle?: unknown;
+      };
       const normalized: AppSettings = {
         ...DEFAULT_SETTINGS,
-        ...stored,
+        ...storedRest,
         expenseTypes: stored.expenseTypes ?? [],
-        navigationStyle: resolveNavigationStyle(stored.navigationStyle),
-        rvbNavigationStyle: resolveRvbNavigationStyle(stored.rvbNavigationStyle),
+        navigationStyle: resolveNavigationStyle(stored.navigationStyle ?? _legacyNav),
       };
       setSettings(normalized);
       settingsRef.current = normalized;
       document.documentElement.lang = normalized.language;
       document.documentElement.dir = getDirection(normalized.language);
+      if (stored.navigationStyle == null && _legacyNav != null) {
+        queueSettingsPersistence(normalized);
+      }
     } else {
       await settingsService.save(DEFAULT_SETTINGS);
     }
@@ -1176,21 +1182,13 @@ function SettingsPageInner() {
                 <NavigationStyleSelector
                   language={settings.language}
                   value={resolveNavigationStyle(settings.navigationStyle)}
-                  onChange={(style: NavigationStyle) => updateSettingsPartial({ navigationStyle: style })}
-                />
-                <div style={{ height: 20 }} aria-hidden="true" />
-                <NavigationStyleSelector
-                  language={settings.language}
-                  variant="rvb"
-                  value={resolveRvbNavigationStyle(settings.rvbNavigationStyle)}
                   onChange={(style: NavigationStyle) => {
-                    // Instant card feedback + Dexie coherence via the canonical
-                    // partial path; authoritative RVB persistence (account /
-                    // local fallback) + live RvbShell switch via the RVB
-                    // preferences service event.
-                    updateSettingsPartial({ rvbNavigationStyle: style });
+                    // Single global preference (HSH + RVB, like theme):
+                    // canonical Dexie write + SETTINGS_EVENT for HSH shells,
+                    // plus RVB service write + RVB event for RvbShell.
+                    updateSettingsPartial({ navigationStyle: style });
                     rvbUiPreferencesService.setRvbNavigationStyle(style).catch((error) => {
-                      console.error("Failed to save RVB navigation style:", error);
+                      console.error("Failed to save navigation style:", error);
                     });
                   }}
                 />

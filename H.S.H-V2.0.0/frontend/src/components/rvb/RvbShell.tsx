@@ -31,7 +31,7 @@ import WorkspaceTransition from "./WorkspaceTransition";
 import {
   DEFAULT_SETTINGS,
   getDirection,
-  resolveRvbNavigationStyle,
+  resolveNavigationStyle,
 } from "../../lib/settings";
 import type { Settings } from "../../types/settings/settings";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
@@ -345,34 +345,6 @@ export default function RvbShell({
   }
 
   const { user, logout } = useRvbAuth();
-  const [notifUnread, setNotifUnread] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    async function loadNotifCount() {
-      try {
-        const { rvbNotificationService } = await import("../../services/rvb-notification.service");
-        const data = await rvbNotificationService.count().catch(() => ({ unreadCount: 0 } as any));
-        if (!cancelled) setNotifUnread(data.unreadCount ?? 0);
-      } catch {}
-    }
-    void loadNotifCount();
-    const h = () => void loadNotifCount();
-    window.addEventListener("hebrih-rvb-notifications-changed", h);
-    // socket realtime
-    let sock: any = null;
-    (async () => {
-      try {
-        const mod = await import("../../services/chat-socket.service");
-        sock = mod.connectChatSocket?.();
-        if (sock) sock.on("rvb:notification", h);
-      } catch {}
-    })();
-    return () => {
-      cancelled = true;
-      window.removeEventListener("hebrih-rvb-notifications-changed", h);
-      if (sock) try { sock.off("rvb:notification", h); } catch {}
-    };
-  }, []);
 
   const t = translations[settings.language];
   const hero = t.hero[activePage] ?? t.hero.dashboard;
@@ -403,6 +375,10 @@ export default function RvbShell({
   // visibleNav, so no role can gain a route through grouping.
   const RVB_PEOPLE_PATHS = ["/rvb/accounts", "/rvb/workers", "/rvb/suppliers", "/rvb/customers"];
   const RVB_OPERATIONS_PATHS = ["/rvb/orders", "/rvb/requests", "/rvb/chats"];
+  // Notifications + Settings live in the sidebar footer utility row (like
+  // HSH), so they are not full main-navigation rows. Routes/pages stay
+  // intact — only the redundant main rows are removed.
+  const RVB_FOOTER_PATHS = ["/rvb/notifications", "/rvb/settings"];
   type RvbNavGroup = "people" | "operations";
 
   // Collapsible nav groups. Accordion: opening one closes the other.
@@ -452,12 +428,12 @@ export default function RvbShell({
     });
   })();
 
-  // Single canonical RVB navigation-mode decision. Exactly one navigation
-  // UI is ever mounted. Deterministic from settings state (default
-  // "classic") — hydration-safe; the stored preference arrives via the
-  // RVB preferences effect + event subscription above. Independent from
-  // the HSH navigationStyle preference.
-  const rvbNavigationStyle = resolveRvbNavigationStyle(settings.rvbNavigationStyle);
+  // Single shared global navigation-mode decision (same canonical
+  // settings.navigationStyle HSH consumes). Exactly one navigation UI is
+  // ever mounted. Deterministic from settings state (default "floating")
+  // — hydration-safe; the stored preference arrives via the RVB
+  // preferences effect + event subscription above.
+  const rvbNavigationStyle = resolveNavigationStyle(settings.navigationStyle);
 
   // Active-route logic shared by classic + floating (extracted unchanged
   // from the classic item renderer, including the portal query matching).
@@ -482,7 +458,10 @@ export default function RvbShell({
   }
 
   const rvbTopItems = visibleNav.filter(
-    (item) => !RVB_PEOPLE_PATHS.includes(item.path) && !RVB_OPERATIONS_PATHS.includes(item.path),
+    (item) =>
+      !RVB_PEOPLE_PATHS.includes(item.path) &&
+      !RVB_OPERATIONS_PATHS.includes(item.path) &&
+      !RVB_FOOTER_PATHS.includes(item.path),
   );
   const rvbPeopleItems = visibleNav.filter((item) => RVB_PEOPLE_PATHS.includes(item.path));
   const rvbOperationsItems = visibleNav.filter((item) => RVB_OPERATIONS_PATHS.includes(item.path));
@@ -585,12 +564,6 @@ export default function RvbShell({
             <Icon size={18} strokeWidth={2} />
           </span>
           <span className={dashboardStyles.sidebarLabel}>{displayLabel}</span>
-          {!isDesktopCollapsed && item.key === "notifications" && notifUnread > 0 && (
-            <span className={dashboardStyles.rvbNavBadge}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
-          )}
-          {isDesktopCollapsed && item.key === "notifications" && notifUnread > 0 && (
-            <span className={dashboardStyles.rvbNavBadgeCollapsed}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
-          )}
         </button>
         {isDesktopCollapsed && (
           <span className={dashboardStyles.tooltip} role="tooltip">
@@ -753,29 +726,59 @@ export default function RvbShell({
           </div>
         )}
 
-        {(user?.role === "manager" || user?.role === "admin") && (
-          <div className={dashboardStyles.sidebarFooter}>
-            <div className={dashboardStyles.navItemWrap}>
-              <button
-                type="button"
-                className={dashboardStyles.onlineButton}
-                onClick={handleSwitchToHsh}
-                aria-label={t.switchToHsh}
-                title={isDesktopCollapsed ? t.switchToHsh : undefined}
-              >
-                <span className={dashboardStyles.onlineButtonIcon} aria-hidden="true">
-                  <Factory size={18} strokeWidth={2} />
-                </span>
-                <span className={dashboardStyles.onlineButtonLabel}>{t.switchToHsh}</span>
-              </button>
-              {isDesktopCollapsed && (
-                <span className={dashboardStyles.tooltip} role="tooltip">
-                  {t.switchToHsh}
-                </span>
+        <div className={dashboardStyles.sidebarFooter}>
+          <div className={dashboardStyles.sidebarUtilityRow}>
+            <span className={dashboardStyles.sidebarUtilityBell}>
+              <RvbNotificationBell language={settings.language} dark={dark} />
+            </span>
+            <button
+              type="button"
+              className={dashboardStyles.sidebarUtilityButton}
+              onClick={toggleTheme}
+              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+              title={dark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {dark ? (
+                <Sun size={18} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Moon size={18} strokeWidth={2} aria-hidden="true" />
               )}
-            </div>
+            </button>
+            <button
+              type="button"
+              className={`${dashboardStyles.sidebarUtilityButton} ${
+                activePage === "settings" ? dashboardStyles.navGroupButtonActive : ""
+              }`}
+              onClick={() => navigate("/rvb/settings")}
+              aria-label={navLabels.settings}
+              title={navLabels.settings}
+              aria-current={activePage === "settings" ? "page" : undefined}
+            >
+              <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
           </div>
-        )}
+          {(user?.role === "manager" || user?.role === "admin") && (
+          <div className={dashboardStyles.navItemWrap}>
+            <button
+              type="button"
+              className={dashboardStyles.onlineButton}
+              onClick={handleSwitchToHsh}
+              aria-label={t.switchToHsh}
+              title={isDesktopCollapsed ? t.switchToHsh : undefined}
+            >
+              <span className={dashboardStyles.onlineButtonIcon} aria-hidden="true">
+                <Factory size={18} strokeWidth={2} />
+              </span>
+              <span className={dashboardStyles.onlineButtonLabel}>{t.switchToHsh}</span>
+            </button>
+            {isDesktopCollapsed && (
+              <span className={dashboardStyles.tooltip} role="tooltip">
+                {t.switchToHsh}
+              </span>
+            )}
+          </div>
+          )}
+        </div>
       </aside>
       </>
       ) : (
@@ -842,6 +845,7 @@ export default function RvbShell({
             onToggleTheme={toggleTheme}
             language={settings.language}
             settingsHref="/rvb/settings"
+            showUtilities={false}
             notificationBell={<RvbNotificationBell language={settings.language} dark={dark} />}
           />
           {children}

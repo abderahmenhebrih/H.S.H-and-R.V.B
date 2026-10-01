@@ -53,6 +53,8 @@ const EMPTY_FORM: FormState = {
 
 const TRANSLATIONS = {
   en: {
+    title: "Suppliers",
+    subtitle: "Manage supplier information, balances, contacts and purchase history.",
     search: "Search suppliers...",
     searchPlaceholder: "Search suppliers by name, phone, address...",
     supplier: "Supplier",
@@ -95,6 +97,8 @@ const TRANSLATIONS = {
   },
 
   fr: {
+    title: "Fournisseurs",
+    subtitle: "Gérer les informations, soldes, contacts et historique des achats.",
     search: "Rechercher des fournisseurs...",
     searchPlaceholder: "Rechercher par nom, téléphone ou adresse...",
     supplier: "Fournisseur",
@@ -137,6 +141,8 @@ const TRANSLATIONS = {
   },
 
   ar: {
+    title: "الموردون",
+    subtitle: "إدارة معلومات الموردين وأرصدتهم وجهات الاتصال وسجل المشتريات.",
     search: "البحث عن الموردين...",
     searchPlaceholder: "البحث بالاسم أو الهاتف أو العنوان...",
     supplier: "المورد",
@@ -383,9 +389,39 @@ export default function SuppliersPage() {
   }
 
   return (
-    <AppShell activePage="suppliers">
+    <AppShell activePage="suppliers" showHeader={false}>
       <main className={styles.suppliersPage}>
         <div className={styles.suppliersShell}>
+          {/* Unified Suppliers header — brand / search / add */}
+          <section className={styles.suppliersHeader}>
+            <div className={styles.suppliersHeaderBrand}>
+              <div className={styles.suppliersLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.suppliersTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.search}
+              />
+            </div>
+
+            <button type="button" className={styles.primaryButton} onClick={openCreate}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addSupplier}
+            </button>
+          </section>
+
           {/* KPI Cards — RED→YELLOW→RED→YELLOW */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -433,26 +469,6 @@ export default function SuppliersPage() {
                 <small className={styles.summarySub}>{t.suppliersWithBalanceSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar — Search + Add Supplier */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label={t.search}
-              />
-            </div>
-
-            <button type="button" className={styles.primaryButton} onClick={openCreate}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addSupplier}
-            </button>
           </section>
 
           {error && <div className={styles.errorBanner}>{error}</div>}

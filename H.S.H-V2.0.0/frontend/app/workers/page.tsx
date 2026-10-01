@@ -56,6 +56,8 @@ const EMPTY_FORM: FormState = {
 
 const TRANSLATIONS = {
   en: {
+    title: "Workers",
+    subtitle: "Manage workers, positions, payroll and balances.",
     search: "Search workers...",
     searchPlaceholder: "Search workers by name, phone, position...",
     worker: "Worker",
@@ -122,6 +124,8 @@ const TRANSLATIONS = {
     outstandingBalanceSub: "Total unpaid balance",
   },
   fr: {
+    title: "Employés",
+    subtitle: "Gérer les employés, postes, salaires et soldes.",
     search: "Rechercher des employés...",
     searchPlaceholder: "Rechercher par nom, téléphone, poste...",
     worker: "Employé",
@@ -188,6 +192,8 @@ const TRANSLATIONS = {
     outstandingBalanceSub: "Solde impayé total",
   },
   ar: {
+    title: "العمال",
+    subtitle: "إدارة العمال والمناصب والرواتب والأرصدة.",
     search: "البحث عن العمال...",
     searchPlaceholder: "البحث بالاسم أو الهاتف أو المنصب...",
     worker: "العامل",
@@ -599,9 +605,42 @@ export default function WorkersPage() {
   }
 
   return (
-    <AppShell activePage="workers">
+    <AppShell activePage="workers" showHeader={false}>
       <main className={styles.workersPage}>
         <div className={styles.workersShell}>
+          {/* Unified Workers header — brand / search / position filter / add */}
+          <section className={styles.workersHeader}>
+            <div className={styles.workersHeaderBrand}>
+              <div className={styles.workersLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.workersTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.search}
+              />
+            </div>
+
+            <PositionFilter value={positionFilter} onChange={setPositionFilter} positions={positions} t={{ allPositions: t.allPositions }} />
+
+            <button type="button" className={styles.primaryButton} onClick={openCreate}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addWorker}
+            </button>
+          </section>
+
           {/* Summary Cards */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -647,29 +686,6 @@ export default function WorkersPage() {
                 <small className={styles.summarySub}>{workersWithBalance} {t.outstandingBalanceSub.toLowerCase()}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label={t.search}
-              />
-            </div>
-
-            <PositionFilter value={positionFilter} onChange={setPositionFilter} positions={positions} t={{ allPositions: t.allPositions }} />
-
-            <button type="button" className={styles.primaryButton} onClick={openCreate}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addWorker}
-            </button>
           </section>
 
           {error && !showForm && !deleteTarget && !archiveTarget && !restoreTarget && (

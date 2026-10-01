@@ -1,10 +1,144 @@
 ﻿.salesPage {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
   color: var(--text);
 }
 
 .salesShell {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Unified Sales header — single card: brand / search / date / add */
+.salesHeader {
+  display: grid;
+  grid-template-columns: minmax(280px, 330px) minmax(240px, 1fr) 160px 150px;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 15px var(--shadow);
+}
+
+.salesHeaderBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.salesLogo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+}
+
+.salesLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.salesTitle {
+  min-width: 0;
+}
+
+.salesTitle h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.salesTitle p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Single-surface header search — outer owns border/bg/radius/focus.
+   Input rule beats globals.css input:not() (0,2,1) without !important. */
+.salesPage .salesHeader .searchBox {
+  height: 56px;
+  min-height: 56px;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-inline: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.salesPage .salesHeader .searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.salesPage .salesHeader .searchBox input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.salesPage .salesHeader .searchBox input::placeholder {
+  color: var(--muted);
+}
+
+/* Header date picker — wrapper owns width, inner trigger stretches to 56px */
+.salesPage .salesHeader .toolbarDate {
+  width: 100%;
+  min-width: 0;
+}
+
+.salesPage .salesHeader .toolbarDate > button {
+  min-height: 56px;
+  height: 56px;
+  width: 100%;
+}
+
+.salesPage .salesHeader .primaryButton {
+  min-height: 56px;
+  width: 100%;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 /* Summary KPI — exact Purchases language: 84px height, 16px padding, 44px icon, gap14 */
@@ -12,7 +146,6 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 20px;
 }
 
 .summaryCard {
@@ -114,22 +247,6 @@
   overflow-wrap: break-word;
   word-break: break-word;
   text-wrap: balance;
-}
-
-/* Toolbar — [ Search | Date | + Add Sale ] — mirrored from Purchases */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 18px;
-  margin-bottom: 15px;
-}
-
-.toolbarDate {
-  width: auto;
-  min-width: 190px;
-  flex: 0 0 auto;
 }
 
 .searchBox {
@@ -1555,14 +1672,38 @@ html[dir="rtl"] .modalFooterActions {
   }
 }
 
+@media (max-width: 1000px) {
+  .salesHeader {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .salesHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .salesPage .salesHeader .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  .salesPage .salesHeader .toolbarDate,
+  .salesPage .salesHeader .primaryButton {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .summaryGrid {
     grid-template-columns: 1fr;
   }
 
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .salesHeader {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .salesPage .salesHeader .toolbarDate,
+  .salesPage .salesHeader .primaryButton {
+    width: 100%;
   }
 
   .dateSelector {
@@ -1613,10 +1754,6 @@ html[dir="rtl"] .modalFooterActions {
   .editRow {
     min-width: 680px;
   }
-}
-
-html[dir="rtl"] .toolbar {
-  direction: rtl;
 }
 
 html[dir="rtl"] .tableHeader,

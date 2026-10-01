@@ -50,6 +50,8 @@ const EMPTY_FORM: FormState = {
 
 const TRANSLATIONS = {
   en: {
+    title: "Vehicles",
+    subtitle: "Manage vehicles, types, registrations and operational transport information.",
     search: "Search vehicles...",
     searchPlaceholder: "Search vehicles by name, registration, type...",
     vehicle: "Vehicle",
@@ -107,6 +109,8 @@ const TRANSLATIONS = {
     typesInUseSub: "Active categories",
   },
   fr: {
+    title: "Véhicules",
+    subtitle: "Gérer les véhicules, les types, les immatriculations et les informations de transport opérationnel.",
     search: "Rechercher des véhicules...",
     searchPlaceholder: "Rechercher par nom, plaque, type...",
     vehicle: "Véhicule",
@@ -164,6 +168,8 @@ const TRANSLATIONS = {
     typesInUseSub: "Catégories actives",
   },
   ar: {
+    title: "المركبات",
+    subtitle: "إدارة المركبات والأنواع والترقيم ومعلومات النقل والتشغيل.",
     search: "البحث عن المركبات...",
     searchPlaceholder: "البحث بالاسم أو اللوحة أو النوع...",
     vehicle: "المركبة",
@@ -561,9 +567,42 @@ export default function VehiclesPage() {
   }
 
   return (
-    <AppShell activePage="vehicles">
+    <AppShell activePage="vehicles" showHeader={false}>
       <main className={styles.vehiclesPage}>
         <div className={styles.vehiclesShell}>
+          {/* Unified Vehicles header — brand / search / type filter / add */}
+          <section className={styles.vehiclesHeader}>
+            <div className={styles.vehiclesHeaderBrand}>
+              <div className={styles.vehiclesLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.vehiclesTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.search}
+              />
+            </div>
+
+            <TypeFilter value={typeFilter} onChange={setTypeFilter} types={vehicleTypes} t={{ allTypes: t.allTypes }} />
+
+            <button type="button" className={styles.primaryButton} onClick={openCreate}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addVehicle}
+            </button>
+          </section>
+
           {/* Summary Cards */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -627,29 +666,6 @@ export default function VehiclesPage() {
                 <small className={styles.summarySub}>{t.typesInUseSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label={t.search}
-              />
-            </div>
-
-            <TypeFilter value={typeFilter} onChange={setTypeFilter} types={vehicleTypes} t={{ allTypes: t.allTypes }} />
-
-            <button type="button" className={styles.primaryButton} onClick={openCreate}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addVehicle}
-            </button>
           </section>
 
           {error && !showForm && !deleteTarget && <div className={styles.errorBanner}>{error}</div>}

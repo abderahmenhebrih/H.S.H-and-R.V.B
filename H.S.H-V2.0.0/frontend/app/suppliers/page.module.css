@@ -1,10 +1,132 @@
 ﻿.suppliersPage {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
   color: var(--text);
 }
 
 .suppliersShell {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Unified Suppliers header — single card: brand / search / add */
+.suppliersHeader {
+  display: grid;
+  grid-template-columns: minmax(300px, 340px) minmax(280px, 1fr) 180px;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 15px var(--shadow);
+}
+
+.suppliersHeaderBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.suppliersLogo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+}
+
+.suppliersLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.suppliersTitle {
+  min-width: 0;
+}
+
+.suppliersTitle h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.suppliersTitle p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Single-surface header search — outer owns border/bg/radius/focus.
+   Input rule beats globals.css input:not() (0,2,1) without !important. */
+.suppliersPage .suppliersHeader .searchBox {
+  height: 56px;
+  min-height: 56px;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-inline: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.suppliersPage .suppliersHeader .searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.suppliersPage .suppliersHeader .searchBox input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.suppliersPage .suppliersHeader .searchBox input::placeholder {
+  color: var(--muted);
+}
+
+.suppliersPage .suppliersHeader .primaryButton {
+  min-height: 56px;
+  width: 100%;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 /* Summary KPI — exact Customers language */
@@ -12,7 +134,6 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 20px;
 }
 
 .summaryCard {
@@ -114,16 +235,6 @@
   overflow-wrap: break-word;
   word-break: break-word;
   text-wrap: balance;
-}
-
-/* Toolbar — Customers geometry: search + add */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 18px;
-  margin-bottom: 15px;
 }
 
 .searchBox {
@@ -830,14 +941,36 @@
   }
 }
 
+@media (max-width: 1000px) {
+  .suppliersHeader {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .suppliersHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .suppliersPage .suppliersHeader .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  .suppliersPage .suppliersHeader .primaryButton {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .summaryGrid {
     grid-template-columns: 1fr;
   }
 
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .suppliersHeader {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .suppliersPage .suppliersHeader .primaryButton {
+    width: 100%;
   }
 
   .tableCard {
@@ -865,10 +998,6 @@
     width: calc(100vw - 20px);
     max-width: calc(100vw - 20px);
   }
-}
-
-html[dir="rtl"] .toolbar {
-  direction: rtl;
 }
 
 html[dir="rtl"] .tableHeader,

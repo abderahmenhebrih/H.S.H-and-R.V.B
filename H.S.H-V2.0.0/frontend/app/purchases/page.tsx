@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDbSync } from "../../src/hooks/useDbSync";
 import {
   AlertTriangle,
+  Calculator,
   CalendarDays,
   Check,
   ChevronDown,
@@ -127,6 +128,8 @@ function formatSelectedDate(date: Date, language: Language): string {
 
 const TRANSLATIONS = {
   en: {
+    title: "Purchases",
+    subtitle: "Manage supplier purchases, product weights, pricing and purchase history.",
     search: "Search purchases...",
     searchPlaceholder: "Search purchases by supplier, product, date...",
     purchases: "purchases",
@@ -199,6 +202,8 @@ const TRANSLATIONS = {
   },
 
   fr: {
+    title: "Achats",
+    subtitle: "Gérer les achats fournisseurs, calculs et historique des achats.",
     search: "Rechercher des achats...",
     searchPlaceholder: "Rechercher par fournisseur, produit, date...",
     purchases: "achats",
@@ -271,6 +276,8 @@ const TRANSLATIONS = {
   },
 
   ar: {
+    title: "المشتريات",
+    subtitle: "إدارة مشتريات الموردين والحسابات وسجل المشتريات.",
     search: "البحث عن المشتريات...",
     searchPlaceholder: "البحث بالمورد أو السلعة أو التاريخ...",
     purchases: "مشتريات",
@@ -763,9 +770,69 @@ export default function PurchasesPage() {
   }
 
   return (
-    <AppShell activePage="purchases">
+    <AppShell activePage="purchases" showHeader={false}>
       <main className={styles.purchasesPage}>
         <div className={styles.purchasesShell}>
+          {/* Unified Purchases header — brand / search / date / calculate / add */}
+          <section className={styles.purchasesHeader}>
+            <div className={styles.purchasesHeaderBrand}>
+              <div className={styles.purchasesLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.purchasesTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t.search}
+                aria-label={t.search}
+              />
+            </div>
+
+            <StyledDatePicker
+              value={toISODate(selectedDate)}
+              onChange={(v) => {
+                if (v) {
+                  const d = parseISODate(v);
+                  if (d) {
+                    const n = new Date(d);
+                    n.setHours(0, 0, 0, 0);
+                    setSelectedDate(n);
+                  }
+                }
+              }}
+              language={language}
+              className={styles.toolbarDate}
+            />
+
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => setShowCalculation(true)}
+            >
+              <Calculator size={16} strokeWidth={2} aria-hidden="true" />
+              {t.calculate}
+            </button>
+
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={startPurchase}
+            >
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addPurchase}
+            </button>
+          </section>
+
           {/* KPI Cards — RED→YELLOW→RED→YELLOW */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -811,55 +878,6 @@ export default function PurchasesPage() {
                 <small className={styles.summarySub}>{t.suppliersInvolvedSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar: Search + Date + Calculations + Add Purchase */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t.search}
-                aria-label={t.search}
-              />
-            </div>
-
-            <StyledDatePicker
-              value={toISODate(selectedDate)}
-              onChange={(v) => {
-                if (v) {
-                  const d = parseISODate(v);
-                  if (d) {
-                    const n = new Date(d);
-                    n.setHours(0, 0, 0, 0);
-                    setSelectedDate(n);
-                  }
-                }
-              }}
-              language={language}
-              className={styles.toolbarDate}
-            />
-
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => setShowCalculation(true)}
-            >
-              {t.calculate}
-            </button>
-
-            <button
-              type="button"
-              className={styles.primaryButton}
-              onClick={startPurchase}
-            >
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addPurchase}
-            </button>
           </section>
 
           {error && !showProductSelector && !showSupplierSelector && !showCalculation && !deleteTarget && (

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDbSync } from "../../src/hooks/useDbSync";
@@ -102,6 +102,8 @@ function formatSelectedDate(date: Date, language: Language): string {
 
 const TRANSLATIONS = {
   en: {
+    title: "Payments",
+    subtitle: "Manage payments, expenses, worker adjustments and transaction records.",
     supplier: "Supplier Payments",
     customer: "Customer Payments",
     worker: "Worker Payments",
@@ -163,6 +165,8 @@ const TRANSLATIONS = {
     permanentAction: "PERMANENT ACTION",
   },
   fr: {
+    title: "Paiements",
+    subtitle: "Gérer les paiements, les dépenses, les ajustements des employés et les relevés de transactions.",
     supplier: "Paiements fournisseurs",
     customer: "Paiements clients",
     worker: "Paiements employés",
@@ -224,6 +228,8 @@ const TRANSLATIONS = {
     permanentAction: "ACTION PERMANENTE",
   },
   ar: {
+    title: "المدفوعات",
+    subtitle: "إدارة المدفوعات والمصاريف وتعديلات العمال وسجلات المعاملات.",
     supplier: "دفع الموردين",
     customer: "دفع الزبائن",
     worker: "دفع العمال",
@@ -744,9 +750,67 @@ export default function PaymentsPage() {
   }, [activeTab, language]);
 
   return (
-    <AppShell activePage="payments">
+    <AppShell activePage="payments" showHeader={false}>
       <main className={styles.paymentsPage}>
         <div className={styles.paymentsShell}>
+          {/* Unified Payments header — brand / search / date / contextual actions / add */}
+          <section className={activeTab === "worker" ? `${styles.paymentsHeader} ${styles.paymentsHeaderWorker}` : styles.paymentsHeader}>
+            <div className={styles.paymentsHeaderBrand}>
+              <div className={styles.paymentsLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.paymentsTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.search}
+                aria-label={t.search}
+              />
+            </div>
+
+            <StyledDatePicker
+              value={toISODate(selectedDate)}
+              onChange={(v) => {
+                if (v) {
+                  const d = parseISODate(v);
+                  if (d) {
+                    const n = new Date(d);
+                    n.setHours(0, 0, 0, 0);
+                    setSelectedDate(n);
+                  }
+                }
+              }}
+              language={language}
+              className={styles.toolbarDate}
+            />
+
+            {activeTab === "worker" && (
+              <>
+                <button type="button" className={styles.secondaryButton} onClick={() => { setBonusForm((c) => ({ ...c, date: toISODate(selectedDate) })); setShowBonus(true); }}>
+                  {t.bonus}
+                </button>
+                <button type="button" className={styles.secondaryButton} onClick={() => { setAbsenceForm((c) => ({ ...c, date: toISODate(selectedDate) })); setShowAbsence(true); }}>
+                  {t.absence}
+                </button>
+              </>
+            )}
+
+            <button type="button" className={styles.primaryButton} onClick={openCreate}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.add}
+            </button>
+          </section>
+
           {/* Category Tabs */}
           <nav className={styles.categoryTabs} aria-label="Payment categories">
             {(["supplier", "customer", "worker", "expense", "vehicle"] as Tab[]).map((tab) => (
@@ -807,54 +871,6 @@ export default function PaymentsPage() {
                 <small className={styles.summarySub}>{t.entitiesInvolvedSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar: Search + Date + Add Payment */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.search}
-                aria-label={t.search}
-              />
-            </div>
-
-            <StyledDatePicker
-              value={toISODate(selectedDate)}
-              onChange={(v) => {
-                if (v) {
-                  const d = parseISODate(v);
-                  if (d) {
-                    const n = new Date(d);
-                    n.setHours(0, 0, 0, 0);
-                    setSelectedDate(n);
-                  }
-                }
-              }}
-              language={language}
-              className={styles.toolbarDate}
-            />
-
-            {activeTab === "worker" && (
-              <>
-                <button type="button" className={styles.secondaryButton} onClick={() => { setBonusForm((c) => ({ ...c, date: toISODate(selectedDate) })); setShowBonus(true); }}>
-                  {t.bonus}
-                </button>
-                <button type="button" className={styles.secondaryButton} onClick={() => { setAbsenceForm((c) => ({ ...c, date: toISODate(selectedDate) })); setShowAbsence(true); }}>
-                  {t.absence}
-                </button>
-              </>
-            )}
-
-            <button type="button" className={styles.primaryButton} onClick={openCreate}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.add}
-            </button>
           </section>
 
           {error && !showForm && !deleteTarget && !deleteExpenseTarget && !showBonus && !showAbsence && (

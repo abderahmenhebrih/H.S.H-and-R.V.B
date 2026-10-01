@@ -1,26 +1,167 @@
 ﻿.paymentsPage {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
   color: var(--text);
 }
 
 .paymentsShell {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
-.purchasesPage {
+/* Unified Payments header — single card: brand / search / date / contextual actions / add.
+   Worker tab renders two extra actions; controls wrap inside the same card below ~1200px. */
+.paymentsHeader {
+  display: grid;
+  grid-template-columns: minmax(280px, 310px) minmax(420px, 1fr) 190px 160px;
+  align-items: center;
+  gap: 16px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 15px var(--shadow);
+}
+
+/* Worker tab: same 4-column tracks so Search stays dominant.
+   Row 1 = brand / search / date / add (auto-placed).
+   Bonus + Absence drop to a second row, right-aligned under date/add. */
+.paymentsHeaderWorker > :nth-child(4) {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.paymentsHeaderWorker > :nth-child(5) {
+  grid-column: 4;
+  grid-row: 2;
+}
+
+.paymentsHeaderBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.paymentsLogo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+}
+
+.paymentsLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.paymentsTitle {
+  min-width: 0;
+}
+
+.paymentsTitle h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--text);
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
-.purchasesShell {
+.paymentsTitle p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Single-surface header search — outer owns border/bg/radius/focus.
+   Input rule beats globals.css input:not() (0,2,1) without !important. */
+.paymentsPage .paymentsHeader .searchBox {
+  height: 56px;
+  min-height: 56px;
   width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-inline: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.paymentsPage .paymentsHeader .searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.paymentsPage .paymentsHeader .searchBox input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.paymentsPage .paymentsHeader .searchBox input::placeholder {
+  color: var(--muted);
+}
+
+/* Header date picker — wrapper owns width, inner trigger stretches to 56px */
+.paymentsPage .paymentsHeader .toolbarDate {
+  width: 100%;
+  min-width: 0;
+}
+
+.paymentsPage .paymentsHeader .toolbarDate > button {
+  min-height: 56px;
+  height: 56px;
+  width: 100%;
+}
+
+.paymentsPage .paymentsHeader .primaryButton,
+.paymentsPage .paymentsHeader .secondaryButton {
+  min-height: 56px;
+  width: 100%;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 /* Category Tabs — segmented navigation */
 .categoryTabs {
   display: flex;
   gap: 8px;
-  margin-top: 20px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -76,7 +217,6 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 14px;
 }
 
 .summaryCard {
@@ -178,22 +318,6 @@
   overflow-wrap: break-word;
   word-break: break-word;
   text-wrap: balance;
-}
-
-/* Toolbar — [ Search | Date | Calculations | + Add Purchase ] */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 18px;
-  margin-bottom: 15px;
-}
-
-.toolbarDate {
-  width: auto;
-  min-width: 190px;
-  flex: 0 0 auto;
 }
 
 .searchBox {
@@ -1758,14 +1882,54 @@ html[dir="rtl"] .modalFooterActions {
   }
 }
 
+@media (max-width: 1200px) {
+  .paymentsHeader {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .paymentsHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .paymentsPage .paymentsHeader .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  /* Worker second-row alignment is a wide-screen treatment only */
+  .paymentsHeaderWorker > :nth-child(4),
+  .paymentsHeaderWorker > :nth-child(5) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .paymentsPage .paymentsHeader .toolbarDate,
+  .paymentsPage .paymentsHeader .secondaryButton,
+  .paymentsPage .paymentsHeader .primaryButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .paymentsHeader {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .paymentsPage .paymentsHeader .toolbarDate,
+  .paymentsPage .paymentsHeader .secondaryButton,
+  .paymentsPage .paymentsHeader .primaryButton {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .summaryGrid {
     grid-template-columns: 1fr;
   }
 
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .paymentsHeader {
+    grid-template-columns: 1fr;
+    padding: 16px;
   }
 
   .dateSelector {
@@ -1822,10 +1986,6 @@ html[dir="rtl"] .modalFooterActions {
   .editRow {
     min-width: 680px;
   }
-}
-
-html[dir="rtl"] .toolbar {
-  direction: rtl;
 }
 
 html[dir="rtl"] .tableHeader,

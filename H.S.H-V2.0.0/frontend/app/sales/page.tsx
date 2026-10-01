@@ -114,6 +114,8 @@ function formatSelectedDate(date: Date, language: Language): string {
 
 const TRANSLATIONS = {
   en: {
+    title: "Sales",
+    subtitle: "Manage customer sales, products, pricing and transaction history.",
     search: "Search sales...",
     searchPlaceholder: "Search sales by customer, product, date...",
     sales: "sales",
@@ -180,6 +182,8 @@ const TRANSLATIONS = {
   },
 
   fr: {
+    title: "Ventes",
+    subtitle: "Gérer les ventes, clients, produits et historique des transactions.",
     search: "Rechercher des ventes...",
     searchPlaceholder: "Rechercher par client, produit, date...",
     sales: "ventes",
@@ -246,6 +250,8 @@ const TRANSLATIONS = {
   },
 
   ar: {
+    title: "المبيعات",
+    subtitle: "إدارة المبيعات والعملاء والمنتجات وسجل المعاملات.",
     search: "البحث عن المبيعات...",
     searchPlaceholder: "البحث بالزبون أو السلعة أو التاريخ...",
     sales: "مبيعات",
@@ -623,9 +629,60 @@ export default function SalesPage() {
   }
 
   return (
-    <AppShell activePage="sales">
+    <AppShell activePage="sales" showHeader={false}>
       <main className={styles.salesPage}>
         <div className={styles.salesShell}>
+          {/* Unified Sales header — brand / search / date / add */}
+          <section className={styles.salesHeader}>
+            <div className={styles.salesHeaderBrand}>
+              <div className={styles.salesLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.salesTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t.search}
+                aria-label={t.search}
+              />
+            </div>
+
+            <StyledDatePicker
+              value={toISODate(selectedDate)}
+              onChange={(v) => {
+                if (v) {
+                  const d = parseISODate(v);
+                  if (d) {
+                    const n = new Date(d);
+                    n.setHours(0, 0, 0, 0);
+                    setSelectedDate(n);
+                  }
+                }
+              }}
+              language={language}
+              className={styles.toolbarDate}
+            />
+
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={startSale}
+            >
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addSale}
+            </button>
+          </section>
+
           {/* KPI Cards — RED→YELLOW→RED→YELLOW (same sequence as Purchases) */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -671,47 +728,6 @@ export default function SalesPage() {
                 <small className={styles.summarySub}>{t.customersInvolvedSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar: Search + Date + Add Sale — mirrored from Purchases (no Calculations for Sales) */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t.search}
-                aria-label={t.search}
-              />
-            </div>
-
-            <StyledDatePicker
-              value={toISODate(selectedDate)}
-              onChange={(v) => {
-                if (v) {
-                  const d = parseISODate(v);
-                  if (d) {
-                    const n = new Date(d);
-                    n.setHours(0, 0, 0, 0);
-                    setSelectedDate(n);
-                  }
-                }
-              }}
-              language={language}
-              className={styles.toolbarDate}
-            />
-
-            <button
-              type="button"
-              className={styles.primaryButton}
-              onClick={startSale}
-            >
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addSale}
-            </button>
           </section>
 
           {error && !showProductSelector && !showCustomerSelector && !deleteTarget && (

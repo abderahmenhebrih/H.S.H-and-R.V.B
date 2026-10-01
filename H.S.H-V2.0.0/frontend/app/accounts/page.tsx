@@ -59,6 +59,8 @@ const EMPTY_FORM: AccountForm = {
 
 const TRANSLATIONS = {
   en: {
+    title: "Accounts",
+    subtitle: "Manage financial accounts, balances and transfers.",
     search: "Search accounts...",
     searchPlaceholder: "Search accounts by name, type, or notes...",
     account: "Account",
@@ -125,6 +127,8 @@ const TRANSLATIONS = {
     selectType: "Select account type",
   },
   fr: {
+    title: "Comptes",
+    subtitle: "Gérer les comptes bancaires et de trésorerie, soldes et transferts.",
     search: "Rechercher des comptes...",
     searchPlaceholder: "Rechercher par nom, type ou notes...",
     account: "Compte",
@@ -191,6 +195,8 @@ const TRANSLATIONS = {
     selectType: "Sélectionner le type de compte",
   },
   ar: {
+    title: "الحسابات",
+    subtitle: "إدارة الحسابات البنكية والنقدية والتحويلات.",
     search: "البحث عن الحسابات...",
     searchPlaceholder: "البحث بالاسم أو النوع أو الملاحظات...",
     account: "الحساب",
@@ -675,9 +681,44 @@ export default function AccountsPage() {
   }
 
   return (
-    <AppShell activePage="accounts">
+    <AppShell activePage="accounts" showHeader={false}>
       <main className={styles.accountsPage}>
         <div className={styles.accountsShell}>
+          {/* Unified Accounts header — brand / search / transfer / add */}
+          <section className={styles.accountsHeader}>
+            <div className={styles.accountsHeaderBrand}>
+              <div className={styles.accountsLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.accountsTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.search}
+              />
+            </div>
+
+            <button type="button" className={styles.secondaryButton} onClick={() => setShowTransfer(true)}>
+              <ArrowRightLeft size={16} strokeWidth={2} aria-hidden="true" />
+              {t.transfer}
+            </button>
+
+            <button type="button" className={styles.primaryButton} onClick={openCreate}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addAccount}
+            </button>
+          </section>
+
           {/* KPI Cards — RED→YELLOW→RED→YELLOW */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -723,31 +764,6 @@ export default function AccountsPage() {
                 <small className={styles.summarySub}>{t.cashAccountsSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar — Search + Transfer + Add */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label={t.search}
-              />
-            </div>
-
-            <button type="button" className={styles.secondaryButton} onClick={() => setShowTransfer(true)}>
-              <ArrowRightLeft size={16} strokeWidth={2} aria-hidden="true" />
-              {t.transfer}
-            </button>
-
-            <button type="button" className={styles.primaryButton} onClick={openCreate}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addAccount}
-            </button>
           </section>
 
           {error && <div className={styles.errorBanner}>{error}</div>}

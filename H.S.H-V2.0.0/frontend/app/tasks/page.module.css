@@ -1,10 +1,149 @@
 ﻿.tasksPage {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
   color: var(--text);
 }
 
 .tasksShell {
   width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Unified Tasks header — single card: brand / search / filter / finished / add */
+.tasksHeader {
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(220px, 1fr) 170px 160px 150px;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 15px var(--shadow);
+}
+
+.tasksHeaderBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tasksLogo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+}
+
+.tasksLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tasksTitle {
+  min-width: 0;
+}
+
+.tasksTitle h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.tasksTitle p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Single-surface header search — outer owns border/bg/radius/focus.
+   Input rule beats globals.css input:not() (0,2,1) without !important. */
+.tasksPage .tasksHeader .searchBox {
+  height: 56px;
+  min-height: 56px;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-inline: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.tasksPage .tasksHeader .searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.tasksPage .tasksHeader .searchBox input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.tasksPage .tasksHeader .searchBox input::placeholder {
+  color: var(--muted);
+}
+
+/* Header status filter — wrapper owns width, inner StyledSelect trigger stretches to 56px */
+.tasksPage .tasksHeader .filterWrapper {
+  width: 100%;
+  min-width: 0;
+}
+
+.tasksPage .tasksHeader .filterWrapper > div {
+  width: 100%;
+}
+
+.tasksPage .tasksHeader .filterWrapper > div > button {
+  min-height: 56px;
+  height: 56px;
+  width: 100%;
+}
+
+.tasksPage .tasksHeader .primaryButton,
+.tasksPage .tasksHeader .secondaryButton {
+  min-height: 56px;
+  width: 100%;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 /* Summary KPI — 5 cards, premium subtle accents */
@@ -12,7 +151,6 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 20px;
 }
 
 .summaryCard {
@@ -126,16 +264,6 @@
   overflow-wrap: break-word;
   word-break: break-word;
   text-wrap: balance;
-}
-
-/* Toolbar — matching Vehicles/Workers geometry */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 18px;
-  margin-bottom: 15px;
 }
 
 .searchBox {
@@ -1209,17 +1337,37 @@
   }
 }
 
+@media (max-width: 1200px) {
+  .tasksHeader {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tasksHeaderBrand {
+    grid-column: 1 / -1;
+  }
+
+  .tasksPage .tasksHeader .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  .tasksPage .tasksHeader .filterWrapper,
+  .tasksPage .tasksHeader .secondaryButton,
+  .tasksPage .tasksHeader .primaryButton {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .summaryGrid {
     grid-template-columns: 1fr;
   }
 
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .tasksHeader {
+    grid-template-columns: 1fr;
+    padding: 16px;
   }
 
-  .filterWrapper {
+  .tasksPage .tasksHeader .filterWrapper {
     width: 100%;
   }
 
@@ -1262,10 +1410,6 @@
     overflow-y: auto;
     overflow-x: hidden;
   }
-}
-
-html[dir="rtl"] .toolbar {
-  direction: rtl;
 }
 
 html[dir="rtl"] .tableHeader,

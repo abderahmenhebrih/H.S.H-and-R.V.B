@@ -34,6 +34,8 @@ import styles from "./page.module.css";
 
 const TRANSLATIONS = {
   en: {
+    title: "Tasks",
+    subtitle: "Manage operational tasks, deadlines and completion status.",
     search: "Search tasks...",
     searchPlaceholder: "Search tasks by name...",
     task: "Task",
@@ -99,6 +101,8 @@ const TRANSLATIONS = {
     completeTask: "Complete task",
   },
   fr: {
+    title: "Tâches",
+    subtitle: "Gérer les tâches opérationnelles, les échéances et leur achèvement.",
     search: "Rechercher des tâches...",
     searchPlaceholder: "Rechercher par nom...",
     task: "Tâche",
@@ -164,6 +168,8 @@ const TRANSLATIONS = {
     completeTask: "Terminer la tâche",
   },
   ar: {
+    title: "المهام",
+    subtitle: "إدارة المهام التشغيلية والمواعيد النهائية وحالة الإنجاز.",
     search: "البحث عن المهام...",
     searchPlaceholder: "البحث بالاسم...",
     task: "المهمة",
@@ -592,9 +598,57 @@ export default function TasksPage() {
   }
 
   return (
-    <AppShell activePage="tasks">
+    <AppShell activePage="tasks" showHeader={false}>
       <main className={styles.tasksPage}>
         <div className={styles.tasksShell}>
+          {/* Unified Tasks header — brand / search / status filter / finished / add */}
+          <section className={styles.tasksHeader}>
+            <div className={styles.tasksHeaderBrand}>
+              <div className={styles.tasksLogo}>
+                <img src="/chicken.jpg" alt="" />
+              </div>
+              <div className={styles.tasksTitle}>
+                <h1>{t.title}</h1>
+                <p>{t.subtitle}</p>
+              </div>
+            </div>
+
+            <div className={styles.searchBox}>
+              <span aria-hidden="true">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.search}
+              />
+            </div>
+
+            <div className={styles.filterWrapper}>
+              <StatusFilter
+                value={statusFilter}
+                onChange={setStatusFilter}
+                t={{ allStatuses: t.allStatuses, newToOld: t.newToOld, closestDeadline: t.closestDeadline, missed: t.missed }}
+              />
+            </div>
+
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => router.push("/tasks/finished")}
+            >
+              <CheckCheck size={16} strokeWidth={2} aria-hidden="true" />
+              {t.finishedTasks}
+            </button>
+
+            <button type="button" className={styles.primaryButton} onClick={openCreate}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addTask}
+            </button>
+          </section>
+
           {/* Summary Cards — 5 in one row */}
           <section className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
@@ -651,44 +705,6 @@ export default function TasksPage() {
                 <small className={styles.summarySub}>{t.missedSub}</small>
               </div>
             </div>
-          </section>
-
-          {/* Toolbar */}
-          <section className={styles.toolbar}>
-            <div className={styles.searchBox}>
-              <span aria-hidden="true">
-                <Search size={18} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label={t.search}
-              />
-            </div>
-
-            <div className={styles.filterWrapper}>
-              <StatusFilter
-                value={statusFilter}
-                onChange={setStatusFilter}
-                t={{ allStatuses: t.allStatuses, newToOld: t.newToOld, closestDeadline: t.closestDeadline, missed: t.missed }}
-              />
-            </div>
-
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => router.push("/tasks/finished")}
-            >
-              <CheckCheck size={16} strokeWidth={2} aria-hidden="true" />
-              {t.finishedTasks}
-            </button>
-
-            <button type="button" className={styles.primaryButton} onClick={openCreate}>
-              <Plus size={16} strokeWidth={2} aria-hidden="true" />
-              {t.addTask}
-            </button>
           </section>
 
           {error && !showForm && !deleteTarget && !completeTarget && <div className={styles.errorBanner}>{error}</div>}

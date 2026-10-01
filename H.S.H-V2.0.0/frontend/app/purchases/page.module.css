@@ -26,12 +26,13 @@
 }
 
 /* Unified Purchases header — single card: brand / search / date / calculate / add.
-   Fluid tracks: no rigid minimums, children shrink safely. */
+   Fluid tracks: no rigid minimums, children shrink safely. One-row
+   minimum ≈ 900px, so both sidebar states stay one-row at desktop. */
 .purchasesHeader {
   display: grid;
-  grid-template-columns: minmax(200px, 280px) minmax(220px, 1fr) minmax(140px, 150px) minmax(100px, 120px) auto;
+  grid-template-columns: minmax(200px, 260px) minmax(200px, 1fr) minmax(140px, 155px) minmax(110px, 140px) minmax(150px, 180px);
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -48,20 +49,21 @@
   max-width: 100%;
 }
 
-/* Compact container state — reflow WITHIN the same card:
-   row 1 brand, row 2 search, row 3 date / calculate / add.
-   Banded above mobile so the <=600px single-column rule keeps authority. */
-@container purchasesHeader (max-width: 1000px) {
-  .purchasesHeader {
-    grid-template-columns: minmax(0, 1fr) minmax(140px, 170px) auto;
+/* Tablet container state — reflow WITHIN the same card:
+   row 1 brand / search, row 2 date / calculate / add. Triggers ONLY
+   when the header is genuinely narrow (<=900px). Specificity beats
+   the viewport <=1200px rules so tablet stays two-row, never three. */
+@container purchasesHeader (min-width: 601px) and (max-width: 900px) {
+  .purchasesPage .purchasesHeader {
+    grid-template-columns: minmax(180px, 260px) minmax(0, 1fr) auto;
   }
 
-  .purchasesPage .purchasesHeaderBrand {
-    grid-column: 1 / -1;
+  .purchasesPage .headerContainer .purchasesHeaderBrand {
+    grid-column: auto;
   }
 
-  .purchasesPage .purchasesHeader .searchBox {
-    grid-column: 1 / -1;
+  .purchasesPage .headerContainer .purchasesHeader .searchBox {
+    grid-column: 2 / -1;
   }
 }
 
@@ -161,6 +163,7 @@
 .purchasesPage .purchasesHeader .toolbarDate {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .purchasesPage .purchasesHeader .toolbarDate > button {

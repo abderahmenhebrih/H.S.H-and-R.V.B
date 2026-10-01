@@ -38,8 +38,10 @@ import {
   ArrowRight,
   Banknote,
   BarChart3,
+  Boxes,
   CarFront,
   ClipboardCheck,
+  ClipboardList,
   ChevronDown,
   FileText,
   Info,
@@ -61,11 +63,36 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { CANONICAL_NAVIGATION } from "../src/lib/navigation";
+import {
+  CANONICAL_NAVIGATION,
+  MANAGEMENT_KEYS,
+  OPERATIONS_KEYS,
+  navGroupForKey,
+} from "../src/lib/navigation";
+import type { NavGroupKey } from "../src/lib/navigation";
 
 // Dashboard now consumes canonical navigation to prevent drift with AppShell
 type SidebarItem = { icon: LucideIcon; key: string };
 const sidebarItems: readonly SidebarItem[] = CANONICAL_NAVIGATION.map(({ icon, key }) => ({ icon, key })) as unknown as readonly SidebarItem[];
+
+// Sidebar routes mirror the canonical paths; children reuse them unchanged.
+const dashboardRoutes: Record<string, string> = {
+  dashboard: "/",
+  office: "/office",
+  products: "/products",
+  customers: "/customers",
+  suppliers: "/suppliers",
+  accounts: "/accounts",
+  purchases: "/purchases",
+  sales: "/sales",
+  payments: "/payments",
+  workers: "/workers",
+  vehicles: "/vehicles",
+  tasks: "/tasks",
+  reports: "/reports",
+  invoice: "/invoice",
+  settings: "/settings",
+};
 
 type QuickAction = { icon: LucideIcon; key: string; color: string; route: string };
 const quickActions: readonly QuickAction[] = [
@@ -84,6 +111,8 @@ const translations = {
     description: "Central management workspace for inventory, sales, purchases, finances and workforce operations.",
     operational: "System operational",
     onlineAccess: "Access RVB",
+    management: "Management",
+    operations: "Operations",
     database: "Local database ready",
     sales: "TODAY'S SALES",
     purchases: "TODAY'S PURCHASES",
@@ -136,6 +165,8 @@ const translations = {
     description: "Espace central de gestion des stocks, ventes, achats, finances et personnel.",
     operational: "Système opérationnel",
     onlineAccess: "Accéder à RVB",
+    management: "Gestion",
+    operations: "Opérations",
     database: "Base de données locale prête",
     sales: "VENTES DU JOUR",
     purchases: "ACHATS DU JOUR",
@@ -188,6 +219,8 @@ const translations = {
     description: "مساحة مركزية لإدارة المخزون والمبيعات والمشتريات والمالية والعمال.",
     operational: "النظام يعمل",
     onlineAccess: "الدخول إلى RVB",
+    management: "الإدارة",
+    operations: "العمليات",
     database: "قاعدة البيانات المحلية جاهزة",
     sales: "مبيعات اليوم",
     purchases: "مشتريات اليوم",
@@ -480,6 +513,39 @@ export default function Dashboard() {
   const t: Translation = translations[settings.language];
 
 
+  // Dashboard is the top-level page: no group starts open.
+  const [openGroup, setOpenGroup] = useState<NavGroupKey | null>(null);
+
+  function toggleGroup(group: NavGroupKey) {
+    setOpenGroup((current) => (current === group ? null : group));
+  }
+
+  const topSidebarItems = sidebarItems.filter(
+    (item) => item.key === "dashboard" || item.key === "office",
+  );
+  const bottomSidebarItems = sidebarItems.filter(
+    (item) =>
+      item.key !== "dashboard" &&
+      item.key !== "office" &&
+      navGroupForKey(item.key) === null,
+  );
+
+  function orderedGroupItems(keys: readonly string[]) {
+    return sidebarItems.filter((item) => keys.includes(item.key)).sort(
+      (a, b) => keys.indexOf(a.key) - keys.indexOf(b.key),
+    );
+  }
+
+  const managementItems = orderedGroupItems(MANAGEMENT_KEYS);
+  const operationsItems = orderedGroupItems(OPERATIONS_KEYS);
+
+  const groupLabels = { management: t.management, operations: t.operations };
+
+  function navigateSidebar(route: string) {
+    setSidebarOpen(false);
+    router.push(route, { scroll: false });
+  }
+
   const navLabels: Record<string, string> = {
     dashboard: t.dashboard,
     office: (t as any).officeNav,
@@ -574,35 +640,152 @@ export default function Dashboard() {
         <div className={styles.sidebarDivider} />
 
         <nav ref={sidebarNavRef as any} className={styles.sidebarNav}>
-          {sidebarItems.map(({ icon: Icon, key }, index) => (
+          {topSidebarItems.map(({ icon: Icon, key }, index) => (
             <div key={key} className={styles.navItemWrap}>
               <button
                 type="button"
                 className={`${styles.sidebarItem} ${index === 0 ? styles.active : ""}`}
-                onClick={() => {
-                  setSidebarOpen(false);
-                  const routes: Record<string, string> = {
-                    dashboard: "/",
-                    office: "/office",
-                    products: "/products",
-                    customers: "/customers",
-                    suppliers: "/suppliers",
-                    accounts: "/accounts",
-                    purchases: "/purchases",
-                    sales: "/sales",
-                    payments: "/payments",
-                    workers: "/workers",
-                    vehicles: "/vehicles",
-                    tasks: "/tasks",
-                    reports: "/reports",
-                    invoice: "/invoice",
-                    settings: "/settings",
-                  };
-                  const route = routes[key];
-                  if (route) {
-                    router.push(route, { scroll: false });
-                  }
-                }}
+                onClick={() => navigateSidebar(dashboardRoutes[key])}
+                aria-label={navLabels[key]}
+                title={isDesktopCollapsed ? navLabels[key] : undefined}
+              >
+                <span className={styles.sidebarIcon} aria-hidden="true">
+                  <Icon size={18} strokeWidth={2} />
+                </span>
+                <span className={styles.sidebarLabel}>{navLabels[key]}</span>
+              </button>
+              {isDesktopCollapsed && (
+                <span className={styles.tooltip} role="tooltip">
+                  {navLabels[key]}
+                </span>
+              )}
+            </div>
+          ))}
+
+          {/* Management group */}
+          <div className={styles.navItemWrap}>
+            <button
+              type="button"
+              className={styles.sidebarItem}
+              onClick={() => toggleGroup("management")}
+              aria-expanded={openGroup === "management"}
+              aria-controls="management-sidebar-group"
+              aria-label={groupLabels.management}
+              title={isDesktopCollapsed ? groupLabels.management : undefined}
+            >
+              <span className={styles.sidebarIcon} aria-hidden="true">
+                <Boxes size={18} strokeWidth={2} />
+              </span>
+              <span className={styles.sidebarLabel}>{groupLabels.management}</span>
+              <span
+                className={`${styles.navGroupChevron} ${
+                  openGroup === "management" ? styles.navGroupChevronOpen : ""
+                }`}
+                aria-hidden="true"
+              >
+                <ChevronDown size={16} strokeWidth={2} />
+              </span>
+            </button>
+            {isDesktopCollapsed && (
+              <span className={styles.tooltip} role="tooltip">
+                {groupLabels.management}
+              </span>
+            )}
+          </div>
+          {openGroup === "management" && (
+            <div
+              id="management-sidebar-group"
+              className={styles.navGroupChildren}
+            >
+              {managementItems.map(({ icon: Icon, key }) => (
+                <div key={key} className={styles.navItemWrap}>
+                  <button
+                    type="button"
+                    className={`${styles.sidebarItem} ${styles.navGroupChild}`}
+                    onClick={() => navigateSidebar(dashboardRoutes[key])}
+                    aria-label={navLabels[key]}
+                    title={isDesktopCollapsed ? navLabels[key] : undefined}
+                  >
+                    <span className={styles.sidebarIcon} aria-hidden="true">
+                      <Icon size={18} strokeWidth={2} />
+                    </span>
+                    <span className={styles.sidebarLabel}>{navLabels[key]}</span>
+                  </button>
+                  {isDesktopCollapsed && (
+                    <span className={styles.tooltip} role="tooltip">
+                      {navLabels[key]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Operations group */}
+          <div className={styles.navItemWrap}>
+            <button
+              type="button"
+              className={styles.sidebarItem}
+              onClick={() => toggleGroup("operations")}
+              aria-expanded={openGroup === "operations"}
+              aria-controls="operations-sidebar-group"
+              aria-label={groupLabels.operations}
+              title={isDesktopCollapsed ? groupLabels.operations : undefined}
+            >
+              <span className={styles.sidebarIcon} aria-hidden="true">
+                <ClipboardList size={18} strokeWidth={2} />
+              </span>
+              <span className={styles.sidebarLabel}>{groupLabels.operations}</span>
+              <span
+                className={`${styles.navGroupChevron} ${
+                  openGroup === "operations" ? styles.navGroupChevronOpen : ""
+                }`}
+                aria-hidden="true"
+              >
+                <ChevronDown size={16} strokeWidth={2} />
+              </span>
+            </button>
+            {isDesktopCollapsed && (
+              <span className={styles.tooltip} role="tooltip">
+                {groupLabels.operations}
+              </span>
+            )}
+          </div>
+          {openGroup === "operations" && (
+            <div
+              id="operations-sidebar-group"
+              className={styles.navGroupChildren}
+            >
+              {operationsItems.map(({ icon: Icon, key }) => (
+                <div key={key} className={styles.navItemWrap}>
+                  <button
+                    type="button"
+                    className={`${styles.sidebarItem} ${styles.navGroupChild}`}
+                    onClick={() => navigateSidebar(dashboardRoutes[key])}
+                    aria-label={navLabels[key]}
+                    title={isDesktopCollapsed ? navLabels[key] : undefined}
+                  >
+                    <span className={styles.sidebarIcon} aria-hidden="true">
+                      <Icon size={18} strokeWidth={2} />
+                    </span>
+                    <span className={styles.sidebarLabel}>{navLabels[key]}</span>
+                  </button>
+                  {isDesktopCollapsed && (
+                    <span className={styles.tooltip} role="tooltip">
+                      {navLabels[key]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {bottomSidebarItems.map(({ icon: Icon, key }) => (
+            <div key={key} className={styles.navItemWrap}>
+              <button
+                type="button"
+                className={styles.sidebarItem}
+                onClick={() => navigateSidebar(dashboardRoutes[key])}
                 aria-label={navLabels[key]}
                 title={isDesktopCollapsed ? navLabels[key] : undefined}
               >

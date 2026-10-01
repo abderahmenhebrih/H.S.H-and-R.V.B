@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import {
   Banknote,
   BarChart3,
+  Boxes,
   BriefcaseBusiness,
+  ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   FileText,
   LayoutDashboard,
   Menu,
@@ -37,7 +40,13 @@ import {
 import type { Settings } from "../../types/settings/settings";
 import { settingsService } from "../../services/settings.service";
 import { getSavedTheme, applyTheme } from "../../lib/theme";
-import { CANONICAL_NAVIGATION } from "../../lib/navigation";
+import {
+  CANONICAL_NAVIGATION,
+  MANAGEMENT_KEYS,
+  OPERATIONS_KEYS,
+  navGroupForKey,
+} from "../../lib/navigation";
+import type { NavGroupKey } from "../../lib/navigation";
 
 type ActivePage =
   | "dashboard"
@@ -94,6 +103,8 @@ const translations = {
     brand: "Hebrih Slaughter House",
     system: "Management System",
     onlineAccess: "Access RVB",
+    management: "Management",
+    operations: "Operations",
     database: "Local database ready",
     ready: "Ready",
     operational: "System operational",
@@ -200,6 +211,8 @@ const translations = {
     brand: "Abattoire Hebrih",
     system: "Système de gestion",
     onlineAccess: "Accéder à RVB",
+    management: "Gestion",
+    operations: "Opérations",
     database: "Base de données locale prête",
     ready: "Prêt",
     operational: "Système opérationnel",
@@ -306,6 +319,8 @@ const translations = {
     brand: "مذبح حبريح للدواجن",
     system: "نظام الإدارة",
     onlineAccess: "الدخول إلى RVB",
+    management: "الإدارة",
+    operations: "العمليات",
     database: "قاعدة البيانات المحلية جاهزة",
     ready: "جاهز",
     operational: "النظام يعمل",
@@ -414,6 +429,19 @@ export default function AppShell({
 
   const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
   const isDesktopCollapsed = !desktopSidebarExpanded;
+
+  // Collapsible nav groups (Management / Operations). Accordion:
+  // opening one closes the other. The group holding the active page
+  // starts open; hover/focus never changes group state.
+  const isManagementActive = (MANAGEMENT_KEYS as readonly string[]).includes(activePage);
+  const isOperationsActive = (OPERATIONS_KEYS as readonly string[]).includes(activePage);
+  const [openGroup, setOpenGroup] = useState<NavGroupKey | null>(
+    isManagementActive ? "management" : isOperationsActive ? "operations" : null,
+  );
+
+  function toggleGroup(group: NavGroupKey) {
+    setOpenGroup((current) => (current === group ? null : group));
+  }
 
   // Input-modality tracking: pointer focus must not pin the sidebar open,
   // keyboard (Tab/arrows) focus must keep it expanded until focus leaves.
@@ -550,6 +578,28 @@ export default function AppShell({
     router.push(path, { scroll: false });
   }
 
+  // Sidebar partition: dashboard + office stay top-level, grouped pages
+  // render only inside their group, remaining items (settings) stay last.
+  // Icons/paths/keys come from canonical navigation — unchanged.
+  const topNavItems = navigation.filter(
+    (item) => item.key === "dashboard" || item.key === "office",
+  );
+  const bottomNavItems = navigation.filter(
+    (item) =>
+      item.key !== "dashboard" &&
+      item.key !== "office" &&
+      navGroupForKey(item.key) === null,
+  );
+
+  function orderedGroupItems(keys: readonly string[]): NavItem[] {
+    return keys
+      .map((key) => navigation.find((item) => item.key === key))
+      .filter((item): item is NavItem => item !== undefined);
+  }
+
+  const managementItems = orderedGroupItems(MANAGEMENT_KEYS);
+  const operationsItems = orderedGroupItems(OPERATIONS_KEYS);
+
   function handleSwitchToRvb() {
     try { sessionStorage.setItem("hebrih-transition-target", "rvb"); } catch {}
     setTransitionTarget("rvb");
@@ -682,7 +732,157 @@ export default function AppShell({
         <div className={dashboardStyles.sidebarDivider} />
 
         <nav ref={sidebarNavRef} className={dashboardStyles.sidebarNav}>
-          {navigation.map(({ icon: Icon, key, path }) => (
+          {topNavItems.map(({ icon: Icon, key, path }) => (
+            <div key={key} className={dashboardStyles.navItemWrap}>
+              <button
+                type="button"
+                className={`${dashboardStyles.sidebarItem} ${
+                  activePage === key ? dashboardStyles.active : ""
+                }`}
+                onClick={() => navigate(path)}
+                aria-label={navLabels[key]}
+                title={isDesktopCollapsed ? navLabels[key] : undefined}
+              >
+                <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
+                  <Icon size={18} strokeWidth={2} />
+                </span>
+                <span className={dashboardStyles.sidebarLabel}>{navLabels[key]}</span>
+              </button>
+              {isDesktopCollapsed && (
+                <span className={dashboardStyles.tooltip} role="tooltip">
+                  {navLabels[key]}
+                </span>
+              )}
+            </div>
+          ))}
+
+          {/* Management group */}
+          <div className={dashboardStyles.navItemWrap}>
+            <button
+              type="button"
+              className={`${dashboardStyles.sidebarItem} ${
+                isManagementActive ? dashboardStyles.navGroupButtonActive : ""
+              }`}
+              onClick={() => toggleGroup("management")}
+              aria-expanded={openGroup === "management"}
+              aria-controls="management-sidebar-group"
+              aria-label={t.management}
+              title={isDesktopCollapsed ? t.management : undefined}
+            >
+              <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
+                <Boxes size={18} strokeWidth={2} />
+              </span>
+              <span className={dashboardStyles.sidebarLabel}>{t.management}</span>
+              <span
+                className={`${dashboardStyles.navGroupChevron} ${
+                  openGroup === "management" ? dashboardStyles.navGroupChevronOpen : ""
+                }`}
+                aria-hidden="true"
+              >
+                <ChevronDown size={16} strokeWidth={2} />
+              </span>
+            </button>
+            {isDesktopCollapsed && (
+              <span className={dashboardStyles.tooltip} role="tooltip">
+                {t.management}
+              </span>
+            )}
+          </div>
+          {openGroup === "management" && (
+            <div
+              id="management-sidebar-group"
+              className={dashboardStyles.navGroupChildren}
+            >
+              {managementItems.map(({ icon: Icon, key, path }) => (
+                <div key={key} className={dashboardStyles.navItemWrap}>
+                  <button
+                    type="button"
+                    className={`${dashboardStyles.sidebarItem} ${dashboardStyles.navGroupChild} ${
+                      activePage === key ? dashboardStyles.active : ""
+                    }`}
+                    onClick={() => navigate(path)}
+                    aria-label={navLabels[key]}
+                    title={isDesktopCollapsed ? navLabels[key] : undefined}
+                  >
+                    <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
+                      <Icon size={18} strokeWidth={2} />
+                    </span>
+                    <span className={dashboardStyles.sidebarLabel}>{navLabels[key]}</span>
+                  </button>
+                  {isDesktopCollapsed && (
+                    <span className={dashboardStyles.tooltip} role="tooltip">
+                      {navLabels[key]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Operations group */}
+          <div className={dashboardStyles.navItemWrap}>
+            <button
+              type="button"
+              className={`${dashboardStyles.sidebarItem} ${
+                isOperationsActive ? dashboardStyles.navGroupButtonActive : ""
+              }`}
+              onClick={() => toggleGroup("operations")}
+              aria-expanded={openGroup === "operations"}
+              aria-controls="operations-sidebar-group"
+              aria-label={t.operations}
+              title={isDesktopCollapsed ? t.operations : undefined}
+            >
+              <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
+                <ClipboardList size={18} strokeWidth={2} />
+              </span>
+              <span className={dashboardStyles.sidebarLabel}>{t.operations}</span>
+              <span
+                className={`${dashboardStyles.navGroupChevron} ${
+                  openGroup === "operations" ? dashboardStyles.navGroupChevronOpen : ""
+                }`}
+                aria-hidden="true"
+              >
+                <ChevronDown size={16} strokeWidth={2} />
+              </span>
+            </button>
+            {isDesktopCollapsed && (
+              <span className={dashboardStyles.tooltip} role="tooltip">
+                {t.operations}
+              </span>
+            )}
+          </div>
+          {openGroup === "operations" && (
+            <div
+              id="operations-sidebar-group"
+              className={dashboardStyles.navGroupChildren}
+            >
+              {operationsItems.map(({ icon: Icon, key, path }) => (
+                <div key={key} className={dashboardStyles.navItemWrap}>
+                  <button
+                    type="button"
+                    className={`${dashboardStyles.sidebarItem} ${dashboardStyles.navGroupChild} ${
+                      activePage === key ? dashboardStyles.active : ""
+                    }`}
+                    onClick={() => navigate(path)}
+                    aria-label={navLabels[key]}
+                    title={isDesktopCollapsed ? navLabels[key] : undefined}
+                  >
+                    <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
+                      <Icon size={18} strokeWidth={2} />
+                    </span>
+                    <span className={dashboardStyles.sidebarLabel}>{navLabels[key]}</span>
+                  </button>
+                  {isDesktopCollapsed && (
+                    <span className={dashboardStyles.tooltip} role="tooltip">
+                      {navLabels[key]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {bottomNavItems.map(({ icon: Icon, key, path }) => (
             <div key={key} className={dashboardStyles.navItemWrap}>
               <button
                 type="button"

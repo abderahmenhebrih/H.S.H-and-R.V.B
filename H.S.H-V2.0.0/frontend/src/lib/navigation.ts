@@ -63,3 +63,31 @@ export const CANONICAL_NAVIGATION: readonly CanonicalNavItem[] = [
 export const NAV_PATHS: Record<NavKey, string> = Object.fromEntries(
   CANONICAL_NAVIGATION.map((item) => [item.key, item.path])
 ) as Record<NavKey, string>;
+
+// Sidebar collapsible groups (HSH only — RVB untouched).
+// Children reuse canonical icons/paths; order here is render order.
+export const MANAGEMENT_KEYS = [
+  "customers",
+  "suppliers",
+  "workers",
+  "vehicles",
+  "accounts",
+  "products",
+] as const satisfies readonly NavKey[];
+
+export const OPERATIONS_KEYS = [
+  "sales",
+  "purchases",
+  "payments",
+  "tasks",
+  "reports",
+  "invoice",
+] as const satisfies readonly NavKey[];
+
+export type NavGroupKey = "management" | "operations";
+
+export function navGroupForKey(key: string): NavGroupKey | null {
+  if ((MANAGEMENT_KEYS as readonly string[]).includes(key)) return "management";
+  if ((OPERATIONS_KEYS as readonly string[]).includes(key)) return "operations";
+  return null;
+}

@@ -1770,4 +1770,76 @@ html[dir="rtl"] .sidebar {
   }
 }
 
+/* =========================
+   SIDEBAR NAV GROUPS (HSH)
+   Management / Operations collapsible parents.
+   Shared by AppShell and the dashboard (same stylesheet).
+   Placed last so drawer/collapsed ties resolve toward full rows.
+   ========================= */
+
+.navGroupChevron {
+  margin-inline-start: auto;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.navGroupChevronOpen {
+  transform: rotate(180deg);
+  color: var(--text);
+}
+
+/* Collapsed desktop: icon-only parents, no chevron, no children.
+   Mobile drawer (.sidebarOpen) always renders full rows. */
+.sidebarCollapsed:not(.sidebarOpen) .navGroupChevron {
+  display: none;
+}
+
+.sidebarCollapsed:not(.sidebarOpen) .navGroupChildren {
+  display: none;
+}
+
+.sidebarNav .navGroupChildren {
+  display: flex;
+  flex-direction: column;
+  animation: navGroupIn 0.18s ease;
+}
+
+@keyframes navGroupIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sidebarNav .navGroupChild {
+  padding-inline-start: 32px;
+}
+
+/* Parent contains the active page: subtle tint only.
+   The active child keeps the strong brown selected style. */
+.navGroupButtonActive {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+
+.navGroupButtonActive .sidebarIcon {
+  color: var(--accent);
+}
+
+.themeDark .navGroupButtonActive {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+
+.themeDark .navGroupButtonActive .sidebarIcon {
+  color: var(--accent);
+}
+
 

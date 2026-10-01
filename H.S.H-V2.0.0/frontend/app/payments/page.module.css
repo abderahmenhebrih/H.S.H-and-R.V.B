@@ -29,7 +29,7 @@
 
 .paymentsHeader {
   display: grid;
-  grid-template-columns: minmax(280px, 310px) minmax(420px, 1fr) 190px auto;
+  grid-template-columns: minmax(200px, 280px) minmax(250px, 1fr) minmax(165px, 195px) minmax(145px, 175px);
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -48,39 +48,38 @@
   max-width: 100%;
 }
 
-/* Compact container state — mirrors the <=1200px viewport treatment
-   but keyed to real header width. Banded above mobile. */
-@container paymentsHeader (max-width: 1150px) {
-  .paymentsHeader {
-    grid-template-columns: 1fr 1fr 1fr;
+/* Worker tab at desktop: all six controls fit one row while the
+   container is wide (one-row minimum ≈ 902px incl. gaps/padding).
+   Search floor tuned to 250px so normal tabs hold one row to 850px. */
+.paymentsHeaderWorker {
+  grid-template-columns: minmax(160px, 200px) minmax(180px, 1fr) minmax(130px, 150px) minmax(90px, 110px) minmax(90px, 110px) minmax(130px, 150px);
+}
+
+/* Tablet container state — reflow WITHIN the same card:
+   row 1 brand / search, row 2 date / add (worker: further rows flow
+   naturally). Triggers ONLY when the header is genuinely narrow
+   (<=850px): both sidebar states stay one-row at desktop widths.
+   Raised specificity beats the viewport <=1200px rules below. */
+@container paymentsHeader (min-width: 601px) and (max-width: 850px) {
+  .paymentsPage .paymentsHeader {
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
   }
 
-  .paymentsPage .paymentsHeaderBrand {
-    grid-column: 1 / -1;
-  }
-
-  .paymentsPage .paymentsHeader .searchBox {
-    grid-column: 1 / -1;
-  }
-
-  .paymentsPage .paymentsHeaderWorker > :nth-child(4),
-  .paymentsPage .paymentsHeaderWorker > :nth-child(5) {
+  .paymentsPage .headerContainer .paymentsHeaderBrand {
     grid-column: auto;
-    grid-row: auto;
+  }
+
+  .paymentsPage .headerContainer .paymentsHeader .searchBox {
+    grid-column: auto;
   }
 }
 
-/* Worker tab: same 4-column tracks so Search stays dominant.
-   Row 1 = brand / search / date / add (auto-placed).
-   Bonus + Absence drop to a second row, right-aligned under date/add. */
-.paymentsHeaderWorker > :nth-child(4) {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-.paymentsHeaderWorker > :nth-child(5) {
-  grid-column: 4;
-  grid-row: 2;
+/* Genuinely narrow header: single column. Agrees with the viewport
+   <=700px/<=600px single-column rules (same specificity or later). */
+@container paymentsHeader (max-width: 600px) {
+  .paymentsHeader {
+    grid-template-columns: 1fr;
+  }
 }
 
 .paymentsHeaderBrand {
@@ -1922,25 +1921,9 @@ html[dir="rtl"] .modalFooterActions {
 }
 
 @media (max-width: 1200px) {
-  .paymentsHeader {
-    grid-template-columns: 1fr 1fr 1fr;
-  }
-
-  .paymentsHeaderBrand {
-    grid-column: 1 / -1;
-  }
-
-  .paymentsPage .paymentsHeader .searchBox {
-    grid-column: 1 / -1;
-  }
-
-  /* Worker second-row alignment is a wide-screen treatment only */
-  .paymentsHeaderWorker > :nth-child(4),
-  .paymentsHeaderWorker > :nth-child(5) {
-    grid-column: auto;
-    grid-row: auto;
-  }
-
+  /* Header stacking is governed solely by the container query above:
+     one row persists while the header itself fits, at any viewport.
+     Only control widths are reinforced here. */
   .paymentsPage .paymentsHeader .toolbarDate,
   .paymentsPage .paymentsHeader .secondaryButton,
   .paymentsPage .paymentsHeader .primaryButton {

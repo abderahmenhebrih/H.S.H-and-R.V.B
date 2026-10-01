@@ -28,9 +28,9 @@
 
 .salesHeader {
   display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(240px, 1fr) minmax(140px, 160px) auto;
+  grid-template-columns: minmax(220px, 290px) minmax(260px, 1fr) minmax(165px, 180px) minmax(145px, 165px);
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -47,20 +47,19 @@
   max-width: 100%;
 }
 
-/* Compact container state — reflow WITHIN the same card:
-   row 1 brand, row 2 search / date / add. Banded above mobile
-   so the <=600px single-column viewport rule keeps authority. */
-@container salesHeader (max-width: 950px) {
+/* Tablet container state — reflow WITHIN the same card:
+   row 1 brand / search, row 2 date / add. Triggers ONLY when the
+   header is genuinely narrow (<=900px): both sidebar states at
+   desktop widths stay one-row. Search floor tuned to 260px so the
+   one-row minimum (~874px) always fits above the breakpoint. */
+@container salesHeader (min-width: 601px) and (max-width: 900px) {
   .salesHeader {
-    grid-template-columns: minmax(0, 1fr) minmax(140px, 170px) auto;
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
   }
 
-  .salesPage .salesHeaderBrand {
-    grid-column: 1 / -1;
-  }
-
-  .salesPage .salesHeader .searchBox {
-    grid-column: auto;
+  .salesPage .salesHeader .primaryButton {
+    max-width: 220px;
+    justify-self: end;
   }
 }
 
@@ -160,6 +159,7 @@
 .salesPage .salesHeader .toolbarDate {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .salesPage .salesHeader .toolbarDate > button {

@@ -53,9 +53,17 @@ export interface SyncChangesResponse {
 
 const BATCH_SIZE = 100;
 
+// Single normalized sync API base. Vercel env values may carry a trailing
+// slash; without trimming, every sync URL becomes //api/... which Express
+// rejects with 404. All sync requests below must use this, never the raw env.
+function getSyncApiBase(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  return raw.replace(/\/+$/, "");
+}
+
 export async function syncPendingOperations(): Promise<SyncResponse> {
   const clientId = await getOrCreateClientId();
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const apiBase = getSyncApiBase();
   const allResults: SyncOperationResult[] = [];
   let overallSuccess = true;
   const MAX_DRAIN_ITERATIONS = 1000;
@@ -347,7 +355,7 @@ function getTableForEntity(entity: string): any {
 }
 
 export async function fetchRemoteChanges(after: number, limit = 200): Promise<SyncChangesResponse> {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const apiBase = getSyncApiBase();
   const url = `${apiBase}/api/sync/changes?after=${after}&limit=${limit}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Fetch changes failed ${res.status}`);
@@ -360,7 +368,7 @@ export interface BootstrapSnapshot {
 }
 
 export async function fetchBootstrap(): Promise<BootstrapSnapshot> {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const apiBase = getSyncApiBase();
   const res = await fetch(`${apiBase}/api/sync/bootstrap`);
   if (!res.ok) throw new Error(`Bootstrap failed ${res.status}`);
   const data = await res.json();
@@ -379,7 +387,7 @@ export async function fetchBootstrap(): Promise<BootstrapSnapshot> {
 }
 
 export async function fetchCurrentRevision(): Promise<number> {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const apiBase = getSyncApiBase();
   try {
     const res = await fetch(`${apiBase}/api/sync/status`);
     if (!res.ok) return 0;

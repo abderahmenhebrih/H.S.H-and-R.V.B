@@ -28,9 +28,9 @@
 
 .tasksHeader {
   display: grid;
-  grid-template-columns: minmax(190px, 250px) minmax(220px, 1fr) minmax(150px, 185px) minmax(165px, 205px) minmax(130px, 155px);
+  grid-template-columns: minmax(190px, 240px) minmax(280px, 1fr) minmax(190px, 230px) minmax(150px, 180px);
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -48,25 +48,18 @@
 }
 
 /* Tablet container state — reflow WITHIN the same card:
-   row 1 brand / search, row 2 status / finished / add. Triggers ONLY
-   when the header is genuinely narrow (<=950px): both sidebar states
-   stay one-row at desktop widths (one-row minimum ≈ 945px).
+   row 1 brand / search, row 2 status / add. Triggers ONLY when the
+   header is genuinely narrow (<=900px): both sidebar states stay
+   one-row at desktop widths (one-row minimum ≈ 900px).
    Raised specificity beats the viewport <=1200px rules below. */
-@container tasksHeader (min-width: 601px) and (max-width: 950px) {
+@container tasksHeader (min-width: 601px) and (max-width: 900px) {
   .tasksPage .tasksHeader {
-    grid-template-columns: minmax(170px, 240px) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
   }
 
-  .tasksPage .headerContainer .tasksHeaderBrand {
-    grid-column: auto;
-  }
-
-  .tasksPage .headerContainer .tasksHeader .searchBox {
-    grid-column: 2 / -1;
-  }
-
-  .tasksPage .headerContainer .tasksHeader .secondaryButton {
-    max-width: 240px;
+  .tasksPage .headerContainer .tasksHeader .primaryButton {
+    max-width: 260px;
+    justify-self: end;
   }
 }
 
@@ -170,7 +163,7 @@
   color: var(--muted);
 }
 
-/* Header status filter — wrapper owns width, inner StyledSelect trigger stretches to 56px */
+/* Header status filter — wrapper owns width, local dropdown trigger stretches to 56px */
 .tasksPage .tasksHeader .filterWrapper {
   width: 100%;
   min-width: 0;
@@ -186,8 +179,155 @@
   width: 100%;
 }
 
-.tasksPage .tasksHeader .primaryButton,
-.tasksPage .tasksHeader .secondaryButton {
+/* Status filter dropdown — local to Tasks (filter options + finished-tasks action) */
+.filterDropdown {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.filterTrigger {
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.filterTrigger:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.filterTrigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.filterTriggerOpen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.filterTrigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filterChevron {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+  flex: 0 0 auto;
+}
+
+.filterChevronOpen {
+  transform: rotate(180deg);
+  color: var(--text);
+}
+
+.filterMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  inset-inline-start: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(280px, 80vw);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(62, 44, 28, 0.14), 0 4px 12px rgba(62, 44, 28, 0.08);
+  z-index: 60;
+}
+
+:global([class*="themeDark"]) .filterMenu {
+  border-color: var(--border);
+  background: var(--panel-elevated);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.filterOption,
+.filterAction {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: start;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.filterOption:hover,
+.filterOptionHover,
+.filterAction:hover,
+.filterActionActive {
+  background: var(--panel-hover);
+}
+
+.filterOption:focus-visible,
+.filterAction:focus-visible {
+  outline: none;
+  background: var(--panel-hover);
+  box-shadow: inset 0 0 0 2px var(--accent-ring);
+}
+
+.filterOptionActive {
+  background: var(--panel-hover);
+  font-weight: 700;
+}
+
+.filterDivider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+  flex: 0 0 auto;
+}
+
+.filterAction {
+  color: var(--text);
+}
+
+.filterAction svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+html[dir="rtl"] .filterOption,
+html[dir="rtl"] .filterAction {
+  text-align: right;
+}
+
+.tasksPage .tasksHeader .primaryButton {
   min-height: 56px;
   width: 100%;
   min-width: 0;
@@ -1392,7 +1532,6 @@
      one row persists while the header itself fits, at any viewport.
      Only control widths are reinforced here. */
   .tasksPage .tasksHeader .filterWrapper,
-  .tasksPage .tasksHeader .secondaryButton,
   .tasksPage .tasksHeader .primaryButton {
     width: 100%;
   }

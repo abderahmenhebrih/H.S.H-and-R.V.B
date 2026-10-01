@@ -28,9 +28,9 @@
    Fluid tracks: no rigid minimums, children shrink safely. */
 .productsHeader {
   display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(260px, 1fr) minmax(140px, 170px) auto;
+  grid-template-columns: minmax(200px, 250px) minmax(280px, 1fr) minmax(165px, 200px) minmax(160px, 190px);
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -47,20 +47,35 @@
   max-width: 100%;
 }
 
-/* Compact container state — reflow WITHIN the same card:
-   row 1 brand, row 2 search / sort / add. Triggers ONLY when the
-   header is genuinely narrow; both sidebar states stay one-row. */
-@container productsHeader (max-width: 950px) {
-  .productsHeader {
-    grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) auto;
+/* Tablet container state — reflow WITHIN the same card:
+   row 1 brand / search, row 2 sort / add. Triggers ONLY when the
+   header is genuinely narrow (<=900px): both sidebar states stay
+   one-row at desktop widths (one-row minimum ≈ 889px).
+   Raised specificity beats the viewport <=1000px rules below. */
+@container productsHeader (min-width: 601px) and (max-width: 900px) {
+  .productsPage .productsHeader {
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
   }
 
-  .productsPage .productsHeaderBrand {
-    grid-column: 1 / -1;
-  }
-
-  .productsPage .productsHeader .searchBox {
+  .productsPage .headerContainer .productsHeaderBrand {
     grid-column: auto;
+  }
+
+  .productsPage .headerContainer .productsHeader .searchBox {
+    grid-column: auto;
+  }
+
+  .productsPage .headerContainer .productsHeader .primaryButton {
+    max-width: 240px;
+    justify-self: end;
+  }
+}
+
+/* Genuinely narrow header: single column. Agrees with the viewport
+   <=600px single-column rule (same specificity or later). */
+@container productsHeader (max-width: 600px) {
+  .productsHeader {
+    grid-template-columns: 1fr;
   }
 }
 

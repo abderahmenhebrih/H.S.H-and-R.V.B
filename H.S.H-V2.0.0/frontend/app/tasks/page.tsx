@@ -10,6 +10,7 @@ import {
   CalendarRange,
   Check,
   CheckCheck,
+  ChevronDown,
   CircleAlert,
   CircleCheck,
   ClipboardCheck,
@@ -23,7 +24,6 @@ import {
 
 import AppShell from "../../src/components/layout/AppShell";
 import StyledDatePicker from "../../src/components/common/StyledDatePicker";
-import StyledSelect from "../../src/components/common/StyledSelect";
 import { taskService } from "../../src/services/task.service";
 import { taskRepository } from "../../src/repositories/task.repository";
 import { settingsService } from "../../src/services/settings.service";
@@ -285,26 +285,159 @@ function getStatusLabel(deadline: number, t: (typeof TRANSLATIONS)[Language]): s
 function StatusFilter({
   value,
   onChange,
+  onFinishedTasks,
   t,
 }: {
   value: string;
   onChange: (v: string) => void;
-  t: { allStatuses: string; newToOld: string; closestDeadline: string; missed: string };
+  onFinishedTasks: () => void;
+  t: { allStatuses: string; newToOld: string; closestDeadline: string; missed: string; finishedTasks: string };
 }) {
-  const options = [
-    { value: "", label: t.allStatuses },
-    { value: "newToOld", label: t.newToOld },
-    { value: "closest", label: t.closestDeadline },
-    { value: "missed", label: t.missed },
-  ];
+  const options = useMemo(
+    () => [
+      { value: "", label: t.allStatuses },
+      { value: "newToOld", label: t.newToOld },
+      { value: "closest", label: t.closestDeadline },
+      { value: "missed", label: t.missed },
+    ],
+    [t],
+  );
+  // Extra non-filter row: navigation action, never a selected value.
+  const actionIndex = options.length;
+  const itemCount = options.length + 1;
+
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
+  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const selectedLabel =
+    options.find((o) => o.value === value)?.label ?? t.allStatuses;
+
+  function openMenu() {
+    const idx = value ? options.findIndex((o) => o.value === value) : 0;
+    setHighlighted(idx >= 0 ? idx : 0);
+    setOpen(true);
+  }
+
+  function closeMenu(focusTrigger = false) {
+    setOpen(false);
+    setHighlighted(-1);
+    if (focusTrigger) triggerRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) closeMenu();
+    }
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeMenu(true);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [open ]);
+
+  function activate(idx: number) {
+    if (idx === actionIndex) {
+      closeMenu();
+      onFinishedTasks();
+      return;
+    }
+    const opt = options[idx];
+    if (opt) {
+      onChange(opt.value);
+      closeMenu();
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!open) {
+      if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        openMenu();
+      }
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlighted((prev) => (prev + 1) % itemCount);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlighted((prev) => (prev - 1 + itemCount) % itemCount);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (highlighted >= 0) activate(highlighted);
+      else closeMenu();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeMenu(true);
+    } else if (e.key === "Tab") {
+      closeMenu();
+    }
+  }
+
   return (
-    <StyledSelect
-      value={value}
-      onChange={onChange}
-      placeholder={t.allStatuses}
-      ariaLabel={t.allStatuses}
-      options={options}
-    />
+    <div className={styles.filterDropdown} ref={ref}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`${styles.filterTrigger} ${open ? styles.filterTriggerOpen : ""}`}
+        onClick={() => {
+          if (open) closeMenu();
+          else openMenu();
+        }}
+        onKeyDown={handleKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={t.allStatuses}
+      >
+        <span>{selectedLabel}</span>
+        <span
+          className={`${styles.filterChevron} ${open ? styles.filterChevronOpen : ""}`}
+          aria-hidden="true"
+        >
+          <ChevronDown size={14} strokeWidth={2} />
+        </span>
+      </button>
+
+      {open && (
+        <div className={styles.filterMenu} role="listbox" aria-label={t.allStatuses}>
+          {options.map((opt, idx) => (
+            <button
+              key={opt.value + idx}
+              type="button"
+              role="option"
+              aria-selected={value === opt.value}
+              tabIndex={-1}
+              className={`${styles.filterOption} ${value === opt.value ? styles.filterOptionActive : ""} ${highlighted === idx ? styles.filterOptionHover : ""}`}
+              onMouseEnter={() => setHighlighted(idx)}
+              onClick={() => activate(idx)}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <div className={styles.filterDivider} role="separator" aria-hidden="true" />
+          <button
+            type="button"
+            tabIndex={-1}
+            className={`${styles.filterAction} ${highlighted === actionIndex ? styles.filterActionActive : ""}`}
+            onMouseEnter={() => setHighlighted(actionIndex)}
+            onClick={() => activate(actionIndex)}
+          >
+            <CheckCheck size={14} strokeWidth={2} aria-hidden="true" />
+            {t.finishedTasks}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -631,18 +764,10 @@ export default function TasksPage() {
               <StatusFilter
                 value={statusFilter}
                 onChange={setStatusFilter}
-                t={{ allStatuses: t.allStatuses, newToOld: t.newToOld, closestDeadline: t.closestDeadline, missed: t.missed }}
+                onFinishedTasks={() => router.push("/tasks/finished")}
+                t={{ allStatuses: t.allStatuses, newToOld: t.newToOld, closestDeadline: t.closestDeadline, missed: t.missed, finishedTasks: t.finishedTasks }}
               />
             </div>
-
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => router.push("/tasks/finished")}
-            >
-              <CheckCheck size={16} strokeWidth={2} aria-hidden="true" />
-              {t.finishedTasks}
-            </button>
 
             <button type="button" className={styles.primaryButton} onClick={openCreate}>
               <Plus size={16} strokeWidth={2} aria-hidden="true" />

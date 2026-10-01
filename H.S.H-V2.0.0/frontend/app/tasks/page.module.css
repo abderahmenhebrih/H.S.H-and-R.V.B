@@ -28,9 +28,9 @@
 
 .tasksHeader {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(220px, 1fr) minmax(140px, 170px) auto auto;
+  grid-template-columns: minmax(190px, 250px) minmax(220px, 1fr) minmax(150px, 185px) minmax(165px, 205px) minmax(130px, 155px);
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -47,19 +47,34 @@
   max-width: 100%;
 }
 
-/* Compact container state — mirrors the <=1200px viewport treatment
-   but keyed to real header width. Banded above mobile. */
-@container tasksHeader (max-width: 1050px) {
+/* Tablet container state — reflow WITHIN the same card:
+   row 1 brand / search, row 2 status / finished / add. Triggers ONLY
+   when the header is genuinely narrow (<=950px): both sidebar states
+   stay one-row at desktop widths (one-row minimum ≈ 945px).
+   Raised specificity beats the viewport <=1200px rules below. */
+@container tasksHeader (min-width: 601px) and (max-width: 950px) {
+  .tasksPage .tasksHeader {
+    grid-template-columns: minmax(170px, 240px) minmax(0, 1fr) auto;
+  }
+
+  .tasksPage .headerContainer .tasksHeaderBrand {
+    grid-column: auto;
+  }
+
+  .tasksPage .headerContainer .tasksHeader .searchBox {
+    grid-column: 2 / -1;
+  }
+
+  .tasksPage .headerContainer .tasksHeader .secondaryButton {
+    max-width: 240px;
+  }
+}
+
+/* Genuinely narrow header: single column. Agrees with the viewport
+   <=600px single-column rule (same specificity or later). */
+@container tasksHeader (max-width: 600px) {
   .tasksHeader {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .tasksPage .tasksHeaderBrand {
-    grid-column: 1 / -1;
-  }
-
-  .tasksPage .tasksHeader .searchBox {
-    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1373,18 +1388,9 @@
 }
 
 @media (max-width: 1200px) {
-  .tasksHeader {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .tasksHeaderBrand {
-    grid-column: 1 / -1;
-  }
-
-  .tasksPage .tasksHeader .searchBox {
-    grid-column: 1 / -1;
-  }
-
+  /* Header stacking is governed solely by the container queries above:
+     one row persists while the header itself fits, at any viewport.
+     Only control widths are reinforced here. */
   .tasksPage .tasksHeader .filterWrapper,
   .tasksPage .tasksHeader .secondaryButton,
   .tasksPage .tasksHeader .primaryButton {

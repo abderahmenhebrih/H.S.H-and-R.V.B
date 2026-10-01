@@ -51,7 +51,7 @@
 /* Compact container state — reflow WITHIN the same card:
    row 1 brand, row 2 search, row 3 date / calculate / add.
    Banded above mobile so the <=600px single-column rule keeps authority. */
-@container purchasesHeader (min-width: 601px) and (max-width: 1180px) {
+@container purchasesHeader (max-width: 1000px) {
   .purchasesHeader {
     grid-template-columns: minmax(0, 1fr) minmax(140px, 170px) auto;
   }

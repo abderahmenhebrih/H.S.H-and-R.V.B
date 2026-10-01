@@ -50,7 +50,7 @@
 /* Compact container state — reflow WITHIN the same card:
    row 1 brand, row 2 search / type filter / add. Banded above
    mobile so the <=600px single-column viewport rule keeps authority. */
-@container vehiclesHeader (min-width: 601px) and (max-width: 1080px) {
+@container vehiclesHeader (max-width: 900px) {
   .vehiclesHeader {
     grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) auto;
   }

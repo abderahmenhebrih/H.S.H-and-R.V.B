@@ -49,7 +49,7 @@
 
 /* Compact container state — mirrors the <=1200px viewport treatment
    but keyed to real header width. Banded above mobile. */
-@container tasksHeader (min-width: 601px) and (max-width: 1180px) {
+@container tasksHeader (max-width: 1050px) {
   .tasksHeader {
     grid-template-columns: 1fr 1fr;
   }

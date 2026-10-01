@@ -28,7 +28,7 @@
 
 .suppliersHeader {
   display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(240px, 1fr) auto;
+  grid-template-columns: minmax(220px, 300px) minmax(300px, 1fr) minmax(165px, 190px);
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -47,18 +47,16 @@
   max-width: 100%;
 }
 
-/* Compact container state — reflow WITHIN the same card.
-   Banded above mobile so the <=600px single-column rule keeps authority. */
-@container suppliersHeader (min-width: 601px) and (max-width: 1080px) {
+/* Compact container state — reflow WITHIN the same card:
+   row 1 brand, row 2 search + add. Triggers ONLY when the header is
+   genuinely narrow (<=850px): both sidebar states at desktop widths
+   stay one-row. The later <=600px viewport rule keeps mobile authority. */
+@container suppliersHeader (max-width: 850px) {
   .suppliersHeader {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .suppliersPage .suppliersHeaderBrand {
-    grid-column: 1 / -1;
-  }
-
-  .suppliersPage .suppliersHeader .searchBox {
     grid-column: 1 / -1;
   }
 }
@@ -159,7 +157,7 @@
   min-height: 56px;
   width: 100%;
   min-width: 0;
-  max-width: 100%;
+  max-width: 190px;
   font-size: 13px;
   white-space: nowrap;
 }
@@ -1006,6 +1004,7 @@
 
   .suppliersPage .suppliersHeader .primaryButton {
     width: 100%;
+    max-width: none;
   }
 
   .tableCard {

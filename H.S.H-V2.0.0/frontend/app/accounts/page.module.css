@@ -50,7 +50,7 @@
 /* Compact container state — reflow WITHIN the same card:
    row 1 brand, row 2 search, row 3 transfer / add. Banded above
    mobile so the <=600px single-column viewport rule keeps authority. */
-@container accountsHeader (min-width: 601px) and (max-width: 1080px) {
+@container accountsHeader (max-width: 850px) {
   .accountsHeader {
     grid-template-columns: minmax(0, 1fr) auto;
   }

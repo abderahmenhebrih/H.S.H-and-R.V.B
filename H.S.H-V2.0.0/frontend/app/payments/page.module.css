@@ -50,7 +50,7 @@
 
 /* Compact container state — mirrors the <=1200px viewport treatment
    but keyed to real header width. Banded above mobile. */
-@container paymentsHeader (min-width: 601px) and (max-width: 1300px) {
+@container paymentsHeader (max-width: 1150px) {
   .paymentsHeader {
     grid-template-columns: 1fr 1fr 1fr;
   }

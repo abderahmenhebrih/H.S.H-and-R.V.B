@@ -156,6 +156,9 @@
   width: calc(100% - 16px);
   margin-inline: 8px;
   height: 44px;
+  /* Anchor for absolutely-positioned collapsed badges; no visual change
+     for items without positioned descendants. */
+  position: relative;
 }
 
 .sidebarCollapsed .sidebarLabel {
@@ -164,6 +167,20 @@
   overflow: hidden;
   white-space: nowrap;
   transition: opacity 0.12s ease, width 0.12s ease;
+}
+
+/* RVB classic sidebar labels grow in expanded rows (badge/chevron sit at
+   the row end) but must contribute zero width when collapsed, otherwise
+   the invisible label steals free space and pushes the icon off-center.
+   Scoped to non-compact asides (RVB classic); HSH keeps its own behavior.
+   The mobile drawer (.sidebarOpen) always renders full rows. */
+.sidebar:not(.sidebarCompact) .sidebarLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebarCollapsed:not(.sidebarOpen):not(.sidebarCompact) .sidebarLabel {
+  flex: 0 0 auto;
 }
 
 .sidebarCollapsed .sidebarDivider {
@@ -369,6 +386,7 @@
 
   display: inline-flex;
   justify-content: center;
+  align-items: center;
 
   font-size: 20px;
 }
@@ -484,6 +502,54 @@
 .sidebarUtilityBell button svg {
   width: 18px;
   height: 18px;
+}
+
+/* RVB navigation badge: in-flow pill at the row end when expanded;
+   absolutely anchored to the button's top-end corner when collapsed, so
+   it never shifts the bell icon or the collapsed rail geometry. */
+.rvbNavBadge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.sidebarCollapsed:not(.sidebarOpen) .sidebarItem > .rvbNavBadgeCollapsed {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #B93A42;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+/* Mobile drawer renders full rows: the badge returns to in-flow layout
+   at the row end, matching the expanded desktop badge. */
+.sidebarCollapsed.sidebarOpen .sidebarItem > .rvbNavBadgeCollapsed {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
 }
 
 /* Collapsed desktop (~76px): stack utility group above Access RVB. */

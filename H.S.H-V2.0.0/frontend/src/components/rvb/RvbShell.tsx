@@ -584,12 +584,12 @@ export default function RvbShell({
           <span className={dashboardStyles.sidebarIcon} aria-hidden="true">
             <Icon size={18} strokeWidth={2} />
           </span>
-          <span className={dashboardStyles.sidebarLabel} style={{ flex: 1 }}>{displayLabel}</span>
+          <span className={dashboardStyles.sidebarLabel}>{displayLabel}</span>
           {!isDesktopCollapsed && item.key === "notifications" && notifUnread > 0 && (
-            <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center" }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
+            <span className={dashboardStyles.rvbNavBadge}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
           )}
           {isDesktopCollapsed && item.key === "notifications" && notifUnread > 0 && (
-            <span style={{ position: "absolute", top: 4, insetInlineEnd: 6, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: "#B93A42", color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center", lineHeight: 1 }}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
+            <span className={dashboardStyles.rvbNavBadgeCollapsed}>{notifUnread > 99 ? "99+" : String(notifUnread)}</span>
           )}
         </button>
         {isDesktopCollapsed && (

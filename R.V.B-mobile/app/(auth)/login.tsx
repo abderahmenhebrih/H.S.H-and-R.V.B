@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import React, { useRef, useState } from "react";
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, type TextInput as RNTextInput } from "react-native";
 import { Screen } from "@/components/common/Screen";
 import { Input } from "@/components/common/Input";
 import { Button } from "@/components/common/Button";
@@ -13,8 +13,16 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const passwordRef = useRef<RNTextInput | null>(null);
+
+  const focusPassword = () => {
+    passwordRef.current?.focus();
+  };
 
   const handleLogin = async () => {
+    // Prevent duplicate submit while a login attempt is already in flight
+    // (e.g. rapid Done presses); the Button also disables via isLoading.
+    if (isLoading) return;
     setFieldError(null);
     setApiError(null);
     const normalized = normalizeTag(tag);
@@ -67,14 +75,24 @@ export default function LoginScreen() {
               placeholder="@abattoire"
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="username"
+              textContentType="username"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={focusPassword}
               error={fieldError && fieldError.toLowerCase().includes("tag") ? fieldError : null}
             />
             <Input
               label="Password"
+              inputRef={passwordRef}
               value={password}
               onChangeText={setPassword}
               placeholder="••••••••"
               secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
               error={fieldError && fieldError.toLowerCase().includes("password") ? fieldError : null}
             />
 

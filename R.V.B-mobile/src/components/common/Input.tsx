@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, TextInput, Text, StyleSheet, Pressable } from "react-native";
+import type { TextInput as RNTextInput } from "react-native";
 import { useTheme } from "@/theme/useTheme";
 
 interface Props {
@@ -16,9 +17,17 @@ interface Props {
   numberOfLines?: number;
   keyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
   maxLength?: number;
+  // Explicit focus/submit contract (Android-safe). Previously unforwarded,
+  // so both fields ran on implicit IME/native defaults.
+  inputRef?: React.Ref<RNTextInput>;
+  returnKeyType?: "done" | "go" | "next" | "search" | "send";
+  blurOnSubmit?: boolean;
+  onSubmitEditing?: () => void;
+  autoComplete?: "username" | "current-password" | "off";
+  textContentType?: "username" | "password" | "none";
 }
 
-export function Input({ label, value, onChangeText, placeholder, secureTextEntry, autoCapitalize = "none", autoCorrect = false, error, editable = true, multiline, numberOfLines, keyboardType, maxLength }: Props) {
+export function Input({ label, value, onChangeText, placeholder, secureTextEntry, autoCapitalize = "none", autoCorrect = false, error, editable = true, multiline, numberOfLines, keyboardType, maxLength, inputRef, returnKeyType, blurOnSubmit, onSubmitEditing, autoComplete, textContentType }: Props) {
   const { theme } = useTheme();
   const [show, setShow] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -35,6 +44,7 @@ export function Input({ label, value, onChangeText, placeholder, secureTextEntry
         ]}
       >
         <TextInput
+          ref={inputRef}
           style={[styles.input, { color: theme.colors.text }]}
           value={value}
           onChangeText={onChangeText}
@@ -47,6 +57,11 @@ export function Input({ label, value, onChangeText, placeholder, secureTextEntry
           numberOfLines={numberOfLines}
           keyboardType={keyboardType}
           maxLength={maxLength}
+          returnKeyType={returnKeyType}
+          blurOnSubmit={blurOnSubmit}
+          onSubmitEditing={onSubmitEditing ? () => onSubmitEditing() : undefined}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholderTextColor={theme.colors.inputPlaceholder}

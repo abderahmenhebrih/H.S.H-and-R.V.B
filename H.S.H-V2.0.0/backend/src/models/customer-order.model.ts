@@ -28,6 +28,11 @@ const customerOrderSchema = new Schema(
     cancelledAt: { type: Number, required: false, default: null },
     notes: { type: String, required: false, default: null },
     originalItems: { type: [orderItemSchema], required: false, default: null },
+    // Client-generated idempotency identity for order creation. Absent
+    // (undefined) on all legacy docs; sparse index below therefore never
+    // collides on historical rows. Scoped by accountId: two different
+    // actors may coincidentally use the same key.
+    clientRequestId: { type: String, required: false, default: undefined },
   },
   {
     collection: "customer_orders",
@@ -37,6 +42,9 @@ const customerOrderSchema = new Schema(
 
 customerOrderSchema.index({ status: 1 });
 customerOrderSchema.index({ customerId: 1, submittedAt: -1 });
+// Race-proof duplicate protection: two simultaneous creates with the same
+// actor + key cannot both insert (second hits E11000 and replays the winner).
+customerOrderSchema.index({ accountId: 1, clientRequestId: 1 }, { unique: true, sparse: true });
 
 export type CustomerOrderDocument = InferSchemaType<typeof customerOrderSchema>;
 

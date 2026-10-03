@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import RvbShell from "../../src/components/rvb/RvbShell";
 import RvbKpiCard from "../../src/components/rvb/dashboard/RvbKpiCard";
 import RvbPendingItem from "../../src/components/rvb/dashboard/RvbPendingItem";
@@ -634,6 +634,8 @@ function CustomerPortal({ settings }: { settings: Settings }) {
   const [loading, setLoading] = useState(true);
   const [orderItems, setOrderItems] = useState<Record<string, { quantity: string; weightKg: string }>>({});
   const [orderNotes, setOrderNotes] = useState("");
+  // Stable idempotency identity for the current order draft (see handlePlaceOrder).
+  const orderIdempotencyKeyRef = useRef<string | null>(null);
   const [shipmentItems, setShipmentItems] = useState<Record<string, { quantity: string; weightKg: string }>>({});
   const [shipmentDesc, setShipmentDesc] = useState("");
   const [discrepancy, setDiscrepancy] = useState("");
@@ -683,9 +685,21 @@ function CustomerPortal({ settings }: { settings: Settings }) {
   const handlePlaceOrder = async () => {
     const { items, total } = buildItems(catalog, orderItems);
     if (items.length===0) { alert("Select products"); return; }
+    // One stable idempotency key per submission attempt (same contract as
+    // mobile): retries reuse it, the next intentional order gets a new one.
+    if (!orderIdempotencyKeyRef.current) {
+      orderIdempotencyKeyRef.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `ord_${Date.now().toString(36)}_${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
+    }
     setSubmitting(true);
     try {
-      await customerOrderService.create({ items, total, notes: orderNotes.trim()||undefined } as any);
+      await customerOrderService.create(
+        { items, total, notes: orderNotes.trim()||undefined } as any,
+        { idempotencyKey: orderIdempotencyKeyRef.current },
+      );
+      orderIdempotencyKeyRef.current = null;
       setOrderItems({}); setOrderNotes("");
       await load();
     } catch(e:any){ alert(e?.data?.code || e?.message || "Failed"); }

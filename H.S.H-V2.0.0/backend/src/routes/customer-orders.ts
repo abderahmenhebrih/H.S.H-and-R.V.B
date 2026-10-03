@@ -59,8 +59,20 @@ router.post("/", async (req: RvbAuthRequest, res) => {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }
-    const created = await createCustomerOrder({ customerId: linkedId, accountId: user.accountId, items, total: Number(total), notes });
-    res.status(201).json({ success: true, order: created });
+    // Idempotency identity for this submission: cleanest contract is the
+    // Idempotency-Key header; body clientRequestId accepted as fallback.
+    // The key is stable across retries of ONE attempt; a new intentional
+    // order uses a new key. Scoping (actor) is derived server-side from the
+    // authenticated session inside the service, never from client input.
+    const rawHeader = (req.headers as any)["idempotency-key"];
+    const headerKey = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const clientRequestId = headerKey !== undefined ? headerKey : (req.body as any)?.clientRequestId;
+    const created = await createCustomerOrder({ customerId: linkedId, accountId: user.accountId, items, total: Number(total), notes, clientRequestId });
+    if (created.idempotentReplay) {
+      res.json({ success: true, order: created.order, idempotentReplay: true });
+      return;
+    }
+    res.status(201).json({ success: true, order: created.order });
   } catch (err: any) {
     res.status(err?.status || 500).json({ success: false, code: err?.code || "INTERNAL_ERROR", message: err?.message });
   }

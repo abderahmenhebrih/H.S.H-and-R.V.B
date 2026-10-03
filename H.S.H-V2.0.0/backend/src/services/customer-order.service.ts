@@ -29,8 +29,37 @@ async function enforceCustomerPrice(items: any[]): Promise<ReturnType<typeof val
   return authoritative as any;
 }
 
-export async function createCustomerOrder(input: { customerId: string; accountId?: string | null; items: any[]; total: number; notes?: string }) {
+export const IDEMPOTENCY_KEY_MAX_LENGTH = 128;
+
+function normalizeIdempotencyKey(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || value.length === 0 || value.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
+    throw codeError("RVB_IDEMPOTENCY_KEY_INVALID", 400, "idempotency key must be a 1-128 char string");
+  }
+  return value;
+}
+
+// Normalized submission fingerprint (server-authoritative items + notes).
+// Identifies key REUSE WITH A DIFFERENT payload (409), while a new key with
+// identical business contents is always allowed (new intentional order).
+function orderSubmissionFingerprint(items: any[], notes: unknown): string {
+  const norm = (Array.isArray(items) ? items : []).map((it: any) => ({
+    productId: String(it?.productId ?? ""),
+    quantity: Number(it?.quantity),
+    weightKg: Number(it?.weightKg),
+    price: Number(it?.price),
+  }));
+  return JSON.stringify({ items: norm, notes: typeof notes === "string" ? notes : null });
+}
+
+function toPublicOrder(doc: any, customerName: string | null) {
+  const plain: any = doc.toObject ? doc.toObject() : doc;
+  return { ...plain, customerName };
+}
+
+export async function createCustomerOrder(input: { customerId: string; accountId?: string | null; items: any[]; total: number; notes?: string; clientRequestId?: unknown }) {
   let { customerId, accountId, items, total, notes } = input as any;
+  const clientRequestId = normalizeIdempotencyKey((input as any).clientRequestId);
   if (!customerId) throw codeError("RVB_CUSTOMER_REQUIRED", 400);
   if (!items || !Array.isArray(items) || items.length === 0) throw codeError("RVB_ITEMS_REQUIRED", 400);
   // For CUSTOMER-originated orders, server is authoritative for price: ignore client price, use Product.price
@@ -49,6 +78,21 @@ export async function createCustomerOrder(input: { customerId: string; accountId
     const acc: any = await RvbAccountModel.findOne({ id: accountId }).lean();
     if (acc && acc.linkedEntityType === "customer" && acc.linkedEntityId !== customerId) throw codeError("RVB_FORBIDDEN", 403);
   }
+  // Idempotency scope is the authenticated actor: the backend derives
+  // accountId from the session, never from a client-supplied scope field.
+  if (clientRequestId !== undefined && !accountId) {
+    throw codeError("RVB_IDEMPOTENCY_KEY_INVALID", 400, "idempotency key requires an authenticated account");
+  }
+  const fingerprint = orderSubmissionFingerprint(items, notes);
+  if (clientRequestId !== undefined) {
+    const existing: any = await CustomerOrderModel.findOne({ accountId, clientRequestId }).lean();
+    if (existing) {
+      if (orderSubmissionFingerprint(existing.items, existing.notes) === fingerprint) {
+        return { order: { ...existing, customerName: customer.name }, idempotentReplay: true };
+      }
+      throw codeError("RVB_IDEMPOTENCY_CONFLICT", 409, "idempotency key was already used with a different order payload");
+    }
+  }
   const now = Date.now();
   const doc: any = {
     id: `corder-${uuidv4()}`,
@@ -66,7 +110,24 @@ export async function createCustomerOrder(input: { customerId: string; accountId
     notes: notes || null,
     originalItems: null,
   };
-  const created = await CustomerOrderModel.create(doc);
+  if (clientRequestId !== undefined) doc.clientRequestId = clientRequestId;
+  let created: any;
+  try {
+    created = await CustomerOrderModel.create(doc);
+  } catch (err: any) {
+    // Concurrent race: two instances inserted the same actor+key at once and
+    // the unique index rejected the loser. Recover the winner instead of 500.
+    if (clientRequestId !== undefined && (err?.code === 11000 || /duplicate key/i.test(String(err?.message || "")))) {
+      const winner: any = await CustomerOrderModel.findOne({ accountId, clientRequestId }).lean();
+      if (winner) {
+        if (orderSubmissionFingerprint(winner.items, winner.notes) === fingerprint) {
+          return { order: { ...winner, customerName: customer.name }, idempotentReplay: true };
+        }
+        throw codeError("RVB_IDEMPOTENCY_CONFLICT", 409, "idempotency key was already used with a different order payload");
+      }
+    }
+    throw err;
+  }
   try {
     const sourceEventId = `customer-order:${doc.id}:submitted`;
     await createRvbNotification({
@@ -90,7 +151,7 @@ export async function createCustomerOrder(input: { customerId: string; accountId
     await RvbActivityModel.create({ id: `rvba-${uuidv4()}`, createdAt: now, actorAccountId: accountId || null, actorTag: submitterAcc?.tag || null, actorRole: submitterAcc?.role || null, entityType: "customer_order", entityId: doc.id, action: "order_submitted", sourceType: "orders", sourceId: doc.id, title: `${customer.name} placed an order`, details: `Order ${doc.id.slice(0, 8)} total ${total}` } as any);
   } catch {}
   const plain: any = created.toObject ? created.toObject() : created;
-  return { ...plain, customerName: customer.name };
+  return { order: { ...plain, customerName: customer.name }, idempotentReplay: false };
 }
 
 async function enrichOrdersWithCustomerName(orders: any[]): Promise<any[]> {

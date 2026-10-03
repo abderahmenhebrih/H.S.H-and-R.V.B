@@ -46,10 +46,17 @@ export const customerOrderService = {
     const data = await handleResponse<{ success: boolean; orders: CustomerOrder[] }>(res);
     return data.orders || [];
   },
-  async create(input: { customerId?: string; items: any[]; total: number; notes?: string }): Promise<CustomerOrder> {
+  async create(input: { customerId?: string; items: any[]; total: number; notes?: string }, opts?: { idempotencyKey?: string }): Promise<CustomerOrder> {
+    // Stable key per attempt; per-call fallback. Same contract as mobile:
+    // retries reuse the key, new intentional orders use a new key.
+    const key =
+      opts?.idempotencyKey ||
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `ord_${Date.now().toString(36)}_${Math.floor(Math.random() * 0xffffffff).toString(16)}`);
     const res = await rvbAuthService.authFetch(BASE, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders(), "Idempotency-Key": key },
       body: JSON.stringify(input),
       credentials: "include",
     });

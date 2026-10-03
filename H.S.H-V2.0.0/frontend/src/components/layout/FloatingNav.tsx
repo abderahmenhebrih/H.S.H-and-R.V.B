@@ -1326,6 +1326,7 @@ export default function FloatingNav({
 
   return (
     <div
+      data-nav-root="floating"
       className={`${styles.root} ${open ? styles.rootOpen : ""} ${dragPos ? styles.rootDragging : ""}`}
       style={dragPos ? { left: dragPos.x, top: dragPos.y } : { left: origin.x, top: origin.y }}
     >

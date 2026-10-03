@@ -37,7 +37,8 @@ import {
   resolveNavigationStyle,
 } from "../../lib/settings";
 import type { Settings } from "../../types/settings/settings";
-import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { settingsService } from "../../services/settings.service";
 import { getSavedTheme, applyTheme } from "../../lib/theme";
 import { useRvbAuth } from "../../contexts/RvbAuthContext";
 import FloatingNav from "../layout/FloatingNav";
@@ -227,6 +228,12 @@ export default function RvbShell({
 
   const [settings, setSettings] = useState<Settings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
 
+  // Cold-load gate (see AppShell): no nav mounts until canonical settings
+  // resolve. Warm transitions reuse the live cache and render immediately.
+  const [settingsReady, setSettingsReady] = useState<boolean>(
+    () => getCachedSettings() !== undefined,
+  );
+
   const [transitionVisible, setTransitionVisible] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<"rvb" | "hsh">("rvb");
 
@@ -243,10 +250,13 @@ export default function RvbShell({
 
   useEffect(() => {
     async function loadSettings() {
-      const stored = await rvbUiPreferencesService.get().catch(() => DEFAULT_SETTINGS);
+      // RVB consumes the SAME canonical value as HSH: Dexie-first canonical
+      // loader (one-time legacy migration, canonical default otherwise).
+      // The legacy RVB preference service is NEVER read here directly.
+      const stored = await settingsService.loadCanonicalSettings().catch(() => undefined);
       if (stored) {
         setSettings(stored);
-        setCachedSettings(stored);
+        setSettingsReady(true);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       }
@@ -255,34 +265,49 @@ export default function RvbShell({
   }, []);
 
   useEffect(() => {
-    const readSettings = (event?: Event) => {
-      const customEvent = event as CustomEvent<Settings> | undefined;
-      if (customEvent?.detail) {
-        setSettings(customEvent.detail);
-        setCachedSettings(customEvent.detail);
-        document.documentElement.lang = customEvent.detail.language;
-        document.documentElement.dir = getDirection(customEvent.detail.language);
+    const applyCanonical = (next: Settings) => {
+      setSettings(next);
+      setCachedSettings(next);
+      setSettingsReady(true);
+      document.documentElement.lang = next.language;
+      document.documentElement.dir = getDirection(next.language);
+    };
+    // Canonical channel: the detail IS canonical state.
+    const readCanonicalEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Settings> | undefined)?.detail;
+      if (detail) applyCanonical(detail);
+    };
+    // Legacy RVB channel: local state only, NEVER the shared cache.
+    const readRvbEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Settings> | undefined)?.detail;
+      if (!detail) {
+        void settingsService.loadCanonicalSettings().then((stored) => {
+          setSettings(stored);
+          document.documentElement.lang = stored.language;
+          document.documentElement.dir = getDirection(stored.language);
+        });
         return;
       }
-      rvbUiPreferencesService.get().then((stored) => {
-        if (!stored) return;
+      setSettings(detail);
+      document.documentElement.lang = detail.language;
+      document.documentElement.dir = getDirection(detail.language);
+    };
+    // Cross-tab signal: re-read CANONICAL Dexie. Legacy storage is never
+    // consulted here.
+    const readCrossTab = () => {
+      void settingsService.loadCanonicalSettings().then((stored) => {
         setSettings(stored);
-        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       });
     };
-    // RVB event (authoritative for this shell) plus the shared HSH
-    // SETTINGS_EVENT: an HSH-originated change dispatches SETTINGS_EVENT
-    // synchronously while the RVB service write is still in flight, so a
-    // shell already mounted must react to both. Same detail shape.
-    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
-    window.addEventListener(SETTINGS_EVENT, readSettings);
-    window.addEventListener("storage", readSettings);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readRvbEvent);
+    window.addEventListener(SETTINGS_EVENT, readCanonicalEvent);
+    window.addEventListener("storage", readCrossTab);
     return () => {
-      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
-      window.removeEventListener(SETTINGS_EVENT, readSettings);
-      window.removeEventListener("storage", readSettings);
+      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readRvbEvent);
+      window.removeEventListener(SETTINGS_EVENT, readCanonicalEvent);
+      window.removeEventListener("storage", readCrossTab);
     };
   }, []);
 
@@ -353,7 +378,11 @@ export default function RvbShell({
     applyTheme(next);
     setDark(next === "dark");
     // Persist personal theme preference (lightweight localStorage + account if authenticated)
-    try { void rvbUiPreferencesService.setTheme(next as any); } catch {}
+    try {
+      void import("@/src/services/rvb-ui-preferences.service").then((m) =>
+        m.rvbUiPreferencesService.setTheme(next as any),
+      );
+    } catch {}
   }
 
   const { user, logout } = useRvbAuth();
@@ -648,7 +677,7 @@ export default function RvbShell({
     >
       <WorkspaceTransition visible={transitionVisible} target={transitionTarget} language={settings.language} />
 
-      {rvbNavigationStyle === "classic" ? (
+      {!settingsReady ? null : rvbNavigationStyle === "classic" ? (
       <>
       {sidebarOpen && (
         <button
@@ -659,6 +688,7 @@ export default function RvbShell({
       )}
 
       <aside
+        data-nav-root="classic"
         className={`${dashboardStyles.sidebar} ${
           sidebarOpen ? dashboardStyles.sidebarOpen : ""
         } ${isDesktopCollapsed ? dashboardStyles.sidebarCollapsed : ""}`}

@@ -284,6 +284,12 @@ export default function Dashboard() {
   const [settings, setSettings] =
     useState<Settings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
 
+  // Cold-load gate (see AppShell): no nav mounts until canonical settings
+  // resolve. Warm transitions reuse the live cache and render immediately.
+  const [settingsReady, setSettingsReady] = useState<boolean>(
+    () => getCachedSettings() !== undefined,
+  );
+
   const [dark, setDark] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
 
@@ -326,53 +332,73 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadSettings() {
-      const stored = await settingsService.get();
+      // Single canonical loader: Dexie-first, one-time legacy migration,
+      // canonical default otherwise. Silent (no events) — this mount sets
+      // its own state.
+      const stored = await settingsService.loadCanonicalSettings().catch(() => undefined);
 
       if (stored) {
         setSettings(stored);
-        setCachedSettings(stored);
+        setSettingsReady(true);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
-      } else {
-        await settingsService.save(DEFAULT_SETTINGS);
       }
     }
 
     loadSettings();
   }, []);
 
-  useEffect(() => {
-    const readSettings = (event?: Event) => {
-      const customEvent = event as CustomEvent<Settings> | undefined;
+  const applyCanonical = (next: Settings) => {
+    setSettings(next);
+    setCachedSettings(next);
+    setSettingsReady(true);
+    document.documentElement.lang = next.language;
+    document.documentElement.dir = getDirection(next.language);
+  };
 
-      if (customEvent?.detail) {
-        setSettings(customEvent.detail);
-        setCachedSettings(customEvent.detail);
-        document.documentElement.lang = customEvent.detail.language;
-        document.documentElement.dir = getDirection(
-          customEvent.detail.language,
-        );
+  useEffect(() => {
+    // Canonical channel: the detail IS canonical state (only the canonical
+    // save path dispatches it).
+    const readCanonicalEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Settings> | undefined)?.detail;
+      if (detail) applyCanonical(detail);
+    };
+    // Legacy RVB channel: local state only, NEVER the shared cache. The
+    // canonical path dispatches SETTINGS_EVENT alongside, which carries the
+    // authoritative value to every shell.
+    const readRvbEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Settings> | undefined)?.detail;
+      if (!detail) {
+        void settingsService.loadCanonicalSettings().then((stored) => {
+          setSettings(stored);
+          document.documentElement.lang = stored.language;
+          document.documentElement.dir = getDirection(stored.language);
+        });
         return;
       }
-
-      settingsService.get().then((stored) => {
-        if (!stored) return;
-
+      setSettings(detail);
+      document.documentElement.lang = detail.language;
+      document.documentElement.dir = getDirection(detail.language);
+    };
+    // Cross-tab signal: the mirror changed elsewhere — re-read CANONICAL
+    // Dexie (persist-then-publish ordering guarantees it is fresh). Legacy
+    // storage is never consulted here.
+    const readCrossTab = () => {
+      void settingsService.loadCanonicalSettings().then((stored) => {
         setSettings(stored);
-        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       });
     };
 
-    window.addEventListener(SETTINGS_EVENT, readSettings);
-    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
-    window.addEventListener("storage", readSettings);
+    window.addEventListener(SETTINGS_EVENT, readCanonicalEvent);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readRvbEvent);
+    window.addEventListener("storage", readCrossTab);
 
     return () => {
-      window.removeEventListener(SETTINGS_EVENT, readSettings);
-      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
-      window.removeEventListener("storage", readSettings);
+      window.removeEventListener(SETTINGS_EVENT, readCanonicalEvent);
+      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readRvbEvent);
+      window.removeEventListener("storage", readCrossTab);
     };
   }, []);
 
@@ -564,7 +590,7 @@ export default function Dashboard() {
     >
       <WorkspaceTransition visible={transitionVisible} target={transitionTarget} language={settings.language} />
 
-      {navigationStyle === "classic" ? (
+      {!settingsReady ? null : navigationStyle === "classic" ? (
         <ClassicSidebar
           activeKey="dashboard"
           topItems={[fanEntry("dashboard"), fanEntry("office")]}

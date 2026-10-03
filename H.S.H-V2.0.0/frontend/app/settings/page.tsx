@@ -6,11 +6,9 @@ import styles from "./page.module.css";
 import { useDbSync } from "../../src/hooks/useDbSync";
 
 import { settingsService } from "../../src/services/settings.service";
-import { rvbUiPreferencesService } from "../../src/services/rvb-ui-preferences.service";
 import { productService } from "../../src/services/product.service";
 import { injuryEquationService } from "../../src/services/injury-equation.service";
 import {
-  SETTINGS_EVENT,
   DEFAULT_SETTINGS,
   getDirection,
   getCachedSettings,
@@ -543,13 +541,14 @@ function SettingsPageInner() {
   const t = TRANSLATIONS[settings.language];
 
   // PBS-BUG-017: backstop mirror sync. Writes the ref only -- never persists,
-  // never dispatches -- so the ref always matches the latest committed state
-  // before any discrete user event handler (which flushes passive effects first)
-  // can call `updateSettingsPartial`. Also publishes to the session-shared
-  // live cache so remounting shells start from committed state, not defaults.
+  // never dispatches, never touches the shared live cache -- so the ref
+  // always matches the latest committed state before any discrete user event
+  // handler (which flushes passive effects first) can call
+  // `updateSettingsPartial`. (The shared cache is published exclusively by
+  // the canonical save path; a per-render cache write here could clobber it
+  // with stale page state after a cross-tab update.)
   useEffect(() => {
     settingsRef.current = settings;
-    setCachedSettings(settings);
   });
 
   useEffect(() => {
@@ -566,29 +565,15 @@ function SettingsPageInner() {
   }, []);
 
   const loadSettings = async () => {
-    const stored = await settingsService.get();
-    if (stored) {
-      // One-time migration: legacy rows may carry only the obsolete
-      // rvbNavigationStyle field — adopt it, then drop it going forward.
-      const { rvbNavigationStyle: _legacyNav, ...storedRest } = stored as AppSettings & {
-        rvbNavigationStyle?: unknown;
-      };
-      const normalized: AppSettings = {
-        ...DEFAULT_SETTINGS,
-        ...storedRest,
-        expenseTypes: stored.expenseTypes ?? [],
-        navigationStyle: resolveNavigationStyle(stored.navigationStyle ?? _legacyNav),
-      };
-      setSettings(normalized);
-      settingsRef.current = normalized;
-      setCachedSettings(normalized);
-      document.documentElement.lang = normalized.language;
-      document.documentElement.dir = getDirection(normalized.language);
-      if (stored.navigationStyle == null && _legacyNav != null) {
-        queueSettingsPersistence(normalized);
-      }
-    } else {
-      await settingsService.save(DEFAULT_SETTINGS);
+    // Single canonical loader: Dexie-first (adopts the obsolete Dexie row
+    // field when present), one-time legacy migration, canonical default
+    // otherwise. Silent publish included; this mount sets its own state.
+    const canonical = await settingsService.loadCanonicalSettings().catch(() => undefined);
+    if (canonical) {
+      setSettings(canonical);
+      settingsRef.current = canonical;
+      document.documentElement.lang = canonical.language;
+      document.documentElement.dir = getDirection(canonical.language);
     }
   };
 
@@ -654,30 +639,19 @@ function SettingsPageInner() {
     setSettings(nextSettings);
     document.documentElement.lang = nextSettings.language;
     document.documentElement.dir = getDirection(nextSettings.language);
-    settingsService
-      .save(nextSettings)
-      .then(() => {
-        window.dispatchEvent(
-          new CustomEvent(SETTINGS_EVENT, {
-            detail: nextSettings,
-          })
-        );
-      })
-      .catch((error) => {
-        console.error("Failed to save settings:", error);
-      });
+    // Single canonical funnel: save() persists, then publishes the shared
+    // live cache, the cross-tab mirror, and both event channels.
+    settingsService.save(nextSettings).catch((error) => {
+      console.error("Failed to save settings:", error);
+    });
   }
 
   // PBS-BUG-017: persists one committed settings snapshot, then notifies the app.
   // Runs exclusively on the serialization chain (see `queueSettingsPersistence`),
-  // never inside a React state updater.
+  // never inside a React state updater. Notification happens inside the
+  // canonical save funnel (persist-then-publish ordering).
   async function persistSettingsSnapshot(nextSettings: AppSettings): Promise<void> {
     await settingsService.save(nextSettings);
-    window.dispatchEvent(
-      new CustomEvent(SETTINGS_EVENT, {
-        detail: nextSettings,
-      })
-    );
   }
 
   // PBS-BUG-017: queues a snapshot for persistence strictly in request order.
@@ -748,7 +722,6 @@ function SettingsPageInner() {
       settingsRef.current = nextSettings;
       document.documentElement.lang = nextSettings.language;
       document.documentElement.dir = getDirection(nextSettings.language);
-      window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: nextSettings }));
       setPendingChange(null);
     } catch (error) {
       console.error("Failed to save settings:", error);
@@ -1195,13 +1168,13 @@ function SettingsPageInner() {
                   language={settings.language}
                   value={resolveNavigationStyle(settings.navigationStyle)}
                   onChange={(style: NavigationStyle) => {
-                    // Single global preference (HSH + RVB, like theme):
-                    // canonical Dexie write + SETTINGS_EVENT for HSH shells,
-                    // plus RVB service write + RVB event for RvbShell.
+                    // Single global preference (HSH + RVB, like theme): the
+                    // canonical settings mutation persists to Dexie, then
+                    // publishes the live cache, both event channels, and the
+                    // cross-tab mirror. NO independent RVB-preference write:
+                    // dual-write architectures have proven fragile and are
+                    // removed (legacy RVB storage is a migration input only).
                     updateSettingsPartial({ navigationStyle: style });
-                    rvbUiPreferencesService.setRvbNavigationStyle(style).catch((error) => {
-                      console.error("Failed to save navigation style:", error);
-                    });
                   }}
                 />
               </>

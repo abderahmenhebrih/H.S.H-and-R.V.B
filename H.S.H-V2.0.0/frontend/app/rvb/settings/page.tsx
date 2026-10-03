@@ -5,7 +5,7 @@ import RvbShell from "../../../src/components/rvb/RvbShell";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
-import { DEFAULT_SETTINGS, getDirection, getCachedSettings, setCachedSettings, resolveNavigationStyle, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { DEFAULT_SETTINGS, getDirection, getCachedSettings, resolveNavigationStyle, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language, Currency, NavigationStyle } from "../../../src/types/settings/settings";
 import { getSavedTheme, applyTheme } from "../../../src/lib/theme";
 import { rvbAuthService } from "../../../src/services/rvb-auth.service";
@@ -279,24 +279,30 @@ function SettingsInner() {
   const [pfpUploading, setPfpUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load RVB presentation settings: language from account preferences, currency from company config
+  // Load canonical presentation settings. Navigation comes from the SAME
+  // canonical Dexie value HSH uses (never the legacy RVB preference
+  // service directly); language/currency enrichment below stays LOCAL to
+  // this page and is never published into the shared live cache.
   useEffect(() => {
-    rvbUiPreferencesService.get().then((s) => { if (s) { setSettings(s); setCachedSettings(s); } }).catch(()=>{});
-    // Also sync currency explicitly from config for freshness
+    settingsService.loadCanonicalSettings().then((s) => { if (s) setSettings(s); }).catch(()=>{});
+    // Also sync currency explicitly from config for freshness (local only)
     import("@/src/services/rvb-config.service").then(({ rvbConfigService }) => {
       rvbConfigService.get().then((cfg) => {
         if (cfg?.currency) setSettings((prev) => ({ ...prev, currency: cfg.currency as any }));
       }).catch(()=>{});
     }).catch(()=>{});
+    // Canonical channel updates local state (shared cache is maintained by
+    // the canonical save path, not here).
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
-      if (ce?.detail) { setSettings(ce.detail); setCachedSettings(ce.detail); }
+      if (ce?.detail) setSettings(ce.detail);
     };
+    window.addEventListener(SETTINGS_EVENT, h as any);
     window.addEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
     const themeH = () => setDark(getSavedTheme() === "dark");
     window.addEventListener("hebrih-theme-change", themeH);
     window.addEventListener("storage", themeH);
-    return () => { window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h as any); window.removeEventListener("hebrih-theme-change", themeH); window.removeEventListener("storage", themeH); };
+    return () => { window.removeEventListener(SETTINGS_EVENT, h as any); window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h as any); window.removeEventListener("hebrih-theme-change", themeH); window.removeEventListener("storage", themeH); };
   }, []);
 
   // Load personal prefs
@@ -551,20 +557,14 @@ function SettingsInner() {
                   language={lang}
                   value={resolveNavigationStyle(settings.navigationStyle)}
                   onChange={(style: NavigationStyle) => {
-                    // Same global preference HSH uses: update local state,
-                    // mirror to Dexie for HSH coherence + SETTINGS_EVENT for
-                    // HSH shells, and persist authoritatively via the RVB
-                    // preferences service (account/local + RVB event for
-                    // RvbShell). No reload needed anywhere.
+                    // Same global preference HSH uses: instant local card
+                    // state, then the ONE canonical mutation path (Dexie
+                    // persist, then shared cache + both events + cross-tab
+                    // mirror). No independent RVB-preference write, no manual
+                    // event dispatch, no reload anywhere.
                     const next: Settings = { ...settings, navigationStyle: style };
                     setSettings(next);
-                    // Publish synchronously: shells mounting before the
-                    // fire-and-forget Dexie save completes must start from
-                    // the new value (save re-publishes on completion).
-                    setCachedSettings(next);
-                    settingsService.save(next).catch(() => {});
-                    window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
-                    rvbUiPreferencesService.setRvbNavigationStyle(style).catch(() => {});
+                    settingsService.setNavigationStyle(style).catch(() => {});
                   }}
                 />
               </>

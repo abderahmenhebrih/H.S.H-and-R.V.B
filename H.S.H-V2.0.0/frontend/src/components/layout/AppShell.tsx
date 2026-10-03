@@ -432,6 +432,15 @@ export default function AppShell({
   const [settings, setSettings] =
     useState<Settings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
 
+  // Cold-load gate: on reload / new tab / direct URL the shared cache is
+  // empty and canonical Dexie state is still loading. While NOT ready, NO
+  // navigation UI mounts at all — this guarantees a settled Classic session
+  // can never paint (or even mount) a Floating root first, and vice versa.
+  // Warm client transitions reuse the live cache and are ready immediately.
+  const [settingsReady, setSettingsReady] = useState<boolean>(
+    () => getCachedSettings() !== undefined,
+  );
+
   const [transitionVisible, setTransitionVisible] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<"rvb" | "hsh">("rvb");
 
@@ -462,15 +471,15 @@ export default function AppShell({
 
   useEffect(() => {
     async function loadSettings() {
-      const stored = await settingsService.get();
+      // Single canonical loader: Dexie-first, one-time legacy migration,
+      // canonical default otherwise. Silent (no events).
+      const stored = await settingsService.loadCanonicalSettings().catch(() => undefined);
 
       if (stored) {
         setSettings(stored);
-        setCachedSettings(stored);
+        setSettingsReady(true);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
-      } else {
-        await settingsService.save(DEFAULT_SETTINGS);
       }
     }
 
@@ -478,37 +487,51 @@ export default function AppShell({
   }, []);
 
   useEffect(() => {
-    const readSettings = (event?: Event) => {
-      const customEvent = event as CustomEvent<Settings> | undefined;
-
-      if (customEvent?.detail) {
-        setSettings(customEvent.detail);
-        setCachedSettings(customEvent.detail);
-        document.documentElement.lang = customEvent.detail.language;
-        document.documentElement.dir = getDirection(
-          customEvent.detail.language,
-        );
+    const applyCanonical = (next: Settings) => {
+      setSettings(next);
+      setCachedSettings(next);
+      setSettingsReady(true);
+      document.documentElement.lang = next.language;
+      document.documentElement.dir = getDirection(next.language);
+    };
+    // Canonical channel: the detail IS canonical state.
+    const readCanonicalEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Settings> | undefined)?.detail;
+      if (detail) applyCanonical(detail);
+    };
+    // Legacy RVB channel: local state only, NEVER the shared cache.
+    const readRvbEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Settings> | undefined)?.detail;
+      if (!detail) {
+        void settingsService.loadCanonicalSettings().then((stored) => {
+          setSettings(stored);
+          document.documentElement.lang = stored.language;
+          document.documentElement.dir = getDirection(stored.language);
+        });
         return;
       }
-
-      settingsService.get().then((stored) => {
-        if (!stored) return;
-
+      setSettings(detail);
+      document.documentElement.lang = detail.language;
+      document.documentElement.dir = getDirection(detail.language);
+    };
+    // Cross-tab signal: re-read CANONICAL Dexie (persist-then-publish
+    // ordering guarantees it is fresh). Legacy storage never consulted.
+    const readCrossTab = () => {
+      void settingsService.loadCanonicalSettings().then((stored) => {
         setSettings(stored);
-        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       });
     };
 
-    window.addEventListener(SETTINGS_EVENT, readSettings);
-    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
-    window.addEventListener("storage", readSettings);
+    window.addEventListener(SETTINGS_EVENT, readCanonicalEvent);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readRvbEvent);
+    window.addEventListener("storage", readCrossTab);
 
     return () => {
-      window.removeEventListener(SETTINGS_EVENT, readSettings);
-      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
-      window.removeEventListener("storage", readSettings);
+      window.removeEventListener(SETTINGS_EVENT, readCanonicalEvent);
+      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readRvbEvent);
+      window.removeEventListener("storage", readCrossTab);
     };
   }, []);
 
@@ -633,9 +656,8 @@ export default function AppShell({
 
   // Single canonical navigation-mode decision. Exactly one navigation UI
   // is ever mounted: ClassicSidebar reserves sidebar width, FloatingNav
-  // overlays without reserving width. Deterministic from settings state
-  // (default "floating") — hydration-safe; stored preference arrives via
-  // the settings effect + SETTINGS_EVENT subscription like theme does.
+  // overlays without reserving width. Until canonical settings resolve on a
+  // cold load (settingsReady), NO nav mounts — never the opposite mode.
   const navigationStyle = resolveNavigationStyle(settings.navigationStyle);
 
   // Sidebar partition (classic mode): dashboard + office stay top-level,
@@ -662,7 +684,7 @@ export default function AppShell({
     >
       <WorkspaceTransition visible={transitionVisible} target={transitionTarget} language={settings.language} />
 
-      {navigationStyle === "classic" ? (
+      {!settingsReady ? null : navigationStyle === "classic" ? (
         <ClassicSidebar
           activeKey={activePage}
           topItems={topSidebarItems}

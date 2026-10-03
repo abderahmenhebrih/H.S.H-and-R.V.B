@@ -2,13 +2,25 @@
 
 import { rvbAuthService } from "./rvb-auth.service";
 import { rvbConfigService } from "./rvb-config.service";
-import { DEFAULT_SETTINGS, getDirection, resolveNavigationStyle } from "../lib/settings";
+import {
+  DEFAULT_SETTINGS,
+  getDirection,
+  readLiveNavigationStyle,
+  resolveNavigationStyle,
+  RVB_UI_PREFERENCES_EVENT,
+  SETTINGS_MIRROR_STORAGE_KEY,
+} from "../lib/settings";
+// Single canonical event channel lives in lib/settings; re-exported here so
+// existing importers keep working. Canonical writes dispatch both events.
+export { RVB_UI_PREFERENCES_EVENT };
 import type { Settings, Language, Currency, NavigationStyle } from "../types/settings/settings";
 import { getSavedTheme, applyTheme } from "../lib/theme";
 
-export const RVB_UI_PREFERENCES_EVENT = "rvb-ui-preferences-change";
 export const RVB_LANGUAGE_STORAGE_KEY = "rvb-ui-language";
-export const RVB_NAVIGATION_STYLE_STORAGE_KEY = "rvb-ui-navigation-style";
+// Physical key is owned by lib/settings now (cross-tab signal + cold-start
+// hint + one-time migration input). Aliased here for compatibility; it is
+// NEVER a runtime navigation value source.
+export const RVB_NAVIGATION_STYLE_STORAGE_KEY = SETTINGS_MIRROR_STORAGE_KEY;
 
 function isValidNavigationStyle(v: any): v is NavigationStyle {
   return v === "classic" || v === "floating";
@@ -66,13 +78,11 @@ function getLocalNavigationStyle(): NavigationStyle {
   return resolveNavigationStyle(undefined);
 }
 
-function setLocalNavigationStyleStorage(style: NavigationStyle) {
-  try {
-    if (typeof window !== "undefined") localStorage.setItem(RVB_NAVIGATION_STYLE_STORAGE_KEY, style);
-  } catch {}
-}
-
-async function getEffectiveNavigationStyle(): Promise<NavigationStyle> {
+// LEGACY migration input only (account ui.navigationStyle, then obsolete
+// ui.rvbNavigationStyle, then the local mirror). Used exclusively by the
+// canonical loader when NO canonical Dexie value exists. Never a runtime
+// source: live readers use the shared cache / canonical state instead.
+export async function getEffectiveNavigationStyle(): Promise<NavigationStyle> {
   const local = getLocalNavigationStyle();
   try {
     const token = rvbAuthService.getAccessToken();
@@ -207,7 +217,11 @@ export const rvbUiPreferencesService = {
       workerPositions,
       vehicleTypes,
       expenseTypes,
-      navigationStyle: await getEffectiveNavigationStyle(),
+      // Canonical navigation wins: an established live/mirrored value always
+      // reflects the latest canonical save. Legacy account/local values are
+      // consulted ONLY when no canonical value was ever established (fresh
+      // profile that never saved canonical state).
+      navigationStyle: readLiveNavigationStyle() ?? (await getEffectiveNavigationStyle()),
     };
     return settings;
   },
@@ -243,28 +257,17 @@ export const rvbUiPreferencesService = {
     this.getPresentationSettings().then((s) => dispatchRvbPreferences(s)).catch(() => {});
   },
 
-  /** Shared global navigation style ("classic" | "floating"), same
-   *  canonical preference HSH uses. Authoritative in account
-   *  ui.navigationStyle when authenticated (legacy ui.rvbNavigationStyle
-   *  migrates on read), localStorage fallback otherwise (same pattern as
-   *  RVB language). Dispatches RVB_UI_PREFERENCES_EVENT so RvbShell
-   *  switches live.
+  /** Shared global navigation style ("classic" | "floating").
+   *  Single-canonical architecture: this delegates to the canonical Dexie
+   *  settings mutation (settingsService.setNavigationStyle), which persists,
+   *  publishes the shared live cache, dispatches both event channels, and
+   *  refreshes the cross-tab mirror. There is deliberately NO independent
+   *  account/localStorage navigation write anymore: legacy account fields
+   *  (ui.navigationStyle / ui.rvbNavigationStyle) and the local mirror are
+   *  one-time migration inputs only, read when no canonical value exists.
    */
   async setRvbNavigationStyle(style: NavigationStyle): Promise<void> {
-    const next = resolveNavigationStyle(style);
-    // Write the local fallback FIRST and synchronously: a shell mounting
-    // before the account PATCH completes must still resolve the new value.
-    // The account write below only upgrades roaming; it never blocks local.
-    setLocalNavigationStyleStorage(next);
-    const token = rvbAuthService.getAccessToken();
-    if (token) {
-      try {
-        await rvbAuthService.updatePreferences({ ui: { navigationStyle: next } } as any);
-      } catch {
-        // fall through to local persistence (already written above)
-      }
-    }
-    const settings = await this.getPresentationSettings();
-    dispatchRvbPreferences(settings);
+    const { settingsService } = await import("./settings.service");
+    await settingsService.setNavigationStyle(style);
   },
 };

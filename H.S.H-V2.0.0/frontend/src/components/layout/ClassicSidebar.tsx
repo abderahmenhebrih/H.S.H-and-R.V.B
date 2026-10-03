@@ -236,6 +236,7 @@ export default function ClassicSidebar({
       )}
 
       <aside
+        data-nav-root="classic"
         className={`${dashboardStyles.sidebar} ${dashboardStyles.sidebarCompact} ${
           drawerOpen ? dashboardStyles.sidebarOpen : ""
         } ${isDesktopCollapsed ? dashboardStyles.sidebarCollapsed : ""}`}

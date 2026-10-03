@@ -22,42 +22,93 @@ interface Props {
   numberOfLines?: number;
   keyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
   maxLength?: number;
-  // Explicit focus/submit contract (Android-safe), using RN TextInput types.
+
   inputRef?: React.Ref<RNTextInput>;
+
   returnKeyType?: TextInputProps["returnKeyType"];
   blurOnSubmit?: TextInputProps["blurOnSubmit"];
   submitBehavior?: TextInputProps["submitBehavior"];
   onSubmitEditing?: () => void;
+
   autoComplete?: TextInputProps["autoComplete"];
   textContentType?: TextInputProps["textContentType"];
   importantForAutofill?: TextInputProps["importantForAutofill"];
-  // Optional external observers, invoked AFTER the internal border state.
+
   onFocus?: (e: NativeSyntheticEvent<TargetedEvent>) => void;
   onBlur?: (e: NativeSyntheticEvent<TargetedEvent>) => void;
 }
 
-export function Input({ label, value, onChangeText, placeholder, secureTextEntry, autoCapitalize = "none", autoCorrect = false, error, editable = true, multiline, numberOfLines, keyboardType, maxLength, inputRef, returnKeyType, blurOnSubmit, submitBehavior, onSubmitEditing, autoComplete, textContentType, importantForAutofill, onFocus: onFocusExternal, onBlur: onBlurExternal }: Props) {
+export function Input({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  autoCapitalize = "none",
+  autoCorrect = false,
+  error,
+  editable = true,
+  multiline,
+  numberOfLines,
+  keyboardType,
+  maxLength,
+  inputRef,
+  returnKeyType,
+  blurOnSubmit,
+  submitBehavior,
+  onSubmitEditing,
+  autoComplete,
+  textContentType,
+  importantForAutofill,
+  onFocus,
+  onBlur,
+}: Props) {
   const { theme } = useTheme();
+
+  // Only controls password visibility.
+  // IMPORTANT: there is intentionally NO local focus state.
   const [show, setShow] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const isSecure = secureTextEntry && !show;
+
+  const isSecure = Boolean(secureTextEntry && !show);
+
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text> : null}
+      {label ? (
+        <Text
+          style={[
+            styles.label,
+            {
+              color: theme.colors.textSecondary,
+            },
+          ]}
+        >
+          {label}
+        </Text>
+      ) : null}
+
       <View
         style={[
           styles.inputWrap,
-          { backgroundColor: theme.colors.inputBackground, borderColor: focused ? theme.colors.primary : theme.colors.inputBorder },
-          error ? { borderColor: theme.colors.error } : null,
-          focused && !error ? { shadowColor: theme.colors.primaryRing, shadowOpacity: 1, shadowRadius: 4 } : null,
+          {
+            backgroundColor: theme.colors.inputBackground,
+            borderColor: error
+              ? theme.colors.error
+              : theme.colors.inputBorder,
+          },
         ]}
       >
         <TextInput
           ref={inputRef}
-          style={[styles.input, { color: theme.colors.text }]}
+          style={[
+            styles.input,
+            {
+              color: theme.colors.text,
+            },
+          ]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
+          placeholderTextColor={theme.colors.inputPlaceholder}
           secureTextEntry={isSecure}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
@@ -69,21 +120,52 @@ export function Input({ label, value, onChangeText, placeholder, secureTextEntry
           returnKeyType={returnKeyType}
           blurOnSubmit={blurOnSubmit}
           submitBehavior={submitBehavior}
-          onSubmitEditing={onSubmitEditing ? () => onSubmitEditing() : undefined}
+          onSubmitEditing={
+            onSubmitEditing
+              ? () => {
+                  onSubmitEditing();
+                }
+              : undefined
+          }
           autoComplete={autoComplete}
           textContentType={textContentType}
           importantForAutofill={importantForAutofill}
-          onFocus={(e) => { setFocused(true); onFocusExternal?.(e); }}
-          onBlur={(e) => { setFocused(false); onBlurExternal?.(e); }}
-          placeholderTextColor={theme.colors.inputPlaceholder}
+          onFocus={onFocus}
+          onBlur={onBlur}
         />
+
         {secureTextEntry ? (
-          <Pressable onPress={() => setShow((s) => !s)} style={styles.showBtn}>
-            <Text style={[styles.showText, { color: theme.colors.primary }]}>{show ? "Hide" : "Show"}</Text>
+          <Pressable
+            onPress={() => setShow((current) => !current)}
+            style={styles.showBtn}
+            hitSlop={8}
+          >
+            <Text
+              style={[
+                styles.showText,
+                {
+                  color: theme.colors.primary,
+                },
+              ]}
+            >
+              {show ? "Hide" : "Show"}
+            </Text>
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text> : null}
+
+      {error ? (
+        <Text
+          style={[
+            styles.error,
+            {
+              color: theme.colors.error,
+            },
+          ]}
+        >
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -91,16 +173,52 @@ export function Input({ label, value, onChangeText, placeholder, secureTextEntry
 export function TextArea(props: Props) {
   return <Input {...props} multiline numberOfLines={4} />;
 }
+
 export function NumberInput(props: Props) {
   return <Input {...props} keyboardType="numeric" />;
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 12 },
-  label: { fontSize: 11, fontWeight: "700", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" },
-  inputWrap: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, minHeight: 44 },
-  input: { flex: 1, paddingVertical: 10, fontSize: 13 },
-  error: { marginTop: 6, fontSize: 12 },
-  showBtn: { marginLeft: 8, paddingVertical: 6, paddingHorizontal: 8 },
-  showText: { fontWeight: "600", fontSize: 13 },
+  wrap: {
+    marginBottom: 12,
+  },
+
+  label: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 6,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+
+  inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    minHeight: 44,
+  },
+
+  input: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 13,
+  },
+
+  error: {
+    marginTop: 6,
+    fontSize: 12,
+  },
+
+  showBtn: {
+    marginLeft: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+
+  showText: {
+    fontWeight: "600",
+    fontSize: 13,
+  },
 });

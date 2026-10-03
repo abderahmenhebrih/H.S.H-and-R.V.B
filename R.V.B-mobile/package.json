@@ -4,10 +4,13 @@
   "main": "expo-router/entry",
   "scheme": "poultrybusinesssuite",
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
     "@expo/vector-icons": "^15.1.1",
     "expo": "~57.0.26",
+    "expo-asset": "~57.0.18",
     "expo-constants": "~57.0.20",
     "expo-dev-client": "~57.0.19",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-image-manipulator": "~57.0.20",
     "expo-image-picker": "~57.0.20",

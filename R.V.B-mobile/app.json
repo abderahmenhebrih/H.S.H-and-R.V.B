@@ -41,6 +41,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "106b89ee-230d-48f7-929f-d239148151c5"
+      }
+    },
+    "owner": "abderahmenhebrih"
   }
 }

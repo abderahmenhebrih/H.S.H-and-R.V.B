@@ -156,6 +156,35 @@ async function startServer() {
     );
   }
 
+  // REQUIRED correctness guarantee: CustomerOrder (accountId, clientRequestId)
+  // unique partial index. Deliberately NOT swallowed like the best-effort
+  // migrations above: without it, concurrent duplicate orders are possible.
+  // Production database that is unavailable (or otherwise unverifiable) is a
+  // startup failure: the server must not listen while order-concurrency
+  // safety is unknown. Development preserves the architecture's
+  // printing-fallback behavior with a loud warning instead.
+  try {
+    const mongoose = (await import("mongoose")).default;
+    if (mongoose.connection.readyState === 1) {
+      const { ensureCustomerOrderIdempotencyIndex } = await import("./models/customer-order.model");
+      await ensureCustomerOrderIdempotencyIndex();
+    } else if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "[customer-order] FATAL: database unavailable in production, idempotency unique index unverified. Refusing to start.",
+      );
+    } else {
+      console.warn(
+        "[customer-order] database unavailable, idempotency unique index NOT verified: order creation is unsafe until DB recovers",
+      );
+    }
+  } catch (error) {
+    console.error(
+      "[customer-order] FATAL: idempotency unique index could not be established. Refusing to start:",
+      error instanceof Error ? error.message : error,
+    );
+    throw error;
+  }
+
   const httpServer = createServer(app);
   initChatSocket(httpServer, allowedOrigins);
   try {

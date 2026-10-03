@@ -67,21 +67,24 @@ const IDEMPOTENCY_INDEX_SPEC = { accountId: 1, clientRequestId: 1 } as const;
 const IDEMPOTENCY_INDEX_NAME = "customer_order_account_idempotency_unique";
 const IDEMPOTENCY_INDEX_FILTER = { clientRequestId: { $type: "string" } } as const;
 
-// Exact known production-test family that generated idempotency duplicates
-// (concurrency acceptance rounds). Narrow by design: no other prefix is
-// eligible for automatic remediation.
-const KNOWN_IDEMPOTENCY_QA_PREFIX = "QA-MOBILE-IDEMP-PROD-";
+// Exact known production-test families that generated idempotency duplicates
+// (concurrency acceptance rounds). Narrow by design: no other prefix — not
+// even generic QA- or QA-MOBILE- — is eligible for automatic remediation.
+const KNOWN_IDEMPOTENCY_QA_PREFIXES = [
+  "QA-MOBILE-IDEMP-PROD-",
+  "QA-MOBILE-IDEMP-FIN-",
+];
 
 // Strict QA predicate for automatic key unsetting. BOTH conditions required:
-// the exact known idempotency-test marker AND a safe terminal state, so an
-// in-flight Under Review QA order is never silently detached from its key.
-// Anything else in a duplicate group aborts the whole group with manual
-// review (zero documents in that group modified).
+// one of the exact known idempotency-test markers AND a safe terminal
+// cancelled state, so an in-flight Under Review QA order is never silently
+// detached from its key. Anything else in a duplicate group aborts the whole
+// group with manual review (zero documents in that group modified).
 function isKnownIdempotencyQaRecord(doc: any): boolean {
   return (
+    doc?.status === "cancelled" &&
     typeof doc?.notes === "string" &&
-    doc.notes.startsWith(KNOWN_IDEMPOTENCY_QA_PREFIX) &&
-    doc.status === "cancelled"
+    KNOWN_IDEMPOTENCY_QA_PREFIXES.some((prefix) => doc.notes.startsWith(prefix))
   );
 }
 

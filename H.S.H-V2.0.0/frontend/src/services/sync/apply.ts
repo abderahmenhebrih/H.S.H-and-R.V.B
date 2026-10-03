@@ -1,6 +1,7 @@
 import { db } from "@/src/lib/database/db";
 import { setServerRevision, getServerRevision } from "./queue";
 import { runAsRemote } from "@/src/lib/database/sync-hooks";
+import { isValidNavigationStyleValue } from "@/src/lib/settings";
 import { getAllSyncTables, getTableForSyncEntity, SYNC_ENTITIES } from "./tables";
 
 export interface SyncChange {
@@ -16,6 +17,41 @@ export interface SyncChange {
 
 function getTable(entity: string): any {
   return getTableForSyncEntity(entity);
+}
+
+// The settings row carries the single canonical navigationStyle. Remote
+// payloads written by older bundles (or any writer that never set the field)
+// carry no valid value; storing them verbatim would erase the local
+// canonical choice, and the next navigation/mount would resolve "floating"
+// (isValidNavigationStyleValue distinguishes absent/invalid from a choice).
+// Preserve a valid local value when the remote payload has none. A valid
+// remote value always wins (genuine newer revision, cross-device roaming).
+type SettingsLike = {
+  navigationStyle?: unknown;
+  rvbNavigationStyle?: unknown;
+};
+
+export async function preserveSettingsNavigation(
+  entity: string,
+  entityId: string,
+  toStore: SettingsLike & Record<string, unknown>,
+  read: (id: string) => Promise<unknown>,
+): Promise<void> {
+  if (entity !== "settings") return;
+  if (!isValidNavigationStyleValue(toStore.navigationStyle)) {
+    try {
+      const local = (await read(entityId)) as SettingsLike | null | undefined;
+      if (isValidNavigationStyleValue(local?.navigationStyle)) {
+        toStore.navigationStyle = local.navigationStyle;
+      }
+    } catch {}
+  }
+  if (isValidNavigationStyleValue(toStore.navigationStyle)) {
+    // Canonical value established: drop the obsolete row field going forward.
+    delete toStore.rvbNavigationStyle;
+  }
+  // Both invalid: leave the payload untouched so the canonical loader can
+  // still migrate a legacy field on next mount.
 }
 
 export async function applyRemoteChange(change: SyncChange): Promise<void> {
@@ -43,6 +79,7 @@ export async function applyRemoteChange(change: SyncChange): Promise<void> {
     lastSyncedAt: Date.now(),
     serverRevision: change.revision,
   };
+  await preserveSettingsNavigation(change.entity, id, toStore, (key) => table.get(key));
   await runAsRemote(async () => {
     await table.put(toStore);
   });
@@ -124,6 +161,7 @@ export async function applyRemoteChanges(changes: SyncChange[]): Promise<void> {
               lastSyncedAt: Date.now(),
               serverRevision: change.revision,
             };
+            await preserveSettingsNavigation(change.entity, change.entityId, toStore, (key) => table.get(key));
             await table.put(toStore);
           }
         }
@@ -292,6 +330,7 @@ export async function applySnapshot(snapshot: Record<string, any[]>, currentRevi
               lastSyncedAt: Date.now(),
               serverRevision: currentRevision,
             };
+            await preserveSettingsNavigation(entity, doc.id, toStore, (id) => table.get(id));
             await table.put(toStore);
           }
         }

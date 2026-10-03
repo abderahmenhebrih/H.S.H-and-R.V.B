@@ -327,12 +327,16 @@ export async function syncPendingOperations(): Promise<SyncResponse> {
       if (r.success && r.canonicalEntity && typeof r.canonicalEntity === "object") {
         try {
           const { runAsRemote } = await import("@/src/lib/database/sync-hooks");
+          const { preserveSettingsNavigation } = await import("./apply");
           const table = getTableForEntity(r.entity);
           if (table) {
             const canon: any = r.canonicalEntity;
             canon.syncStatus = "synced";
             canon.lastSyncedAt = Date.now();
             if (r.revision) canon.serverRevision = r.revision;
+            // A server echo without a valid navigationStyle must not erase the
+            // local canonical choice (same guard as the pull paths).
+            await preserveSettingsNavigation(r.entity, r.entityId, canon, (id) => table.get(id));
             await runAsRemote(async () => {
               await (table as any).put(canon);
             });

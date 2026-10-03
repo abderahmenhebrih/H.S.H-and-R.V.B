@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, type TextInput as RNTextInput } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { Screen } from "@/components/common/Screen";
 import { Input } from "@/components/common/Input";
 import { Button } from "@/components/common/Button";
@@ -13,11 +13,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const passwordRef = useRef<RNTextInput | null>(null);
-
-  const focusPassword = () => {
-    passwordRef.current?.focus();
-  };
 
   const handleLogin = async () => {
     // Prevent duplicate submit while a login attempt is already in flight
@@ -77,14 +72,20 @@ export default function LoginScreen() {
               autoCorrect={false}
               autoComplete="username"
               textContentType="username"
-              returnKeyType="next"
+              // Video-proven device bug: ANY tag submit path (including the
+              // previous onSubmitEditing -> password.focus()) fires
+              // spuriously ~40ms after tap on this Android build, jumping
+              // focus to password and then dropping the keyboard. For this
+              // RC, reliability beats Next-key convenience: tag has NO submit
+              // handler at all, blurOnSubmit={false} so the IME action key is
+              // a verified no-op, and returnKeyType="done" deliberately does
+              // NOT advertise advancement. Password is tapped manually.
+              returnKeyType="done"
               blurOnSubmit={false}
-              onSubmitEditing={focusPassword}
               error={fieldError && fieldError.toLowerCase().includes("tag") ? fieldError : null}
             />
             <Input
               label="Password"
-              inputRef={passwordRef}
               value={password}
               onChangeText={setPassword}
               placeholder="••••••••"

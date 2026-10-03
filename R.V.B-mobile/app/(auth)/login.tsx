@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { Screen } from "@/components/common/Screen";
 import { Input } from "@/components/common/Input";
 import { Button } from "@/components/common/Button";
@@ -13,6 +13,29 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // TEMPORARY hardware diagnostics (removed after device confirmation).
+  // Observation only: never focuses, blurs, or dismisses anything.
+  const t0Ref = useRef(Date.now());
+  const [diagEvents, setDiagEvents] = useState<string[]>([]);
+  const logDiag = (label: string) => {
+    const ms = Date.now() - t0Ref.current;
+    setDiagEvents((prev) => [...prev.slice(-11), `${label} +${ms}ms`]);
+  };
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => logDiag("keyboardDidShow"));
+    const hide = Keyboard.addListener("keyboardDidHide", () => logDiag("keyboardDidHide"));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  // Android autofill is disabled for login (native credential layer was
+  // seizing focus ~40ms after tag tap on hardware). iOS keeps semantic
+  // hints; web keeps normal autocomplete.
+  const isAndroid = Platform.OS === "android";
 
   const handleLogin = async () => {
     // Prevent duplicate submit while a login attempt is already in flight
@@ -53,7 +76,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen scroll padded>
+    <Screen padded>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
@@ -70,18 +93,14 @@ export default function LoginScreen() {
               placeholder="@abattoire"
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete="username"
-              textContentType="username"
-              // Video-proven device bug: ANY tag submit path (including the
-              // previous onSubmitEditing -> password.focus()) fires
-              // spuriously ~40ms after tap on this Android build, jumping
-              // focus to password and then dropping the keyboard. For this
-              // RC, reliability beats Next-key convenience: tag has NO submit
-              // handler at all, blurOnSubmit={false} so the IME action key is
-              // a verified no-op, and returnKeyType="done" deliberately does
-              // NOT advertise advancement. Password is tapped manually.
+              autoComplete={isAndroid ? "off" : "username"}
+              textContentType={isAndroid ? undefined : "username"}
+              importantForAutofill={isAndroid ? "no" : undefined}
               returnKeyType="done"
-              blurOnSubmit={false}
+              submitBehavior="submit"
+              onFocus={() => logDiag("TAG focus")}
+              onBlur={() => logDiag("TAG blur")}
+              onSubmitEditing={() => logDiag("TAG submit")}
               error={fieldError && fieldError.toLowerCase().includes("tag") ? fieldError : null}
             />
             <Input
@@ -90,9 +109,13 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               placeholder="••••••••"
               secureTextEntry
-              autoComplete="current-password"
-              textContentType="password"
+              autoComplete={isAndroid ? "off" : "current-password"}
+              textContentType={isAndroid ? undefined : "password"}
+              importantForAutofill={isAndroid ? "no" : undefined}
               returnKeyType="done"
+              submitBehavior="submit"
+              onFocus={() => logDiag("PASSWORD focus")}
+              onBlur={() => logDiag("PASSWORD blur")}
               onSubmitEditing={handleLogin}
               error={fieldError && fieldError.toLowerCase().includes("password") ? fieldError : null}
             />
@@ -103,6 +126,13 @@ export default function LoginScreen() {
             <Button title="Sign in" onPress={handleLogin} loading={isLoading} style={{ marginTop: 8 }} />
 
             <Text style={styles.footerNote}>Physical device: use LAN IP (not localhost) in EXPO_PUBLIC_RVB_API_URL</Text>
+
+            <View style={styles.diagBox}>
+              <Text style={styles.diagTitle}>DIAG TEMP — remove after hardware confirmation</Text>
+              {diagEvents.map((e, i) => (
+                <Text key={`${i}-${e}`} style={styles.diagText}>{e}</Text>
+              ))}
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -120,4 +150,7 @@ const styles = StyleSheet.create({
   form: { backgroundColor: "#fff", borderRadius: 16, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   apiError: { color: "#DC2626", fontSize: 13, marginBottom: 8, textAlign: "center" },
   footerNote: { marginTop: 12, color: "#94A3B8", fontSize: 11, textAlign: "center" },
+  diagBox: { marginTop: 12, padding: 8, borderWidth: 1, borderColor: "#F59E0B", borderRadius: 8, backgroundColor: "#FFFBEB" },
+  diagTitle: { fontSize: 10, fontWeight: "800", color: "#92400E", marginBottom: 4 },
+  diagText: { fontSize: 10, color: "#451A03", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
 });

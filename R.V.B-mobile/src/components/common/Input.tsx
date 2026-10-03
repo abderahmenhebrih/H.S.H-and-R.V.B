@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { View, TextInput, Text, StyleSheet, Pressable } from "react-native";
-import type { TextInput as RNTextInput } from "react-native";
+import type {
+  TextInput as RNTextInput,
+  TextInputProps,
+  NativeSyntheticEvent,
+  TargetedEvent,
+} from "react-native";
 import { useTheme } from "@/theme/useTheme";
 
 interface Props {
@@ -17,17 +22,21 @@ interface Props {
   numberOfLines?: number;
   keyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
   maxLength?: number;
-  // Explicit focus/submit contract (Android-safe). Previously unforwarded,
-  // so both fields ran on implicit IME/native defaults.
+  // Explicit focus/submit contract (Android-safe), using RN TextInput types.
   inputRef?: React.Ref<RNTextInput>;
-  returnKeyType?: "done" | "go" | "next" | "search" | "send";
-  blurOnSubmit?: boolean;
+  returnKeyType?: TextInputProps["returnKeyType"];
+  blurOnSubmit?: TextInputProps["blurOnSubmit"];
+  submitBehavior?: TextInputProps["submitBehavior"];
   onSubmitEditing?: () => void;
-  autoComplete?: "username" | "current-password" | "off";
-  textContentType?: "username" | "password" | "none";
+  autoComplete?: TextInputProps["autoComplete"];
+  textContentType?: TextInputProps["textContentType"];
+  importantForAutofill?: TextInputProps["importantForAutofill"];
+  // Optional external observers, invoked AFTER the internal border state.
+  onFocus?: (e: NativeSyntheticEvent<TargetedEvent>) => void;
+  onBlur?: (e: NativeSyntheticEvent<TargetedEvent>) => void;
 }
 
-export function Input({ label, value, onChangeText, placeholder, secureTextEntry, autoCapitalize = "none", autoCorrect = false, error, editable = true, multiline, numberOfLines, keyboardType, maxLength, inputRef, returnKeyType, blurOnSubmit, onSubmitEditing, autoComplete, textContentType }: Props) {
+export function Input({ label, value, onChangeText, placeholder, secureTextEntry, autoCapitalize = "none", autoCorrect = false, error, editable = true, multiline, numberOfLines, keyboardType, maxLength, inputRef, returnKeyType, blurOnSubmit, submitBehavior, onSubmitEditing, autoComplete, textContentType, importantForAutofill, onFocus: onFocusExternal, onBlur: onBlurExternal }: Props) {
   const { theme } = useTheme();
   const [show, setShow] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -59,11 +68,13 @@ export function Input({ label, value, onChangeText, placeholder, secureTextEntry
           maxLength={maxLength}
           returnKeyType={returnKeyType}
           blurOnSubmit={blurOnSubmit}
+          submitBehavior={submitBehavior}
           onSubmitEditing={onSubmitEditing ? () => onSubmitEditing() : undefined}
           autoComplete={autoComplete}
           textContentType={textContentType}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          importantForAutofill={importantForAutofill}
+          onFocus={(e) => { setFocused(true); onFocusExternal?.(e); }}
+          onBlur={(e) => { setFocused(false); onBlurExternal?.(e); }}
           placeholderTextColor={theme.colors.inputPlaceholder}
         />
         {secureTextEntry ? (

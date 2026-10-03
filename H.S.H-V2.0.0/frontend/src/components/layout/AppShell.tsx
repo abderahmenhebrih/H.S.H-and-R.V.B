@@ -31,10 +31,13 @@ import {
   SETTINGS_EVENT,
   DEFAULT_SETTINGS,
   getDirection,
+  getCachedSettings,
+  setCachedSettings,
   resolveNavigationStyle,
 } from "../../lib/settings";
 import type { Settings } from "../../types/settings/settings";
 import { settingsService } from "../../services/settings.service";
+import { RVB_UI_PREFERENCES_EVENT } from "../../services/rvb-ui-preferences.service";
 import { getSavedTheme, applyTheme } from "../../lib/theme";
 import {
   CANONICAL_NAVIGATION,
@@ -427,7 +430,7 @@ export default function AppShell({
   const [themeReady, setThemeReady] = useState(false);
 
   const [settings, setSettings] =
-    useState<Settings>(DEFAULT_SETTINGS);
+    useState<Settings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
 
   const [transitionVisible, setTransitionVisible] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<"rvb" | "hsh">("rvb");
@@ -463,6 +466,7 @@ export default function AppShell({
 
       if (stored) {
         setSettings(stored);
+        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       } else {
@@ -479,6 +483,7 @@ export default function AppShell({
 
       if (customEvent?.detail) {
         setSettings(customEvent.detail);
+        setCachedSettings(customEvent.detail);
         document.documentElement.lang = customEvent.detail.language;
         document.documentElement.dir = getDirection(
           customEvent.detail.language,
@@ -490,16 +495,19 @@ export default function AppShell({
         if (!stored) return;
 
         setSettings(stored);
+        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       });
     };
 
     window.addEventListener(SETTINGS_EVENT, readSettings);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
     window.addEventListener("storage", readSettings);
 
     return () => {
       window.removeEventListener(SETTINGS_EVENT, readSettings);
+      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
       window.removeEventListener("storage", readSettings);
     };
   }, []);

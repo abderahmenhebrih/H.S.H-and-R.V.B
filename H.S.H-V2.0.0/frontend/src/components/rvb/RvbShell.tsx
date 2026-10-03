@@ -30,7 +30,10 @@ import RvbNotificationBell from "../notifications/RvbNotificationBell";
 import WorkspaceTransition from "./WorkspaceTransition";
 import {
   DEFAULT_SETTINGS,
+  SETTINGS_EVENT,
   getDirection,
+  getCachedSettings,
+  setCachedSettings,
   resolveNavigationStyle,
 } from "../../lib/settings";
 import type { Settings } from "../../types/settings/settings";
@@ -222,7 +225,7 @@ export default function RvbShell({
   const desktopSidebarExpanded = sidebarHovered || sidebarFocused;
   const isDesktopCollapsed = !desktopSidebarExpanded;
 
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<Settings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
 
   const [transitionVisible, setTransitionVisible] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<"rvb" | "hsh">("rvb");
@@ -243,6 +246,7 @@ export default function RvbShell({
       const stored = await rvbUiPreferencesService.get().catch(() => DEFAULT_SETTINGS);
       if (stored) {
         setSettings(stored);
+        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       }
@@ -255,6 +259,7 @@ export default function RvbShell({
       const customEvent = event as CustomEvent<Settings> | undefined;
       if (customEvent?.detail) {
         setSettings(customEvent.detail);
+        setCachedSettings(customEvent.detail);
         document.documentElement.lang = customEvent.detail.language;
         document.documentElement.dir = getDirection(customEvent.detail.language);
         return;
@@ -262,14 +267,21 @@ export default function RvbShell({
       rvbUiPreferencesService.get().then((stored) => {
         if (!stored) return;
         setSettings(stored);
+        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       });
     };
+    // RVB event (authoritative for this shell) plus the shared HSH
+    // SETTINGS_EVENT: an HSH-originated change dispatches SETTINGS_EVENT
+    // synchronously while the RVB service write is still in flight, so a
+    // shell already mounted must react to both. Same detail shape.
     window.addEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
+    window.addEventListener(SETTINGS_EVENT, readSettings);
     window.addEventListener("storage", readSettings);
     return () => {
       window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
+      window.removeEventListener(SETTINGS_EVENT, readSettings);
       window.removeEventListener("storage", readSettings);
     };
   }, []);

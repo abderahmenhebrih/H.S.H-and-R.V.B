@@ -13,6 +13,8 @@ import {
   SETTINGS_EVENT,
   DEFAULT_SETTINGS,
   getDirection,
+  getCachedSettings,
+  setCachedSettings,
   resolveNavigationStyle,
 } from "../../src/lib/settings";
 import { getSavedTheme, applyTheme } from "../../src/lib/theme";
@@ -500,13 +502,15 @@ function SettingsPageInner() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AppSettings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
   // PBS-BUG-017: synchronous mirror of the latest settings for concurrency-safe
   // partial updates. Written synchronously wherever `settings` state is set and
   // re-synced after every commit by the mirror effect below, so
   // `updateSettingsPartial` never needs an impure state updater and never reads
   // a stale render closure. This ref is never persisted and never dispatches.
-  const settingsRef = useRef<AppSettings>(DEFAULT_SETTINGS);
+  // Initialized from the session-shared cache (same hydration-safe source as
+  // the shells) so a revisit never flashes a stale default.
+  const settingsRef = useRef<AppSettings>(getCachedSettings() ?? DEFAULT_SETTINGS);
   // PBS-BUG-017: serialization chain for settings persistence. Each queued
   // snapshot is saved strictly in request order, so an older save can never
   // complete after (and clobber) a newer one.
@@ -541,9 +545,11 @@ function SettingsPageInner() {
   // PBS-BUG-017: backstop mirror sync. Writes the ref only -- never persists,
   // never dispatches -- so the ref always matches the latest committed state
   // before any discrete user event handler (which flushes passive effects first)
-  // can call `updateSettingsPartial`.
+  // can call `updateSettingsPartial`. Also publishes to the session-shared
+  // live cache so remounting shells start from committed state, not defaults.
   useEffect(() => {
     settingsRef.current = settings;
+    setCachedSettings(settings);
   });
 
   useEffect(() => {
@@ -575,6 +581,7 @@ function SettingsPageInner() {
       };
       setSettings(normalized);
       settingsRef.current = normalized;
+      setCachedSettings(normalized);
       document.documentElement.lang = normalized.language;
       document.documentElement.dir = getDirection(normalized.language);
       if (stored.navigationStyle == null && _legacyNav != null) {
@@ -693,6 +700,11 @@ function SettingsPageInner() {
     const next = { ...settingsRef.current, ...partial } as AppSettings;
     settingsRef.current = next;
     setSettings(next);
+    // Publish synchronously to the session-shared live cache so a shell
+    // mounting before the queued Dexie save completes still starts from the
+    // current preference (no route-transition flash). The queued save
+    // re-publishes the same snapshot after persisting.
+    setCachedSettings(next);
     document.documentElement.lang = next.language;
     document.documentElement.dir = getDirection(next.language);
     queueSettingsPersistence(next);

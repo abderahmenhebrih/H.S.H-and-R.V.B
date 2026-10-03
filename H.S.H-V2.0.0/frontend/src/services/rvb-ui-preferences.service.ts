@@ -252,15 +252,18 @@ export const rvbUiPreferencesService = {
    */
   async setRvbNavigationStyle(style: NavigationStyle): Promise<void> {
     const next = resolveNavigationStyle(style);
+    // Write the local fallback FIRST and synchronously: a shell mounting
+    // before the account PATCH completes must still resolve the new value.
+    // The account write below only upgrades roaming; it never blocks local.
+    setLocalNavigationStyleStorage(next);
     const token = rvbAuthService.getAccessToken();
     if (token) {
       try {
         await rvbAuthService.updatePreferences({ ui: { navigationStyle: next } } as any);
       } catch {
-        // fall through to local persistence
+        // fall through to local persistence (already written above)
       }
     }
-    setLocalNavigationStyleStorage(next);
     const settings = await this.getPresentationSettings();
     dispatchRvbPreferences(settings);
   },

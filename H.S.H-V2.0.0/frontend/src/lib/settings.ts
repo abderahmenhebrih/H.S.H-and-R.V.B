@@ -2,6 +2,24 @@ import type { Settings, Language, Currency, NavigationStyle } from "../types/set
 
 export const SETTINGS_EVENT = "hebrih-settings-change";
 
+// Session-shared live settings. Module singleton: every shell mounts with
+// the already-known preference instead of rediscovering it from Dexie
+// starting at the default (which caused a FloatingNav flash on every
+// client-side route transition). Hydration-safe: the module instance is
+// fresh on the server and on first client load (cache empty → DEFAULT),
+// and setCachedSettings is only ever called from client-side effects,
+// event handlers, and post-save paths — never during SSR/render.
+// Warmed by settingsService.save plus every shell settings assignment.
+let cachedSettings: Settings | undefined;
+
+export function getCachedSettings(): Settings | undefined {
+  return cachedSettings;
+}
+
+export function setCachedSettings(next: Settings): void {
+  cachedSettings = next;
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   language: "en",
   currency: "DA",

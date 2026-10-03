@@ -5,7 +5,7 @@ import RvbShell from "../../../src/components/rvb/RvbShell";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
-import { DEFAULT_SETTINGS, getDirection, resolveNavigationStyle, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { DEFAULT_SETTINGS, getDirection, getCachedSettings, setCachedSettings, resolveNavigationStyle, SETTINGS_EVENT } from "../../../src/lib/settings";
 import type { Settings, Language, Currency, NavigationStyle } from "../../../src/types/settings/settings";
 import { getSavedTheme, applyTheme } from "../../../src/lib/theme";
 import { rvbAuthService } from "../../../src/services/rvb-auth.service";
@@ -251,7 +251,7 @@ function initials(name: string): string {
 function SettingsInner() {
   const router = useRouter();
   const { user, logout, changePassword, setUser } = useRvbAuth();
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<Settings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
   const [dark, setDark] = useState(() => {
     try { return getSavedTheme() === "dark"; } catch { return false; }
   });
@@ -281,7 +281,7 @@ function SettingsInner() {
 
   // Load RVB presentation settings: language from account preferences, currency from company config
   useEffect(() => {
-    rvbUiPreferencesService.get().then((s) => { if (s) setSettings(s); }).catch(()=>{});
+    rvbUiPreferencesService.get().then((s) => { if (s) { setSettings(s); setCachedSettings(s); } }).catch(()=>{});
     // Also sync currency explicitly from config for freshness
     import("@/src/services/rvb-config.service").then(({ rvbConfigService }) => {
       rvbConfigService.get().then((cfg) => {
@@ -290,7 +290,7 @@ function SettingsInner() {
     }).catch(()=>{});
     const h = (e: Event) => {
       const ce = e as CustomEvent<Settings>;
-      if (ce?.detail) setSettings(ce.detail);
+      if (ce?.detail) { setSettings(ce.detail); setCachedSettings(ce.detail); }
     };
     window.addEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
     const themeH = () => setDark(getSavedTheme() === "dark");
@@ -558,6 +558,10 @@ function SettingsInner() {
                     // RvbShell). No reload needed anywhere.
                     const next: Settings = { ...settings, navigationStyle: style };
                     setSettings(next);
+                    // Publish synchronously: shells mounting before the
+                    // fire-and-forget Dexie save completes must start from
+                    // the new value (save re-publishes on completion).
+                    setCachedSettings(next);
                     settingsService.save(next).catch(() => {});
                     window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
                     rvbUiPreferencesService.setRvbNavigationStyle(style).catch(() => {});

@@ -6,6 +6,7 @@ import styles from "./page.module.css";
 import { useDbSync } from "../src/hooks/useDbSync";
 
 import { settingsService } from "../src/services/settings.service";
+import { RVB_UI_PREFERENCES_EVENT } from "../src/services/rvb-ui-preferences.service";
 import { saleService } from "../src/services/sale.service";
 import { purchaseService } from "../src/services/purchase.service";
 import { customerService } from "../src/services/customer.service";
@@ -17,6 +18,8 @@ import {
   DEFAULT_SETTINGS,
   formatCurrency,
   getDirection,
+  getCachedSettings,
+  setCachedSettings,
   resolveNavigationStyle,
 } from "../src/lib/settings";
 import type { Settings } from "../src/types/settings/settings";
@@ -279,7 +282,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   const [settings, setSettings] =
-    useState<Settings>(DEFAULT_SETTINGS);
+    useState<Settings>(() => getCachedSettings() ?? DEFAULT_SETTINGS);
 
   const [dark, setDark] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
@@ -327,6 +330,7 @@ export default function Dashboard() {
 
       if (stored) {
         setSettings(stored);
+        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       } else {
@@ -343,6 +347,7 @@ export default function Dashboard() {
 
       if (customEvent?.detail) {
         setSettings(customEvent.detail);
+        setCachedSettings(customEvent.detail);
         document.documentElement.lang = customEvent.detail.language;
         document.documentElement.dir = getDirection(
           customEvent.detail.language,
@@ -354,16 +359,19 @@ export default function Dashboard() {
         if (!stored) return;
 
         setSettings(stored);
+        setCachedSettings(stored);
         document.documentElement.lang = stored.language;
         document.documentElement.dir = getDirection(stored.language);
       });
     };
 
     window.addEventListener(SETTINGS_EVENT, readSettings);
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
     window.addEventListener("storage", readSettings);
 
     return () => {
       window.removeEventListener(SETTINGS_EVENT, readSettings);
+      window.removeEventListener(RVB_UI_PREFERENCES_EVENT, readSettings);
       window.removeEventListener("storage", readSettings);
     };
   }, []);

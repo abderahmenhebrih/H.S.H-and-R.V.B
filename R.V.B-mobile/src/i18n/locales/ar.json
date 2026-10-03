@@ -1,0 +1,21 @@
+{
+  "auth": {
+    "login": "تسجيل الدخول",
+    "tag": "@tag",
+    "password": "كلمة المرور",
+    "changePassword": "تغيير كلمة المرور",
+    "onboarding": "الإعداد"
+  },
+  "tabs": {
+    "mainChats": "الدردشات الرئيسية",
+    "secondaryChats": "الثانوية",
+    "profile": "الملف الشخصي",
+    "search": "بحث",
+    "settings": "الإعدادات"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "retry": "إعادة المحاولة",
+    "error": "حدث خطأ ما"
+  }
+}

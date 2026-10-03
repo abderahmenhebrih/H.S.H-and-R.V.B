@@ -1,0 +1,21 @@
+{
+  "auth": {
+    "login": "Sign in",
+    "tag": "@tag",
+    "password": "Password",
+    "changePassword": "Change Password",
+    "onboarding": "Onboarding"
+  },
+  "tabs": {
+    "mainChats": "Main Chats",
+    "secondaryChats": "Secondary",
+    "profile": "Profile",
+    "search": "Search",
+    "settings": "Settings"
+  },
+  "common": {
+    "loading": "Loading...",
+    "retry": "Retry",
+    "error": "Something went wrong"
+  }
+}

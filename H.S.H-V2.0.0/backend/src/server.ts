@@ -193,6 +193,17 @@ async function startServer() {
   } catch (e) {
     console.warn("reminder processor start failed", (e as any)?.message);
   }
+  // Chat media orphan cleanup: bounded 6h interval, delayed first tick, never
+  // blocks startup. The interval is unref'd and stoppable via
+  // stopChatUploadCleanupProcessor() (production server.ts has no SIGTERM /
+  // SIGINT shutdown handlers, so nothing is added here that could change
+  // Render's graceful-shutdown semantics).
+  try {
+    const { startChatUploadCleanupProcessor } = await import("./services/chat-upload-cleanup.processor");
+    startChatUploadCleanupProcessor();
+  } catch (e) {
+    console.warn("chat upload cleanup processor start failed", (e as any)?.message);
+  }
   httpServer.listen(PORT, () => {
     console.log(`Backend server running on http://localhost:${PORT}`);
   });

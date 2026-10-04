@@ -232,13 +232,19 @@ class CloudinaryChatMediaStorage implements ChatMediaStorage {
   }
 
   async delete(publicId: string): Promise<void> {
-    // resource_type unknown here; try image then video (best-effort cleanup).
+    // Best-effort across resource types. "ok" or "not found" (either type)
+    // means the blob is gone. Only throws when every attempt fails with a
+    // real error (network/auth) — callers keep the row and retry next cycle.
+    let lastErr: unknown = null;
     for (const resourceType of ["image", "video"] as const) {
       try {
         const res: any = await this.client.uploader.destroy(publicId, { resource_type: resourceType });
         if (res?.result === "ok" || res?.result === "not found") return;
-      } catch {}
+      } catch (e) {
+        lastErr = e;
+      }
     }
+    throw lastErr instanceof Error ? lastErr : new Error("[chat-media] Cloudinary delete failed");
   }
 }
 
@@ -339,6 +345,24 @@ export function getMockChatMediaStorage(): MockChatMediaStorage {
 
 let localDevSingleton: LocalDevChatMediaStorage | null = null;
 
+function getLocalDevStorage(): LocalDevChatMediaStorage {
+  if (!localDevSingleton) localDevSingleton = new LocalDevChatMediaStorage();
+  return localDevSingleton;
+}
+
+// Delete a single blob for the provider that owns it — no env switching.
+// Mock/local-dev deletes never throw (missing file = already gone).
+// Cloudinary throws on hard failure (network/auth) so callers can retry.
+export async function deleteChatMediaBlob(publicId: string, provider?: string): Promise<void> {
+  const name = (provider || "").toLowerCase();
+  if (name === "mock") return mockSingleton.delete(publicId);
+  if (name === "local-dev") return getLocalDevStorage().delete(publicId);
+  // Cloudinary (or unknown persistent provider): construct directly so the
+  // correct credentials are used even if the active provider has changed.
+  // Throws when unconfigured — the caller must keep the row for retry.
+  return new CloudinaryChatMediaStorage().delete(publicId);
+}
+
 // Factory. Reads env at call time so tests can switch providers in-process.
 // CHAT_STORAGE_PROVIDER: "cloudinary" | "local-dev" | "mock".
 // Default: "mock" in test mode, "cloudinary" when Cloudinary env is complete,
@@ -346,10 +370,7 @@ let localDevSingleton: LocalDevChatMediaStorage | null = null;
 export function resolveChatMediaStorage(): ChatMediaStorage {
   const explicit = (process.env.CHAT_STORAGE_PROVIDER || "").trim().toLowerCase();
   if (explicit === "mock") return mockSingleton;
-  if (explicit === "local-dev") {
-    if (!localDevSingleton) localDevSingleton = new LocalDevChatMediaStorage();
-    return localDevSingleton;
-  }
+  if (explicit === "local-dev") return getLocalDevStorage();
   if (explicit === "cloudinary") return new CloudinaryChatMediaStorage();
   const inTest = process.env.NODE_ENV === "test" || process.env.RVB_TEST_MODE === "true";
   if (inTest) return mockSingleton;
@@ -359,6 +380,5 @@ export function resolveChatMediaStorage(): ChatMediaStorage {
   if (process.env.NODE_ENV === "production") {
     throw new Error("[chat-media] No media storage configured in production (set CLOUDINARY_* env)");
   }
-  if (!localDevSingleton) localDevSingleton = new LocalDevChatMediaStorage();
-  return localDevSingleton;
+  return getLocalDevStorage();
 }

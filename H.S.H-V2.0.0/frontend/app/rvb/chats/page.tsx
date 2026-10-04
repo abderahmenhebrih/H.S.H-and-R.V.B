@@ -497,7 +497,7 @@ function ChatsInner() {
         const idx = prev.findIndex((c) => c.id === convId);
         if (idx >= 0) {
           const copy = [...prev];
-          const conv: any = { ...copy[idx], lastMessageAt: msg.createdAt, lastMessagePreview: messagePreview(msg.content, (msg as any).attachments), lastMessageSenderId: msg.senderAccountId, updatedAt: Date.now() };
+          const conv: any = { ...copy[idx], lastMessageAt: msg.createdAt, lastMessagePreview: messagePreview(msg.content, msg.attachments), lastMessageSenderId: msg.senderAccountId, updatedAt: Date.now() };
           copy.splice(idx, 1);
           copy.unshift(conv);
           return copy;
@@ -972,12 +972,12 @@ function ChatsInner() {
                               el?.scrollIntoView({ behavior: "smooth", block: "center" });
                             }}>
                               <strong>{replyOrig ? (replyOrig.senderAccountId === myId ? "You" : (selectedConv.participants as any[]).find((p: any) => p.accountId === replyOrig.senderAccountId)?.account?.displayName || "…") : "…"}: </strong>
-                              {replyOrig ? (replyOrig.isDeleted ? t.deleted : messagePreview(replyOrig.content, (replyOrig as any).attachments) || t.deleted) : t.deleted}
+                              {replyOrig ? (replyOrig.isDeleted ? t.deleted : messagePreview(replyOrig.content, replyOrig.attachments) || t.deleted) : t.deleted}
                             </div>
                           )}
-                          {Array.isArray((m as any).attachments) && (m as any).attachments.length > 0 && !m.isDeleted && (
+                          {Array.isArray(m.attachments) && m.attachments.length > 0 && !m.isDeleted && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: m.content ? 6 : 2 }}>
-                              {((m as any).attachments as ChatAttachment[]).map((a) => {
+                              {(m.attachments as ChatAttachment[]).map((a) => {
                                 // URL metadata only; anything without an http(s)
                                 // url is skipped (never render binary inline).
                                 const url = typeof a?.url === "string" && /^https?:\/\//i.test(a.url) ? a.url : null;
@@ -1019,7 +1019,7 @@ function ChatsInner() {
                             </div>
                           )}
                           <div dir="auto" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                            {m.isDeleted ? <em style={{ opacity: 0.8 }}>{t.deleted}</em> : m.content ? m.content : ((m as any).attachments?.length ? messagePreview("", (m as any).attachments) : "")}
+                            {m.isDeleted ? <em style={{ opacity: 0.8 }}>{t.deleted}</em> : m.content ? m.content : (m.attachments?.length ? messagePreview("", m.attachments) : "")}
                           </div>
                           <div className={`${styles.messageMeta} ${isMe ? styles.messageMetaMe : ""}`}>
                             <span>{formatTime(m.createdAt, lang)}</span>
@@ -1061,7 +1061,7 @@ function ChatsInner() {
                   <div className={styles.replyStrip}>
                     <CornerUpLeft size={12} />
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {editing ? `${t.edit}: ${messagePreview(editing.content, (editing as any).attachments).slice(0, 40)}` : `${t.reply}: ${replyTo ? messagePreview(replyTo.content, (replyTo as any).attachments).slice(0, 40) : ""}`}
+                      {editing ? `${t.edit}: ${messagePreview(editing.content, editing.attachments).slice(0, 40)}` : `${t.reply}: ${replyTo ? messagePreview(replyTo.content, replyTo.attachments).slice(0, 40) : ""}`}
                     </span>
                     <button className={styles.iconButton} onClick={() => { setReplyTo(null); setEditing(null); setComposer(editing ? "" : composer); }}><X size={12} /></button>
                   </div>
@@ -1188,7 +1188,7 @@ function ChatsInner() {
                     const pm = messages.find((m) => m.id === p.messageId);
                     return (
                       <div key={p.messageId} style={{ padding: 8, border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel-hover)", fontSize: 12, marginBottom: 6 }}>
-                        <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pm ? (pm.isDeleted ? t.deleted : messagePreview(pm.content, (pm as any).attachments) || p.messageId.slice(0, 8)) : p.messageId.slice(0, 8)}</div>
+                        <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pm ? (pm.isDeleted ? t.deleted : messagePreview(pm.content, pm.attachments) || p.messageId.slice(0, 8)) : p.messageId.slice(0, 8)}</div>
                         <small style={{ color: "var(--muted)" }}>{formatDateShort(p.pinnedAt, lang)}</small>
                       </div>
                     );

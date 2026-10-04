@@ -7,6 +7,7 @@ import {
   sniffMediaBytes,
   getImageDimensions,
   resolveChatMediaStorage,
+  deleteChatMediaBlob,
   CHAT_IMAGE_MAX_BYTES,
   CHAT_VIDEO_MAX_BYTES,
   CHAT_ATTACHMENT_MAX_COUNT,
@@ -176,33 +177,32 @@ export async function markAttachmentsAttached(ids: string[]): Promise<void> {
 }
 
 // Orphan cleanup: pending uploads that expired without ever being attached.
-// Deletes provider blobs (best-effort) + rows. Attached rows are kept as the
-// ownership trail. Wire to a scheduler/cron; safe to run concurrently.
+// Deletes the provider blob first; the row is removed only when the blob is
+// confirmed gone. Cloudinary hard failures (network/auth) keep the row for
+// retry on the next cycle. Attached rows are kept as the ownership trail.
+// Wire to a scheduler/cron; safe to run concurrently across instances only in
+// the sense that double-deletes are idempotent (mock/local-dev deletes and
+// Cloudinary destroy are all idempotent).
 export async function deleteOrphanChatUploads(limit = 100): Promise<{ rows: number; blobs: number }> {
   const now = Date.now();
   const orphans: any[] = await ChatUploadModel.find({ status: "pending", expiresAt: { $lt: now } })
     .limit(limit)
     .lean();
   let blobs = 0;
+  let deleted = 0;
   for (const o of orphans) {
     try {
-      // Only delete the blob for the provider that owns it.
-      const storageName = o.provider;
-      const prev = process.env.CHAT_STORAGE_PROVIDER;
-      try {
-        process.env.CHAT_STORAGE_PROVIDER = storageName === "mock" || storageName === "local-dev" ? storageName : prev;
-        await resolveChatMediaStorage().delete(o.publicId);
-        blobs++;
-      } catch {
-        // best-effort
-      } finally {
-        if (prev === undefined) delete process.env.CHAT_STORAGE_PROVIDER;
-        else process.env.CHAT_STORAGE_PROVIDER = prev;
-      }
-    } catch {}
+      await deleteChatMediaBlob(o.publicId, o.provider);
+      blobs++;
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.warn("[chat-upload-cleanup] blob delete failed, keeping row for retry:", o.id, e?.message);
+      continue;
+    }
     await ChatUploadModel.deleteOne({ id: o.id });
+    deleted++;
   }
-  return { rows: orphans.length, blobs };
+  return { rows: deleted, blobs };
 }
 
 // Authenticated local-dev file serving helper for GET /media/:uploadId.

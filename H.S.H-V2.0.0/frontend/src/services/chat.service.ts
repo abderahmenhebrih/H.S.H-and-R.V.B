@@ -42,6 +42,18 @@ export type Conversation = {
   isArchived?: boolean;
 };
 
+export type ChatAttachment = {
+  id: string;
+  kind: "image" | "video";
+  url: string;
+  publicId?: string | null;
+  mimeType: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -56,8 +68,23 @@ export type Message = {
   reactions?: Array<{ accountId: string; emoji: string; createdAt: number }>;
   readBy?: Array<{ accountId: string; readAt: number }>;
   mentions?: string[];
+  attachments?: ChatAttachment[];
   sender?: any;
 };
+
+// Shared preview semantics (hubs + notifications + pins): text preferred,
+// media-only falls back to [Image]/[Video]/[Media] — never blank, never a URL.
+export function messagePreview(content: string, attachments?: Array<{ kind?: string }>): string {
+  const trimmed = typeof content === "string" ? content.trim() : "";
+  if (trimmed) return trimmed.slice(0, 80);
+  const atts = Array.isArray(attachments) ? attachments : [];
+  const hasImage = atts.some((a) => a?.kind === "image");
+  const hasVideo = atts.some((a) => a?.kind === "video");
+  if (hasImage && hasVideo) return "[Media]";
+  if (hasImage) return "[Image]";
+  if (hasVideo) return "[Video]";
+  return "";
+}
 
 export const chatService = {
   async list(category?: string, search?: string): Promise<Conversation[]> {
@@ -118,15 +145,35 @@ export const chatService = {
     const data = await handleResponse<{ success: boolean; messages: Message[] }>(res);
     return data.messages || [];
   },
-  async sendMessage(conversationId: string, content: string, replyToMessageId?: string | null, reminderMinutes?: number | null): Promise<Message> {
+  async sendMessage(conversationId: string, content: string, replyToMessageId?: string | null, reminderMinutes?: number | null, attachmentIds?: string[]): Promise<Message> {
     const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ content, replyToMessageId, reminderMinutes }),
+      body: JSON.stringify({
+        content,
+        replyToMessageId,
+        reminderMinutes,
+        ...(attachmentIds && attachmentIds.length ? { attachmentIds } : {}),
+      }),
       credentials: "include",
     });
     const data = await handleResponse<{ success: boolean; message: Message }>(res);
     return data.message;
+  },
+  // Authenticated multipart upload (bytes as FormData, never base64/JSON).
+  // Returns the trusted attachment record; its id is sent via sendMessage.
+  // No Content-Type header: the browser sets the multipart boundary itself.
+  async uploadAttachment(conversationId: string, file: File): Promise<ChatAttachment> {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    const res = await rvbAuthService.authFetch(`${BASE}/${encodeURIComponent(conversationId)}/attachments`, {
+      method: "POST",
+      headers: { ...getAuthHeaders() },
+      body: form,
+      credentials: "include",
+    });
+    const data = await handleResponse<{ success: boolean; attachment: ChatAttachment }>(res);
+    return data.attachment;
   },
   async editMessage(messageId: string, content: string): Promise<Message> {
     const res = await rvbAuthService.authFetch(`${BASE}/messages/${encodeURIComponent(messageId)}`, {

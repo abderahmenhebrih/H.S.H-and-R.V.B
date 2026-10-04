@@ -48,8 +48,11 @@
     "edited": "معدّلة",
     "typing": "يكتب...",
     "justNow": "الآن",
-    "mediaTooLarge": "الوسائط كبيرة جدًا (~500KB كحد أقصى بعد الضغط)",
-    "unsupportedType": "نوع الوسائط غير مدعوم"
+    "mediaTooLarge": "الوسائط كبيرة جدًا (الصور 8MB، الفيديو 25MB كحد أقصى)",
+    "unsupportedType": "نوع الوسائط غير مدعوم",
+    "openVideo": "فتح الفيديو",
+    "openVideoFailed": "تعذر فتح الفيديو",
+    "ready": "جاهز"
   },
   "settings": {
     "title": "الإعدادات",

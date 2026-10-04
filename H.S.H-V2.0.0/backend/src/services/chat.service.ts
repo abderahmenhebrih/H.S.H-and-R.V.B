@@ -5,6 +5,7 @@ import { MessageAuditModel } from "../models/message-audit.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { createRvbNotification } from "./rvb-notification.service";
 import { RvbChatReminderModel } from "../models/rvb-chat-reminder.model";
+import { resolveAttachmentIds, markAttachmentsAttached } from "./chat-upload.service";
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;
@@ -35,6 +36,26 @@ function toSafeConversation(doc: any) {
   const o = doc.toObject ? doc.toObject() : doc;
   return o;
 }
+function sanitizeAttachments(raw: unknown): any[] {
+  // URL-metadata only. Any legacy/base64 payload (dataUrl/Buffer) that may
+  // exist in old QA documents is stripped here so REST + sockets NEVER carry
+  // media bytes, even if such a document is read back.
+  if (!Array.isArray(raw)) return [];
+  return (raw as any[])
+    .filter((a) => a && (a.kind === "image" || a.kind === "video") && typeof a.url === "string" && /^https?:\/\//i.test(a.url))
+    .map((a) => ({
+      id: String(a.id || ""),
+      kind: a.kind,
+      url: String(a.url),
+      publicId: typeof a.publicId === "string" ? a.publicId : null,
+      mimeType: typeof a.mimeType === "string" ? a.mimeType : null,
+      size: Number(a.size) || 0,
+      width: Number.isFinite(Number(a.width)) ? Number(a.width) : null,
+      height: Number.isFinite(Number(a.height)) ? Number(a.height) : null,
+      duration: Number.isFinite(Number(a.duration)) ? Number(a.duration) : null,
+    }));
+}
+
 function toSafeMessage(doc: any, forAdmin = false) {
   if (!doc) return null;
   const o = doc.toObject ? doc.toObject() : { ...doc };
@@ -47,76 +68,42 @@ function toSafeMessage(doc: any, forAdmin = false) {
       // Keep audit only for admin, hide original
     };
   }
-  return o;
+  // Always serve sanitized URL metadata (drops any legacy binary fields).
+  return { ...o, attachments: sanitizeAttachments(o.attachments) };
 }
 
-// ---- Additive shared attachment contract (mobile + desktop safe) ----
-// Stored inline as data URLs over the existing authenticated JSON pipeline:
-// no separate upload endpoint, no secrets on device, membership/permission
-// enforced by sendMessage before anything is persisted. Sized to stay well
-// under the global express.json 1mb limit and Mongo document limits.
+// ---- URL-based attachment contract (production) ----
+// Clients upload bytes via POST /:id/attachments (multipart) and send messages
+// with { attachmentIds: [...] }. sendMessage resolves each id against the
+// server-side ChatUpload row — client-supplied URLs are never trusted.
+// Inline base64/dataUrl payloads are rejected outright (re-upload required).
 export type ChatAttachmentInput = {
+  id: string;
   kind: "image" | "video";
-  dataUrl: string;
+  url: string;
+  publicId?: string | null;
   mimeType: string;
   size: number;
   width?: number | null;
   height?: number | null;
+  duration?: number | null;
 };
 
 export const CHAT_ATTACHMENT_MAX_COUNT = 3;
-// ~700k chars ≈ 525KB binary; keeps total JSON body under the 1mb server limit.
-export const CHAT_ATTACHMENT_MAX_CHARS = 700_000;
-const CHAT_IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-const CHAT_VIDEO_MIMES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 
-export function validateChatAttachments(input: unknown): ChatAttachmentInput[] {
-  if (input === undefined || input === null) return [];
-  if (!Array.isArray(input)) throw codeError("RVB_ATTACHMENT_INVALID", 400, "Attachments must be an array");
-  if (input.length > CHAT_ATTACHMENT_MAX_COUNT)
-    throw codeError("RVB_ATTACHMENT_LIMIT", 400, `Max ${CHAT_ATTACHMENT_MAX_COUNT} attachments`);
-  return (input as any[]).map((a: any, i: number) => {
-    const kind = a?.kind;
-    if (kind !== "image" && kind !== "video")
-      throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: kind must be image|video`);
-    const dataUrl = a?.dataUrl;
-    if (typeof dataUrl !== "string" || dataUrl.length < 32)
-      throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: dataUrl required`);
-    if (dataUrl.length > CHAT_ATTACHMENT_MAX_CHARS)
-      throw codeError("RVB_ATTACHMENT_TOO_LARGE", 413, `Attachment ${i} too large (max ~500KB)`);
-    const mimeType = String(a?.mimeType || "").toLowerCase().split(";")[0].trim();
-    if (kind === "image") {
-      if (!CHAT_IMAGE_MIMES.has(mimeType))
-        throw codeError("RVB_ATTACHMENT_TYPE", 400, `Attachment ${i}: image must be jpeg/png/webp`);
-      if (!dataUrl.startsWith("data:image/"))
-        throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: dataUrl must be data:image/...`);
-    } else {
-      if (!CHAT_VIDEO_MIMES.has(mimeType))
-        throw codeError("RVB_ATTACHMENT_TYPE", 400, `Attachment ${i}: video must be mp4/mov/webm`);
-      if (!dataUrl.startsWith("data:video/"))
-        throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: dataUrl must be data:video/...`);
-    }
-    const size = Number(a?.size);
-    if (!Number.isFinite(size) || size <= 0 || size > 800_000)
-      throw codeError("RVB_ATTACHMENT_TOO_LARGE", 413, `Attachment ${i} size out of bounds`);
-    const width = a?.width === undefined || a?.width === null ? null : Number(a.width);
-    const height = a?.height === undefined || a?.height === null ? null : Number(a.height);
-    return {
-      kind,
-      dataUrl,
-      mimeType,
-      size: Math.floor(size),
-      width: Number.isFinite(width as number) && (width as number) > 0 ? Math.floor(width as number) : null,
-      height: Number.isFinite(height as number) && (height as number) > 0 ? Math.floor(height as number) : null,
-    };
-  });
+export function attachmentPreviewLabel(attachments: Array<{ kind?: string }>): string {
+  if (attachments.some((a) => a?.kind === "image") && attachments.some((a) => a?.kind === "video")) return "[Media]";
+  if (attachments.some((a) => a?.kind === "image")) return "[Image]";
+  if (attachments.some((a) => a?.kind === "video")) return "[Video]";
+  return "[Attachment]";
 }
 
-export function attachmentPreviewLabel(attachments: ChatAttachmentInput[]): string {
-  if (attachments.some((a) => a.kind === "image") && attachments.some((a) => a.kind === "video")) return "[Media]";
-  if (attachments.some((a) => a.kind === "image")) return "[Image]";
-  if (attachments.some((a) => a.kind === "video")) return "[Video]";
-  return "[Attachment]";
+// Shared preview semantics for hubs + notifications (desktop + mobile).
+export function messagePreviewText(content: string, attachments: Array<{ kind?: string }>): string {
+  const trimmed = typeof content === "string" ? content.trim() : "";
+  if (trimmed) return trimmed.slice(0, 80);
+  if (attachments && attachments.length) return attachmentPreviewLabel(attachments);
+  return "";
 }
 
 export function isManagementRole(role: string) {
@@ -465,16 +452,30 @@ export async function updateGroup(convId: string, accountId: string, input: { na
 }
 
 // Message operations
-export async function sendMessage(convId: string, senderId: string, content: string, replyTo?: string | null, reminderMinutes?: number | null, reminderAtLegacy?: number | null, attachmentsInput?: unknown) {
-  const attachments = validateChatAttachments(attachmentsInput);
+export async function sendMessage(convId: string, senderId: string, content: string, replyTo?: string | null, reminderMinutes?: number | null, reminderAtLegacy?: number | null, attachmentIdsInput?: unknown) {
   const trimmed = typeof content === "string" ? content.trim() : "";
-  if (!trimmed && attachments.length === 0) throw codeError("RVB_CONTENT_REQUIRED", 400);
-  if (trimmed.length > MESSAGE_MAX) throw codeError("RVB_CONTENT_TOO_LONG", 400);
+  // Inline attachment payloads (legacy base64/dataUrl era) are rejected:
+  // bytes must flow through POST /:id/attachments, messages carry ids only.
+  if ((attachmentIdsInput as any) !== undefined && (attachmentIdsInput as any) !== null && !Array.isArray(attachmentIdsInput)) {
+    throw codeError("RVB_ATTACHMENT_INVALID", 400, "attachmentIds must be an array of upload ids");
+  }
+  if (Array.isArray(attachmentIdsInput)) {
+    for (const entry of attachmentIdsInput as any[]) {
+      if (entry !== null && typeof entry === "object") {
+        throw codeError("RVB_ATTACHMENT_INVALID", 400, "Inline attachments not accepted (upload first, send ids)");
+      }
+    }
+  }
   const conv: any = await ConversationModel.findOne({ id: convId });
   if (!conv) throw codeError("RVB_CONVERSATION_NOT_FOUND", 404);
   const sender: any = await RvbAccountModel.findOne({ id: senderId }).lean();
   if (!sender || sender.status !== "active") throw codeError("RVB_FORBIDDEN", 403);
   if (!isParticipant(conv, senderId)) throw codeError("RVB_FORBIDDEN", 403, "Not member");
+  // Trusted resolution AFTER membership is proven: ids must be uploads by this
+  // sender into this conversation (cross-conversation / cross-user ids rejected).
+  const attachments = await resolveAttachmentIds(attachmentIdsInput, { conversationId: convId, senderId });
+  if (!trimmed && attachments.length === 0) throw codeError("RVB_CONTENT_REQUIRED", 400);
+  if (trimmed.length > MESSAGE_MAX) throw codeError("RVB_CONTENT_TOO_LONG", 400);
   checkRate(senderId);
   if (replyTo) {
     const orig: any = await MessageModel.findOne({ id: replyTo, conversationId: convId }).lean();
@@ -525,6 +526,10 @@ export async function sendMessage(convId: string, senderId: string, content: str
     reminderAt: effectiveReminderAt,
     attachments,
   } as any);
+  // Uploaded bytes now referenced by a message: reusable for immediate retry,
+  // no duplicate upload required; unreferenced rows expire via orphan cleanup.
+  await markAttachmentsAttached(attachments.map((a: any) => a.id));
+  const previewLabel = messagePreviewText(trimmed, attachments);
   await MessageAuditModel.create({
     id: `audit-${uuidv4()}`,
     createdAt: now,
@@ -532,10 +537,10 @@ export async function sendMessage(convId: string, senderId: string, content: str
     conversationId: convId,
     action: "create",
     actorAccountId: senderId,
-    contentSnapshot: trimmed || attachmentPreviewLabel(attachments),
+    contentSnapshot: previewLabel,
   } as any);
   conv.lastMessageAt = now;
-  conv.lastMessagePreview = (trimmed || attachmentPreviewLabel(attachments)).slice(0, 80);
+  conv.lastMessagePreview = previewLabel.slice(0, 80);
   conv.lastMessageSenderId = senderId;
   conv.updatedAt = now;
   await conv.save();
@@ -618,7 +623,8 @@ export async function sendMessage(convId: string, senderId: string, content: str
         type: "system",
         severity: isMention || isReply ? "warning" : "info",
         title,
-        message: (trimmed || attachmentPreviewLabel(attachments)).slice(0, 120),
+        // Media-only notifications use [Image]/[Video]/[Media] — never raw URLs.
+        message: previewLabel.slice(0, 120),
         entityType: "conversation",
         entityId: convId,
         route: "/rvb/chats",
@@ -753,20 +759,41 @@ export async function getMessageAudit(messageId: string, requesterId: string) {
 }
 
 export async function toggleReaction(messageId: string, accountId: string) {
-  const msg: any = await MessageModel.findOne({ id: messageId });
-  if (!msg) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
-  const conv: any = await ConversationModel.findOne({ id: msg.conversationId }).lean();
+  const existing: any = await MessageModel.findOne({ id: messageId }).lean();
+  if (!existing) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
+  const conv: any = await ConversationModel.findOne({ id: existing.conversationId }).lean();
   if (!isParticipant(conv, accountId)) throw codeError("RVB_FORBIDDEN", 403);
   const emoji = "🤝";
-  const idx = (msg.reactions as any[]).findIndex((r: any) => r.accountId === accountId && r.emoji === emoji);
-  if (idx >= 0) {
-    msg.reactions.splice(idx, 1);
-  } else {
-    msg.reactions.push({ accountId, emoji, createdAt: Date.now() });
-  }
-  msg.updatedAt = Date.now();
-  await msg.save();
-  return msg.toObject ? msg.toObject() : msg;
+  const now = Date.now();
+  // Atomic toggle in ONE MongoDB update (aggregation pipeline): concurrent
+  // rapid toggles from the same user can no longer interleave a
+  // read-modify-write and duplicate the entry. Membership was verified above;
+  // the toggle itself is a single atomic document update.
+  const isMine = {
+    $and: [{ $eq: ["$$r.accountId", accountId] }, { $eq: ["$$r.emoji", emoji] }],
+  };
+  const current = { $ifNull: ["$reactions", []] };
+  const hasMine = { $gt: [{ $size: { $filter: { input: current, as: "r", cond: isMine } } }, 0] };
+  const updated: any = await MessageModel.findOneAndUpdate(
+    { id: messageId },
+    [
+      {
+        $set: {
+          reactions: {
+            $cond: [
+              hasMine,
+              { $filter: { input: current, as: "r", cond: { $not: [isMine] } } },
+              { $concatArrays: [current, [{ accountId, emoji, createdAt: now }]] },
+            ],
+          },
+          updatedAt: now,
+        },
+      },
+    ],
+    { returnDocument: "after", updatePipeline: true } as any,
+  ).lean();
+  if (!updated) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
+  return updated;
 }
 
 export async function pinMessage(conversationId: string, messageId: string, accountId: string) {

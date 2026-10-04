@@ -48,8 +48,11 @@
     "edited": "edited",
     "typing": "typing...",
     "justNow": "just now",
-    "mediaTooLarge": "Media too large (max ~500KB after compression)",
-    "unsupportedType": "Unsupported media type"
+    "mediaTooLarge": "Media too large (images 8 MB, videos 25 MB max)",
+    "unsupportedType": "Unsupported media type",
+    "openVideo": "Open video",
+    "openVideoFailed": "Could not open video",
+    "ready": "Ready"
   },
   "settings": {
     "title": "Settings",

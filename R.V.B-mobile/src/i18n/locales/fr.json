@@ -48,8 +48,11 @@
     "edited": "modifié",
     "typing": "écrit...",
     "justNow": "à l'instant",
-    "mediaTooLarge": "Média trop volumineux (~500 Ko max après compression)",
-    "unsupportedType": "Type de média non pris en charge"
+    "mediaTooLarge": "Média trop volumineux (images 8 Mo, vidéos 25 Mo max)",
+    "unsupportedType": "Type de média non pris en charge",
+    "openVideo": "Ouvrir la vidéo",
+    "openVideoFailed": "Impossible d'ouvrir la vidéo",
+    "ready": "Prêt"
   },
   "settings": {
     "title": "Paramètres",

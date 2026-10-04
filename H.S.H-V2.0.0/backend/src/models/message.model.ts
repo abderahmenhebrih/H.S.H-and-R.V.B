@@ -28,16 +28,18 @@ const readSchema = new Schema(
 
 const attachmentSchema = new Schema(
   {
-    // Additive shared contract (mobile + desktop safe: optional, ignored by old clients).
-    // Stored inline as data URL to reuse the existing JSON auth pipeline
-    // (no separate upload endpoint / no secrets on device). Bounded in size
-    // by the service validator below so documents stay well under Mongo limits.
+    // Production URL-based contract (shared mobile + desktop).
+    // Metadata + delivery URL only. NEVER binary/base64: bytes live in object
+    // storage (Cloudinary in production), referenced by trusted upload ids.
+    id: { type: String, required: true },
     kind: { type: String, enum: ["image", "video"], required: true },
-    dataUrl: { type: String, required: true },
+    url: { type: String, required: true },
+    publicId: { type: String, required: false, default: null },
     mimeType: { type: String, required: true },
     size: { type: Number, required: true },
     width: { type: Number, required: false, default: null },
     height: { type: Number, required: false, default: null },
+    duration: { type: Number, required: false, default: null },
   },
   { _id: false }
 );

@@ -1,4 +1,6 @@
-import { api } from "@/api/client";
+import { api, getAccessTokenMemory } from "@/api/client";
+import { getApiBaseUrl } from "@/api/config";
+import { RvbApiError } from "@/types/rvb";
 
 export async function getConversations(category?: "main" | "secondary", search?: string) {
   const q = new URLSearchParams();
@@ -29,22 +31,68 @@ export async function getMessages(conversationId: string, params?: { before?: nu
   const res = await api.get<{ success: boolean; messages: any[] }>(`/api/rvb/chats/${conversationId}/messages${qs}`);
   return res.messages || [];
 }
+// Production URL-based contract (shared with desktop). Messages carry ONLY
+// attachment metadata + delivery URL; bytes travel once via multipart upload.
 export type ChatAttachment = {
+  id: string;
   kind: "image" | "video";
-  dataUrl: string;
+  url: string;
+  publicId?: string | null;
   mimeType: string;
   size: number;
   width?: number | null;
   height?: number | null;
+  duration?: number | null;
 };
 
-export async function sendMessage(conversationId: string, content: string, replyTo?: string | null, attachments?: ChatAttachment[]) {
+export async function sendMessage(conversationId: string, content: string, replyTo?: string | null, attachmentIds?: string[]) {
   const res = await api.post<{ success: boolean; message: any }>(`/api/rvb/chats/${conversationId}/messages`, {
     content,
     replyToMessageId: replyTo || null,
-    ...(attachments && attachments.length ? { attachments } : {}),
+    ...(attachmentIds && attachmentIds.length ? { attachmentIds } : {}),
   });
   return res.message;
+}
+
+// Authenticated multipart upload. Sends the local file URI as binary
+// (FormData) — never base64. Returns the trusted attachment record whose id
+// is then referenced in sendMessage (reusable for immediate retry).
+export async function uploadAttachment(
+  conversationId: string,
+  file: { uri: string; mimeType: string; name?: string },
+): Promise<ChatAttachment> {
+  const base = getApiBaseUrl();
+  const token = getAccessTokenMemory();
+  const form = new FormData();
+  form.append("file", {
+    uri: file.uri,
+    type: file.mimeType,
+    name: file.name || (file.mimeType.startsWith("video/") ? "video.mp4" : "image.jpg"),
+  } as any);
+  const headers: Record<string, string> = { "X-RVB-Client": "native" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  // NOTE: no Content-Type header — fetch sets multipart boundary itself.
+  const res = await fetch(`${base}/api/rvb/chats/${encodeURIComponent(conversationId)}/attachments`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!res.ok || !json?.attachment) {
+    throw new RvbApiError({
+      status: res.status,
+      code: json?.code || `HTTP_${res.status}`,
+      message: json?.message || "Upload failed",
+      data: json,
+    });
+  }
+  return json.attachment as ChatAttachment;
 }
 export async function editMessage(messageId: string, content: string) {
   const res = await api.patch<{ success: boolean; message: any }>(`/api/rvb/chats/messages/${messageId}`, { content });

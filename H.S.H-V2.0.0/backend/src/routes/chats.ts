@@ -7,8 +7,74 @@ import { ConversationModel } from "../models/conversation.model";
 import { MessageModel } from "../models/message.model";
 
 import { rateLimit, accountKey } from "../middleware/rateLimiter";
+import multer from "multer";
 const router = Router();
 router.use(requireRvbAuth as any);
+
+// Multipart parser for chat media: memory-backed buffer forwarded immediately
+// to object storage (never persisted to Render disk). Transport cap sits just
+// above the largest kind cap so kind-specific RVB errors surface from the
+// validator; anything beyond maps to RVB_ATTACHMENT_TOO_LARGE.
+const chatUploadParser = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 26 * 1024 * 1024, files: 1 },
+});
+
+function runMulterSingle(req: any, res: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    (chatUploadParser.single("file") as any)(req, res, (err: any) => {
+      if (!err) return resolve();
+      if (err?.code === "LIMIT_FILE_SIZE") {
+        const e: any = new Error("File too large");
+        e.code = "RVB_ATTACHMENT_TOO_LARGE";
+        e.status = 413;
+        return reject(e);
+      }
+      const e: any = new Error(err?.message || "Invalid upload");
+      e.code = "RVB_ATTACHMENT_INVALID";
+      e.status = 400;
+      return reject(e);
+    });
+  });
+}
+
+// Authenticated media delivery for local-dev provider files + auth-gated
+// redirect for CDN URLs. Registered before "/:id" so "media" can never be
+// mistaken for a conversation id.
+router.get("/media/:uploadId", async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const uploadId = String((req.params as any).uploadId);
+    const { ChatUploadModel } = await import("../models/chat-upload.model");
+    const rec: any = await ChatUploadModel.findOne({ id: uploadId }).lean();
+    if (!rec) {
+      res.status(404).json({ success: false, code: "RVB_ATTACHMENT_INVALID", message: "Unknown attachment" });
+      return;
+    }
+    const conv: any = await ConversationModel.findOne({ id: rec.conversationId }).lean();
+    const member = (conv?.participants as any[])?.some((p: any) => p.accountId === user.accountId && !p.leftAt);
+    if (!conv || !member) {
+      res.status(403).json({ success: false, code: "RVB_FORBIDDEN", message: "Not member" });
+      return;
+    }
+    if (rec.provider === "local-dev") {
+      const { getUploadFilePath } = await import("../services/chat-upload.service");
+      const file = await getUploadFilePath(uploadId);
+      if (!file) {
+        res.status(404).json({ success: false, code: "RVB_ATTACHMENT_INVALID", message: "File missing" });
+        return;
+      }
+      res.setHeader("Content-Type", rec.mimeType || "application/octet-stream");
+      res.setHeader("Cache-Control", "private, max-age=86400");
+      res.sendFile(file.path);
+      return;
+    }
+    // CDN / mock URLs: authenticated indirection, bytes stay on the provider.
+    res.redirect(302, rec.url);
+  } catch (err: any) {
+    res.status(err?.status || 500).json({ success: false, code: err?.code || "INTERNAL_ERROR", message: err?.message });
+  }
+});
 
 // GET /api/rvb/chats?category=main|secondary&search=
 router.get("/", async (req: RvbAuthRequest, res) => {
@@ -137,17 +203,19 @@ router.get("/:id/messages", async (req: RvbAuthRequest, res) => {
   }
 });
 
-// POST /api/rvb/chats/:id/messages { content, replyTo, attachments?, reminderMinutes | reminderAt(legacy) } - per-account rate limit
+// POST /api/rvb/chats/:id/messages { content, replyTo, attachmentIds?, reminderMinutes | reminderAt(legacy) } - per-account rate limit
+// attachmentIds are trusted upload ids from POST /:id/attachments. Inline
+// attachment objects (base64 era) are rejected by the service.
 router.post("/:id/messages", rateLimit({ windowMs: 10 * 1000, max: 20, key: accountKey }) as any, async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const id = String((req.params as any).id);
-    const { content, replyToMessageId, replyTo, reminderMinutes, reminderAt, attachments } = req.body as any;
+    const { content, replyToMessageId, replyTo, reminderMinutes, reminderAt, attachmentIds } = req.body as any;
     const reply = replyToMessageId || replyTo || null;
     // Prefer server-trusted reminderMinutes (30|60|120), fallback to legacy reminderAt timestamp
     const rm = reminderMinutes !== undefined && reminderMinutes !== null ? Number(reminderMinutes) : null;
     const legacyAt = reminderAt !== undefined && reminderAt !== null ? Number(reminderAt) : null;
-    const msg = await chatSvc.sendMessage(id, user.accountId, content, reply, rm, legacyAt, attachments);
+    const msg = await chatSvc.sendMessage(id, user.accountId, content, reply, rm, legacyAt, attachmentIds);
     // Emit via socket if available
     try {
       const { getIO } = await import("../lib/chat-socket");
@@ -166,6 +234,36 @@ router.post("/:id/messages", rateLimit({ windowMs: 10 * 1000, max: 20, key: acco
       }
     } catch {}
     res.status(201).json({ success: true, message: msg });
+  } catch (err: any) {
+    res.status(err?.status || 500).json({ success: false, code: err?.code || "INTERNAL_ERROR", message: err?.message });
+  }
+});
+
+// POST /api/rvb/chats/:id/attachments  multipart/form-data { file }
+// Authenticated, membership-checked upload into object storage. Returns the
+// trusted attachment metadata (incl. its upload id) for use with
+// POST /:id/messages { attachmentIds }. Heavier per-account rate limit.
+router.post("/:id/attachments", rateLimit({ windowMs: 10 * 60 * 1000, max: 20, key: accountKey }) as any, async (req: RvbAuthRequest, res) => {
+  try {
+    const user = req.rvbUser!;
+    const id = String((req.params as any).id);
+    await runMulterSingle(req as any, res as any);
+    const file = (req as any).file as { buffer?: Buffer; size?: number; originalname?: string; mimetype?: string } | undefined;
+    if (!file?.buffer || file.buffer.length === 0) {
+      res.status(400).json({ success: false, code: "RVB_ATTACHMENT_INVALID", message: "No file received (field: file)" });
+      return;
+    }
+    const proto = (req as any).protocol || "http";
+    const host = (req as any).get?.("host") || "";
+    const { uploadChatAttachment } = await import("../services/chat-upload.service");
+    const attachment = await uploadChatAttachment({
+      conversationId: id,
+      uploaderAccountId: user.accountId,
+      buffer: file.buffer,
+      clientMime: file.mimetype,
+      baseUrl: host ? `${proto}://${host}` : undefined,
+    });
+    res.status(201).json({ success: true, attachment });
   } catch (err: any) {
     res.status(err?.status || 500).json({ success: false, code: err?.code || "INTERNAL_ERROR", message: err?.message });
   }

@@ -12,6 +12,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Linking,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,6 +26,7 @@ import {
   getConversation,
   getMessages,
   sendMessage,
+  uploadAttachment,
   editMessage,
   deleteMessage,
   toggleReaction,
@@ -40,10 +42,24 @@ import { useLanguage } from "@/i18n";
 import { formatDateTime } from "@/utils/date";
 
 const PAGE_LIMIT = 30;
-// Keep inline data-URL bodies under the backend express.json 1mb limit.
-const ATTACH_MAX_CHARS = 650_000;
+// Production caps mirror the backend (images 8 MB, videos 25 MB). The client
+// pre-checks picker fileSize so oversized media fails fast with a clear label;
+// the backend re-validates authoritatively.
+const CLIENT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+const CLIENT_VIDEO_MAX_BYTES = 25 * 1024 * 1024;
 
-type PendingAttachment = ChatAttachment & { localUri: string };
+// Local selection staged above the composer. Bytes are uploaded as multipart
+// binary at send time (never base64); the returned server record id is what
+// the message references. uploadedRef survives a failed send so retry reuses
+// the same upload without sending bytes twice.
+type PendingAttachment = {
+  kind: "image" | "video";
+  localUri: string;
+  mimeType: string;
+  name: string;
+  width?: number | null;
+  height?: number | null;
+};
 
 function msgId(m: any): string {
   return String(m?.id ?? "");
@@ -95,7 +111,9 @@ export default function ChatDetail() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [typing, setTyping] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
+  const [uploaded, setUploaded] = useState<ChatAttachment | null>(null);
   const [picking, setPicking] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [reactingId, setReactingId] = useState<string | null>(null);
@@ -248,7 +266,7 @@ export default function ChatDetail() {
   }, [convId, myId]);
 
   const pickAttachment = useCallback(async () => {
-    if (picking || sending) return;
+    if (picking || sending || uploading) return;
     setAttachError(null);
     setPicking(true);
     try {
@@ -268,81 +286,51 @@ export default function ChatDetail() {
       const asset = result.assets[0] as any;
       const isVideo = asset.type === "video" || String(asset.mimeType || "").startsWith("video/");
       if (isVideo) {
+        // Video binary uploads via multipart at send time — never read into
+        // JS memory as base64. Oversized clips fail fast here AND server-side.
         const mimeType = String(asset.mimeType || "video/mp4").split(";")[0].trim().toLowerCase();
-        // Bounded video: read as base64 and enforce the inline size cap.
-        // Large clips are rejected with a clear message (no silent discard).
-        let FileSystem: any = null;
-        try {
-          FileSystem = await import("expo-file-system");
-        } catch {
-          FileSystem = null;
-        }
-        const reader = FileSystem?.readAsStringAsync;
-        if (!reader) {
-          setAttachError(t("conversation.unsupportedType", "Unsupported media type"));
-          return;
-        }
-        const b64 = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: (FileSystem?.EncodingType?.Base64 as any) ?? "base64",
-        });
-        const dataUrl = `data:${mimeType};base64,${b64}`;
-        if (dataUrl.length > ATTACH_MAX_CHARS) {
-          setAttachError(t("conversation.mediaTooLarge", "Media too large (max ~500KB after compression)"));
+        if (typeof asset.fileSize === "number" && asset.fileSize > CLIENT_VIDEO_MAX_BYTES) {
+          setAttachError(t("conversation.mediaTooLarge", "Media too large (images 8 MB, videos 25 MB max)"));
           return;
         }
         setAttachment({
           kind: "video",
-          dataUrl,
+          localUri: asset.uri,
           mimeType,
-          size: dataUrl.length,
+          name: asset.fileName || "video.mp4",
           width: asset.width ?? null,
           height: asset.height ?? null,
-          localUri: asset.uri,
         });
+        setUploaded(null);
         return;
       }
-      // Image: normalize to bounded JPEG (keeps aspect, no forced square crop).
-      const qualities = [0.8, 0.65, 0.5, 0.35, 0.25];
-      let best: { dataUrl: string; w: number; h: number } | null = null;
-      for (const q of qualities) {
-        const manip = await ImageManipulator.manipulateAsync(
-          asset.uri,
-          [{ resize: { width: 1280 } }],
-          { compress: q, format: ImageManipulator.SaveFormat.JPEG, base64: true },
-        );
-        if (!manip.base64) continue;
-        const dataUrl = `data:image/jpeg;base64,${manip.base64}`;
-        best = { dataUrl, w: manip.width, h: manip.height };
-        if (dataUrl.length <= ATTACH_MAX_CHARS) break;
-      }
-      if (!best) {
-        setAttachError(t("conversation.mediaTooLarge", "Media too large (max ~500KB after compression)"));
-        return;
-      }
-      if (best.dataUrl.length > ATTACH_MAX_CHARS) {
-        setAttachError(t("conversation.mediaTooLarge", "Media too large (max ~500KB after compression)"));
-        return;
-      }
+      // Image: single normalize pass (max dimension 1600, JPEG) — no loops,
+      // no base64. The manipulated FILE uri is staged for multipart upload.
+      const manip = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 1600 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+      );
       setAttachment({
         kind: "image",
-        dataUrl: best.dataUrl,
+        localUri: manip.uri,
         mimeType: "image/jpeg",
-        size: best.dataUrl.length,
-        width: best.w,
-        height: best.h,
-        localUri: asset.uri,
+        name: "image.jpg",
+        width: manip.width,
+        height: manip.height,
       });
+      setUploaded(null);
     } catch (e: any) {
       setAttachError(e?.message || t("conversation.uploadFailed", "Upload failed. Retry or remove the attachment."));
     } finally {
       setPicking(false);
     }
-  }, [picking, sending, t]);
+  }, [picking, sending, uploading, t]);
 
   const handleSend = useCallback(async () => {
     const text = composer.trim();
-    if (sending || picking) return; // prevent rapid double-send
-    if (!text && !attachment) {
+    if (sending || picking || uploading) return; // prevent rapid double-send
+    if (!text && !attachment && !uploaded) {
       Alert.alert(t("common.error", "Something went wrong"), t("conversation.emptyError", "Write a message or attach media"));
       return;
     }
@@ -353,23 +341,38 @@ export default function ChatDetail() {
     setSending(true);
     setSendError(null);
     try {
-      const payload: ChatAttachment[] | undefined = attachment
-        ? [{ kind: attachment.kind, dataUrl: attachment.dataUrl, mimeType: attachment.mimeType, size: attachment.size, width: attachment.width ?? null, height: attachment.height ?? null }]
-        : undefined;
-      const msg = await sendMessage(convId, text, null, payload);
+      // Upload bytes first (multipart binary). A completed upload is kept in
+      // uploadedRef: if the message send below fails, retry reuses the same
+      // upload id — no duplicate upload, no lost media.
+      let record = uploaded;
+      if (attachment && !record) {
+        setUploading(true);
+        try {
+          record = await uploadAttachment(convId, {
+            uri: attachment.localUri,
+            mimeType: attachment.mimeType,
+            name: attachment.name,
+          });
+          if (mountedRef.current) setUploaded(record);
+        } finally {
+          if (mountedRef.current) setUploading(false);
+        }
+      }
+      const msg = await sendMessage(convId, text, null, record ? [record.id] : undefined);
       // Upsert (not blind append): safe even if the socket echo arrived first.
       setMessages((prev) => mergeMessages(prev, [msg]));
       setComposer("");
       setAttachment(null);
+      setUploaded(null);
       setAttachError(null);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
-      // Keep composer + attachment so nothing is silently discarded.
+      // Keep composer + staged/uploaded attachment so nothing is silently discarded.
       setSendError(e?.message || "Send failed");
     } finally {
       setSending(false);
     }
-  }, [composer, attachment, sending, picking, convId, t]);
+  }, [composer, attachment, uploaded, sending, picking, uploading, convId, t]);
 
   const handleEdit = async (m: any) => {
     if (!editText.trim()) {
@@ -561,14 +564,19 @@ export default function ChatDetail() {
                       </Text>
                     ) : null}
                     {atts.map((a, idx) => {
-                      if (a?.kind === "image" && typeof a?.dataUrl === "string") {
+                      // URL-based attachments only. Anything without an http(s)
+                      // url (e.g. legacy inline payloads) is skipped, never
+                      // rendered as binary.
+                      const url = typeof a?.url === "string" && /^https?:\/\//i.test(a.url) ? a.url : null;
+                      if (!url) return null;
+                      if (a?.kind === "image") {
                         const aw = Number(a.width) || 4;
                         const ah = Number(a.height) || 3;
                         const ratio = Math.min(Math.max(ah / aw, 0.4), 1.4);
                         return (
-                          <Pressable key={idx} onPress={() => setPreviewImg(a.dataUrl)} accessibilityLabel={t("conversation.openPreview", "Open preview")}>
+                          <Pressable key={idx} onPress={() => setPreviewImg(url)} accessibilityLabel={t("conversation.openPreview", "Open preview")}>
                             <Image
-                              source={{ uri: a.dataUrl }}
+                              source={{ uri: url }}
                               style={[styles.attachmentImage, { aspectRatio: aw / ah > 0 ? aw / ah : 4 / 3, minHeight: 120 * ratio + 60 }]}
                               resizeMode="cover"
                             />
@@ -576,20 +584,25 @@ export default function ChatDetail() {
                         );
                       }
                       if (a?.kind === "video") {
+                        // No native video player installed (expo-video would
+                        // force a dev-client rebuild): system/browser playback
+                        // via Linking. Reported as a known limitation.
                         return (
                           <Pressable
                             key={idx}
-                            onPress={() =>
-                              Alert.alert(
-                                t("conversation.videoAttachment", "Video attachment"),
-                                "Video playback needs the media player update. The clip is stored safely with this message.",
-                              )
-                            }
+                            onPress={() => {
+                              Linking.openURL(url).catch(() =>
+                                Alert.alert(
+                                  t("conversation.videoAttachment", "Video attachment"),
+                                  t("conversation.openVideoFailed", "Could not open video"),
+                                ),
+                              );
+                            }}
                             style={[styles.videoBox, { borderColor: own ? "rgba(252,246,239,0.5)" : theme.colors.border }]}
                           >
                             <Ionicons name="play-circle" size={30} color={own ? "#FCF6EF" : theme.colors.primary} />
                             <Text style={[styles.videoText, { color: own ? "#FCF6EF" : theme.colors.text }]}>
-                              {t("conversation.videoAttachment", "Video attachment")}
+                              {t("conversation.openVideo", "Open video")}
                               {a?.size ? ` • ${Math.max(1, Math.round(Number(a.size) / 1024))} KB` : ""}
                             </Text>
                           </Pressable>
@@ -684,13 +697,14 @@ export default function ChatDetail() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.previewLabel, { color: theme.colors.text }]} numberOfLines={1}>
                   {attachment.kind === "image" ? t("conversation.imageAttachment", "Image attachment") : t("conversation.videoAttachment", "Video attachment")}
-                  {attachment.size ? ` • ${Math.max(1, Math.round(attachment.size / 1024))} KB` : ""}
+                  {uploaded ? ` • ${t("conversation.ready", "Ready")}` : uploading ? ` • ${t("conversation.uploading", "Uploading…")}` : ""}
                 </Text>
                 {attachError ? <Text style={[styles.previewError, { color: theme.colors.error }]}>{attachError}</Text> : null}
               </View>
               <Pressable
                 onPress={() => {
                   setAttachment(null);
+                  setUploaded(null);
                   setAttachError(null);
                 }}
                 accessibilityLabel={t("conversation.removeAttachment", "Remove attachment")}
@@ -713,10 +727,10 @@ export default function ChatDetail() {
           <View style={[styles.composer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
             <Pressable
               onPress={pickAttachment}
-              disabled={picking || sending}
+              disabled={picking || sending || uploading}
               accessibilityRole="button"
               accessibilityLabel={t("conversation.attach", "Attach photo or video")}
-              style={[styles.attachBtn, { borderColor: theme.colors.border, opacity: picking || sending ? 0.5 : 1 }]}
+              style={[styles.attachBtn, { borderColor: theme.colors.border, opacity: picking || sending || uploading ? 0.5 : 1 }]}
             >
               {picking ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Ionicons name="add" size={22} color={theme.colors.primary} />}
             </Pressable>
@@ -744,10 +758,10 @@ export default function ChatDetail() {
               testID="chat-send-button"
               accessibilityRole="button"
               onPress={handleSend}
-              disabled={sending || picking || (!composer.trim() && !attachment)}
-              style={[styles.sendBtn, { backgroundColor: composer.trim() || attachment ? theme.colors.primary : theme.colors.border }]}
+              disabled={sending || picking || uploading || (!composer.trim() && !attachment && !uploaded)}
+              style={[styles.sendBtn, { backgroundColor: composer.trim() || attachment || uploaded ? theme.colors.primary : theme.colors.border }]}
             >
-              {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{t("conversation.send", "Send")}</Text>}
+              {sending || uploading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{t("conversation.send", "Send")}</Text>}
             </Pressable>
           </View>
         </View>

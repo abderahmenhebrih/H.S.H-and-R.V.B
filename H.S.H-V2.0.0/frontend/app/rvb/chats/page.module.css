@@ -606,6 +606,47 @@
   font-size: 12px;
 }
 
+/* Chat media attachments (URL-based, shared mobile/desktop contract) */
+.attachmentImage {
+  width: 240px;
+  max-width: 100%;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  object-fit: cover;
+  cursor: zoom-in;
+  background: rgba(0, 0, 0, 0.06);
+  display: block;
+}
+.attachmentVideo {
+  width: 280px;
+  max-width: 100%;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  background: #000;
+  display: block;
+}
+.stagedBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-hover);
+  font-size: 12px;
+  color: var(--muted);
+  flex: none;
+}
+.stagedThumb {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border);
+}
+
 /* Tablet — narrower left panel, keep two columns */
 @media (max-width: 1150px) {
   .chatLayout {

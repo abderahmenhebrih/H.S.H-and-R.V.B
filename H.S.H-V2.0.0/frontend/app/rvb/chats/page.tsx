@@ -10,9 +10,9 @@ import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
 import type { RvbAccount } from "../../../src/types/rvb/rvb-account";
-import { chatService, type Conversation, type Message } from "../../../src/services/chat.service";
+import { chatService, messagePreview, type Conversation, type Message, type ChatAttachment } from "../../../src/services/chat.service";
 import { connectChatSocket, getChatSocket } from "../../../src/services/chat-socket.service";
-import { Search, MessagesSquare, Send, Pin, MoreVertical, LogOut, Users, UserPlus, X, CornerUpLeft, Handshake, CheckCheck, Edit3, Trash2, Eye, Clock, AlertTriangle } from "lucide-react";
+import { Search, MessagesSquare, Send, Pin, MoreVertical, LogOut, Users, UserPlus, X, CornerUpLeft, Handshake, CheckCheck, Edit3, Trash2, Eye, Clock, AlertTriangle, Paperclip } from "lucide-react";
 import styles from "./page.module.css";
 
 const TR: Record<Language, any> = {
@@ -67,6 +67,17 @@ const TR: Record<Language, any> = {
     reminder60: "60 minutes",
     reminder120: "120 minutes",
     mentionHint: "Mentions: @workers @suppliers @customers @managers @everyone",
+    attach: "Attach photo or video",
+    attachRemove: "Remove attachment",
+    uploading: "Uploading…",
+    uploadFailed: "Upload failed. Retry or remove the attachment.",
+    imageLabel: "Image",
+    videoLabel: "Video",
+    openVideo: "Open video",
+    mediaTooLarge: "File too large (images 8 MB, videos 25 MB max)",
+    mediaBadType: "Unsupported file (jpeg/png/webp/mp4/mov/webm only)",
+    emptyAttach: "Write a message or attach media",
+    ready: "Ready",
     officialBadge: "Official",
     admin: "Admin",
     manager: "Manager",
@@ -143,6 +154,17 @@ const TR: Record<Language, any> = {
     reminder120: "120 minutes",
     mentionHint: "Mentions: @workers @suppliers @customers @managers @everyone",
     officialBadge: "Officiel",
+    attach: "Joindre photo ou vidéo",
+    attachRemove: "Retirer la pièce jointe",
+    uploading: "Envoi en cours…",
+    uploadFailed: "Échec de l'envoi. Réessayez ou retirez la pièce jointe.",
+    imageLabel: "Image",
+    videoLabel: "Vidéo",
+    openVideo: "Ouvrir la vidéo",
+    mediaTooLarge: "Fichier trop volumineux (images 8 Mo, vidéos 25 Mo max)",
+    mediaBadType: "Fichier non pris en charge (jpeg/png/webp/mp4/mov/webm)",
+    emptyAttach: "Écrivez un message ou joignez un média",
+    ready: "Prêt",
     admin: "Admin",
     manager: "Manager",
     supervisor: "Superviseur",
@@ -217,6 +239,17 @@ const TR: Record<Language, any> = {
     reminder60: "٦٠ دقيقة",
     reminder120: "١٢٠ دقيقة",
     mentionHint: "إشارات: @workers @suppliers @customers @managers @everyone",
+    attach: "إرفاق صورة أو فيديو",
+    attachRemove: "إزالة المرفق",
+    uploading: "جارٍ الرفع…",
+    uploadFailed: "فشل الرفع. أعد المحاولة أو أزل المرفق.",
+    imageLabel: "صورة",
+    videoLabel: "فيديو",
+    openVideo: "فتح الفيديو",
+    mediaTooLarge: "الملف كبير جدًا (الصور 8MB، الفيديو 25MB كحد أقصى)",
+    mediaBadType: "ملف غير مدعوم (jpeg/png/webp/mp4/mov/webm فقط)",
+    emptyAttach: "اكتب رسالة أو أرفق وسائط",
+    ready: "جاهز",
     officialBadge: "رسمي",
     admin: "مسؤول",
     manager: "مدير",
@@ -341,6 +374,17 @@ function ChatsInner() {
   const [auditData, setAuditData] = useState<any | null>(null);
   const [messageSearch, setMessageSearch] = useState("");
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  // Staged media: local File previewed instantly, uploaded as multipart binary
+  // at send time (never base64). uploadedAttachment survives a failed send so
+  // retry reuses the same upload id without sending bytes twice.
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [stagedUrl, setStagedUrl] = useState<string | null>(null);
+  const [uploadedAttachment, setUploadedAttachment] = useState<ChatAttachment | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [attachError, setAttachError] = useState("");
+  const [previewAttachment, setPreviewAttachment] = useState<ChatAttachment | null>(null);
+  const [videoFailed, setVideoFailed] = useState<Record<string, boolean>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeout = useRef<any>(null);
@@ -413,6 +457,7 @@ function ChatsInner() {
     setReplyTo(null);
     setEditing(null);
     setMessageSearch("");
+    clearStaged();
     try {
       const conv = await chatService.get(id);
       setSelectedConv(conv);
@@ -446,12 +491,13 @@ function ChatsInner() {
         // Mark read if we are viewing
         chatService.markRead(convId, msg.id).catch(() => {});
       }
-      // Update conversation preview and resort
+      // Update conversation preview and resort (shared preview semantics:
+      // text preferred, media-only shows [Image]/[Video], never blank/URL).
       setConversations((prev) => {
         const idx = prev.findIndex((c) => c.id === convId);
         if (idx >= 0) {
           const copy = [...prev];
-          const conv: any = { ...copy[idx], lastMessageAt: msg.createdAt, lastMessagePreview: msg.content.slice(0, 80), lastMessageSenderId: msg.senderAccountId, updatedAt: Date.now() };
+          const conv: any = { ...copy[idx], lastMessageAt: msg.createdAt, lastMessagePreview: messagePreview(msg.content, (msg as any).attachments), lastMessageSenderId: msg.senderAccountId, updatedAt: Date.now() };
           copy.splice(idx, 1);
           copy.unshift(conv);
           return copy;
@@ -517,9 +563,55 @@ function ChatsInner() {
     };
   }, [selectedId, loadConversations]);
 
+  const clearStaged = useCallback(() => {
+    setStagedUrl((prev) => {
+      if (prev) {
+        try { URL.revokeObjectURL(prev); } catch {}
+      }
+      return null;
+    });
+    setStagedFile(null);
+    setUploadedAttachment(null);
+    setAttachError("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  useEffect(() => () => {
+    if (stagedUrl) {
+      try { URL.revokeObjectURL(stagedUrl); } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleFileSelect = (f: File | null) => {
+    setAttachError("");
+    if (!f) return;
+    const mime = (f.type || "").toLowerCase().split(";")[0].trim();
+    const isImage = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(mime);
+    const isVideo = ["video/mp4", "video/quicktime", "video/webm"].includes(mime);
+    if (!isImage && !isVideo) {
+      setAttachError(t.mediaBadType);
+      return;
+    }
+    const cap = isImage ? 8 * 1024 * 1024 : 25 * 1024 * 1024;
+    if (f.size <= 0 || f.size > cap) {
+      setAttachError(t.mediaTooLarge);
+      return;
+    }
+    // New selection replaces the previous staged upload (no re-upload needed
+    // confusion: the old upload id stays valid server-side for orphan cleanup).
+    clearStaged();
+    setStagedFile(f);
+    try {
+      setStagedUrl(URL.createObjectURL(f));
+    } catch {
+      setStagedUrl(null);
+    }
+  };
+
   const handleSend = async () => {
     const text = composer.trim();
-    if (!text || !selectedId) return;
+    if ((!text && !stagedFile && !uploadedAttachment) || !selectedId) return;
     if (text.length > 2000) { alert("Message too long"); return; }
     // Check archived cannot send: backend will reject, but disable UI if user archived? user is active via auth
     const trimmed = text;
@@ -531,11 +623,24 @@ function ChatsInner() {
     setReplyTo(null);
     setReminderChoice(null);
     setSending(true);
+    setAttachError("");
     // Preserve scroll anchor? For now append optimistically after server confirms
     try {
+      // Upload bytes first (multipart binary). A completed upload is retained:
+      // if the message send below fails, retry reuses the same upload id.
+      let record = uploadedAttachment;
+      if (stagedFile && !record) {
+        setUploading(true);
+        try {
+          record = await chatService.uploadAttachment(selectedId, stagedFile);
+          setUploadedAttachment(record);
+        } finally {
+          setUploading(false);
+        }
+      }
       const sent = editing
         ? await chatService.editMessage(editing.id, trimmed)
-        : await chatService.sendMessage(selectedId, trimmed, replyTo?.id || null, reminderMinutes);
+        : await chatService.sendMessage(selectedId, trimmed, replyTo?.id || null, reminderMinutes, record ? [record.id] : undefined);
       if (editing) {
         setMessages((prev) => prev.map((m) => (m.id === sent.id ? sent : m)));
         setEditing(null);
@@ -548,9 +653,12 @@ function ChatsInner() {
       }
       // Clear typing
       getChatSocket()?.emit("chat:typing", { conversationId: selectedId, isTyping: false });
+      clearStaged();
       void loadConversations();
     } catch (e: any) {
       setComposer(prevComposer);
+      // Keep staged/uploaded media so retry reuses the upload id.
+      setAttachError(e?.data?.code || e?.message ? String(e?.data?.code || e?.message) : t.uploadFailed);
       alert(e?.data?.code || e?.message || "Send failed");
     } finally { setSending(false); }
   };
@@ -864,11 +972,54 @@ function ChatsInner() {
                               el?.scrollIntoView({ behavior: "smooth", block: "center" });
                             }}>
                               <strong>{replyOrig ? (replyOrig.senderAccountId === myId ? "You" : (selectedConv.participants as any[]).find((p: any) => p.accountId === replyOrig.senderAccountId)?.account?.displayName || "…") : "…"}: </strong>
-                              {replyOrig ? (replyOrig.isDeleted ? t.deleted : replyOrig.content.slice(0, 60)) : t.deleted}
+                              {replyOrig ? (replyOrig.isDeleted ? t.deleted : messagePreview(replyOrig.content, (replyOrig as any).attachments) || t.deleted) : t.deleted}
+                            </div>
+                          )}
+                          {Array.isArray((m as any).attachments) && (m as any).attachments.length > 0 && !m.isDeleted && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: m.content ? 6 : 2 }}>
+                              {((m as any).attachments as ChatAttachment[]).map((a) => {
+                                // URL metadata only; anything without an http(s)
+                                // url is skipped (never render binary inline).
+                                const url = typeof a?.url === "string" && /^https?:\/\//i.test(a.url) ? a.url : null;
+                                if (!url) return null;
+                                if (a.kind === "image") {
+                                  const ratio = a.width && a.height && a.width > 0 && a.height > 0 ? a.width / a.height : 4 / 3;
+                                  return (
+                                    <img
+                                      key={a.id || url}
+                                      src={url}
+                                      alt={t.imageLabel}
+                                      className={styles.attachmentImage}
+                                      style={{ aspectRatio: String(Math.min(Math.max(ratio, 0.5), 2)) }}
+                                      onClick={() => setPreviewAttachment(a)}
+                                    />
+                                  );
+                                }
+                                if (a.kind === "video") {
+                                  if (videoFailed[a.id || url]) {
+                                    return (
+                                      <a key={a.id || url} href={url} target="_blank" rel="noreferrer" className={styles.secondaryButton} style={{ minHeight: 26, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}>{t.openVideo}</a>
+                                    );
+                                  }
+                                  return (
+                                    // Native HTML5 playback, no autoplay. If the
+                                    // codec is unsupported, fall back to a link.
+                                    <video
+                                      key={a.id || url}
+                                      src={url}
+                                      controls
+                                      preload="metadata"
+                                      className={styles.attachmentVideo}
+                                      onError={() => setVideoFailed((prev) => ({ ...prev, [a.id || url]: true }))}
+                                    />
+                                  );
+                                }
+                                return null;
+                              })}
                             </div>
                           )}
                           <div dir="auto" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                            {m.isDeleted ? <em style={{ opacity: 0.8 }}>{t.deleted}</em> : m.content}
+                            {m.isDeleted ? <em style={{ opacity: 0.8 }}>{t.deleted}</em> : m.content ? m.content : ((m as any).attachments?.length ? messagePreview("", (m as any).attachments) : "")}
                           </div>
                           <div className={`${styles.messageMeta} ${isMe ? styles.messageMetaMe : ""}`}>
                             <span>{formatTime(m.createdAt, lang)}</span>
@@ -910,7 +1061,7 @@ function ChatsInner() {
                   <div className={styles.replyStrip}>
                     <CornerUpLeft size={12} />
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {editing ? `${t.edit}: ${editing.content.slice(0, 40)}` : `${t.reply}: ${replyTo?.content.slice(0, 40)}`}
+                      {editing ? `${t.edit}: ${messagePreview(editing.content, (editing as any).attachments).slice(0, 40)}` : `${t.reply}: ${replyTo ? messagePreview(replyTo.content, (replyTo as any).attachments).slice(0, 40) : ""}`}
                     </span>
                     <button className={styles.iconButton} onClick={() => { setReplyTo(null); setEditing(null); setComposer(editing ? "" : composer); }}><X size={12} /></button>
                   </div>
@@ -925,8 +1076,43 @@ function ChatsInner() {
                   </div>
                 )}
 
+                {(stagedFile || attachError) && (
+                  <div className={styles.stagedBar}>
+                    {stagedUrl && stagedFile?.type.startsWith("image/") ? (
+                      <img src={stagedUrl} alt="" className={styles.stagedThumb} />
+                    ) : stagedFile ? (
+                      <span className={styles.stagedThumb} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>{t.videoLabel}</span>
+                    ) : null}
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {stagedFile ? `${stagedFile.name} · ${Math.max(1, Math.round(stagedFile.size / 1024))} KB` : ""}
+                      {uploadedAttachment ? ` · ${t.ready}` : uploading ? ` · ${t.uploading}` : ""}
+                    </span>
+                    {attachError ? <span style={{ color: "var(--danger)", fontSize: 11 }}>{attachError}</span> : null}
+                    <button className={styles.iconButton} onClick={clearStaged} aria-label={t.attachRemove}><X size={12} /></button>
+                  </div>
+                )}
+
                 <div className={styles.composer}>
                   <div className={styles.composerRow}>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        handleFileSelect(e.target.files?.[0] || null);
+                      }}
+                    />
+                    <button
+                      className={styles.iconButton}
+                      style={{ width: 44, height: 44, flex: "none" }}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={composerDisabled || sending || uploading}
+                      aria-label={t.attach}
+                      title={t.attach}
+                    >
+                      <Paperclip size={16} />
+                    </button>
                     <textarea
                       ref={composerRef}
                       className={styles.composerInput}
@@ -938,7 +1124,7 @@ function ChatsInner() {
                       disabled={composerDisabled || sending}
                       aria-label={t.message}
                     />
-                    <button className={styles.sendButton} onClick={() => void handleSend()} disabled={composerDisabled || sending || !composer.trim()} aria-label={t.send}><Send size={16} /></button>
+                    <button className={styles.sendButton} onClick={() => void handleSend()} disabled={composerDisabled || sending || uploading || (!composer.trim() && !stagedFile && !uploadedAttachment)} aria-label={t.send}><Send size={16} /></button>
                   </div>
                   <small style={{ fontSize: 11, color: "var(--subtle)" }}>{t.enterToSend} · {t.mentionHint}</small>
                 </div>
@@ -1002,7 +1188,7 @@ function ChatsInner() {
                     const pm = messages.find((m) => m.id === p.messageId);
                     return (
                       <div key={p.messageId} style={{ padding: 8, border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel-hover)", fontSize: 12, marginBottom: 6 }}>
-                        <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pm ? (pm.isDeleted ? t.deleted : pm.content.slice(0, 60)) : p.messageId.slice(0, 8)}</div>
+                        <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pm ? (pm.isDeleted ? t.deleted : messagePreview(pm.content, (pm as any).attachments) || p.messageId.slice(0, 8)) : p.messageId.slice(0, 8)}</div>
                         <small style={{ color: "var(--muted)" }}>{formatDateShort(p.pinnedAt, lang)}</small>
                       </div>
                     );
@@ -1087,6 +1273,20 @@ function ChatsInner() {
                 <button className={styles.secondaryButton} onClick={() => setShowNewChat(null)} style={{ flex: 1 }}>{t.cancel}</button>
                 <button className={styles.primaryButton} onClick={() => void handleCreateGroup()} style={{ flex: 1 }}>{t.create}</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewAttachment && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "grid", placeItems: "center", zIndex: 1000 }} onClick={() => setPreviewAttachment(null)}>
+          <div style={{ width: "min(720px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }} onClick={(e) => e.stopPropagation()} dir={isRtl ? "rtl" : "ltr"}>
+            <div style={{ padding: 12, borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <strong style={{ fontSize: 13 }}>{t.imageLabel}</strong>
+              <button className={styles.iconButton} onClick={() => setPreviewAttachment(null)}><X size={12} /></button>
+            </div>
+            <div style={{ padding: 12, overflow: "auto", display: "grid", placeItems: "center", background: "#000" }}>
+              <img src={previewAttachment.url} alt={t.imageLabel} style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} />
             </div>
           </div>
         </div>

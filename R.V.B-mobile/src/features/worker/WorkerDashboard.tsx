@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Alert } from "react-native";
 import { Avatar } from "@/components/common/Avatar";
+import { NotificationBell } from "@/components/common/NotificationBell";
 import { Loading } from "@/components/common/Loading";
 import { ErrorState } from "@/components/common/ErrorState";
 import { Empty } from "@/components/common/Empty";
@@ -150,6 +151,7 @@ export function WorkerDashboard() {
           <Text style={[styles.tag, rtl && { textAlign: "right" }]}>@{account?.tag}</Text>
           <Text style={[styles.role, rtl && { textAlign: "right" }]}>{worker.position} • {worker.status}</Text>
         </View>
+        <NotificationBell />
       </View>
 
       {error ? (

@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import { Screen } from "@/components/common/Screen";
 import { Avatar } from "@/components/common/Avatar";
-import { AppHeader } from "@/components/layout/AppHeader";
+import { NotificationBell } from "@/components/common/NotificationBell";
 import { Loading } from "@/components/common/Loading";
 import { ErrorState } from "@/components/common/ErrorState";
 import { useAuthStore } from "@/stores/auth-store";
@@ -35,24 +35,15 @@ export default function ProfileScreen() {
   return <GenericProfile />;
 }
 
-// Common top header for every profile variant: translated Profile title +
-// the existing notification bell (unread badge included). Role dashboards
-// render their own content below with no header of their own, so exactly
-// one header exists. Also provides the SafeArea shell the bare dashboard
-// ScrollViews were missing.
+// Safe-area shell shared by every profile variant. No title bar here: each
+// variant's own identity card carries the notification bell.
 function ProfileShell({ children }: { children: React.ReactNode }) {
-  const { t } = useLanguage();
-  return (
-    <Screen padded={false}>
-      <AppHeader title={t("tabs.profile", "Profile")} showNotifications />
-      {children}
-    </Screen>
-  );
+  return <Screen padded={false}>{children}</Screen>;
 }
 
 function GenericProfile() {
   const { account, refreshProfile } = useAuthStore();
-  const { t } = useLanguage();
+  const { t, isRTL: rtl } = useLanguage();
   const [portal, setPortal] = useState<RvbPortalMeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,14 +80,16 @@ function GenericProfile() {
   const displayAccount = portal?.account || account;
   return (
     <Screen padded={false}>
-      <AppHeader title={t("tabs.profile", "Profile")} showNotifications />
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        <View style={styles.header}>
-          <Avatar uri={displayAccount?.profilePicture || null} name={displayAccount?.displayName || "User"} size={80} />
-          <Text style={styles.name}>{displayAccount?.displayName}</Text>
-          <Text style={styles.tag}>@{displayAccount?.tag}</Text>
-          <Text style={styles.role}>{displayAccount?.role}</Text>
-          {displayAccount?.onboardingStatus === "pending" ? <Text style={styles.pending}>Onboarding pending</Text> : null}
+        <View style={[styles.identityCard, rtl && { flexDirection: "row-reverse" }]}>
+          <Avatar uri={displayAccount?.profilePicture || null} name={displayAccount?.displayName || "User"} size={56} />
+          <View style={[styles.identityInfo, rtl && { alignItems: "flex-end", marginLeft: 0, marginRight: 12 }]}>
+            <Text style={[styles.identityName, rtl && { textAlign: "right" }]}>{displayAccount?.displayName}</Text>
+            <Text style={[styles.identityTag, rtl && { textAlign: "right" }]}>@{displayAccount?.tag}</Text>
+            <Text style={[styles.identityRole, rtl && { textAlign: "right" }]}>{displayAccount?.role} • {displayAccount?.status}</Text>
+            {displayAccount?.onboardingStatus === "pending" ? <Text style={styles.pending}>Onboarding pending</Text> : null}
+          </View>
+          <NotificationBell />
         </View>
         {error ? (
           <View style={styles.section}>
@@ -158,6 +151,11 @@ const rowStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 32 },
+  identityCard: { flexDirection: "row", alignItems: "center", padding: 16, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 16 },
+  identityInfo: { flex: 1, marginLeft: 12 },
+  identityName: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
+  identityTag: { color: "#0F766E", fontWeight: "600", marginTop: 2 },
+  identityRole: { color: "#64748B", fontSize: 12, marginTop: 2, textTransform: "capitalize" },
   header: { alignItems: "center", paddingVertical: 16, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 16 },
   name: { marginTop: 12, fontSize: 18, fontWeight: "800", color: "#0F172A" },
   tag: { color: "#0F766E", fontWeight: "600", marginTop: 2 },

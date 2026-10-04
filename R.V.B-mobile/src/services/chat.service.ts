@@ -29,8 +29,21 @@ export async function getMessages(conversationId: string, params?: { before?: nu
   const res = await api.get<{ success: boolean; messages: any[] }>(`/api/rvb/chats/${conversationId}/messages${qs}`);
   return res.messages || [];
 }
-export async function sendMessage(conversationId: string, content: string, replyTo?: string | null) {
-  const res = await api.post<{ success: boolean; message: any }>(`/api/rvb/chats/${conversationId}/messages`, { content, replyToMessageId: replyTo || null });
+export type ChatAttachment = {
+  kind: "image" | "video";
+  dataUrl: string;
+  mimeType: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+};
+
+export async function sendMessage(conversationId: string, content: string, replyTo?: string | null, attachments?: ChatAttachment[]) {
+  const res = await api.post<{ success: boolean; message: any }>(`/api/rvb/chats/${conversationId}/messages`, {
+    content,
+    replyToMessageId: replyTo || null,
+    ...(attachments && attachments.length ? { attachments } : {}),
+  });
   return res.message;
 }
 export async function editMessage(messageId: string, content: string) {

@@ -80,7 +80,10 @@ export default function MainChatsScreen({ bare = false }: { bare?: boolean }) {
         ListEmptyComponent={<Empty title="No main chats" message="Official conversations will appear here." />}
         renderItem={({ item }) => {
           const name = item.name || item.participants?.map((p: any) => p.account?.displayName || p.accountId).join(", ").slice(0, 40) || "Chat";
-          const last = item.lastMessage?.content || item.lastMessageContent || "";
+          // Backend enriches conversations with lastMessagePreview (additive
+          // attachment contract renders "[Image]"/"[Video]" there); keep legacy
+          // fallbacks so old payloads still render.
+          const last = item.lastMessagePreview || item.lastMessage?.content || item.lastMessageContent || "";
           const unread = item.unreadCount || 0;
           const pinned = item.pinnedMessages?.length || 0;
           return (
@@ -101,7 +104,7 @@ export default function MainChatsScreen({ bare = false }: { bare?: boolean }) {
                   <Text style={[styles.last, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]} numberOfLines={1}>
                     {last || "No messages yet"}
                   </Text>
-                  {item.updatedAt ? <Text style={[styles.time, { color: theme.colors.textTertiary }]}>{formatDateTime(item.updatedAt, lang)}</Text> : null}
+                  {item.lastMessageAt || item.updatedAt ? <Text style={[styles.time, { color: theme.colors.textTertiary }]}>{formatDateTime(item.lastMessageAt || item.updatedAt, lang)}</Text> : null}
                 </View>
                 {unread > 0 ? (
                   <View style={[styles.unread, { backgroundColor: theme.colors.primary }]}>

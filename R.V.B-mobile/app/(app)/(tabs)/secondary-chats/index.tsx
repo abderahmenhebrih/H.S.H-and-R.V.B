@@ -130,7 +130,7 @@ export default function SecondaryChatsScreen({ bare = false }: { bare?: boolean 
         ListEmptyComponent={<Empty title="No secondary chats" message="Create a DM or group. Any role can chat if permitted." />}
         renderItem={({ item }) => {
           const name = item.name || item.participants?.map((p: any) => p.account?.displayName || p.accountId).join(", ").slice(0, 40) || "Chat";
-          const last = item.lastMessage?.content || "";
+          const last = item.lastMessagePreview || item.lastMessage?.content || item.lastMessageContent || "";
           const isGroup = item.type === "group" || (item.participants?.length || 0) > 2;
           return (
             <Pressable onPress={() => router.push(`/(app)/chat/${item.id}` as any)} style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }, theme.shadows.xs]}>

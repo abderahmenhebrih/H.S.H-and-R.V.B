@@ -17,7 +17,10 @@ export default function ProfileStack() {
   const gate = getAuthGate(status, account);
   const role = (gate === "app" ? account?.role : undefined) as RvbRole | undefined;
   const seg = segments as unknown as string[];
-  const leaf = seg[0] === "(app)" && seg[1] === "profile" ? seg[2] : undefined;
+  // Segments include route groups: ["(app)", "(tabs)", "profile", <leaf?>].
+  // Resolve the leaf after "profile" regardless of the "(tabs)" group.
+  const profileIdx = seg.lastIndexOf("profile");
+  const leaf = profileIdx >= 0 ? (seg[profileIdx + 1] as string | undefined) : undefined;
   const checker = leaf ? MANAGEMENT_ACCESS[leaf] : undefined;
   // PBS-BUG-037: redirect unauthorized management deep links to the safe
   // profile home. Note: expo-router instantiates a matched file route even

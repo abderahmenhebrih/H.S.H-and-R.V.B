@@ -43,10 +43,80 @@ function toSafeMessage(doc: any, forAdmin = false) {
       ...o,
       content: "Message deleted",
       editHistory: [],
+      attachments: [],
       // Keep audit only for admin, hide original
     };
   }
   return o;
+}
+
+// ---- Additive shared attachment contract (mobile + desktop safe) ----
+// Stored inline as data URLs over the existing authenticated JSON pipeline:
+// no separate upload endpoint, no secrets on device, membership/permission
+// enforced by sendMessage before anything is persisted. Sized to stay well
+// under the global express.json 1mb limit and Mongo document limits.
+export type ChatAttachmentInput = {
+  kind: "image" | "video";
+  dataUrl: string;
+  mimeType: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+};
+
+export const CHAT_ATTACHMENT_MAX_COUNT = 3;
+// ~700k chars ≈ 525KB binary; keeps total JSON body under the 1mb server limit.
+export const CHAT_ATTACHMENT_MAX_CHARS = 700_000;
+const CHAT_IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const CHAT_VIDEO_MIMES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
+
+export function validateChatAttachments(input: unknown): ChatAttachmentInput[] {
+  if (input === undefined || input === null) return [];
+  if (!Array.isArray(input)) throw codeError("RVB_ATTACHMENT_INVALID", 400, "Attachments must be an array");
+  if (input.length > CHAT_ATTACHMENT_MAX_COUNT)
+    throw codeError("RVB_ATTACHMENT_LIMIT", 400, `Max ${CHAT_ATTACHMENT_MAX_COUNT} attachments`);
+  return (input as any[]).map((a: any, i: number) => {
+    const kind = a?.kind;
+    if (kind !== "image" && kind !== "video")
+      throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: kind must be image|video`);
+    const dataUrl = a?.dataUrl;
+    if (typeof dataUrl !== "string" || dataUrl.length < 32)
+      throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: dataUrl required`);
+    if (dataUrl.length > CHAT_ATTACHMENT_MAX_CHARS)
+      throw codeError("RVB_ATTACHMENT_TOO_LARGE", 413, `Attachment ${i} too large (max ~500KB)`);
+    const mimeType = String(a?.mimeType || "").toLowerCase().split(";")[0].trim();
+    if (kind === "image") {
+      if (!CHAT_IMAGE_MIMES.has(mimeType))
+        throw codeError("RVB_ATTACHMENT_TYPE", 400, `Attachment ${i}: image must be jpeg/png/webp`);
+      if (!dataUrl.startsWith("data:image/"))
+        throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: dataUrl must be data:image/...`);
+    } else {
+      if (!CHAT_VIDEO_MIMES.has(mimeType))
+        throw codeError("RVB_ATTACHMENT_TYPE", 400, `Attachment ${i}: video must be mp4/mov/webm`);
+      if (!dataUrl.startsWith("data:video/"))
+        throw codeError("RVB_ATTACHMENT_INVALID", 400, `Attachment ${i}: dataUrl must be data:video/...`);
+    }
+    const size = Number(a?.size);
+    if (!Number.isFinite(size) || size <= 0 || size > 800_000)
+      throw codeError("RVB_ATTACHMENT_TOO_LARGE", 413, `Attachment ${i} size out of bounds`);
+    const width = a?.width === undefined || a?.width === null ? null : Number(a.width);
+    const height = a?.height === undefined || a?.height === null ? null : Number(a.height);
+    return {
+      kind,
+      dataUrl,
+      mimeType,
+      size: Math.floor(size),
+      width: Number.isFinite(width as number) && (width as number) > 0 ? Math.floor(width as number) : null,
+      height: Number.isFinite(height as number) && (height as number) > 0 ? Math.floor(height as number) : null,
+    };
+  });
+}
+
+export function attachmentPreviewLabel(attachments: ChatAttachmentInput[]): string {
+  if (attachments.some((a) => a.kind === "image") && attachments.some((a) => a.kind === "video")) return "[Media]";
+  if (attachments.some((a) => a.kind === "image")) return "[Image]";
+  if (attachments.some((a) => a.kind === "video")) return "[Video]";
+  return "[Attachment]";
 }
 
 export function isManagementRole(role: string) {
@@ -395,9 +465,11 @@ export async function updateGroup(convId: string, accountId: string, input: { na
 }
 
 // Message operations
-export async function sendMessage(convId: string, senderId: string, content: string, replyTo?: string | null, reminderMinutes?: number | null, reminderAtLegacy?: number | null) {
-  if (!content || !content.trim()) throw codeError("RVB_CONTENT_REQUIRED", 400);
-  if (content.trim().length > MESSAGE_MAX) throw codeError("RVB_CONTENT_TOO_LONG", 400);
+export async function sendMessage(convId: string, senderId: string, content: string, replyTo?: string | null, reminderMinutes?: number | null, reminderAtLegacy?: number | null, attachmentsInput?: unknown) {
+  const attachments = validateChatAttachments(attachmentsInput);
+  const trimmed = typeof content === "string" ? content.trim() : "";
+  if (!trimmed && attachments.length === 0) throw codeError("RVB_CONTENT_REQUIRED", 400);
+  if (trimmed.length > MESSAGE_MAX) throw codeError("RVB_CONTENT_TOO_LONG", 400);
   const conv: any = await ConversationModel.findOne({ id: convId });
   if (!conv) throw codeError("RVB_CONVERSATION_NOT_FOUND", 404);
   const sender: any = await RvbAccountModel.findOne({ id: senderId }).lean();
@@ -408,7 +480,7 @@ export async function sendMessage(convId: string, senderId: string, content: str
     const orig: any = await MessageModel.findOne({ id: replyTo, conversationId: convId }).lean();
     if (!orig) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
   }
-  const mentions = parseMentions(content);
+  const mentions = parseMentions(trimmed);
   // Validate mentions against conversation context: only allow relevant
   // For official groups, filter allowed. For others allow all group tags but not meaningless? For simplicity enforce: workers_group allows @workers/@managers/@everyone etc.
   const allowedByKind: Record<string, string[]> = {
@@ -440,7 +512,7 @@ export async function sendMessage(convId: string, senderId: string, content: str
     updatedAt: now,
     conversationId: convId,
     senderAccountId: senderId,
-    content: content.trim(),
+    content: trimmed,
     replyToMessageId: replyTo || null,
     editedAt: null,
     deletedAt: null,
@@ -451,6 +523,7 @@ export async function sendMessage(convId: string, senderId: string, content: str
     readBy: [{ accountId: senderId, readAt: now }],
     mentions,
     reminderAt: effectiveReminderAt,
+    attachments,
   } as any);
   await MessageAuditModel.create({
     id: `audit-${uuidv4()}`,
@@ -459,10 +532,10 @@ export async function sendMessage(convId: string, senderId: string, content: str
     conversationId: convId,
     action: "create",
     actorAccountId: senderId,
-    contentSnapshot: content.trim(),
+    contentSnapshot: trimmed || attachmentPreviewLabel(attachments),
   } as any);
   conv.lastMessageAt = now;
-  conv.lastMessagePreview = content.trim().slice(0, 80);
+  conv.lastMessagePreview = (trimmed || attachmentPreviewLabel(attachments)).slice(0, 80);
   conv.lastMessageSenderId = senderId;
   conv.updatedAt = now;
   await conv.save();
@@ -506,9 +579,9 @@ export async function sendMessage(convId: string, senderId: string, content: str
       // Individual @tag mentions
       const individualTagRegex = /@([a-z0-9._]{3,30})/gi;
       let m: any;
-      const contentLower = content.toLowerCase();
+      const contentLower = trimmed.toLowerCase();
       // Use original content for tag extraction but compare lower
-      const tagMatches = [...content.matchAll(/@([a-z0-9._]{3,30})/gi)].map((x) => x[1].toLowerCase());
+      const tagMatches = [...trimmed.matchAll(/@([a-z0-9._]{3,30})/gi)].map((x) => x[1].toLowerCase());
       for (const tag of tagMatches) {
         // Skip group tags already handled
         if (["workers", "suppliers", "customers", "managers", "everyone"].includes(tag)) continue;
@@ -545,7 +618,7 @@ export async function sendMessage(convId: string, senderId: string, content: str
         type: "system",
         severity: isMention || isReply ? "warning" : "info",
         title,
-        message: content.trim().slice(0, 120),
+        message: (trimmed || attachmentPreviewLabel(attachments)).slice(0, 120),
         entityType: "conversation",
         entityId: convId,
         route: "/rvb/chats",

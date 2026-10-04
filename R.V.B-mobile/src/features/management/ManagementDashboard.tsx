@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "@/components/common/Avatar";
+import { NotificationBell } from "@/components/common/NotificationBell";
 import { Card } from "@/components/common/Card";
 import { Loading } from "@/components/common/Loading";
 import { isRTL } from "@/i18n";
@@ -59,6 +60,7 @@ export function ManagementDashboard() {
           <Text style={[styles.tag, { color: theme.colors.primary }, rtl && { textAlign: "right" }]}>@{account?.tag}</Text>
           <Text style={[styles.role, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]}>{account?.role} • {account?.status}</Text>
         </View>
+        <NotificationBell />
       </View>
 
       {isSupervisor && workerMini ? (

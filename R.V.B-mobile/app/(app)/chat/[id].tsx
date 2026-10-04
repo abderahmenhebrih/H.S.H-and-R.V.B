@@ -1,47 +1,152 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, FlatList, StyleSheet, TextInput, Pressable, Alert, ActivityIndicator } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TextInput,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+  Image,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { useTheme } from "@/theme/useTheme";
 import { useAuthStore } from "@/stores/auth-store";
-import { getConversation, getMessages, sendMessage, editMessage, deleteMessage, toggleReaction, pinMessage, unpinMessage, markRead } from "@/services/chat.service";
+import {
+  getConversation,
+  getMessages,
+  sendMessage,
+  editMessage,
+  deleteMessage,
+  toggleReaction,
+  pinMessage,
+  unpinMessage,
+  markRead,
+  type ChatAttachment,
+} from "@/services/chat.service";
 import { getSocket } from "@/services/socket";
-import { Screen } from "@/components/common/Screen";
 import { Loading } from "@/components/common/Loading";
 import { ErrorState } from "@/components/common/ErrorState";
-import { isRTL } from "@/i18n";
+import { useLanguage } from "@/i18n";
 import { formatDateTime } from "@/utils/date";
+
+const PAGE_LIMIT = 30;
+// Keep inline data-URL bodies under the backend express.json 1mb limit.
+const ATTACH_MAX_CHARS = 650_000;
+
+type PendingAttachment = ChatAttachment & { localUri: string };
+
+function msgId(m: any): string {
+  return String(m?.id ?? "");
+}
+
+function senderOf(m: any): string | undefined {
+  return m?.senderAccountId ?? m?.senderId ?? m?.accountId;
+}
+
+function mergeMessages(prev: any[], incoming: any[]): any[] {
+  const map = new Map<string, any>();
+  for (const m of prev) if (msgId(m)) map.set(msgId(m), m);
+  for (const m of incoming) if (msgId(m)) map.set(msgId(m), m);
+  return [...map.values()].sort((a, b) => (a?.createdAt || 0) - (b?.createdAt || 0));
+}
+
+function contentLabel(m: any): string {
+  const c = typeof m?.content === "string" && m.content.trim() ? m.content : "";
+  if (c) return c;
+  const atts: any[] = Array.isArray(m?.attachments) ? m.attachments : [];
+  if (atts.some((a) => a?.kind === "image") && atts.some((a) => a?.kind === "video")) return "[Media]";
+  if (atts.some((a) => a?.kind === "image")) return "[Image]";
+  if (atts.some((a) => a?.kind === "video")) return "[Video]";
+  return "";
+}
 
 export default function ChatDetail() {
   const { theme } = useTheme();
-  const rtl = isRTL();
+  const { t, isRTL } = useLanguage();
+  const rtl = isRTL;
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const convId = String(id);
   const account = useAuthStore((s) => s.account);
+  const myId = account?.id;
+  const { width: winWidth } = useWindowDimensions();
+  const wide = winWidth >= 700;
+
   const [conv, setConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [composer, setComposer] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [typing, setTyping] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [previewImg, setPreviewImg] = useState<string | null>(null);
+  const [reactingId, setReactingId] = useState<string | null>(null);
   const flatRef = useRef<FlatList>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+    };
+  }, []);
+
+  const handleBack = useCallback(() => {
+    try {
+      const r: any = router as any;
+      if (typeof r.canGoBack === "function" && !r.canGoBack()) {
+        router.replace("/(app)/chats" as any);
+        return;
+      }
+    } catch {}
+    try {
+      router.back();
+    } catch {
+      router.replace("/(app)/chats" as any);
+    }
+  }, [router]);
+  // NOTE: Android hardware Back pops this Stack screen to the previous chat
+  // list automatically (conversation lives outside Tabs). No custom BackHandler
+  // is registered so the two mechanisms cannot fight.
 
   const load = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
       const c = await getConversation(convId);
+      if (!mountedRef.current) return;
       setConv(c);
-      const msgs = await getMessages(convId, { limit: 50 });
-      setMessages(msgs.reverse());
-      // Mark read
-      const last = msgs[0];
-      if (last) markRead(convId, last.id).catch(() => {});
+      // Backend listMessages already returns oldest-first; do NOT reverse.
+      const msgs = await getMessages(convId, { limit: PAGE_LIMIT });
+      if (!mountedRef.current) return;
+      setMessages(Array.isArray(msgs) ? msgs : []);
+      setHasMore((msgs || []).length >= PAGE_LIMIT);
+      // Mark the whole conversation read (no upTo = all messages).
+      markRead(convId).catch(() => {});
     } catch (e: any) {
-      setError(e?.message || "Failed to load conversation");
+      if (mountedRef.current) setError(e?.message || "Failed to load conversation");
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [convId]);
 
@@ -49,32 +154,77 @@ export default function ChatDetail() {
     load();
   }, [load]);
 
+  const loadOlder = useCallback(async () => {
+    if (loadingOlder || !hasMore || messages.length === 0) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = messages[0]?.createdAt;
+      const older = await getMessages(convId, { limit: PAGE_LIMIT, before: oldest });
+      if (!mountedRef.current) return;
+      if (!older || older.length === 0) {
+        setHasMore(false);
+        return;
+      }
+      setMessages((prev) => mergeMessages(older, prev));
+      if (older.length < PAGE_LIMIT) setHasMore(false);
+    } catch (e: any) {
+      Alert.alert("Failed", e?.message || "Could not load older messages");
+    } finally {
+      if (mountedRef.current) setLoadingOlder(false);
+    }
+  }, [convId, loadingOlder, hasMore, messages]);
+
   useEffect(() => {
     const s = getSocket();
     if (!s) return;
+    // Explicit join covers conversations created after the socket connected
+    // (server auto-join only covers memberships at connect time).
+    try {
+      s.emit("chat:join", { conversationId: convId });
+    } catch {}
     const onNew = (p: any) => {
-      if (p.conversationId === convId) {
-        setMessages((prev) => [...prev, p.message]);
-        markRead(convId, p.message.id).catch(() => {});
-      }
+      if (p?.conversationId !== convId || !p?.message) return;
+      // Upsert by id: dedupes the server echo of our own just-sent message.
+      setMessages((prev) => mergeMessages(prev, [p.message]));
+      // The open conversation must not remain unread.
+      markRead(convId).catch(() => {});
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 120);
     };
     const onEdited = (p: any) => {
-      setMessages((prev) => prev.map((m) => (m.id === p.message.id ? p.message : m)));
+      if (!p?.message) return;
+      setMessages((prev) => prev.map((m) => (msgId(m) === msgId(p.message) ? p.message : m)));
     };
     const onDeleted = (p: any) => {
-      setMessages((prev) => prev.map((m) => (m.id === p.messageId ? { ...m, deletedAt: Date.now(), content: "Message deleted" } : m)));
+      if (!p?.messageId) return;
+      setMessages((prev) =>
+        prev.map((m) => (msgId(m) === String(p.messageId) ? { ...m, isDeleted: true, deletedAt: Date.now(), content: "Message deleted", attachments: [] } : m)),
+      );
     };
     const onReaction = (p: any) => {
-      setMessages((prev) => prev.map((m) => (m.id === p.message.id ? p.message : m)));
+      if (!p?.message) return;
+      setMessages((prev) => prev.map((m) => (msgId(m) === msgId(p.message) ? p.message : m)));
     };
     const onPinned = (p: any) => {
-      setConv(p.conversation);
+      if (p?.conversation) setConv(p.conversation);
     };
     const onTyping = (p: any) => {
-      if (p.conversationId === convId && p.accountId !== account?.id) {
-        setTyping(p.displayName || "Someone is typing");
-        setTimeout(() => setTyping(null), 3000);
-      }
+      if (p?.conversationId !== convId || p?.accountId === myId) return;
+      const who = p?.displayName || p?.tag || "Someone";
+      setTyping(who);
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      typingTimer.current = setTimeout(() => {
+        if (mountedRef.current) setTyping(null);
+      }, 3000);
+    };
+    const onReconnect = async () => {
+      // Refetch the tail after reconnect so nothing is missed.
+      try {
+        const latest = await getMessages(convId, { limit: PAGE_LIMIT });
+        if (mountedRef.current && Array.isArray(latest)) setMessages((prev) => mergeMessages(prev, latest));
+        try {
+          s.emit("chat:join", { conversationId: convId });
+        } catch {}
+      } catch {}
     };
     s.on("chat:newMessage", onNew);
     s.on("chat:messageEdited", onEdited);
@@ -82,6 +232,7 @@ export default function ChatDetail() {
     s.on("chat:reactionUpdated", onReaction);
     s.on("chat:pinnedUpdated", onPinned);
     s.on("chat:typing", onTyping);
+    s.on("connect", onReconnect);
     return () => {
       s.off("chat:newMessage", onNew);
       s.off("chat:messageEdited", onEdited);
@@ -89,28 +240,136 @@ export default function ChatDetail() {
       s.off("chat:reactionUpdated", onReaction);
       s.off("chat:pinnedUpdated", onPinned);
       s.off("chat:typing", onTyping);
+      s.off("connect", onReconnect);
+      try {
+        s.emit("chat:leave", { conversationId: convId });
+      } catch {}
     };
-  }, [convId, account?.id]);
+  }, [convId, myId]);
 
-  const handleSend = async () => {
+  const pickAttachment = useCallback(async () => {
+    if (picking || sending) return;
+    setAttachError(null);
+    setPicking(true);
+    try {
+      const lib = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!lib.granted) {
+        setAttachError(t("conversation.unsupportedType", "Unsupported media type"));
+        Alert.alert(t("common.error", "Something went wrong"), "Gallery permission denied. Enable in settings.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images", "videos"],
+        allowsEditing: false,
+        quality: 0.8,
+        exif: false,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0] as any;
+      const isVideo = asset.type === "video" || String(asset.mimeType || "").startsWith("video/");
+      if (isVideo) {
+        const mimeType = String(asset.mimeType || "video/mp4").split(";")[0].trim().toLowerCase();
+        // Bounded video: read as base64 and enforce the inline size cap.
+        // Large clips are rejected with a clear message (no silent discard).
+        let FileSystem: any = null;
+        try {
+          FileSystem = await import("expo-file-system");
+        } catch {
+          FileSystem = null;
+        }
+        const reader = FileSystem?.readAsStringAsync;
+        if (!reader) {
+          setAttachError(t("conversation.unsupportedType", "Unsupported media type"));
+          return;
+        }
+        const b64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: (FileSystem?.EncodingType?.Base64 as any) ?? "base64",
+        });
+        const dataUrl = `data:${mimeType};base64,${b64}`;
+        if (dataUrl.length > ATTACH_MAX_CHARS) {
+          setAttachError(t("conversation.mediaTooLarge", "Media too large (max ~500KB after compression)"));
+          return;
+        }
+        setAttachment({
+          kind: "video",
+          dataUrl,
+          mimeType,
+          size: dataUrl.length,
+          width: asset.width ?? null,
+          height: asset.height ?? null,
+          localUri: asset.uri,
+        });
+        return;
+      }
+      // Image: normalize to bounded JPEG (keeps aspect, no forced square crop).
+      const qualities = [0.8, 0.65, 0.5, 0.35, 0.25];
+      let best: { dataUrl: string; w: number; h: number } | null = null;
+      for (const q of qualities) {
+        const manip = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1280 } }],
+          { compress: q, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+        );
+        if (!manip.base64) continue;
+        const dataUrl = `data:image/jpeg;base64,${manip.base64}`;
+        best = { dataUrl, w: manip.width, h: manip.height };
+        if (dataUrl.length <= ATTACH_MAX_CHARS) break;
+      }
+      if (!best) {
+        setAttachError(t("conversation.mediaTooLarge", "Media too large (max ~500KB after compression)"));
+        return;
+      }
+      if (best.dataUrl.length > ATTACH_MAX_CHARS) {
+        setAttachError(t("conversation.mediaTooLarge", "Media too large (max ~500KB after compression)"));
+        return;
+      }
+      setAttachment({
+        kind: "image",
+        dataUrl: best.dataUrl,
+        mimeType: "image/jpeg",
+        size: best.dataUrl.length,
+        width: best.w,
+        height: best.h,
+        localUri: asset.uri,
+      });
+    } catch (e: any) {
+      setAttachError(e?.message || t("conversation.uploadFailed", "Upload failed. Retry or remove the attachment."));
+    } finally {
+      setPicking(false);
+    }
+  }, [picking, sending, t]);
+
+  const handleSend = useCallback(async () => {
     const text = composer.trim();
-    if (!text) return;
+    if (sending || picking) return; // prevent rapid double-send
+    if (!text && !attachment) {
+      Alert.alert(t("common.error", "Something went wrong"), t("conversation.emptyError", "Write a message or attach media"));
+      return;
+    }
     if (text.length > 2000) {
-      Alert.alert("Too long", "Max 2000 characters");
+      Alert.alert(t("common.error", "Something went wrong"), t("conversation.tooLong", "Max 2000 characters"));
       return;
     }
     setSending(true);
+    setSendError(null);
     try {
-      const msg = await sendMessage(convId, text);
-      setMessages((prev) => [...prev, msg]);
+      const payload: ChatAttachment[] | undefined = attachment
+        ? [{ kind: attachment.kind, dataUrl: attachment.dataUrl, mimeType: attachment.mimeType, size: attachment.size, width: attachment.width ?? null, height: attachment.height ?? null }]
+        : undefined;
+      const msg = await sendMessage(convId, text, null, payload);
+      // Upsert (not blind append): safe even if the socket echo arrived first.
+      setMessages((prev) => mergeMessages(prev, [msg]));
       setComposer("");
-      flatRef.current?.scrollToEnd({ animated: true });
+      setAttachment(null);
+      setAttachError(null);
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
     } catch (e: any) {
-      Alert.alert("Failed", e?.message || "Send failed");
+      // Keep composer + attachment so nothing is silently discarded.
+      setSendError(e?.message || "Send failed");
     } finally {
       setSending(false);
     }
-  };
+  }, [composer, attachment, sending, picking, convId, t]);
 
   const handleEdit = async (m: any) => {
     if (!editText.trim()) {
@@ -123,8 +382,8 @@ export default function ChatDetail() {
       return;
     }
     try {
-      const updated = await editMessage(m.id, editText.trim());
-      setMessages((prev) => prev.map((x) => (x.id === m.id ? updated : x)));
+      const updated = await editMessage(msgId(m), editText.trim());
+      setMessages((prev) => prev.map((x) => (msgId(x) === msgId(m) ? updated : x)));
       setEditingId(null);
       setEditText("");
     } catch (e: any) {
@@ -134,14 +393,16 @@ export default function ChatDetail() {
 
   const handleDelete = async (m: any) => {
     Alert.alert("Delete message", "Delete this message?", [
-      { text: "Cancel", style: "cancel" },
+      { text: t("conversation.cancel", "Cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("conversation.delete", "Delete"),
         style: "destructive",
         onPress: async () => {
           try {
-            await deleteMessage(m.id);
-            setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, deletedAt: Date.now(), content: "Message deleted" } : x)));
+            await deleteMessage(msgId(m));
+            setMessages((prev) =>
+              prev.map((x) => (msgId(x) === msgId(m) ? { ...x, isDeleted: true, deletedAt: Date.now(), content: "Message deleted", attachments: [] } : x)),
+            );
           } catch (e: any) {
             Alert.alert("Failed", e?.message || "Delete failed");
           }
@@ -151,19 +412,25 @@ export default function ChatDetail() {
   };
 
   const handleReaction = async (m: any) => {
+    const mid = msgId(m);
+    if (reactingId) return; // serialize toggles: backend read-modify-write races otherwise
+    setReactingId(mid);
     try {
-      const updated = await toggleReaction(m.id);
-      setMessages((prev) => prev.map((x) => (x.id === m.id ? updated : x)));
+      const updated = await toggleReaction(mid);
+      setMessages((prev) => prev.map((x) => (msgId(x) === mid ? updated : x)));
     } catch (e: any) {
       Alert.alert("Failed", e?.message || "Reaction failed");
+    } finally {
+      setReactingId(null);
     }
   };
 
   const handlePin = async (m: any) => {
-    const isPinned = conv?.pinnedMessages?.some((p: any) => p.messageId === m.id);
+    const mid = msgId(m);
+    const isPinned = conv?.pinnedMessages?.some((p: any) => p.messageId === mid);
     try {
-      if (isPinned) await unpinMessage(convId, m.id);
-      else await pinMessage(convId, m.id);
+      if (isPinned) await unpinMessage(convId, mid);
+      else await pinMessage(convId, mid);
       const c = await getConversation(convId);
       setConv(c);
     } catch (e: any) {
@@ -172,173 +439,387 @@ export default function ChatDetail() {
   };
 
   const canEdit = (m: any) => {
-    if (m.senderId !== account?.id && m.accountId !== account?.id) return false;
-    if (m.deletedAt) return false;
-    const elapsed = Date.now() - (m.createdAt || 0);
+    if (senderOf(m) !== myId) return false;
+    if (m?.isDeleted || m?.deletedAt) return false;
+    const elapsed = Date.now() - (m?.createdAt || 0);
     return elapsed <= 15 * 60 * 1000;
   };
+
+  const title = useMemo(() => {
+    if (conv?.name) return conv.name;
+    const names = (conv?.participants || [])
+      .map((p: any) => p?.account?.displayName || p?.account?.tag)
+      .filter(Boolean);
+    return names.slice(0, 3).join(", ") || "Chat";
+  }, [conv]);
+
+  const subtitle = useMemo(() => {
+    const count = conv?.participants?.length || 0;
+    const unit = count === 1 ? t("conversation.member", "member") : t("conversation.members", "members");
+    const pinned = conv?.pinnedMessages?.length || 0;
+    return `${count} ${unit}${pinned ? ` • ${pinned}/3 ${t("conversation.pinned", "Pinned").toLowerCase()}` : ""}`;
+  }, [conv, t]);
 
   if (loading) return <Loading message="Loading conversation..." />;
   if (error) return <ErrorState title="Could not load chat" message={error} onRetry={load} />;
 
   const pinned = conv?.pinnedMessages || [];
+  const byId = new Map(messages.map((m) => [msgId(m), m]));
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-        <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
-          {conv?.name || conv?.participants?.map((p: any) => p.account?.displayName).join(", ") || "Chat"}
-        </Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>{conv?.participants?.length || 0} members {pinned.length ? `• ${pinned.length}/3 pinned` : ""}</Text>
-      </View>
-      {pinned.length > 0 ? (
-        <View style={[styles.pinnedSection, { backgroundColor: theme.colors.warningSoft, borderColor: theme.colors.warning }]}>
-          <Text style={[styles.pinnedTitle, { color: theme.colors.warning }]}>Pinned ({pinned.length}/3)</Text>
-          {pinned.map((p: any) => {
-            const msg = messages.find((m) => m.id === p.messageId);
-            return (
-              <View key={p.messageId} style={styles.pinnedRow}>
-                <Text style={[styles.pinnedText, { color: theme.colors.text }]} numberOfLines={1}>
-                  {msg?.content || p.messageId}
-                </Text>
-                <Pressable onPress={() => handlePin({ id: p.messageId })}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: "700", fontSize: 11 }}>Unpin</Text>
-                </Pressable>
-              </View>
-            );
-          })}
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
+          <Pressable
+            onPress={handleBack}
+            accessibilityRole="button"
+            accessibilityLabel={t("conversation.back", "Back")}
+            hitSlop={10}
+            style={[styles.backBtn, { borderColor: theme.colors.border }]}
+          >
+            <Ionicons name={rtl ? "chevron-forward" : "chevron-back"} size={22} color={theme.colors.text} />
+          </Pressable>
+          <View style={[styles.headerText, rtl && { alignItems: "flex-end" }]}>
+            <Text style={[styles.title, { color: theme.colors.text }, rtl && { textAlign: "right" }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          </View>
         </View>
-      ) : null}
-      <FlatList
-        ref={flatRef as any}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 12, paddingBottom: 80 }}
-        renderItem={({ item }) => {
-          const isOwn = item.senderId === account?.id || item.accountId === account?.id;
-          const isDeleted = !!item.deletedAt;
-          const edited = item.editedAt && !isDeleted;
-          return (
-            <View style={[styles.bubbleWrap, isOwn ? styles.ownWrap : styles.otherWrap, rtl && { flexDirection: "row-reverse" }]}>
-              <View
-                style={[
-                  styles.bubble,
-                  {
-                    backgroundColor: isOwn ? theme.colors.primary : theme.colors.surface,
-                    borderColor: theme.colors.border,
-                  },
-                  isDeleted && { opacity: 0.6 },
-                ]}
-              >
-                {item.replyTo ? <Text style={[styles.reply, { color: isOwn ? "#FCF6EF" : theme.colors.textSecondary }]}>↳ {item.replyTo?.slice(0, 40)}</Text> : null}
-                {editingId === item.id ? (
-                  <View>
-                    <TextInput value={editText} onChangeText={setEditText} style={[styles.editInput, { borderColor: theme.colors.border, color: isOwn ? "#FCF6EF" : theme.colors.text }]} multiline />
-                    <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
-                      <Pressable onPress={() => handleEdit(item)} style={[styles.smallBtn, { backgroundColor: theme.colors.success }]}>
-                        <Text style={styles.smallBtnText}>Save</Text>
-                      </Pressable>
-                      <Pressable onPress={() => setEditingId(null)} style={[styles.smallBtn, { backgroundColor: theme.colors.surfaceHover, borderColor: theme.colors.border }]}>
-                        <Text style={[styles.smallBtnText, { color: theme.colors.text }]}>Cancel</Text>
-                      </Pressable>
+
+        {pinned.length > 0 ? (
+          <View style={[styles.pinnedSection, { backgroundColor: theme.colors.warningSoft, borderColor: theme.colors.warning }]}>
+            <Text style={[styles.pinnedTitle, { color: theme.colors.warning }]}>
+              {t("conversation.pinned", "Pinned")} ({pinned.length}/3)
+            </Text>
+            {pinned.map((p: any) => {
+              const msg = byId.get(String(p.messageId));
+              return (
+                <View key={String(p.messageId)} style={styles.pinnedRow}>
+                  <Text style={[styles.pinnedText, { color: theme.colors.text }]} numberOfLines={1}>
+                    {msg ? contentLabel(msg) || String(p.messageId) : String(p.messageId)}
+                  </Text>
+                  <Pressable onPress={() => handlePin({ id: p.messageId })}>
+                    <Text style={{ color: theme.colors.primary, fontWeight: "700", fontSize: 11 }}>{t("conversation.unpin", "Unpin")}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        <View style={[styles.column, wide && styles.columnWide]}>
+          <FlatList
+            ref={flatRef as any}
+            data={messages}
+            keyExtractor={(item) => msgId(item)}
+            style={styles.flex}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={
+              hasMore && messages.length > 0 ? (
+                <Pressable onPress={loadOlder} disabled={loadingOlder} style={[styles.loadOlder, { borderColor: theme.colors.border }]}>
+                  {loadingOlder ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <Text style={[styles.loadOlderText, { color: theme.colors.primary }]}>{t("conversation.loadOlder", "Load older messages")}</Text>
+                  )}
+                </Pressable>
+              ) : null
+            }
+            onContentSizeChange={() => {
+              // Only auto-anchor on first paint; live arrivals scroll explicitly.
+            }}
+            renderItem={({ item }) => {
+              const own = senderOf(item) === myId;
+              const isDeleted = !!(item.isDeleted || item.deletedAt);
+              const edited = item.editedAt && !isDeleted;
+              const atts: any[] = Array.isArray(item.attachments) ? item.attachments : [];
+              const replyOrig = item.replyToMessageId ? byId.get(String(item.replyToMessageId)) : null;
+              const readByOthers = Array.isArray(item.readBy) && item.readBy.some((r: any) => r?.accountId && r.accountId !== myId);
+              return (
+                <View style={[styles.bubbleWrap, own ? styles.ownWrap : styles.otherWrap, rtl && { flexDirection: "row-reverse" }]}>
+                  <View
+                    style={[
+                      styles.bubble,
+                      {
+                        backgroundColor: own ? theme.colors.primary : theme.colors.surface,
+                        borderColor: theme.colors.border,
+                      },
+                      isDeleted && { opacity: 0.6 },
+                    ]}
+                  >
+                    {item.replyToMessageId ? (
+                      <Text style={[styles.reply, { color: own ? "#FCF6EF" : theme.colors.textSecondary }]} numberOfLines={2}>
+                        ↳ {replyOrig ? contentLabel(replyOrig).slice(0, 60) : String(item.replyToMessageId).slice(0, 40)}
+                      </Text>
+                    ) : null}
+                    {atts.map((a, idx) => {
+                      if (a?.kind === "image" && typeof a?.dataUrl === "string") {
+                        const aw = Number(a.width) || 4;
+                        const ah = Number(a.height) || 3;
+                        const ratio = Math.min(Math.max(ah / aw, 0.4), 1.4);
+                        return (
+                          <Pressable key={idx} onPress={() => setPreviewImg(a.dataUrl)} accessibilityLabel={t("conversation.openPreview", "Open preview")}>
+                            <Image
+                              source={{ uri: a.dataUrl }}
+                              style={[styles.attachmentImage, { aspectRatio: aw / ah > 0 ? aw / ah : 4 / 3, minHeight: 120 * ratio + 60 }]}
+                              resizeMode="cover"
+                            />
+                          </Pressable>
+                        );
+                      }
+                      if (a?.kind === "video") {
+                        return (
+                          <Pressable
+                            key={idx}
+                            onPress={() =>
+                              Alert.alert(
+                                t("conversation.videoAttachment", "Video attachment"),
+                                "Video playback needs the media player update. The clip is stored safely with this message.",
+                              )
+                            }
+                            style={[styles.videoBox, { borderColor: own ? "rgba(252,246,239,0.5)" : theme.colors.border }]}
+                          >
+                            <Ionicons name="play-circle" size={30} color={own ? "#FCF6EF" : theme.colors.primary} />
+                            <Text style={[styles.videoText, { color: own ? "#FCF6EF" : theme.colors.text }]}>
+                              {t("conversation.videoAttachment", "Video attachment")}
+                              {a?.size ? ` • ${Math.max(1, Math.round(Number(a.size) / 1024))} KB` : ""}
+                            </Text>
+                          </Pressable>
+                        );
+                      }
+                      return null;
+                    })}
+                    {editingId === msgId(item) ? (
+                      <View>
+                        <TextInput
+                          value={editText}
+                          onChangeText={setEditText}
+                          style={[styles.editInput, { borderColor: theme.colors.border, color: own ? "#FCF6EF" : theme.colors.text }]}
+                          multiline
+                        />
+                        <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
+                          <Pressable onPress={() => handleEdit(item)} style={[styles.smallBtn, { backgroundColor: theme.colors.success }]}>
+                            <Text style={styles.smallBtnText}>{t("conversation.save", "Save")}</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setEditingId(null)}
+                            style={[styles.smallBtn, { backgroundColor: theme.colors.surfaceHover, borderColor: theme.colors.border }]}
+                          >
+                            <Text style={[styles.smallBtnText, { color: theme.colors.text }]}>{t("conversation.cancel", "Cancel")}</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : item.content ? (
+                      <Text style={[styles.content, { color: own ? "#FCF6EF" : theme.colors.text }]}>{item.content}</Text>
+                    ) : null}
+                    <View style={{ flexDirection: "row", gap: 6, marginTop: 4, alignItems: "center" }}>
+                      <Text style={[styles.meta, { color: own ? "rgba(252,246,239,0.8)" : theme.colors.textTertiary }]}>
+                        {formatDateTime(item.createdAt, "en")}
+                        {edited ? ` • ${t("conversation.edited", "edited")}` : ""}
+                      </Text>
+                      {own && readByOthers ? <Text style={{ color: own ? "#FCF6EF" : theme.colors.success, fontSize: 10 }}>✓✓</Text> : null}
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                      {!isDeleted ? (
+                        <>
+                          <Pressable onPress={() => handleReaction(item)} disabled={reactingId === msgId(item)} style={styles.action}>
+                            <Text style={{ fontSize: 12 }}>
+                              🤝 {item.reactions?.length || 0}
+                              {reactingId === msgId(item) ? "…" : ""}
+                            </Text>
+                          </Pressable>
+                          <Pressable onPress={() => handlePin(item)} style={styles.action}>
+                            <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: "600" }}>
+                              {conv?.pinnedMessages?.some((p: any) => p.messageId === msgId(item)) ? t("conversation.unpin", "Unpin") : t("conversation.pin", "Pin")}
+                            </Text>
+                          </Pressable>
+                          {canEdit(item) ? (
+                            <Pressable
+                              onPress={() => {
+                                setEditingId(msgId(item));
+                                setEditText(item.content || "");
+                              }}
+                              style={styles.action}
+                            >
+                              <Text style={{ color: theme.colors.primary, fontSize: 11 }}>{t("conversation.edit", "Edit")}</Text>
+                            </Pressable>
+                          ) : null}
+                          {(own || account?.role === "admin") ? (
+                            <Pressable onPress={() => handleDelete(item)} style={styles.action}>
+                              <Text style={{ color: theme.colors.error, fontSize: 11 }}>{t("conversation.delete", "Delete")}</Text>
+                            </Pressable>
+                          ) : null}
+                        </>
+                      ) : null}
                     </View>
                   </View>
-                ) : (
-                  <Text style={[styles.content, { color: isOwn ? "#FCF6EF" : theme.colors.text }]}>{renderMentions(item.content, theme)}</Text>
-                )}
-                <View style={{ flexDirection: "row", gap: 6, marginTop: 4, alignItems: "center" }}>
-                  <Text style={[styles.meta, { color: isOwn ? "rgba(252,246,239,0.8)" : theme.colors.textTertiary }]}>{formatDateTime(item.createdAt, "en")}{edited ? " • edited" : ""}</Text>
-                  {isOwn && item.readAt ? <Text style={{ color: isOwn ? "#FCF6EF" : theme.colors.success, fontSize: 10 }}>✓✓</Text> : null}
                 </View>
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                  {!isDeleted ? (
-                    <>
-                      <Pressable onPress={() => handleReaction(item)} style={styles.action}>
-                        <Text style={{ fontSize: 12 }}>🤝 {item.reactions?.length || 0}</Text>
-                      </Pressable>
-                      <Pressable onPress={() => handlePin(item)} style={styles.action}>
-                        <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: "600" }}>{conv?.pinnedMessages?.some((p: any) => p.messageId === item.id) ? "Unpin" : "Pin"}</Text>
-                      </Pressable>
-                      {canEdit(item) ? (
-                        <Pressable
-                          onPress={() => {
-                            setEditingId(item.id);
-                            setEditText(item.content);
-                          }}
-                          style={styles.action}
-                        >
-                          <Text style={{ color: theme.colors.primary, fontSize: 11 }}>Edit</Text>
-                        </Pressable>
-                      ) : null}
-                      {(isOwn || account?.role === "admin") ? (
-                        <Pressable onPress={() => handleDelete(item)} style={styles.action}>
-                          <Text style={{ color: theme.colors.error, fontSize: 11 }}>Delete</Text>
-                        </Pressable>
-                      ) : null}
-                    </>
-                  ) : null}
-                </View>
-              </View>
+              );
+            }}
+          />
+          {typing ? (
+            <View style={[styles.typing, { backgroundColor: theme.colors.surfaceHover }]}>
+              <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>
+                {typing} {t("conversation.typing", "typing...")}
+              </Text>
             </View>
-          );
-        }}
-      />
-      {typing ? (
-        <View style={[styles.typing, { backgroundColor: theme.colors.surfaceHover }]}>
-          <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>{typing} typing...</Text>
+          ) : null}
+          {attachment ? (
+            <View style={[styles.previewBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
+              {attachment.kind === "image" ? (
+                <Image source={{ uri: attachment.localUri }} style={styles.previewThumb} />
+              ) : (
+                <View style={[styles.previewThumb, styles.previewVideo, { borderColor: theme.colors.border }]}>
+                  <Ionicons name="videocam" size={20} color={theme.colors.primary} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.previewLabel, { color: theme.colors.text }]} numberOfLines={1}>
+                  {attachment.kind === "image" ? t("conversation.imageAttachment", "Image attachment") : t("conversation.videoAttachment", "Video attachment")}
+                  {attachment.size ? ` • ${Math.max(1, Math.round(attachment.size / 1024))} KB` : ""}
+                </Text>
+                {attachError ? <Text style={[styles.previewError, { color: theme.colors.error }]}>{attachError}</Text> : null}
+              </View>
+              <Pressable
+                onPress={() => {
+                  setAttachment(null);
+                  setAttachError(null);
+                }}
+                accessibilityLabel={t("conversation.removeAttachment", "Remove attachment")}
+                style={[styles.previewRemove, { borderColor: theme.colors.border }]}
+              >
+                <Ionicons name="close" size={16} color={theme.colors.text} />
+              </Pressable>
+            </View>
+          ) : null}
+          {attachError && !attachment ? (
+            <View style={[styles.inlineError, { backgroundColor: theme.colors.errorSoft || theme.colors.surfaceHover }]}>
+              <Text style={[styles.inlineErrorText, { color: theme.colors.error }]}>{attachError}</Text>
+            </View>
+          ) : null}
+          {sendError ? (
+            <View style={[styles.inlineError, { backgroundColor: theme.colors.errorSoft || theme.colors.surfaceHover }]}>
+              <Text style={[styles.inlineErrorText, { color: theme.colors.error }]}>{sendError}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.composer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
+            <Pressable
+              onPress={pickAttachment}
+              disabled={picking || sending}
+              accessibilityRole="button"
+              accessibilityLabel={t("conversation.attach", "Attach photo or video")}
+              style={[styles.attachBtn, { borderColor: theme.colors.border, opacity: picking || sending ? 0.5 : 1 }]}
+            >
+              {picking ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Ionicons name="add" size={22} color={theme.colors.primary} />}
+            </Pressable>
+            <TextInput
+              testID="chat-composer-input"
+              accessibilityLabel="message input"
+              value={composer}
+              onChangeText={(tx) => {
+                setComposer(tx);
+                const s = getSocket();
+                if (s) {
+                  try {
+                    s.emit("chat:typing", { conversationId: convId, isTyping: true });
+                  } catch {}
+                }
+              }}
+              onFocus={() => setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 250)}
+              placeholder={t("conversation.messagePlaceholder", "Message… @tag supported")}
+              style={[styles.input, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.inputBorder, color: theme.colors.text }, rtl && { textAlign: "right" }]}
+              placeholderTextColor={theme.colors.textTertiary}
+              multiline
+              maxLength={2000}
+            />
+            <Pressable
+              testID="chat-send-button"
+              accessibilityRole="button"
+              onPress={handleSend}
+              disabled={sending || picking || (!composer.trim() && !attachment)}
+              style={[styles.sendBtn, { backgroundColor: composer.trim() || attachment ? theme.colors.primary : theme.colors.border }]}
+            >
+              {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{t("conversation.send", "Send")}</Text>}
+            </Pressable>
+          </View>
         </View>
-      ) : null}
-      <View style={[styles.composer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
-        <TextInput
-          testID="chat-composer-input"
-          accessibilityLabel="message input"
-          value={composer}
-          onChangeText={(t) => {
-            setComposer(t);
-            const s = getSocket();
-            if (s) s.emit("chat:typing", { conversationId: convId });
-          }}
-          placeholder="Message… @tag supported"
-          style={[styles.input, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.inputBorder, color: theme.colors.text }, rtl && { textAlign: "right" }]}
-          placeholderTextColor={theme.colors.textTertiary}
-          multiline
-          maxLength={2000}
-        />
-        <Pressable testID="chat-send-button" accessibilityRole="button" onPress={handleSend} disabled={sending || !composer.trim()} style={[styles.sendBtn, { backgroundColor: composer.trim() ? theme.colors.primary : theme.colors.border }]}>
-          {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Send</Text>}
+      </KeyboardAvoidingView>
+
+      <Modal visible={!!previewImg} transparent animationType="fade" onRequestClose={() => setPreviewImg(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setPreviewImg(null)}>
+          <View style={styles.modalBody}>
+            {previewImg ? <Image source={{ uri: previewImg }} style={styles.modalImage} resizeMode="contain" /> : null}
+            <Pressable onPress={() => setPreviewImg(null)} style={[styles.modalClose, { backgroundColor: theme.colors.surface }]}>
+              <Text style={{ color: theme.colors.text, fontWeight: "700" }}>{t("common.close", "Close")}</Text>
+            </Pressable>
+          </View>
         </Pressable>
-      </View>
-    </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
-function renderMentions(text: string, theme: any) {
-  // Simple mention highlight for @workers etc.
-  return text;
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { padding: 12, borderBottomWidth: 1 },
+  safe: { flex: 1 },
+  flex: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  backBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  headerText: { flex: 1 },
   title: { fontSize: 16, fontWeight: "800" },
   subtitle: { fontSize: 11, marginTop: 2 },
   pinnedSection: { margin: 8, borderRadius: 8, padding: 10, borderWidth: 1 },
   pinnedTitle: { fontWeight: "700", fontSize: 11, marginBottom: 4 },
   pinnedRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
   pinnedText: { fontSize: 12, flex: 1 },
+  column: { flex: 1, width: "100%", alignSelf: "center" },
+  columnWide: { maxWidth: 760 },
+  listContent: { padding: 12, paddingBottom: 12, flexGrow: 1 },
+  loadOlder: { alignSelf: "center", borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 10 },
+  loadOlderText: { fontSize: 12, fontWeight: "700" },
   bubbleWrap: { flexDirection: "row", marginTop: 8 },
   ownWrap: { justifyContent: "flex-end" },
   otherWrap: { justifyContent: "flex-start" },
-  bubble: { maxWidth: "78%", borderRadius: 12, padding: 10, borderWidth: 1 },
+  bubble: { maxWidth: "78%", minWidth: 64, borderRadius: 12, padding: 10, borderWidth: 1 },
   content: { fontSize: 13, lineHeight: 18 },
   reply: { fontSize: 11, fontStyle: "italic", marginBottom: 4 },
   meta: { fontSize: 10, marginTop: 4 },
   action: { paddingHorizontal: 6, paddingVertical: 2 },
-  composer: { flexDirection: "row", alignItems: "flex-end", padding: 8, borderTopWidth: 1, gap: 8 },
-  input: { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, maxHeight: 100 },
-  sendBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, minWidth: 60, alignItems: "center" },
+  attachmentImage: { width: 220, maxWidth: "100%", borderRadius: 8, marginBottom: 6, backgroundColor: "#00000010" },
+  videoBox: { width: 220, maxWidth: "100%", borderRadius: 8, marginBottom: 6, padding: 14, borderWidth: 1, alignItems: "center", gap: 6 },
+  videoText: { fontSize: 11, fontWeight: "600", textAlign: "center" },
   typing: { padding: 6, alignItems: "center" },
+  previewBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1 },
+  previewThumb: { width: 48, height: 48, borderRadius: 8 },
+  previewVideo: { borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  previewLabel: { fontSize: 12, fontWeight: "600" },
+  previewError: { fontSize: 11, marginTop: 2 },
+  previewRemove: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  inlineError: { paddingHorizontal: 12, paddingVertical: 7 },
+  inlineErrorText: { fontSize: 11, fontWeight: "600" },
+  composer: { flexDirection: "row", alignItems: "flex-end", padding: 8, borderTopWidth: 1, gap: 8 },
+  attachBtn: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  input: { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, maxHeight: 110 },
+  sendBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, minWidth: 60, minHeight: 42, alignItems: "center", justifyContent: "center" },
   editInput: { borderWidth: 1, borderRadius: 8, padding: 8, fontSize: 13, minHeight: 40 },
   smallBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: "center" },
   smallBtnText: { color: "#fff", fontWeight: "700", fontSize: 11 },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", alignItems: "center", justifyContent: "center", padding: 16 },
+  modalBody: { width: "100%", maxWidth: 640, alignItems: "center", gap: 12 },
+  modalImage: { width: "100%", height: 420, borderRadius: 12 },
+  modalClose: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999 },
 });

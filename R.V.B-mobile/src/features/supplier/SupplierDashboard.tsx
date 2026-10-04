@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, Alert, Platform } from "react-native";
 import { Avatar } from "@/components/common/Avatar";
+import { NotificationBell } from "@/components/common/NotificationBell";
 import { Loading } from "@/components/common/Loading";
 import { ErrorState } from "@/components/common/ErrorState";
 import { Empty } from "@/components/common/Empty";
@@ -122,6 +123,7 @@ export function SupplierDashboard() {
           <Text style={[styles.tag, rtl && { textAlign: "right" }]}>@{account?.tag}</Text>
           <Text style={[styles.role, rtl && { textAlign: "right" }]}>Supplier • {supplier.id.slice(0,8)}</Text>
         </View>
+        <NotificationBell />
       </View>
 
       {error ? <View style={{ marginTop: 12 }}><ErrorState title="Connection problem" message={error} onRetry={loadAll} /></View> : null}

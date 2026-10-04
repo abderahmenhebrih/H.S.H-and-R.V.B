@@ -26,6 +26,22 @@ const readSchema = new Schema(
   { _id: false }
 );
 
+const attachmentSchema = new Schema(
+  {
+    // Additive shared contract (mobile + desktop safe: optional, ignored by old clients).
+    // Stored inline as data URL to reuse the existing JSON auth pipeline
+    // (no separate upload endpoint / no secrets on device). Bounded in size
+    // by the service validator below so documents stay well under Mongo limits.
+    kind: { type: String, enum: ["image", "video"], required: true },
+    dataUrl: { type: String, required: true },
+    mimeType: { type: String, required: true },
+    size: { type: Number, required: true },
+    width: { type: Number, required: false, default: null },
+    height: { type: Number, required: false, default: null },
+  },
+  { _id: false }
+);
+
 const messageSchema = new Schema(
   {
     id: { type: String, required: true, unique: true },
@@ -33,7 +49,8 @@ const messageSchema = new Schema(
     updatedAt: { type: Number, required: true },
     conversationId: { type: String, required: true },
     senderAccountId: { type: String, required: true },
-    content: { type: String, required: true },
+    // Text may be empty for attachment-only messages (additive contract).
+    content: { type: String, required: false, default: "" },
     replyToMessageId: { type: String, required: false, default: null },
     editedAt: { type: Number, required: false, default: null },
     deletedAt: { type: Number, required: false, default: null },
@@ -45,6 +62,7 @@ const messageSchema = new Schema(
     // For mentions/tags snapshot (store raw content, parsed mentions via service)
     mentions: { type: [String], required: false, default: [] },
     reminderAt: { type: Number, required: false, default: null },
+    attachments: { type: [attachmentSchema], required: false, default: [] },
   },
   { collection: "messages", versionKey: false }
 );

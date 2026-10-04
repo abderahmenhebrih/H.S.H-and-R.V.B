@@ -1,36 +1,21 @@
-import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import React, { useState } from "react";
+import { View, Text, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions } from "react-native";
 import { Screen } from "@/components/common/Screen";
 import { Input } from "@/components/common/Input";
 import { Button } from "@/components/common/Button";
 import { useAuthStore } from "@/stores/auth-store";
 import { normalizeTag, isValidTag } from "@/utils/tag";
 import { RvbApiError } from "@/types/rvb";
+import { useTheme } from "@/theme/useTheme";
 
 export default function LoginScreen() {
   const { login, isLoading, error } = useAuthStore();
+  const { theme } = useTheme();
+  const { width } = useWindowDimensions();
   const [tag, setTag] = useState("");
   const [password, setPassword] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-
-  // TEMPORARY hardware diagnostics (removed after device confirmation).
-  // Observation only: never focuses, blurs, or dismisses anything.
-  const t0Ref = useRef(Date.now());
-  const [diagEvents, setDiagEvents] = useState<string[]>([]);
-  const logDiag = (label: string) => {
-    const ms = Date.now() - t0Ref.current;
-    setDiagEvents((prev) => [...prev.slice(-11), `${label} +${ms}ms`]);
-  };
-
-  useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => logDiag("keyboardDidShow"));
-    const hide = Keyboard.addListener("keyboardDidHide", () => logDiag("keyboardDidHide"));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   // Android autofill is disabled for login (native credential layer was
   // seizing focus ~40ms after tag tap on hardware). iOS keeps semantic
@@ -76,62 +61,57 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen padded>
+    <Screen padded={false} style={{ backgroundColor: theme.colors.background }}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Text style={styles.title}>Poultry Business Suite</Text>
-            <Text style={styles.subtitle}>R.V.B — Sign in</Text>
-            <Text style={styles.hint}>Use your @tag and password</Text>
-          </View>
-
-          <View style={styles.form}>
-            <Input
-              label="@tag"
-              value={tag}
-              onChangeText={setTag}
-              placeholder="@abattoire"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete={isAndroid ? "off" : "username"}
-              textContentType={isAndroid ? undefined : "username"}
-              importantForAutofill={isAndroid ? "no" : undefined}
-              returnKeyType="done"
-              submitBehavior="submit"
-              onFocus={() => logDiag("TAG focus")}
-              onBlur={() => logDiag("TAG blur")}
-              onSubmitEditing={() => logDiag("TAG submit")}
-              error={fieldError && fieldError.toLowerCase().includes("tag") ? fieldError : null}
+          <View style={[styles.center, { width: Math.min(width * 0.92, 440) }]}>
+            <Image
+              source={require("../../assets/chickenicon.png")}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityRole="image"
             />
-            <Input
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              secureTextEntry
-              autoComplete={isAndroid ? "off" : "current-password"}
-              textContentType={isAndroid ? undefined : "password"}
-              importantForAutofill={isAndroid ? "no" : undefined}
-              returnKeyType="done"
-              submitBehavior="submit"
-              onFocus={() => logDiag("PASSWORD focus")}
-              onBlur={() => logDiag("PASSWORD blur")}
-              onSubmitEditing={handleLogin}
-              error={fieldError && fieldError.toLowerCase().includes("password") ? fieldError : null}
-            />
+            <Text style={[styles.title, { color: theme.colors.text }]}>Poultry Business Suite</Text>
 
-            {apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
-            {error && !apiError ? <Text style={styles.apiError}>{error}</Text> : null}
+            <View style={[styles.card, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border }, theme.shadows.card]}>
+              <Text style={[styles.cardHeading, { color: theme.colors.text }]}>Sign in</Text>
 
-            <Button title="Sign in" onPress={handleLogin} loading={isLoading} style={{ marginTop: 8 }} />
+              <Input
+                label="@TAG"
+                value={tag}
+                onChangeText={setTag}
+                placeholder="@abattoire"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete={isAndroid ? "off" : "username"}
+                textContentType={isAndroid ? undefined : "username"}
+                importantForAutofill={isAndroid ? "no" : undefined}
+                returnKeyType="done"
+                submitBehavior="submit"
+                error={fieldError && fieldError.toLowerCase().includes("tag") ? fieldError : null}
+              />
+              <Input
+                label="PASSWORD"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
+                secureTextEntry
+                autoComplete={isAndroid ? "off" : "current-password"}
+                textContentType={isAndroid ? undefined : "password"}
+                importantForAutofill={isAndroid ? "no" : undefined}
+                returnKeyType="done"
+                submitBehavior="submit"
+                onSubmitEditing={handleLogin}
+                error={fieldError && fieldError.toLowerCase().includes("password") ? fieldError : null}
+              />
 
-            <Text style={styles.footerNote}>Physical device: use LAN IP (not localhost) in EXPO_PUBLIC_RVB_API_URL</Text>
+              {apiError ? <Text style={[styles.apiError, { color: theme.colors.error }]}>{apiError}</Text> : null}
+              {error && !apiError ? <Text style={[styles.apiError, { color: theme.colors.error }]}>{error}</Text> : null}
 
-            <View style={styles.diagBox}>
-              <Text style={styles.diagTitle}>DIAG TEMP — remove after hardware confirmation</Text>
-              {diagEvents.map((e, i) => (
-                <Text key={`${i}-${e}`} style={styles.diagText}>{e}</Text>
-              ))}
+              <Button title="Sign in" onPress={handleLogin} loading={isLoading} style={styles.signInButton} />
+
+              <Text style={[styles.helpLine, { color: theme.colors.textSecondary }]}>Forgot your credentials?</Text>
+              <Text style={styles.adminLine}>Contact your administrator</Text>
             </View>
           </View>
         </ScrollView>
@@ -140,17 +120,18 @@ export default function LoginScreen() {
   );
 }
 
+const TEAL_ACCENT = "#0F766E";
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: "center", paddingVertical: 24 },
-  header: { alignItems: "center", marginBottom: 24 },
-  title: { fontSize: 22, fontWeight: "800", color: "#0F172A" },
-  subtitle: { marginTop: 6, fontSize: 16, fontWeight: "600", color: "#0F766E" },
-  hint: { marginTop: 4, color: "#64748B", fontSize: 13 },
-  form: { backgroundColor: "#fff", borderRadius: 16, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  apiError: { color: "#DC2626", fontSize: 13, marginBottom: 8, textAlign: "center" },
-  footerNote: { marginTop: 12, color: "#94A3B8", fontSize: 11, textAlign: "center" },
-  diagBox: { marginTop: 12, padding: 8, borderWidth: 1, borderColor: "#F59E0B", borderRadius: 8, backgroundColor: "#FFFBEB" },
-  diagTitle: { fontSize: 10, fontWeight: "800", color: "#92400E", marginBottom: 4 },
-  diagText: { fontSize: 10, color: "#451A03", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+  content: { flexGrow: 1, justifyContent: "center", alignItems: "center", paddingVertical: 32, paddingHorizontal: 16 },
+  center: { alignItems: "center" },
+  logo: { width: 120, height: 120, marginBottom: 16 },
+  title: { fontSize: 24, fontWeight: "800", textAlign: "center", marginBottom: 20 },
+  card: { width: "100%", borderRadius: 22, padding: 24, borderWidth: 1 },
+  cardHeading: { fontSize: 20, fontWeight: "800", textAlign: "center", marginBottom: 20 },
+  apiError: { fontSize: 13, marginTop: 4, marginBottom: 8, textAlign: "center" },
+  signInButton: { marginTop: 12, height: 54 },
+  helpLine: { marginTop: 16, fontSize: 12, textAlign: "center" },
+  adminLine: { marginTop: 4, fontSize: 13, fontWeight: "700", textAlign: "center", color: TEAL_ACCENT },
 });

@@ -4,7 +4,7 @@
     "slug": "poultry-business-suite",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/chickenicon.png",
     "scheme": "poultrybusinesssuite",
     "userInterfaceStyle": "light",
     "ios": {

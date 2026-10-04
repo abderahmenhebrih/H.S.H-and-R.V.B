@@ -7,12 +7,12 @@ import { Avatar } from "@/components/common/Avatar";
 import { useTheme } from "@/theme/useTheme";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/api/client";
-import { isRTL } from "@/i18n";
+import { useLanguage } from "@/i18n";
 
 export default function SettingsScreen() {
   const { theme, mode, setTheme } = useTheme();
   const { account, logout } = useAuthStore();
-  const rtl = isRTL();
+  const { t, isRTL: rtl } = useLanguage();
   const [prefs, setPrefs] = useState<{ language: string; theme: string } | null>(null);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
   return (
     <Screen padded={false}>
       <ScrollView contentContainerStyle={[styles.content, { backgroundColor: theme.colors.background }]}>
-        <Text style={[styles.title, { color: theme.colors.text }, rtl && { textAlign: "right" }]}>Settings</Text>
+        <Text style={[styles.title, { color: theme.colors.text }, rtl && { textAlign: "right" }]}>{t("settings.title", "Settings")}</Text>
 
         <Card>
           <View style={[styles.accountRow, rtl && { flexDirection: "row-reverse" }]}>
@@ -76,7 +76,7 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]}>Language</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]}>{t("settings.language", "Language")}</Text>
         <Card>
           <View style={[styles.langRow, rtl && { flexDirection: "row-reverse" }]}>
             {(["en", "fr", "ar"] as const).map((l) => {
@@ -91,7 +91,7 @@ export default function SettingsScreen() {
           <Text style={[styles.hint, { color: theme.colors.textTertiary }, rtl && { textAlign: "right" }]}>UI updates immediately • no pull-to-refresh needed</Text>
         </Card>
 
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]}>Theme</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]}>{t("settings.theme", "Theme")}</Text>
         <Card>
           <View style={[styles.langRow, rtl && { flexDirection: "row-reverse" }]}>
             {(["light", "dark", "system"] as const).map((t) => (
@@ -103,7 +103,7 @@ export default function SettingsScreen() {
           <Text style={[styles.hint, { color: theme.colors.textTertiary }, rtl && { textAlign: "right" }]}>Current: {mode} • resolves to {theme.dark ? "dark" : "light"}</Text>
         </Card>
 
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]}>About</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }, rtl && { textAlign: "right" }]}>{t("settings.about", "About")}</Text>
         <Card>
           <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Poultry Business Suite</Text>
           <Text style={[styles.cardHint, { color: theme.colors.textSecondary }]}>R.V.B Mobile • v1.0.0</Text>
@@ -111,7 +111,7 @@ export default function SettingsScreen() {
         </Card>
 
         <View style={{ marginTop: 24 }}>
-          <Button title="Sign out" onPress={handleLogout} variant="secondary" />
+          <Button title={t("settings.signOut", "Sign out")} onPress={handleLogout} variant="secondary" />
         </View>
         <Text style={[styles.hint, { color: theme.colors.textTertiary, textAlign: "center", marginTop: 12 }]}>Build: Hebrih Slaughter House • R.V.B</Text>
       </ScrollView>

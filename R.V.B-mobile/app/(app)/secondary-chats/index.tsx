@@ -15,7 +15,7 @@ import { searchDirectory } from "@/services/directory.service";
 import { router } from "expo-router";
 import { isRTL } from "@/i18n";
 
-export default function SecondaryChatsScreen() {
+export default function SecondaryChatsScreen({ bare = false }: { bare?: boolean }) {
   const { theme } = useTheme();
   const rtl = isRTL();
   const [conversations, setConversations] = useState<any[]>([]);
@@ -108,9 +108,11 @@ export default function SecondaryChatsScreen() {
 
   const filtered = search.trim() ? conversations.filter((c) => c.name?.toLowerCase().includes(search.toLowerCase())) : conversations;
 
-  return (
-    <Screen padded={false}>
-      <AppHeader title="Secondary Chats" subtitle="DMs & Groups • any role" showNotifications />
+  // Bare mode: embedded inside the Chats hub (hub owns Screen + header).
+  // Standalone route keeps its own chrome. All logic/routes/modals/sockets
+  // are identical in both modes.
+  const body = (
+    <>
       <View style={{ padding: 16, backgroundColor: theme.colors.background }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Text style={[styles.title, { color: theme.colors.text }, rtl && { textAlign: "right" }]}>Chats</Text>
@@ -177,6 +179,14 @@ export default function SecondaryChatsScreen() {
           <Button title="Cancel" variant="secondary" onPress={() => setShowNew(false)} />
         </View>
       </AppModal>
+    </>
+  );
+
+  if (bare) return body;
+  return (
+    <Screen padded={false}>
+      <AppHeader title="Secondary Chats" subtitle="DMs & Groups • any role" showNotifications />
+      {body}
     </Screen>
   );
 }

@@ -11,12 +11,13 @@ import { useTheme } from "@/theme/useTheme";
 import { searchDirectory } from "@/services/directory.service";
 import { createDM } from "@/services/chat.service";
 import { router } from "expo-router";
-import { isRTL } from "@/i18n";
+import { isRTL, useLanguage } from "@/i18n";
 
 const ROLES: (string | undefined)[] = [undefined, "worker", "supervisor", "supplier", "customer", "manager"];
 
 export default function DirectoryScreen() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const rtl = isRTL();
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<string | undefined>(undefined);
@@ -76,7 +77,7 @@ export default function DirectoryScreen() {
 
   return (
     <Screen padded={false}>
-      <AppHeader title="Directory" subtitle="Search by @tag or role" showNotifications />
+      <AppHeader title={t("search.title", "Directory")} subtitle={t("search.subtitle", "Search by @tag or role")} showNotifications />
       <View style={{ padding: 16, backgroundColor: theme.colors.background }}>
         <View style={{ marginTop: 4 }}>
           <SearchField value={query} onChangeText={setQuery} placeholder="Search @tag or name" />

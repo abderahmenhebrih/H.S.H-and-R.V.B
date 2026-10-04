@@ -9,13 +9,43 @@
   "tabs": {
     "mainChats": "Chats principaux",
     "secondaryChats": "Secondaire",
+    "chats": "Discussions",
     "profile": "Profil",
     "search": "Recherche",
     "settings": "Paramètres"
   },
+  "chats": {
+    "title": "Discussions",
+    "main": "Principaux",
+    "secondary": "Secondaire"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "theme": "Thème",
+    "about": "À propos",
+    "signOut": "Se déconnecter"
+  },
+  "profile": {
+    "account": "Compte",
+    "id": "ID",
+    "tag": "Tag",
+    "displayName": "Nom affiché",
+    "role": "Rôle",
+    "status": "Statut",
+    "onboarding": "Intégration",
+    "linkedEntity": "Entité liée"
+  },
+  "search": {
+    "title": "Répertoire",
+    "subtitle": "Rechercher par @tag ou rôle"
+  },
   "common": {
     "loading": "Chargement...",
     "retry": "Réessayer",
-    "error": "Une erreur est survenue"
+    "error": "Une erreur est survenue",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "close": "Fermer"
   }
 }

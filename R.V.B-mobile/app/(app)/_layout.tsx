@@ -1,13 +1,18 @@
 import React, { useEffect } from "react";
 import { Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/stores/auth-store";
 import { connectSocket } from "@/services/socket";
 import { useTheme } from "@/theme/useTheme";
+import { useLanguage } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function AppTabsLayout() {
   const { accessToken } = useAuthStore();
   const { theme } = useTheme();
+  const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 8);
 
   useEffect(() => {
     if (accessToken) connectSocket(accessToken);
@@ -20,50 +25,55 @@ export default function AppTabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.tabInactive,
-        tabBarStyle: { backgroundColor: theme.colors.tabBackground, borderTopColor: theme.colors.border, height: 62, paddingTop: 6, paddingBottom: 8 },
+        tabBarStyle: {
+          backgroundColor: theme.colors.tabBackground,
+          borderTopColor: theme.colors.border,
+          height: 62 + bottomInset,
+          paddingTop: 6,
+          paddingBottom: bottomInset,
+        },
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700" },
       }}
     >
       <Tabs.Screen
-        name="main-chats"
+        name="chats"
         options={{
-          title: "Main Chats",
-          tabBarLabel: "Main Chats",
+          title: t("tabs.chats", "Chats"),
+          tabBarLabel: t("tabs.chats", "Chats"),
           tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="secondary-chats"
-        options={{
-          title: "Secondary Chats",
-          tabBarLabel: "Secondary",
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
-          tabBarLabel: "Profile",
+          title: t("tabs.profile", "Profile"),
+          tabBarLabel: t("tabs.profile", "Profile"),
           tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          title: "Search",
-          tabBarLabel: "Search",
+          title: t("tabs.search", "Search"),
+          tabBarLabel: t("tabs.search", "Search"),
           tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "search" : "search-outline"} size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
-          tabBarLabel: "Settings",
+          title: t("tabs.settings", "Settings"),
+          tabBarLabel: t("tabs.settings", "Settings"),
           tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "settings" : "settings-outline"} size={22} color={color} />,
         }}
       />
+      {/* Kept navigable, hidden from the bar: the hub composes these two,
+          conversation view is pushed from chat lists, notifications live
+          behind the header bell. */}
+      <Tabs.Screen name="main-chats" options={{ href: null }} />
+      <Tabs.Screen name="secondary-chats" options={{ href: null }} />
+      <Tabs.Screen name="chat" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -65,7 +65,9 @@ export function AppHeader({ title, subtitle, showBack, showNotifications, unread
 }
 
 const styles = StyleSheet.create({
-  header: { height: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, borderBottomWidth: 1 },
+  // Shared authenticated top breathing room: sits below the safe-area inset
+  // on every AppHeader screen (phone + web) with no per-page margins.
+  header: { height: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, borderBottomWidth: 1, marginTop: 12 },
   left: { flexDirection: "row", alignItems: "center", flex: 1 },
   iconBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 16, fontWeight: "800" },

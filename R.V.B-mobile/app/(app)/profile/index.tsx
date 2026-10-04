@@ -11,6 +11,7 @@ import { WorkerDashboard } from "@/features/worker/WorkerDashboard";
 import { SupplierDashboard } from "@/features/supplier/SupplierDashboard";
 import { CustomerDashboard } from "@/features/customer/CustomerDashboard";
 import { ManagementDashboard } from "@/features/management/ManagementDashboard";
+import { useLanguage } from "@/i18n";
 import { useEffect, useState } from "react";
 
 export default function ProfileScreen() {
@@ -35,6 +36,7 @@ export default function ProfileScreen() {
 
 function GenericProfile() {
   const { account, refreshProfile } = useAuthStore();
+  const { t } = useLanguage();
   const [portal, setPortal] = useState<RvbPortalMeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,19 +87,19 @@ function GenericProfile() {
           </View>
         ) : null}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionTitle}>{t("profile.account", "Account")}</Text>
           <View style={styles.card}>
-            <Row label="ID" value={displayAccount?.id || "-"} />
-            <Row label="Tag" value={`@${displayAccount?.tag}`} />
-            <Row label="Display name" value={displayAccount?.displayName || "-"} />
-            <Row label="Role" value={displayAccount?.role || "-"} />
-            <Row label="Status" value={displayAccount?.status || "-"} />
-            <Row label="Onboarding" value={displayAccount?.onboardingStatus || "-"} />
-            {displayAccount?.linkedEntityType ? <Row label="Linked entity" value={`${displayAccount.linkedEntityType} ${displayAccount.linkedEntityId || ""}`.trim()} /> : null}
+            <Row label={t("profile.id", "ID")} value={displayAccount?.id || "-"} />
+            <Row label={t("profile.tag", "Tag")} value={`@${displayAccount?.tag}`} />
+            <Row label={t("profile.displayName", "Display name")} value={displayAccount?.displayName || "-"} />
+            <Row label={t("profile.role", "Role")} value={displayAccount?.role || "-"} />
+            <Row label={t("profile.status", "Status")} value={displayAccount?.status || "-"} />
+            <Row label={t("profile.onboarding", "Onboarding")} value={displayAccount?.onboardingStatus || "-"} />
+            {displayAccount?.linkedEntityType ? <Row label={t("profile.linkedEntity", "Linked entity")} value={`${displayAccount.linkedEntityType} ${displayAccount.linkedEntityId || ""}`.trim()} /> : null}
           </View>
         </View>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Linked entity</Text>
+          <Text style={styles.sectionTitle}>{t("profile.linkedEntity", "Linked entity")}</Text>
           <View style={styles.card}>
             {portal?.entity ? (
               <View style={{ alignItems: "center", gap: 8 }}>

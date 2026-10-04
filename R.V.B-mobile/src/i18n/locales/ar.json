@@ -9,13 +9,43 @@
   "tabs": {
     "mainChats": "الدردشات الرئيسية",
     "secondaryChats": "الثانوية",
+    "chats": "الدردشات",
     "profile": "الملف الشخصي",
     "search": "بحث",
     "settings": "الإعدادات"
   },
+  "chats": {
+    "title": "الدردشات",
+    "main": "الرئيسية",
+    "secondary": "الثانوية"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "language": "اللغة",
+    "theme": "المظهر",
+    "about": "حول",
+    "signOut": "تسجيل الخروج"
+  },
+  "profile": {
+    "account": "الحساب",
+    "id": "المعرف",
+    "tag": "الوسم",
+    "displayName": "اسم العرض",
+    "role": "الدور",
+    "status": "الحالة",
+    "onboarding": "الإعداد",
+    "linkedEntity": "الكيان المرتبط"
+  },
+  "search": {
+    "title": "الدليل",
+    "subtitle": "ابحث بالوسم أو الدور"
+  },
   "common": {
     "loading": "جاري التحميل...",
     "retry": "إعادة المحاولة",
-    "error": "حدث خطأ ما"
+    "error": "حدث خطأ ما",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "close": "إغلاق"
   }
 }

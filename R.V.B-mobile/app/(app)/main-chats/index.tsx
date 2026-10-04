@@ -13,7 +13,7 @@ import { router } from "expo-router";
 import { isRTL } from "@/i18n";
 import { formatDateTime, getCurrentLanguage } from "@/utils/date";
 
-export default function MainChatsScreen() {
+export default function MainChatsScreen({ bare = false }: { bare?: boolean }) {
   const { theme } = useTheme();
   const rtl = isRTL();
   const lang = getCurrentLanguage();
@@ -57,9 +57,11 @@ export default function MainChatsScreen() {
   if (loading) return <Loading message="Loading main chats..." />;
   if (error && conversations.length === 0) return <ErrorState title="Could not load chats" message={error} onRetry={load} />;
 
-  return (
-    <Screen padded={false}>
-      <AppHeader title="Main Chats" subtitle="Official • pinned up to 3" showNotifications />
+  // Bare mode: embedded inside the Chats hub (hub owns Screen + header).
+  // Standalone route keeps its own chrome. All logic/routes/badges/sockets
+  // are identical in both modes.
+  const body = (
+    <>
       <View style={{ padding: 16, backgroundColor: theme.colors.background }}>
         <View style={{ marginTop: 4 }}>
           <SearchField value={search} onChangeText={setSearch} placeholder="Search chats or @tag" />
@@ -111,6 +113,14 @@ export default function MainChatsScreen() {
           );
         }}
       />
+    </>
+  );
+
+  if (bare) return body;
+  return (
+    <Screen padded={false}>
+      <AppHeader title="Main Chats" subtitle="Official • pinned up to 3" showNotifications />
+      {body}
     </Screen>
   );
 }

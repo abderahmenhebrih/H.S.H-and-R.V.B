@@ -9,13 +9,43 @@
   "tabs": {
     "mainChats": "Main Chats",
     "secondaryChats": "Secondary",
+    "chats": "Chats",
     "profile": "Profile",
     "search": "Search",
     "settings": "Settings"
   },
+  "chats": {
+    "title": "Chats",
+    "main": "Main",
+    "secondary": "Secondary"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "about": "About",
+    "signOut": "Sign out"
+  },
+  "profile": {
+    "account": "Account",
+    "id": "ID",
+    "tag": "Tag",
+    "displayName": "Display name",
+    "role": "Role",
+    "status": "Status",
+    "onboarding": "Onboarding",
+    "linkedEntity": "Linked entity"
+  },
+  "search": {
+    "title": "Directory",
+    "subtitle": "Search by @tag or role"
+  },
   "common": {
     "loading": "Loading...",
     "retry": "Retry",
-    "error": "Something went wrong"
+    "error": "Something went wrong",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close"
   }
 }

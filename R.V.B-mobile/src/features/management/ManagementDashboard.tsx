@@ -51,7 +51,7 @@ export function ManagementDashboard() {
   const cards = isSupervisor ? supervisorCards : managerCards;
 
   return (
-    <ScrollView contentContainerStyle={[styles.content, { backgroundColor: theme.colors.background }]} refreshControl={<RefreshControl refreshing={false} onRefresh={() => {}} />}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { backgroundColor: theme.colors.background }]} refreshControl={<RefreshControl refreshing={false} onRefresh={() => {}} />}>
       <View style={[styles.header, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }, theme.shadows.xs, rtl && { flexDirection: "row-reverse" }]}>
         <Avatar uri={account?.profilePicture || null} name={account?.displayName || "User"} size={64} />
         <View style={[styles.headerText, rtl && { alignItems: "flex-end", marginLeft: 0, marginRight: 12 }]}>

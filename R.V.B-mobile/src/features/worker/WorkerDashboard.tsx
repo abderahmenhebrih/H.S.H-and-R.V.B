@@ -141,7 +141,7 @@ export function WorkerDashboard() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       {/* Header */}
       <View style={[styles.header, rtl && { flexDirection: "row-reverse" }]}>
         <Avatar uri={account?.profilePicture || null} name={worker.name} size={72} />

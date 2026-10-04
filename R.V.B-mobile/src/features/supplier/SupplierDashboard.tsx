@@ -114,7 +114,7 @@ export function SupplierDashboard() {
   if (!supplier) return <ErrorState title="Supplier not found" message={error || "No supplier linked to this account."} onRetry={loadAll} />;
 
   return (
-    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       <View style={[styles.header, rtl && { flexDirection: "row-reverse" }]}>
         <Avatar uri={account?.profilePicture || null} name={supplier.name} size={72} />
         <View style={[styles.headerText, rtl && { alignItems: "flex-end", marginLeft: 0, marginRight: 12 }]}>

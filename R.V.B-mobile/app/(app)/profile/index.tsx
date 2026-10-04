@@ -19,20 +19,35 @@ export default function ProfileScreen() {
   const { account } = useAuthStore();
 
   if (account?.role === "worker") {
-    return <WorkerDashboard />;
+    return <ProfileShell><WorkerDashboard /></ProfileShell>;
   }
   if (account?.role === "supplier") {
-    return <SupplierDashboard />;
+    return <ProfileShell><SupplierDashboard /></ProfileShell>;
   }
   if (account?.role === "customer") {
-    return <CustomerDashboard />;
+    return <ProfileShell><CustomerDashboard /></ProfileShell>;
   }
   if (account?.role === "supervisor" || account?.role === "manager" || account?.role === "admin") {
-    return <ManagementDashboard />;
+    return <ProfileShell><ManagementDashboard /></ProfileShell>;
   }
 
   // Fallback generic
   return <GenericProfile />;
+}
+
+// Common top header for every profile variant: translated Profile title +
+// the existing notification bell (unread badge included). Role dashboards
+// render their own content below with no header of their own, so exactly
+// one header exists. Also provides the SafeArea shell the bare dashboard
+// ScrollViews were missing.
+function ProfileShell({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage();
+  return (
+    <Screen padded={false}>
+      <AppHeader title={t("tabs.profile", "Profile")} showNotifications />
+      {children}
+    </Screen>
+  );
 }
 
 function GenericProfile() {

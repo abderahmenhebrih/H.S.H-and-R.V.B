@@ -108,7 +108,7 @@ export function CustomerDashboard() {
   const underReviewOrders = orders.filter(o => o.status==="under_review").length;
 
   return (
-    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       <View style={[styles.header, rtl && { flexDirection: "row-reverse" }]}>
         <Avatar uri={account?.profilePicture || null} name={customer.name} size={72} />
         <View style={[styles.headerText, rtl && { alignItems: "flex-end", marginLeft: 0, marginRight: 12 }]}>

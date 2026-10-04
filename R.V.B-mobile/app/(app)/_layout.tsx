@@ -67,12 +67,15 @@ export default function AppTabsLayout() {
           tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "settings" : "settings-outline"} size={22} color={color} />,
         }}
       />
-      {/* Kept navigable, hidden from the bar: the hub composes these two,
-          conversation view is pushed from chat lists, notifications live
-          behind the header bell. */}
+      {/* Kept navigable, hidden from the bar: the hub composes the two chat
+          lists, the conversation view is pushed from chat lists and
+          notifications, notifications live behind the header bell.
+          NOTE: the conversation route registers as "chat/[id]" (the chat/
+          directory has no index route), so THAT exact name must be hidden —
+          a "chat" entry matches nothing and the dynamic tab reappears. */}
       <Tabs.Screen name="main-chats" options={{ href: null }} />
       <Tabs.Screen name="secondary-chats" options={{ href: null }} />
-      <Tabs.Screen name="chat" options={{ href: null }} />
+      <Tabs.Screen name="chat/[id]" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );

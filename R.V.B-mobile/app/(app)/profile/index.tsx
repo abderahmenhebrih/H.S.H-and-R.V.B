@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import { Screen } from "@/components/common/Screen";
 import { Avatar } from "@/components/common/Avatar";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { Loading } from "@/components/common/Loading";
 import { ErrorState } from "@/components/common/ErrorState";
 import { useAuthStore } from "@/stores/auth-store";
@@ -73,6 +74,7 @@ function GenericProfile() {
   const displayAccount = portal?.account || account;
   return (
     <Screen padded={false}>
+      <AppHeader title={t("tabs.profile", "Profile")} showNotifications />
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         <View style={styles.header}>
           <Avatar uri={displayAccount?.profilePicture || null} name={displayAccount?.displayName || "User"} size={80} />

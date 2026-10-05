@@ -18,12 +18,10 @@ import {
 } from "lucide-react";
 
 import AppShell from "../../src/components/layout/AppShell";
-import StyledSelect from "../../src/components/common/StyledSelect";
 import { productService } from "../../src/services/product.service";
 import { productEditOperation } from "../../src/services/operations/product-edit.operation";
 import { productDeleteOperation } from "../../src/services/operations/product-delete.operation";
 import { settingsService } from "../../src/services/settings.service";
-import { invoiceTaxProfileService } from "../../src/services/invoice-tax-profile.service";
 import { useCircularDeleteCountdown } from "../../src/hooks/useCircularDeleteCountdown";
 import countdownStyles from "../../src/components/common/ProtectedDeleteModal.module.css";
 import {
@@ -33,7 +31,6 @@ import {
 } from "../../src/lib/settings";
 
 import type { Product } from "../../src/types/entities/product";
-import type { InvoiceTaxProfile } from "../../src/types/entities/invoice-tax-profile";
 import type { Currency, Language } from "../../src/types/settings/settings";
 
 import styles from "./page.module.css";
@@ -44,7 +41,6 @@ type FormState = {
   quantity: string;
   weightKg: string;
   description: string;
-  taxProfileId: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -53,7 +49,6 @@ const EMPTY_FORM: FormState = {
   quantity: "0",
   weightKg: "0",
   description: "",
-  taxProfileId: "",
 };
 
 const TRANSLATIONS = {
@@ -131,10 +126,6 @@ const TRANSLATIONS = {
     of: "of",
     paginationPrev: "Previous",
     paginationNext: "Next",
-    taxProfile: "Tax Profile",
-    notConfigured: "Not configured",
-    selectTaxProfile: "Select tax profile",
-    taxProfileHelp: "Product tax overrides seller default",
   },
 
   fr: {
@@ -211,10 +202,6 @@ const TRANSLATIONS = {
     of: "sur",
     paginationPrev: "Précédent",
     paginationNext: "Suivant",
-    taxProfile: "Profil fiscal",
-    notConfigured: "Non configuré",
-    selectTaxProfile: "Sélectionner le profil fiscal",
-    taxProfileHelp: "La taxe produit remplace le défaut vendeur",
   },
 
   ar: {
@@ -291,10 +278,6 @@ const TRANSLATIONS = {
     of: "من",
     paginationPrev: "السابق",
     paginationNext: "التالي",
-    taxProfile: "الملف الضريبي",
-    notConfigured: "غير محدد",
-    selectTaxProfile: "اختر الملف الضريبي",
-    taxProfileHelp: "ضريبة المنتج تتقدم على الضريبة الافتراضية للبائع",
   },
 } as const;
 
@@ -324,28 +307,6 @@ export default function ProductsPage() {
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   const t = TRANSLATIONS[language];
-
-  const [taxProfiles, setTaxProfiles] = useState<InvoiceTaxProfile[]>([]);
-
-  const taxProfileOptions = useMemo(() => {
-    const enabled = taxProfiles.filter((tp) => tp.enabled === true);
-    const opts: { value: string; label: string }[] = [
-      { value: "", label: t.notConfigured },
-    ];
-    for (const tp of enabled) {
-      opts.push({ value: tp.id, label: tp.name });
-    }
-    return opts;
-  }, [taxProfiles, t.notConfigured]);
-
-  async function loadTaxProfiles() {
-    try {
-      const all = await invoiceTaxProfileService.getAll();
-      setTaxProfiles(all);
-    } catch {
-      setTaxProfiles([]);
-    }
-  }
 
   const {
     displaySec: deleteDisplaySec,
@@ -378,7 +339,6 @@ export default function ProductsPage() {
   useEffect(() => {
     void loadSettings();
     void loadProducts();
-    void loadTaxProfiles();
 
     const handleSettingsChange = () => {
       void loadSettings();
@@ -393,7 +353,6 @@ export default function ProductsPage() {
 
   useDbSync(() => {
     void loadProducts();
-    void loadTaxProfiles();
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -456,7 +415,6 @@ export default function ProductsPage() {
       quantity: String(product.quantity),
       weightKg: String(product.weightKg),
       description: product.description ?? "",
-      taxProfileId: product.taxProfileId ?? "",
     });
 
     setError("");
@@ -505,22 +463,21 @@ export default function ProductsPage() {
     setError("");
 
     try {
-      // Product creation defines no tax override: taxProfileId is omitted entirely
-      // so the backend default (seller default tax hierarchy) applies. No tax
-      // value is invented here — notably no silent 0%.
-      const baseInput: any = {
+      // The product form defines no tax override in either mode: taxProfileId
+      // is omitted from both create and edit payloads, so the backend default
+      // (seller default tax hierarchy) applies and any legacy stored value is
+      // preserved untouched. No tax value is invented here — notably no silent 0%.
+      const input: any = {
         name: form.name.trim(),
         price: Number(form.price),
         quantity: Number(form.quantity),
         weightKg: Number(form.weightKg),
         description: form.description.trim() || undefined,
       };
-      // For edit, "Not configured" must explicitly clear taxProfileId with undefined/null handling in operation (null sentinel).
-      // Edit retains its Tax Profile control; only create drops it.
       if (editingId) {
-        await productEditOperation.edit({ productId: editingId, ...baseInput, taxProfileId: form.taxProfileId?.trim() || undefined });
+        await productEditOperation.edit({ productId: editingId, ...input });
       } else {
-        await productService.create(baseInput);
+        await productService.create(input);
       }
 
       await loadProducts();
@@ -945,32 +902,6 @@ export default function ProductsPage() {
                     }
                   />
                 </label>
-
-                {/* Tax Profile override is edit-only. Creation defines no tax
-                    override (backend/seller default applies), so the control,
-                    its label, helper text and container are absent here — the
-                    modal shrinks with Description as the last field. */}
-                {editingId && (
-                  <label>
-                    <span>
-                      {t.taxProfile}{" "}
-                      <small>{t.optional}</small>
-                    </span>
-                    <StyledSelect
-                      value={form.taxProfileId}
-                      onChange={(value) =>
-                        setForm((current) => ({
-                          ...current,
-                          taxProfileId: value,
-                        }))
-                      }
-                      options={taxProfileOptions}
-                      placeholder={t.notConfigured}
-                      ariaLabel={t.taxProfile}
-                    />
-                    <small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 500 }}>{t.taxProfileHelp}</small>
-                  </label>
-                )}
 
                 {error && (
                   <div className={styles.formError}>

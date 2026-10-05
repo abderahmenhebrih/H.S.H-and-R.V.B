@@ -44,20 +44,24 @@ export class ProductEditOperation {
 
       const updatedAt = Date.now();
 
-      const normalizedTaxProfileId = input.taxProfileId?.trim() ? input.taxProfileId.trim() : null;
       const changes: any = {
         name: input.name.trim(),
         price: input.price,
         quantity: input.quantity,
         weightKg: input.weightKg,
         description: input.description?.trim() || undefined,
-        // Use null to explicitly clear old taxProfileId on server; undefined would be omitted in JSON and preserve old value
-        taxProfileId: normalizedTaxProfileId,
         updatedAt,
         syncStatus: "pending" as const,
       };
-      // When clearing (null), we must ensure Dexie stores null and sync payload contains null (not omitted)
-      // Backend will $set taxProfileId to null, which is treated as "Not configured" (falsy) by tax resolver
+      // taxProfileId is a partial-update field: when the caller omits it
+      // (undefined — the case for all product-form edits since the Tax Profile
+      // editor was removed from the UI), the key stays out of `changes` so any
+      // legacy stored value is preserved untouched. Only an explicitly passed
+      // value alters it (trimmed id, or null to clear — null is stored and
+      // synced as null, treated as "Not configured" (falsy) by tax resolver).
+      if (input.taxProfileId !== undefined) {
+        changes.taxProfileId = input.taxProfileId?.trim() ? input.taxProfileId.trim() : null;
+      }
 
 
       await productRepository.update(input.productId, changes);

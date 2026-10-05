@@ -10,7 +10,6 @@ const CHANGED_PASSWORD = "Rvb-QA-P1!Changed";
 
 const QA_USERS = {
   manager: { tag: "qa.rvb.p1.manager", role: "manager" },
-  admin: { tag: "qa.rvb.p1.admin", role: "admin" },
   supervisor: { tag: "qa.rvb.p1.supervisor", role: "supervisor" },
   worker: { tag: "qa.rvb.p1.worker", role: "worker" },
   supplier: { tag: "qa.rvb.p1.supplier", role: "supplier" },
@@ -412,7 +411,7 @@ test.describe("R.V.B Desktop Phase 1 — dedicated Chromium closeout", () => {
   test("first-login password change and PFP onboarding cannot be bypassed; compressed image persists after reload", async ({ page, browser, request }) => {
     await signInAndLand(page, QA_USERS.manager.tag);
     const tag = uniqueTag("first");
-    const accountDialog = await openAccountCreate(page, "Admin");
+    const accountDialog = await openAccountCreate(page, "Manager");
     const createdFirstLoginAccount = await finishAccountCreate(page, accountDialog, {
       tag,
       password: TEMP_PASSWORD,
@@ -502,7 +501,7 @@ test.describe("R.V.B Desktop Phase 1 — dedicated Chromium closeout", () => {
     await firstLoginContext.close();
   });
 
-  test("all six QA roles land correctly and enforce visible plus server-side guards", async ({ browser, request }) => {
+  test("all five QA roles land correctly and enforce visible plus server-side guards", async ({ browser, request }) => {
     const managerNav = ["RVB Dashboard", "Accounts & Access", "Workers", "Suppliers", "Customers", "Orders", "Requests", "Chats", "Notifications & Activity", "Directory", "Settings"];
     const portalNav = ["Main Chats", "Secondary Chats", "Profile & Management", "Search", "Settings"];
     for (const user of Object.values(QA_USERS)) {
@@ -512,7 +511,7 @@ test.describe("R.V.B Desktop Phase 1 — dedicated Chromium closeout", () => {
         const result = await signInAndLand(rolePage, user.tag);
         expect(result.account.role).toBe(user.role);
         const nav = rolePage.locator("aside nav");
-        if (user.role === "manager" || user.role === "admin") {
+        if (user.role === "manager") {
           for (const label of managerNav) await expect(nav.getByRole("button", { name: label, exact: true })).toBeVisible();
         } else if (user.role === "supervisor") {
           for (const label of [...portalNav, "Customers"]) await expect(nav.getByRole("button", { name: label, exact: true })).toBeVisible();
@@ -524,7 +523,7 @@ test.describe("R.V.B Desktop Phase 1 — dedicated Chromium closeout", () => {
 
         const authHeaders = { Authorization: `Bearer ${result.accessToken}` };
         const accountsResponse = await request.get(`${API_BASE}/api/rvb/accounts`, { headers: authHeaders });
-        expect(accountsResponse.status()).toBe(user.role === "manager" || user.role === "admin" ? 200 : 403);
+        expect(accountsResponse.status()).toBe(user.role === "manager" ? 200 : 403);
 
         if (user.role === "supervisor") {
           expect((await request.get(`${API_BASE}/api/rvb/customers`, { headers: authHeaders })).status()).toBe(200);
@@ -535,7 +534,7 @@ test.describe("R.V.B Desktop Phase 1 — dedicated Chromium closeout", () => {
           expect((await ownWorker.json()).worker.id).toBe("qa-rvb-p1-worker-supervisor");
         }
 
-        if (user.role === "manager" || user.role === "admin") {
+        if (user.role === "manager") {
           await rolePage.goto("/rvb/accounts", { waitUntil: "domcontentloaded" });
           await expect(rolePage).toHaveURL(/\/rvb\/accounts$/);
         } else if (user.role === "supervisor") {
@@ -623,7 +622,7 @@ test.describe("R.V.B Desktop Phase 1 — dedicated Chromium closeout", () => {
     expect(linkedAccount.linkedEntityId).toBe(createdWorker.id);
     expect(createdWorker.name).toBe(workerName);
 
-    const duplicateTagDialog = await openAccountCreate(page, "Admin");
+    const duplicateTagDialog = await openAccountCreate(page, "Manager");
     const duplicateTag = await finishAccountCreate(page, duplicateTagDialog, {
       tag: workerTag,
       password: TEMP_PASSWORD,

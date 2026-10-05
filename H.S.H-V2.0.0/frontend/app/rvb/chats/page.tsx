@@ -82,7 +82,6 @@ const TR: Record<Language, any> = {
     emptyAttach: "Write a message or attach media",
     ready: "Ready",
     officialBadge: "Official",
-    admin: "Admin",
     manager: "Manager",
     supervisor: "Supervisor",
     worker: "Worker",
@@ -169,7 +168,6 @@ const TR: Record<Language, any> = {
     mediaBadType: "Fichier non pris en charge (jpeg/png/webp/mp4/mov/webm)",
     emptyAttach: "Écrivez un message ou joignez un média",
     ready: "Prêt",
-    admin: "Admin",
     manager: "Manager",
     supervisor: "Superviseur",
     worker: "Travailleur",
@@ -256,7 +254,6 @@ const TR: Record<Language, any> = {
     emptyAttach: "اكتب رسالة أو أرفق وسائط",
     ready: "جاهز",
     officialBadge: "رسمي",
-    admin: "مسؤول",
     manager: "مدير",
     supervisor: "مشرف",
     worker: "عامل",
@@ -794,7 +791,7 @@ function ChatsInner() {
   const mainGroups = useMemo(() => conversations.filter((c) => c.type === "official_group"), [conversations]);
   const mainPrivates = useMemo(() => conversations.filter((c) => c.type === "official_private"), [conversations]);
 
-  const isAdmin = user?.role === "admin";
+  const isManager = user?.role === "manager";
 
   const composerDisabled = !selectedId || user?.status !== "active" || selectedConv?.isArchived;
 
@@ -1052,7 +1049,7 @@ function ChatsInner() {
                             {!m.isDeleted && <button className={styles.secondaryButton} style={{ minHeight: 24, padding: "0 6px", fontSize: 11 }} onClick={() => void handlePin(m)}>{isPinned ? t.unpin : t.pin}</button>}
                             {canEdit && <button className={styles.secondaryButton} style={{ minHeight: 24, padding: "0 6px", fontSize: 11 }} onClick={() => handleEditClick(m)}><Edit3 size={10} />{t.edit}</button>}
                             {isMe && !m.isDeleted && <button className={styles.secondaryButton} style={{ minHeight: 24, padding: "0 6px", fontSize: 11 }} onClick={() => void handleDelete(m)}><Trash2 size={10} />{t.delete}</button>}
-                            {isAdmin && <button className={styles.secondaryButton} style={{ minHeight: 24, padding: "0 6px", fontSize: 11 }} onClick={() => void handleAudit(m)}><Eye size={10} />{t.audit}</button>}
+                            {isManager && <button className={styles.secondaryButton} style={{ minHeight: 24, padding: "0 6px", fontSize: 11 }} onClick={() => void handleAudit(m)}><Eye size={10} />{t.audit}</button>}
                           </div>
                         </div>
                         {isMe && <span className={styles.messageAvatar} style={{ background: "var(--accent)", color: "#fff" }}>{initials(user?.displayName || "Me")}</span>}
@@ -1233,7 +1230,7 @@ function ChatsInner() {
             <div style={{ padding: 12, borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
               <div className={styles.searchBox}><Search size={14} /><input value={dirSearch} onChange={(e) => setDirSearch(e.target.value)} placeholder={t.dirSearch} /></div>
               <div style={{ display: "flex", gap: 6, overflowX: "auto" }}>
-                {["all", "worker", "supplier", "customer", "manager", "admin", "supervisor"].map((r) => (
+                {["all", "worker", "supplier", "customer", "manager", "supervisor"].map((r) => (
                   <button key={r} className={dirRole === r ? styles.primaryButton : styles.secondaryButton} onClick={() => setDirRole(r)} style={{ minHeight: 28, padding: "0 8px", fontSize: 11 }}>{r === "all" ? t.all : r}</button>
                 ))}
               </div>
@@ -1258,7 +1255,7 @@ function ChatsInner() {
               <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 700 }}>{t.groupName}<input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder={t.groupName} style={{ height: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8 }} /></label>
               <div className={styles.searchBox}><Search size={14} /><input value={dirSearch} onChange={(e) => setDirSearch(e.target.value)} placeholder={t.dirSearch} /></div>
               <div style={{ display: "flex", gap: 6, overflowX: "auto" }}>
-                {["all", "worker", "supplier", "customer", "manager", "admin", "supervisor"].map((r) => (
+                {["all", "worker", "supplier", "customer", "manager", "supervisor"].map((r) => (
                   <button key={r} className={dirRole === r ? styles.primaryButton : styles.secondaryButton} onClick={() => setDirRole(r)} style={{ minHeight: 28, padding: "0 8px", fontSize: 11 }}>{r === "all" ? t.all : r}</button>
                 ))}
               </div>

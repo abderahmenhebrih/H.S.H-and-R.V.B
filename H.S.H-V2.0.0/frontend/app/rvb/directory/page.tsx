@@ -40,7 +40,6 @@ const TR: Record<Language, any> = {
     self: "You",
     roleLabels: {
       manager: "Manager",
-      admin: "Admin",
       supervisor: "Supervisor",
       worker: "Worker",
       supplier: "Supplier",
@@ -74,7 +73,6 @@ const TR: Record<Language, any> = {
     self: "Vous",
     roleLabels: {
       manager: "Manager",
-      admin: "Admin",
       supervisor: "Superviseur",
       worker: "Travailleur",
       supplier: "Fournisseur",
@@ -108,7 +106,6 @@ const TR: Record<Language, any> = {
     self: "أنت",
     roleLabels: {
       manager: "مدير",
-      admin: "مسؤول",
       supervisor: "مشرف",
       worker: "عامل",
       supplier: "مورد",
@@ -224,7 +221,7 @@ function DirectoryInner() {
     if (!acc || !acc.linkedEntityType || !acc.linkedEntityId) return false;
     if (!user) return false;
     const role = user.role;
-    if (role === "manager" || role === "admin") return true;
+    if (role === "manager") return true;
     if (role === "supervisor") {
       // supervisor can open linked worker or customer (customer management), but not supplier
       if (acc.linkedEntityType === "supplier") return false;

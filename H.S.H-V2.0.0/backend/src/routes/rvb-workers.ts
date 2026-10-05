@@ -12,9 +12,9 @@ import { archiveByLinkedEntity, reactivateByLinkedEntity } from "../services/rvb
 
 const router = Router();
 
-// All business routes require auth; workers are manager/admin only
+// All business routes require auth; workers are manager only
 router.use(requireRvbAuth as any);
-router.use(requireRvbRole("manager", "admin") as any);
+router.use(requireRvbRole("manager") as any);
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;

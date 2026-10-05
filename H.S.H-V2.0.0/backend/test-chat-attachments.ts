@@ -93,7 +93,7 @@ async function run() {
     return signAccessToken({ accountId: acc.id, tag: acc.tag, role: acc.role, sessionId: sessId });
   }
 
-  const admin = await mkAccount("admin.t", "admin");
+  const admin = await mkAccount("admin.t", "manager");
   const workerA = await mkAccount("alice.w", "worker");
   const workerB = await mkAccount("bob.w", "worker");
   const outsider = await mkAccount("mallory.w", "worker");

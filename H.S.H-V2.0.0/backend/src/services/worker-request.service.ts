@@ -91,7 +91,7 @@ export async function createWorkerRequest(input: CreateWorkerRequestInput) {
       route: "/rvb/requests",
       sourceEventId,
       audienceType: "role",
-      audienceIds: ["manager", "admin"],
+      audienceIds: ["manager"],
       priority: type === "payment" || type === "loan" ? "high" : "normal",
       category: "requests",
     } as any);

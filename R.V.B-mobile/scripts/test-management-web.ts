@@ -90,14 +90,14 @@ async function testSupervisor(page: any) {
   console.log("Supervisor PASS");
 }
 
-async function testAdmin(page: any) {
-  console.log("\n=== Admin ===");
-  await login(page, "qa.admin.mobile", "Mobile123!");
+async function testManagerSecondPass(page: any) {
+  console.log("\n=== Manager (second pass, ex-admin coverage) ===");
+  await login(page, "qa.manager.mobile", "Mobile123!");
   await page.waitForTimeout(1500);
   const hasAccounts = (await page.getByText("Accounts & Access").count()) > 0;
-  console.log(`Admin Accounts visible: ${hasAccounts}`);
-  if (!hasAccounts) throw new Error("Admin missing Accounts");
-  console.log("Admin PASS");
+  console.log(`Manager Accounts visible: ${hasAccounts}`);
+  if (!hasAccounts) throw new Error("Manager missing Accounts");
+  console.log("Manager second-pass PASS");
 }
 
 async function run() {
@@ -110,7 +110,7 @@ async function run() {
   try {
     await testManager(page);
     await testSupervisor(page);
-    await testAdmin(page);
+    await testManagerSecondPass(page);
     console.log("\n=== Management Web Test PASS ===");
     await browser.close();
     process.exit(0);

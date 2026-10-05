@@ -13,6 +13,10 @@ const rvbAccountSchema = new Schema(
     displayName: { type: String, required: true },
     role: {
       type: String,
+      // "admin" retained ONLY as legacy read-compatibility so pre-migration
+      // documents remain readable; the service layer rejects "admin" for all
+      // new creates (RVB_ROLE_INVALID). Remove after migration proves zero
+      // admin accounts remain.
       enum: ["manager", "admin", "supervisor", "worker", "supplier", "customer"],
       required: true,
     },

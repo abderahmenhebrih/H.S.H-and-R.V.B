@@ -100,15 +100,15 @@ assert(appShellContent.includes('settingsHref="/settings"'), "H.S.H settings gea
 
 console.log("\n=== F. Access HSH visibility ===");
 function hasGateForRole(content:string, role:string){
-  // For manager/admin visible, others hidden: check gate uses manager/admin only
-  return content.includes('(user?.role === "manager" || user?.role === "admin") && (');
+  // For manager visible, others hidden: check gate uses manager only (admin retired)
+  return content.includes('user?.role === "manager" && (');
 }
-assert(hasGateForRole(rvbShellContent,"manager"), "Access HSH gate exists for manager/admin");
-assert(rvbShellContent.includes('(user?.role === "manager" || user?.role === "admin") && ('), "Access HSH only for manager/admin");
+assert(hasGateForRole(rvbShellContent,"manager"), "Access HSH gate exists for manager");
+assert(rvbShellContent.includes('user?.role === "manager" && ('), "Access HSH only for manager");
 // Simulate role check
-const roles = ["manager","admin","supervisor","worker","supplier","customer"];
+const roles = ["manager","supervisor","worker","supplier","customer"];
 for(const r of roles){
-  const visible = r==="manager"||r==="admin";
+  const visible = r==="manager";
   const msg = `${r} -> ${visible?"visible":"hidden"}`;
   // Our gate logic would hide for non-manager/admin
   const shouldBeVisible = visible;
@@ -117,8 +117,8 @@ for(const r of roles){
   assert(true, `Access HSH visibility ${msg}`); // placeholder as gate is static
 }
 // More explicit: ensure file does not allow supervisor to see Access HSH by checking gate wraps entire footer
-const gateWrapsFooter = rvbShellContent.includes('(user?.role === "manager" || user?.role === "admin") && (') && rvbShellContent.includes("sidebarFooter");
-assert(gateWrapsFooter, "Access HSH footer wrapped with manager/admin gate");
+const gateWrapsFooter = rvbShellContent.includes('user?.role === "manager" && (') && rvbShellContent.includes("sidebarFooter");
+assert(gateWrapsFooter, "Access HSH footer wrapped with manager gate");
 
 console.log("\n=== G. FRONTEND_MODE=rvb-public ===");
 const proxyContent = fs.readFileSync(path.join(frontendRoot,"proxy.ts"),"utf8");

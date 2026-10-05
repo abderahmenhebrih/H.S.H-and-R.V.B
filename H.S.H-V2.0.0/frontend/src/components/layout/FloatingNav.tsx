@@ -46,7 +46,7 @@ type FloatingNavProps = {
   onAccessRvb: () => void;
   rvbLabel: string;
   // Fourth utility orbit icon. HSH always uses the default "rvb" (Store);
-  // RVB floating passes "hsh" (Access HSH, manager/admin) or "signout".
+  // RVB floating passes "hsh" (Access HSH, manager) or "signout".
   // Optional with HSH default — HSH rendering is unchanged.
   utilityActionIcon?: "rvb" | "hsh" | "signout";
   bell: React.ReactNode;

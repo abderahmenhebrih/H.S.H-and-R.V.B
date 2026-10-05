@@ -12,7 +12,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const role = user.role;
-    if (role !== "manager" && role !== "admin" && role !== "supervisor" && role !== "customer") {
+    if (role !== "manager" && role !== "supervisor" && role !== "customer") {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }
@@ -28,7 +28,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
       res.json({ success: true, orders: docs });
       return;
     }
-    // Manager/Admin/Supervisor can see all or filtered
+    // Manager/Supervisor can see all or filtered
     const docs = await listCustomerOrders({
       customerId: customerId && !Array.isArray(customerId) ? customerId : undefined,
       status: status && !Array.isArray(status) ? status : undefined,
@@ -78,7 +78,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
   }
 });
 
-router.post("/:id/review", requireRvbRole("manager", "admin", "supervisor") as any, async (req: RvbAuthRequest, res) => {
+router.post("/:id/review", requireRvbRole("manager", "supervisor") as any, async (req: RvbAuthRequest, res) => {
   try {
     const rawId = (req.params as any).id;
     const id = Array.isArray(rawId) ? rawId[0] : rawId;

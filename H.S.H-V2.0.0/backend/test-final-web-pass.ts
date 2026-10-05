@@ -88,7 +88,7 @@ async function main() {
   const prod = await ProductModel.create({ id: `prod-${uuidv4()}`, createdAt: now, updatedAt: now, syncStatus: "synced", name: "Chicken", price: 100, quantity: 100, weightKg: 200, description: "test" } as any).then((d: any) => d.toObject ? d.toObject() : d);
 
   const mgr = await createAccount("mgrFinal", "manager", null, null);
-  const admin = await createAccount("adminFinal", "admin", null, null);
+  const mgr2 = await createAccount("mgrFinal2", "manager", null, null);
   const sup = await createAccount("supFinal", "supervisor", "worker", w1.id);
   const workerA = await createAccount("workerA", "worker", "worker", w1.id);
   const workerB = await createAccount("workerB", "worker", "worker", w2.id);
@@ -174,7 +174,7 @@ async function main() {
   const r5 = await request(app).get("/api/rvb/suppliers").set("Authorization", `Bearer ${supSess.access}`);
   assert(r5.status === 403, "Supervisor cannot list suppliers");
   const r6 = await request(app).get("/api/rvb/customers").set("Authorization", `Bearer ${supSess.access}`);
-  assert(r6.status === 200, "Supervisor customer list must be 200 (manager/admin/supervisor allowed)", `${r6.status} ${r6.body.code}`);
+  assert(r6.status === 200, "Supervisor customer list must be 200 (manager/supervisor allowed)", `${r6.status} ${r6.body.code}`);
   // Additional supervisor customer CRUD exact tests
   const supList = r6.body.customers || [];
   // Supervisor create customer

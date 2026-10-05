@@ -14,7 +14,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
     const { supplierId } = req.query as any;
     const sid = supplierId && !Array.isArray(supplierId) ? supplierId : Array.isArray(supplierId) ? supplierId[0] : undefined;
     const role = user.role;
-    if (role === "manager" || role === "admin") {
+    if (role === "manager") {
       const docs = await listSupplierRequests(sid);
       res.json({ success: true, requests: docs });
       return;
@@ -44,7 +44,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const role = user.role;
-    if (role !== "manager" && role !== "admin" && role !== "supplier") {
+    if (role !== "manager" && role !== "supplier") {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }
@@ -84,7 +84,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
   }
 });
 
-router.post("/:id/review", requireRvbRole("manager", "admin") as any, async (req: RvbAuthRequest, res) => {
+router.post("/:id/review", requireRvbRole("manager") as any, async (req: RvbAuthRequest, res) => {
   try {
     const rawId = (req.params as any).id;
     const id = Array.isArray(rawId) ? rawId[0] : rawId;

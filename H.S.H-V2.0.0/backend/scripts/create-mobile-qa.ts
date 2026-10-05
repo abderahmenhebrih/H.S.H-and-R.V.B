@@ -12,7 +12,6 @@ const QA_ACCOUNTS = [
   { tag: "qa.supplier.mobile", displayName: "QA Supplier Mobile", role: "supplier", linkedEntityType: "supplier", linkedEntityId: "sup-r484-b8c3" },
   { tag: "qa.customer.mobile", displayName: "QA Customer Mobile", role: "customer", linkedEntityType: "customer", linkedEntityId: "cust-r484-2mfc" },
   { tag: "qa.supervisor.mobile", displayName: "QA Supervisor Mobile", role: "supervisor", linkedEntityType: "worker", linkedEntityId: "worker-rcfk-52h5" },
-  { tag: "qa.admin.mobile", displayName: "QA Admin Mobile", role: "admin", linkedEntityType: null, linkedEntityId: null },
   { tag: "qa.manager.mobile", displayName: "QA Manager Mobile", role: "manager", linkedEntityType: null, linkedEntityId: null },
   { tag: "qa.onboard.mobile", displayName: "QA Onboard Mobile", role: "worker", linkedEntityType: "worker", linkedEntityId: "w-int-1790074516163", onboardingStatus: "pending" },
   { tag: "qa.pwd.mobile", displayName: "QA Pwd Mobile", role: "worker", linkedEntityType: "worker", linkedEntityId: "274f1cce-8c2b-4f22-b712-75c3f84569fe", mustChangePassword: true },

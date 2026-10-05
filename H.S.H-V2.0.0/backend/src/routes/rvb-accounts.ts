@@ -56,8 +56,8 @@ function handleError(res: any, err: any) {
   res.status(status).json({ success: false, code, message: err?.message || code });
 }
 
-// Protect all account management routes: Manager/Admin only
-router.use(requireRvbAuth as any, requireRvbRole("manager", "admin") as any);
+// Protect all account management routes: Manager only
+router.use(requireRvbAuth as any, requireRvbRole("manager") as any);
 
 async function enrichAccountsWithDisplayName(accounts: any[]): Promise<any[]> {
   if (!accounts || accounts.length === 0) return accounts;
@@ -215,7 +215,7 @@ router.post("/:id/disable", async (req, res) => {
 });
 
 // DELETE /api/rvb/accounts/:id — permanent login-identity removal.
-// Manager/Admin only (router-level). Linked business entities, business
+// Manager only (router-level). Linked business entities, business
 // history, chats and audits are explicitly preserved by the service.
 router.delete("/:id", async (req, res) => {
   try {

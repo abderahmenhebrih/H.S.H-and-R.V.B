@@ -443,7 +443,7 @@ export default function RvbShell({
   }
 
   // Role-aware navigation per spec 35
-  const isManager = user?.role === "manager" || user?.role === "admin";
+  const isManager = user?.role === "manager";
   const isSupervisor = user?.role === "supervisor";
   const isSecondary = user && ["worker","supplier","customer","supervisor"].includes(user.role);
   const portalNav: NavItem[] = [
@@ -542,7 +542,7 @@ export default function RvbShell({
   // group and a single-item group (Settings, or People for supervisors —
   // settings stays one tap away via the settings orbit for everyone).
   const rvbFloatConfig = (() => {
-    const canSeeHsh = user?.role === "manager" || user?.role === "admin";
+    const canSeeHsh = user?.role === "manager";
     if (isSupervisor || isSecondary) {
       const profile = findRvbItem("/rvb");
       const search = findRvbItem("/rvb/directory");
@@ -806,7 +806,7 @@ export default function RvbShell({
               <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
-          {(user?.role === "manager" || user?.role === "admin") && (
+          {user?.role === "manager" && (
           <div className={dashboardStyles.navItemWrap}>
             <button
               type="button"

@@ -74,7 +74,7 @@ export async function listActivitiesForUser(params: {
   limit?: number;
 }) {
   const { accountId, role, source, search, date, actor, page = 1, limit = 25 } = params;
-  const isManager = role === "manager" || role === "admin";
+  const isManager = role === "manager";
   const isSupervisor = role === "supervisor";
 
   // Fetch linked entity info for scope
@@ -119,7 +119,7 @@ export async function listActivitiesForUser(params: {
 
   // Scope filtering with proper portal scopes and private chat participant restriction
   if (isManager) {
-    // Manager/Admin broad but still private chat only when participant
+    // Manager broad but still private chat only when participant
     // Allow all non-chat activities, plus only participant chats
     const scopeOr: any[] = [{ sourceType: { $ne: "chats" } }, ...chatAllowedBranches];
     filters.push({ $or: scopeOr });

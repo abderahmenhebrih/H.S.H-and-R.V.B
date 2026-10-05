@@ -322,7 +322,7 @@ function SettingsInner() {
   };
   const handleCurrSelect = (v: Currency) => {
     if (v === settings.currency) return;
-    // Only manager/admin may change currency; guard UI will disable for others
+    // Only manager may change currency; guard UI will disable for others
     setPending({ type: "currency", oldValue: settings.currency, newValue: v });
   };
   const confirmPending = async () => {
@@ -535,15 +535,15 @@ function SettingsInner() {
                       <small className={styles.sharedBadge}>{(t.general as any).currencyShared || t.general.shared}</small>
                     </div>
                     <div style={{ minWidth: 180 }}>
-                      {user && (user.role === "manager" || user.role === "admin") ? (
+                      {user && user.role === "manager" ? (
                         <StyledSelect value={settings.currency} onChange={(v) => handleCurrSelect(v as Currency)} ariaLabel={t.general.currency} options={[{ value: "DA", label: "DA — Algerian Dinar" }, { value: "€", label: "€ — Euro" }, { value: "$", label: "$ — US Dollar" }]} />
                       ) : (
                         <div style={{ minHeight: 38, display: "grid", placeItems: "center", padding: "0 12px", border: "1px solid var(--border)", borderRadius: 9, background: "var(--panel-hover)", color: "var(--muted)", fontSize: 13, fontWeight: 700 }}>{settings.currency} — read-only</div>
                       )}
                     </div>
                   </div>
-                  {user && !(user.role === "manager" || user.role === "admin") && (
-                    <small style={{ color: "var(--muted)", fontSize: 11, marginTop: 6, display: "block" }}>Currency is a company setting — only Manager/Admin can change it.</small>
+                  {user && user.role !== "manager" && (
+                    <small style={{ color: "var(--muted)", fontSize: 11, marginTop: 6, display: "block" }}>Currency is a company setting — only Manager can change it.</small>
                   )}
                 </div>
               </div>

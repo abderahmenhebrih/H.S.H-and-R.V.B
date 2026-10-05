@@ -7,12 +7,12 @@ import { useRvbAuth } from "../../contexts/RvbAuthContext";
 
 export function useIsRvbManager(): boolean {
   const { user } = useRvbAuth();
-  return user?.role === "manager" || user?.role === "admin";
+  return user?.role === "manager";
 }
 
 export function RvbManagerOnly({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
   const { user } = useRvbAuth();
-  const isManager = user?.role === "manager" || user?.role === "admin";
+  const isManager = user?.role === "manager";
   if (!isManager) return (fallback as any) ?? null;
   return <>{children}</>;
 }
@@ -21,7 +21,7 @@ export function RvbAccountsGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useRvbAuth();
   const router = useRouter();
 
-  const isManager = user?.role === "manager" || user?.role === "admin";
+  const isManager = user?.role === "manager";
 
   useEffect(() => {
     if (loading) return;
@@ -90,17 +90,17 @@ export function RvbRoleGuard({ allowedRoles, children }: { allowedRoles: string[
 }
 
 export function RvbWorkersGuard({ children }: { children: React.ReactNode }) {
-  return <RvbRoleGuard allowedRoles={["manager", "admin"]}>{children}</RvbRoleGuard>;
+  return <RvbRoleGuard allowedRoles={["manager"]}>{children}</RvbRoleGuard>;
 }
 
 export function RvbSuppliersGuard({ children }: { children: React.ReactNode }) {
-  return <RvbRoleGuard allowedRoles={["manager", "admin"]}>{children}</RvbRoleGuard>;
+  return <RvbRoleGuard allowedRoles={["manager"]}>{children}</RvbRoleGuard>;
 }
 
 export function RvbCustomersGuard({ children }: { children: React.ReactNode }) {
-  return <RvbRoleGuard allowedRoles={["manager", "admin", "supervisor"]}>{children}</RvbRoleGuard>;
+  return <RvbRoleGuard allowedRoles={["manager", "supervisor"]}>{children}</RvbRoleGuard>;
 }
 
 export function RvbOrdersGuard({ children }: { children: React.ReactNode }) {
-  return <RvbRoleGuard allowedRoles={["manager", "admin", "supervisor"]}>{children}</RvbRoleGuard>;
+  return <RvbRoleGuard allowedRoles={["manager", "supervisor"]}>{children}</RvbRoleGuard>;
 }

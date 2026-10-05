@@ -193,7 +193,7 @@ function RvbSuppliersInner() {
   const t = (TR as any)[lang] ?? TR.en;
   const isRtl = lang === "ar";
   const { user } = useRvbAuth();
-  const isManager = user?.role === "manager" || user?.role === "admin";
+  const isManager = user?.role === "manager";
 
   const load = useCallback(async () => {
     setLoading(true);

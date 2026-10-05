@@ -45,7 +45,9 @@ function codeError(code: string, status: number, message?: string) {
 }
 
 function validateRole(role: string) {
-  if (!isValidRvbRole(role)) {
+  // Canonical roles only. The retired "admin" role is rejected for all new
+  // accounts (existing admin documents are migrated in-place to manager).
+  if (role === "admin" || !isValidRvbRole(role)) {
     throw codeError("RVB_ROLE_INVALID", 400);
   }
 }
@@ -142,7 +144,7 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
       if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
     }
   } else {
-    // manager/admin: must not have linkage
+    // manager: must not have linkage
     if (linkedEntityType || linkedEntityId) {
       if (linkedEntityType && linkedEntityId) {
         if (isPortalRoleRole(linkedEntityType)) {
@@ -310,13 +312,13 @@ export async function deleteRvbAccount(id: string, actorAccountId?: string) {
   }
 
   // Last-management-account protection: deleting the final usable
-  // manager/admin would lock administration out. Backend-enforced (frontend
+  // manager would lock administration out. Backend-enforced (frontend
   // also hides, but this is the authority). Archived/disabled targets are
   // already unusable, so they never trip this guard.
-  if (account.status === "active" && (account.role === "manager" || account.role === "admin")) {
+  if (account.status === "active" && account.role === "manager") {
     const remaining = await RvbAccountModel.countDocuments({
       status: "active",
-      role: { $in: ["manager", "admin"] },
+      role: "manager",
       id: { $ne: account.id },
     });
     if (remaining === 0) throw codeError("RVB_LAST_MANAGER", 409);

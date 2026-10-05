@@ -28,21 +28,21 @@ async function run() {
   const pageB = await ctxB.newPage();
 
   // Login via API to get tokens for direct API setup
-  console.log("Logging in admin and worker via API...");
-  const admin = await login("qa.admin.mobile", "Mobile123!");
+  console.log("Logging in manager and worker via API...");
+  const manager = await login("qa.manager.mobile", "Mobile123!");
   const worker = await login("qa.worker.mobile", "Mobile123!");
-  console.log(`Admin ${admin.account.tag} Worker ${worker.account.tag}`);
+  console.log(`Manager ${manager.account.tag} Worker ${worker.account.tag}`);
 
-  // Ensure a DM exists between admin and worker via API (use admin token to create DM to worker)
+  // Ensure a DM exists between manager and worker via API (use manager token to create DM to worker)
   let conv: any = null;
   try {
-    conv = await api("/api/rvb/chats/dm", admin.accessToken, { otherAccountId: worker.account.id }, "POST");
+    conv = await api("/api/rvb/chats/dm", manager.accessToken, { otherAccountId: worker.account.id }, "POST");
     console.log(`Created DM ${conv.conversation?.id || conv.id}`);
     conv = conv.conversation || conv;
   } catch (e: any) {
     console.log(`DM create maybe exists: ${e.message}`);
     // Try list to find existing
-    const list = await api("/api/rvb/chats?category=secondary", admin.accessToken);
+    const list = await api("/api/rvb/chats?category=secondary", manager.accessToken);
     conv = (list.conversations || []).find((c: any) => c.participants?.some((p: any) => p.accountId === worker.account.id));
     console.log(`Found existing DM ${conv?.id}`);
   }
@@ -51,7 +51,7 @@ async function run() {
   console.log(`Using conversation ${convId}`);
 
   // Login via UI for both contexts to get socket connected
-  for (const [page, tag] of [[pageA, "qa.admin.mobile"], [pageB, "qa.worker.mobile"]] as const) {
+  for (const [page, tag] of [[pageA, "qa.manager.mobile"], [pageB, "qa.worker.mobile"]] as const) {
     await page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForSelector('text="Sign in"', { timeout: 15000 }).catch(() => {});
     let tagLoc = page.getByPlaceholder("@abattoire");
@@ -100,7 +100,7 @@ async function run() {
     console.log("A sent via UI");
   } else {
     // Fallback via API
-    await api(`/api/rvb/chats/${convId}/messages`, admin.accessToken, { content: testMsg }, "POST");
+    await api(`/api/rvb/chats/${convId}/messages`, manager.accessToken, { content: testMsg }, "POST");
     console.log("A sent via API");
     await pageA.waitForTimeout(1000);
   }
@@ -136,26 +136,26 @@ async function run() {
 
   // Reaction, Edit, Pin, etc. via API for verification
   console.log("\nTesting reaction, edit, pin via API...");
-  const msgsForReaction = await api(`/api/rvb/chats/${convId}/messages?limit=5`, admin.accessToken);
+  const msgsForReaction = await api(`/api/rvb/chats/${convId}/messages?limit=5`, manager.accessToken);
   const targetMsg = msgsForReaction.messages?.[0];
   if (targetMsg) {
     // Reaction
     try {
-      await api(`/api/rvb/chats/messages/${targetMsg.id}/reaction`, admin.accessToken, {}, "POST");
+      await api(`/api/rvb/chats/messages/${targetMsg.id}/reaction`, manager.accessToken, {}, "POST");
       console.log(`Reaction on ${targetMsg.id.slice(0, 8)} OK`);
     } catch (e: any) {
       console.log(`Reaction failed: ${e.message}`);
     }
     // Edit within 15m (should succeed)
     try {
-      await api(`/api/rvb/chats/messages/${targetMsg.id}`, admin.accessToken, { content: targetMsg.content + " edited" }, "PATCH");
+      await api(`/api/rvb/chats/messages/${targetMsg.id}`, manager.accessToken, { content: targetMsg.content + " edited" }, "PATCH");
       console.log(`Edit within window OK`);
     } catch (e: any) {
       console.log(`Edit failed: ${e.message}`);
     }
     // Pin
     try {
-      await api(`/api/rvb/chats/${convId}/pin`, admin.accessToken, { messageId: targetMsg.id }, "POST");
+      await api(`/api/rvb/chats/${convId}/pin`, manager.accessToken, { messageId: targetMsg.id }, "POST");
       console.log(`Pin OK`);
     } catch (e: any) {
       console.log(`Pin maybe limit: ${e.message}`);
@@ -166,11 +166,11 @@ async function run() {
   console.log("\nPin limit 3/3 test...");
   const pinIds: string[] = [];
   for (let i = 0; i < 4; i++) {
-    const m = await api(`/api/rvb/chats/${convId}/messages`, admin.accessToken, { content: `Pin test ${i} ${Date.now()}` }, "POST");
+    const m = await api(`/api/rvb/chats/${convId}/messages`, manager.accessToken, { content: `Pin test ${i} ${Date.now()}` }, "POST");
     const mid = m.message?.id || m.id;
     if (i < 3) {
       try {
-        await api(`/api/rvb/chats/${convId}/pin`, admin.accessToken, { messageId: mid }, "POST");
+        await api(`/api/rvb/chats/${convId}/pin`, manager.accessToken, { messageId: mid }, "POST");
         pinIds.push(mid);
         console.log(`Pinned ${i + 1}/3`);
       } catch (e: any) {
@@ -179,7 +179,7 @@ async function run() {
     } else {
       // 4th should 409
       try {
-        await api(`/api/rvb/chats/${convId}/pin`, admin.accessToken, { messageId: mid }, "POST");
+        await api(`/api/rvb/chats/${convId}/pin`, manager.accessToken, { messageId: mid }, "POST");
         console.log("ERROR: 4th pin should have 409 but succeeded");
         throw new Error("Pin limit not enforced");
       } catch (e: any) {
@@ -188,9 +188,9 @@ async function run() {
       }
       // Unpin one and pin fourth
       if (pinIds.length > 0) {
-        await api(`/api/rvb/chats/${convId}/unpin`, admin.accessToken, { messageId: pinIds[0] }, "POST");
+        await api(`/api/rvb/chats/${convId}/unpin`, manager.accessToken, { messageId: pinIds[0] }, "POST");
         console.log(`Unpinned one`);
-        await api(`/api/rvb/chats/${convId}/pin`, admin.accessToken, { messageId: mid }, "POST");
+        await api(`/api/rvb/chats/${convId}/pin`, manager.accessToken, { messageId: mid }, "POST");
         console.log(`Pinned fourth after unpin OK`);
       }
     }
@@ -199,11 +199,11 @@ async function run() {
   // Group test via Secondary Chats UI creation already covered in secondary-chats, but via API:
   console.log("\nGroup creation test...");
   try {
-    const group = await api("/api/rvb/chats/group", admin.accessToken, { name: `QA Group ${Date.now()}`, memberIds: [worker.account.id] }, "POST");
+    const group = await api("/api/rvb/chats/group", manager.accessToken, { name: `QA Group ${Date.now()}`, memberIds: [worker.account.id] }, "POST");
     console.log(`Group created ${group.conversation?.id || group.id}`);
     const gid = group.conversation?.id || group.id;
     // Send message to group
-    await api(`/api/rvb/chats/${gid}/messages`, admin.accessToken, { content: "Group hello" }, "POST");
+    await api(`/api/rvb/chats/${gid}/messages`, manager.accessToken, { content: "Group hello" }, "POST");
     console.log("Group message sent");
     // Worker should see via API
     const gMsgs = await api(`/api/rvb/chats/${gid}/messages?limit=5`, worker.accessToken);

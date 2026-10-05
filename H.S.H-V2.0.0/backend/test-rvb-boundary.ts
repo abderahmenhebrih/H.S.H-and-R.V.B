@@ -272,16 +272,16 @@ if (fs.existsSync(rvbShellPath)) {
   } else {
     console.log("PASS: RvbShell passes settingsHref=/rvb/settings");
   }
-  // Check Access HSH gate
-  if (!rvbShellContent.includes('user?.role === "manager"') || !rvbShellContent.includes('user?.role === "admin"')) {
-    console.error("FAIL: RvbShell Access HSH not gated to manager/admin");
+  // Check Access HSH gate (manager only; admin retired)
+  if (!rvbShellContent.includes('user?.role === "manager"')) {
+    console.error("FAIL: RvbShell Access HSH not gated to manager");
     failed = true;
   } else {
-    const hasGateWrap = rvbShellContent.includes('(user?.role === "manager" || user?.role === "admin") && (');
+    const hasGateWrap = rvbShellContent.includes('user?.role === "manager" && (');
     if (!hasGateWrap) {
       console.warn("WARN: RvbShell gate may not wrap sidebarFooter correctly");
     }
-    console.log("PASS: RvbShell Access HSH gated to manager/admin");
+    console.log("PASS: RvbShell Access HSH gated to manager");
   }
   // Verify Access HSH hidden for portal roles (supervisor, worker, supplier, customer) - ensure not rendered unconditionally
   // Check that file does not contain unconditional rendering of Access HSH without gate

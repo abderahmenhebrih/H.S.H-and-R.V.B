@@ -182,10 +182,10 @@ async function run() {
   }
 
   try {
-    const adminAcc = await svc.createRvbAccount({ tag: `adm.${Date.now().toString().slice(-6)}`, displayName: "Test Admin", role: "admin" });
-    record("G2. Admin account", !!adminAcc && adminAcc.role === "admin", `id=${adminAcc?.id}`);
+    await svc.createRvbAccount({ tag: `adm.${Date.now().toString().slice(-6)}`, displayName: "Test Admin", role: "admin" });
+    record("G2. Admin creation rejected", false, "did not throw");
   } catch (e: any) {
-    record("G2. Admin account", false, e?.code || e?.message);
+    record("G2. Admin creation rejected", e?.code === "RVB_ROLE_INVALID", `code=${e?.code}`);
   }
 
   try {

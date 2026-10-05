@@ -11,8 +11,8 @@ router.get("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const role = user.role;
-    // Manager/Admin may read any Worker activity
-    if (role === "manager" || role === "admin") {
+    // Manager may read any Worker activity
+    if (role === "manager") {
       const { workerId } = req.query as any;
       const filter: any = {};
       if (workerId) filter.workerId = Array.isArray(workerId) ? workerId[0] : workerId;

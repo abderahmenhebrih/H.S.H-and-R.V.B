@@ -1,8 +1,8 @@
 import type { RvbRole } from "@/types/rvb";
 
-export const RVB_ROLES: readonly RvbRole[] = ["manager", "admin", "supervisor", "worker", "supplier", "customer"] as const;
+export const RVB_ROLES: readonly RvbRole[] = ["manager", "supervisor", "worker", "supplier", "customer"] as const;
 
-export const MANAGEMENT_ROLES: readonly RvbRole[] = ["manager", "admin", "supervisor"] as const;
+export const MANAGEMENT_ROLES: readonly RvbRole[] = ["manager", "supervisor"] as const;
 export const PORTAL_ROLES: readonly RvbRole[] = ["worker", "supplier", "customer"] as const;
 export const SECONDARY_TAB_ROLES: readonly RvbRole[] = ["worker", "supplier", "customer"] as const;
 
@@ -20,10 +20,6 @@ export function isSecondaryTabRole(role: RvbRole): boolean {
 
 export function isManagerRole(role: RvbRole): boolean {
   return role === "manager";
-}
-
-export function isAdminRole(role: RvbRole): boolean {
-  return role === "admin";
 }
 
 export function isSupervisorRole(role: RvbRole): boolean {
@@ -46,8 +42,6 @@ export function getRoleLabel(role: RvbRole): string {
   switch (role) {
     case "manager":
       return "Manager";
-    case "admin":
-      return "Admin";
     case "supervisor":
       return "Supervisor";
     case "worker":
@@ -62,29 +56,29 @@ export function getRoleLabel(role: RvbRole): string {
 }
 
 export function canAccessWorkerManagement(role: RvbRole): boolean {
-  return role === "manager" || role === "admin";
+  return role === "manager";
 }
 
 export function canAccessSupplierManagement(role: RvbRole): boolean {
-  return role === "manager" || role === "admin";
+  return role === "manager";
 }
 
 export function canAccessCustomerManagement(role: RvbRole): boolean {
-  return role === "manager" || role === "admin" || role === "supervisor";
+  return role === "manager" || role === "supervisor";
 }
 
 // PBS-BUG-037: route-guard helpers completing the management matrix.
 // Mirror the backend requireRvbRole contracts + visible ManagementDashboard
-// cards: accounts are manager/admin-only; aggregated requests and customer
+// cards: accounts are manager-only; aggregated requests and customer
 // orders admit supervisor (backend scopes supervisor to customer source).
 export function canAccessAccountsManagement(role: RvbRole): boolean {
-  return role === "manager" || role === "admin";
+  return role === "manager";
 }
 
 export function canAccessRequestsManagement(role: RvbRole): boolean {
-  return role === "manager" || role === "admin" || role === "supervisor";
+  return role === "manager" || role === "supervisor";
 }
 
 export function canAccessOrdersManagement(role: RvbRole): boolean {
-  return role === "manager" || role === "admin" || role === "supervisor";
+  return role === "manager" || role === "supervisor";
 }

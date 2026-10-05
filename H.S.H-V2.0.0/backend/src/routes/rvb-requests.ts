@@ -52,12 +52,12 @@ router.post("/:source/:id/review", async (req: RvbAuthRequest, res) => {
     const id = String((req.params as any).id);
     const { status, notes, items, total, calculation, date } = req.body as any;
     const role = user.role;
-    // Permissions: manager/admin can review all, supervisor only customer
+    // Permissions: manager can review all, supervisor only customer
     if (role === "supervisor" && source !== "customer") {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN", message: "Supervisor cannot review worker/supplier requests" });
       return;
     }
-    if (!["manager", "admin", "supervisor"].includes(role)) {
+    if (!["manager", "supervisor"].includes(role)) {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }

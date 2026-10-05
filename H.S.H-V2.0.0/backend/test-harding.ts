@@ -188,7 +188,7 @@ async function main() {
   const product = await createProduct("Chicken", 100, 200);
 
   const managerAcc = await createAccount("manager1", "manager", null, null);
-  const adminAcc = await createAccount("admin1", "admin", null, null);
+  const adminAcc = await createAccount("admin1", "manager", null, null);
   const workerAccA = await createAccount("workerA", "worker", "worker", workerA.id);
   const workerAccB = await createAccount("workerB", "worker", "worker", workerB.id);
   const supplierAccA = await createAccount("supplierA", "supplier", "supplier", supplierA.id);

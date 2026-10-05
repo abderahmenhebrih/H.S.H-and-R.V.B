@@ -49,11 +49,11 @@ function testAuthGate() {
 
 function testRoles() {
   console.log("• role helpers");
-  assert.strictEqual(RVB_ROLES.length, 6);
+  assert.strictEqual(RVB_ROLES.length, 5);
   assert.ok(!RVB_ROLES.includes("accountant" as any));
   assert.ok(!RVB_ROLES.includes("co-manager" as any));
+  assert.ok(!RVB_ROLES.includes("admin" as any));
   assert.strictEqual(isManagementRole("manager"), true);
-  assert.strictEqual(isManagementRole("admin"), true);
   assert.strictEqual(isManagementRole("supervisor"), true);
   assert.strictEqual(isManagementRole("worker"), false);
   assert.strictEqual(isPortalRole("worker"), true);

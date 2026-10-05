@@ -23,12 +23,12 @@ function resolveNotificationRoute(n: any, role: string): string | null {
     if (role === "worker") return "/(app)/profile/requests";
     if (role === "supplier") return "/(app)/profile/supplier-requests";
     if (role === "customer") return "/(app)/profile/customer-requests";
-    if (role === "supervisor" || role === "manager" || role === "admin") return "/(app)/profile/requests-management";
+    if (role === "supervisor" || role === "manager") return "/(app)/profile/requests-management";
     return "/(app)/profile/requests";
   }
   if (cat === "orders" || n.route === "/rvb/orders") {
     if (role === "customer") return "/(app)/profile/customer-orders";
-    if (role === "supervisor" || role === "manager" || role === "admin") return "/(app)/profile/orders";
+    if (role === "supervisor" || role === "manager") return "/(app)/profile/orders";
     return "/(app)/profile/customer-orders";
   }
   if (cat === "requests" && source === "worker" && role === "worker") return "/(app)/profile/requests";

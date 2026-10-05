@@ -1360,7 +1360,7 @@ export default function ChatDetail() {
                     <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>{t("conversation.edit", "Edit")}</Text>
                   </Pressable>
                 ) : null}
-                {menuMsg && (senderOf(menuMsg) === myId || account?.role === "admin") ? (
+                {menuMsg && (senderOf(menuMsg) === myId || account?.role === "manager") ? (
                   confirmDeleteId === msgId(menuMsg) ? (
                     <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}>
                       <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>

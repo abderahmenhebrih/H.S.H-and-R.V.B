@@ -27,7 +27,7 @@ export default function ProfileScreen() {
   if (account?.role === "customer") {
     return <ProfileShell><CustomerDashboard /></ProfileShell>;
   }
-  if (account?.role === "supervisor" || account?.role === "manager" || account?.role === "admin") {
+  if (account?.role === "supervisor" || account?.role === "manager") {
     return <ProfileShell><ManagementDashboard /></ProfileShell>;
   }
 

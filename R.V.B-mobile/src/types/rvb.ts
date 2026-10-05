@@ -1,4 +1,4 @@
-export type RvbRole = "manager" | "admin" | "supervisor" | "worker" | "supplier" | "customer";
+export type RvbRole = "manager" | "supervisor" | "worker" | "supplier" | "customer";
 
 export type RvbAccountStatus = "active" | "archived" | "disabled";
 export type RvbOnboardingStatus = "pending" | "complete";

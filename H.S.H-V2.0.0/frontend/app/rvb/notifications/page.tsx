@@ -463,7 +463,7 @@ function NotificationsInner() {
     return groups;
   }, [activities, lang, t]);
 
-  const isManager = user?.role === "manager" || user?.role === "admin";
+  const isManager = user?.role === "manager";
 
   return (
     <RvbShell activePage="notifications">

@@ -161,12 +161,12 @@ async function run() {
   console.log("\nL. Tabs: Main Chats, Secondary Chats, Profile + Management, Search, Settings -> PASS (code verified, 5 tabs in _layout)");
   // M. Role routing
   console.log("\nM. Role routing: test login each role");
-  for (const tag of ["qa.worker.mobile","qa.supplier.mobile","qa.customer.mobile","qa.supervisor.mobile","qa.admin.mobile","qa.manager.mobile"]) {
+  for (const tag of ["qa.worker.mobile","qa.supplier.mobile","qa.customer.mobile","qa.supervisor.mobile","qa.manager.mobile"]) {
     let r2 = await post("/api/rvb/auth/login", { tag, password: "Mobile123!", native: true });
     console.log(`  ${tag} -> ${r2.status} ${r2.json?.account?.role} onboard ${r2.json?.account?.onboardingStatus} mustChange ${r2.json?.mustChangePassword}`);
     if (r2.status!==200) throw new Error(`M failed for ${tag}`);
   }
-  console.log("  PASS all six roles routable");
+  console.log("  PASS all five roles routable");
 
   // N. Worker default landing Profile + Management
   console.log("\nN. Worker default landing: app logic initialRouteName=profile -> PASS (verified in _layout initialRouteName='profile')");

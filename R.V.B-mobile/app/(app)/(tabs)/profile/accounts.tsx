@@ -37,7 +37,7 @@ export default function AccountsScreen() {
       setAccounts(data);
       setFiltered(data);
     } catch (e: any) {
-      if (e?.code === "RVB_FORBIDDEN") setError("Forbidden: Manager/Admin only");
+      if (e?.code === "RVB_FORBIDDEN") setError("Forbidden: Manager only");
       else setError(e?.message || "Failed to load accounts");
     } finally {
       setLoading(false);
@@ -185,7 +185,7 @@ export default function AccountsScreen() {
           <TextInput placeholder="@tag (immutable, e.g. qa.tmp.mobile)" value={form.tag} onChangeText={(v) => setForm({ ...form, tag: v })} style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]} placeholderTextColor={theme.colors.textTertiary} autoCapitalize="none" testID="account-create-tag" />
           <TextInput placeholder="Display Name" value={form.displayName} onChangeText={(v) => setForm({ ...form, displayName: v })} style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]} placeholderTextColor={theme.colors.textTertiary} testID="account-create-displayName" />
           <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-            {(["worker", "supplier", "customer", "supervisor", "manager", "admin"] as const).map((r) => (
+            {(["worker", "supplier", "customer", "supervisor", "manager"] as const).map((r) => (
               <Pressable key={r} onPress={() => setForm({ ...form, role: r })} style={[styles.chip, { borderColor: form.role === r ? theme.colors.primary : theme.colors.border, backgroundColor: form.role === r ? theme.colors.primarySoft : theme.colors.surface }]}>
                 <Text style={[styles.chipText, { color: form.role === r ? theme.colors.primary : theme.colors.textSecondary }]}>{r}</Text>
               </Pressable>

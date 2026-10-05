@@ -104,7 +104,7 @@ export async function createCustomerRequest(input: {
       route: "/rvb/requests",
       sourceEventId,
       audienceType: "role",
-      audienceIds: ["manager", "admin", "supervisor"],
+      audienceIds: ["manager", "supervisor"],
       priority: "high",
       category: "requests",
     } as any);

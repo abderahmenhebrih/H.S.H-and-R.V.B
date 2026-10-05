@@ -105,7 +105,6 @@ async function seedRvbPhase1Fixtures() {
   const passwordHash = await hashPassword(QA_PASSWORD);
   const accounts = [
     { role: "manager", tag: "qa.rvb.p1.manager", displayName: "QA RVB Phase1 Manager", linkedEntityType: null, linkedEntityId: null },
-    { role: "admin", tag: "qa.rvb.p1.admin", displayName: "QA RVB Phase1 Admin", linkedEntityType: null, linkedEntityId: null },
     { role: "supervisor", tag: "qa.rvb.p1.supervisor", displayName: "QA RVB Phase1 Supervisor", linkedEntityType: "worker", linkedEntityId: supervisorWorkerId },
     { role: "worker", tag: "qa.rvb.p1.worker", displayName: "QA RVB Phase1 Worker", linkedEntityType: "worker", linkedEntityId: roleWorkerId },
     { role: "supplier", tag: "qa.rvb.p1.supplier", displayName: "QA RVB Phase1 Supplier", linkedEntityType: "supplier", linkedEntityId: supplierId },

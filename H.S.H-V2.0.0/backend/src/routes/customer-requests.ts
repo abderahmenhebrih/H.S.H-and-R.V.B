@@ -12,7 +12,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const role = user.role;
-    if (role !== "manager" && role !== "admin" && role !== "supervisor" && role !== "customer") {
+    if (role !== "manager" && role !== "supervisor" && role !== "customer") {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }
@@ -28,7 +28,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
       res.json({ success: true, requests: docs });
       return;
     }
-    // Manager/Admin/Supervisor can see all or filtered
+    // Manager/Supervisor can see all or filtered
     const cid = customerId && !Array.isArray(customerId) ? customerId : Array.isArray(customerId) ? customerId[0] : undefined;
     const docs = await listCustomerRequests(cid);
     res.json({ success: true, requests: docs });
@@ -41,7 +41,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const role = user.role;
-    if (role !== "manager" && role !== "admin" && role !== "supervisor" && role !== "customer") {
+    if (role !== "manager" && role !== "supervisor" && role !== "customer") {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }
@@ -59,7 +59,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
         return;
       }
     } else {
-      // manager/admin/supervisor must supply customerId
+      // manager/supervisor must supply customerId
       if (!cid) {
         res.status(400).json({ success: false, code: "RVB_CUSTOMER_REQUIRED" });
         return;
@@ -82,7 +82,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
   }
 });
 
-router.post("/:id/review", requireRvbRole("manager", "admin", "supervisor") as any, async (req: RvbAuthRequest, res) => {
+router.post("/:id/review", requireRvbRole("manager", "supervisor") as any, async (req: RvbAuthRequest, res) => {
   try {
     const rawId = (req.params as any).id;
     const id = Array.isArray(rawId) ? rawId[0] : rawId;

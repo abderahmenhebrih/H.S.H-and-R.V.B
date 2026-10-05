@@ -344,7 +344,7 @@
   color: var(--muted);
   line-height: 1;
 }
-.role_manager, .role_admin { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-ring); }
+.role_manager { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-ring); }
 .role_supervisor { background: rgba(125,90,40,0.09); color: #7d5a28; border-color: rgba(125,90,40,0.18); }
 .role_worker { background: var(--panel-hover); color: var(--muted); }
 .role_supplier { background: rgba(58,125,82,0.09); color: #3A7D52; border-color: rgba(58,125,82,0.18); }

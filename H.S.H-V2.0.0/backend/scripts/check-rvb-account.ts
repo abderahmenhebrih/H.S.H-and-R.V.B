@@ -24,9 +24,10 @@ async function main(): Promise<void> {
     await client.connect();
     const database = client.db();
     const accounts = database.collection("rvb_accounts");
-    const [totalAccounts, managementAccounts, account] = await Promise.all([
+    const [totalAccounts, managementAccounts, legacyAdminAccounts, account] = await Promise.all([
       accounts.countDocuments({}),
-      accounts.countDocuments({ role: { $in: ["manager", "admin"] } }),
+      accounts.countDocuments({ role: { $in: ["manager", "supervisor"] } }),
+      accounts.countDocuments({ role: "admin" }),
       accounts.findOne({ tag }, { projection: {
         _id: 0, id: 1, tag: 1, role: 1, status: 1, passwordHash: 1,
         mustChangePassword: 1, lockedUntil: 1,
@@ -40,6 +41,7 @@ async function main(): Promise<void> {
       refreshSecretConfigured: Boolean(process.env.RVB_JWT_REFRESH_SECRET),
       totalAccounts,
       managementAccounts,
+      legacyAdminAccounts,
       requestedTag: tag,
       found: Boolean(account),
       account: account ? {

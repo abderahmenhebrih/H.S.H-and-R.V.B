@@ -98,8 +98,8 @@ async function main() {
         console.error(`Existing account id ${existingId} not found`);
         process.exit(1);
       }
-      if (existing.role !== "manager" && existing.role !== "admin") {
-        console.warn(`Warning: existing role is ${existing.role}, expected manager/admin. Continuing.`);
+      if (existing.role !== "manager") {
+        console.warn(`Warning: existing role is ${existing.role}, expected manager. Continuing.`);
       }
       existing.passwordHash = await hashPassword(password!);
       existing.mustChangePassword = false;

@@ -1,6 +1,5 @@
 export const RVB_ROLES = [
   "manager",
-  "admin",
   "supervisor",
   "worker",
   "supplier",
@@ -9,7 +8,10 @@ export const RVB_ROLES = [
 
 export type RvbRole = typeof RVB_ROLES[number];
 
-export const RVB_MANAGEMENT_ROLES: readonly RvbRole[] = ["manager", "admin", "supervisor"] as const;
+// Canonical management roles. The retired "admin" role was consolidated into
+// "manager" (admin -> manager in-place migration); "admin" is no longer valid
+// for newly-created accounts and is rejected by validateRole below.
+export const RVB_MANAGEMENT_ROLES: readonly RvbRole[] = ["manager", "supervisor"] as const;
 export const RVB_PORTAL_ROLES: readonly RvbRole[] = ["worker", "supplier", "customer"] as const;
 
 export function isValidRvbRole(role: string): role is RvbRole {

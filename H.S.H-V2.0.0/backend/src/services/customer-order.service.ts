@@ -140,7 +140,7 @@ export async function createCustomerOrder(input: { customerId: string; accountId
       route: "/rvb/orders",
       sourceEventId,
       audienceType: "role",
-      audienceIds: ["manager", "admin", "supervisor"],
+      audienceIds: ["manager", "supervisor"],
       priority: "high",
       category: "orders",
     } as any);

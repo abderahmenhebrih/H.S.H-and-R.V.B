@@ -283,7 +283,7 @@ async function run(){
   console.log("\n15. Security");
   try{ await api("/api/rvb/suppliers","GET", undefined, supLogin.access); throw new Error("should 403"); }catch(e:any){ console.log(`   GET /suppliers blocked ${e.code} ${e.status}`); assert(e.status===403,"403"); }
   try{ await api("/api/rvb/accounts","GET", undefined, supLogin.access); throw new Error("should 403"); }catch(e:any){ console.log(`   GET /accounts blocked ${e.code} ${e.status}`); assert(e.status===403,"403"); }
-  // Try to review own request as supplier (should 403, only manager/admin)
+  // Try to review own request as supplier (should 403, only manager)
   const ownReq = hist.json.requests.find((r:any)=> r.status==="under_review");
   if(ownReq){
     try{ await api(`/api/rvb/supplier-requests/${ownReq.id}/review`,"POST",{status:"accepted"}, supLogin.access); throw new Error("supplier review should 403"); }catch(e:any){ console.log(`   Supplier review own blocked ${e.code} ${e.status}`); assert(e.status===403,"403"); }

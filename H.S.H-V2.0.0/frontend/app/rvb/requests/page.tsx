@@ -342,7 +342,7 @@ function RvbRequestsGuard({ children }: { children: React.ReactNode }) {
     return <div style={{ minHeight: "60vh", display: "grid", placeItems: "center", color: "var(--muted)" }}><Clock size={20} style={{ animation: "spin 0.8s linear infinite" } as any} /></div>;
   }
   if (!user) return <>{children}</>;
-  const allowed = ["manager", "admin", "supervisor"].includes(user.role);
+  const allowed = ["manager", "supervisor"].includes(user.role);
   if (!allowed) {
     return (
       <RvbShell activePage="requests">

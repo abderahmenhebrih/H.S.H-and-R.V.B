@@ -72,7 +72,8 @@ conversationSchema.index(
   { officialKind: 1 },
   { unique: true, partialFilterExpression: { type: "official_group", officialKind: { $type: "string" } } }
 );
-// Official private: unique per admin per entity (fix bug where second Admin was blocked). Only for official_private.
+// Official private: unique per manager per entity (previously per admin; admin
+// consolidated into manager). Only for official_private.
 conversationSchema.index(
   { officialKind: 1, linkedEntityId: 1, adminAccountId: 1 },
   {

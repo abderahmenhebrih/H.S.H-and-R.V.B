@@ -13,7 +13,7 @@ function buildRoleFilter(role: DirectoryRoleFilter): any {
   if (role === "supervisor") return { role: "supervisor" };
   if (role === "supplier") return { role: "supplier" };
   if (role === "customer") return { role: "customer" };
-  if (role === "management") return { role: { $in: ["manager", "admin", "supervisor"] } };
+  if (role === "management") return { role: { $in: ["manager", "supervisor"] } };
   return {};
 }
 
@@ -43,7 +43,7 @@ export async function listDirectory(params: {
       { tag: { $regex: escTag, $options: "i" } },
     ];
     // role label search: if q matches role string, include via role regex
-    const roleLabels = ["manager", "admin", "supervisor", "worker", "supplier", "customer"];
+    const roleLabels = ["manager", "supervisor", "worker", "supplier", "customer"];
     const lower = q.toLowerCase().replace(/^@/, "");
     if (roleLabels.some((r) => r.includes(lower) || lower.includes(r))) {
       // already handled by broader but add explicit role regex

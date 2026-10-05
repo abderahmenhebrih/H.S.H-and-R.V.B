@@ -12,7 +12,7 @@ import { applyLinkedEntityLifecycleToRvbAccount } from "../services/rvb-account.
 
 const router = Router();
 router.use(requireRvbAuth as any);
-router.use(requireRvbRole("manager", "admin", "supervisor") as any);
+router.use(requireRvbRole("manager", "supervisor") as any);
 
 function codeError(code: string, status: number, message?: string) {
   const err = new Error(message || code) as any;

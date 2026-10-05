@@ -1078,8 +1078,8 @@ export default function RvbDashboardPage() {
         const total = accs.length;
         const active = accs.filter((a: any) => a.status === "active").length;
         const byRole = (role: string, status: string) => accs.filter((a: any) => a.role === role && a.status === status).length;
-        const mgmtActive = accs.filter((a: any) => ["manager","admin","supervisor"].includes(a.role) && a.status === "active").length;
-        const mgmtArchived = accs.filter((a: any) => ["manager","admin","supervisor"].includes(a.role) && a.status === "archived").length;
+        const mgmtActive = accs.filter((a: any) => ["manager","supervisor"].includes(a.role) && a.status === "active").length;
+        const mgmtArchived = accs.filter((a: any) => ["manager","supervisor"].includes(a.role) && a.status === "archived").length;
         setAcctCounts({
           total,
           active,

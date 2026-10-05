@@ -56,16 +56,16 @@ function sanitizeAttachments(raw: unknown): any[] {
     }));
 }
 
-function toSafeMessage(doc: any, forAdmin = false) {
+function toSafeMessage(doc: any, forManager = false) {
   if (!doc) return null;
   const o = doc.toObject ? doc.toObject() : { ...doc };
-  if (!forAdmin && o.isDeleted) {
+  if (!forManager && o.isDeleted) {
     return {
       ...o,
       content: "Message deleted",
       editHistory: [],
       attachments: [],
-      // Keep audit only for admin, hide original
+      // Keep audit only for manager, hide original
     };
   }
   // Always serve sanitized URL metadata (drops any legacy binary fields).
@@ -107,7 +107,7 @@ export function messagePreviewText(content: string, attachments: Array<{ kind?: 
 }
 
 export function isManagementRole(role: string) {
-  return ["manager", "admin", "supervisor"].includes(role);
+  return ["manager", "supervisor"].includes(role);
 }
 
 export async function ensureMainChats() {
@@ -196,22 +196,26 @@ export async function syncMainMembership() {
     await conv.save();
   }
 
-  // Ensure admin↔entity private chats for each active worker/supplier/customer linked account where admin exists
-  const admins = accounts.filter((a: any) => a.role === "admin" && a.status === "active");
-  if (admins.length > 0) {
-    // Use first admin as canonical admin for official private (or all admins? spec says Admin ↔ each). For simplicity create per admin per entity.
-    for (const admin of admins) {
+  // Ensure manager↔entity private chats for each active worker/supplier/customer linked account.
+  // (Previously created per admin account; the retired admin role was
+  // consolidated into manager, so managers now own these private chats.
+  // Stored officialKind values "admin_*" and the adminAccountId field are
+  // kept verbatim for historical compatibility — they may hold a manager id.)
+  const managers = accounts.filter((a: any) => a.role === "manager" && a.status === "active");
+  if (managers.length > 0) {
+    // Create per manager per entity (spec: Management ↔ each).
+    for (const manager of managers) {
       for (const wid of workerIds) {
         const acc = byId.get(wid);
-        await ensureOfficialPrivate("admin_worker", acc.linkedEntityId, acc.id, admin.id);
+        await ensureOfficialPrivate("admin_worker", acc.linkedEntityId, acc.id, manager.id);
       }
       for (const sid of supplierIds) {
         const acc = byId.get(sid);
-        await ensureOfficialPrivate("admin_supplier", acc.linkedEntityId, acc.id, admin.id);
+        await ensureOfficialPrivate("admin_supplier", acc.linkedEntityId, acc.id, manager.id);
       }
       for (const cid of customerIds) {
         const acc = byId.get(cid);
-        await ensureOfficialPrivate("admin_customer", acc.linkedEntityId, acc.id, admin.id);
+        await ensureOfficialPrivate("admin_customer", acc.linkedEntityId, acc.id, manager.id);
       }
     }
   }
@@ -228,7 +232,7 @@ export async function ensureOfficialPrivate(
     admin_supplier: "suppliers_group",
     admin_customer: "customers_group",
   };
-  // deterministic id: official-private-${kind}-${entityId}-${adminId} ? But spec says one per entity lifecycle. If multiple admins, each admin has its own chat.
+  // deterministic id: official-private-${kind}-${entityId}-${managerId}. If multiple managers, each manager has its own chat.
   const id = `official-private-${kind}-${entityId}-${adminAccountId}`;
   const existing = await ConversationModel.findOne({ id }).lean();
   if (existing) {
@@ -263,7 +267,7 @@ export async function ensureOfficialPrivate(
     avatar: null,
     createdBy: adminAccountId,
     participants: [
-      { accountId: adminAccountId, role: adminAcc?.role || "admin", joinedAt: now, leftAt: null },
+      { accountId: adminAccountId, role: adminAcc?.role || "manager", joinedAt: now, leftAt: null },
       { accountId: entityAccountId, role: entityAcc?.role || "unknown", joinedAt: now, leftAt: null },
     ],
     dmKey: null,
@@ -568,7 +572,7 @@ export async function sendMessage(convId: string, senderId: string, content: str
         workers: (acc) => acc?.role === "worker",
         suppliers: (acc) => acc?.role === "supplier",
         customers: (acc) => acc?.role === "customer",
-        managers: (acc) => ["manager", "admin", "supervisor"].includes(acc?.role),
+        managers: (acc) => ["manager", "supervisor"].includes(acc?.role),
         everyone: () => true,
       };
       for (const tag of mentions) {
@@ -727,12 +731,12 @@ export async function editMessage(messageId: string, editorId: string, newConten
   return msg.toObject ? msg.toObject() : msg;
 }
 
-export async function deleteMessage(messageId: string, deleterId: string, isAdmin = false) {
+export async function deleteMessage(messageId: string, deleterId: string, isManager = false) {
   const msg: any = await MessageModel.findOne({ id: messageId });
   if (!msg) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
   if (msg.isDeleted) throw codeError("RVB_ALREADY_DELETED", 400);
-  // Only sender can delete, unless admin audited delete? For now only sender
-  if (msg.senderAccountId !== deleterId && !isAdmin) throw codeError("RVB_FORBIDDEN", 403);
+  // Only sender can delete, unless manager audited delete (transferred from retired admin).
+  if (msg.senderAccountId !== deleterId && !isManager) throw codeError("RVB_FORBIDDEN", 403);
   msg.isDeleted = true;
   msg.deletedAt = Date.now();
   msg.deletedBy = deleterId;
@@ -752,7 +756,8 @@ export async function deleteMessage(messageId: string, deleterId: string, isAdmi
 
 export async function getMessageAudit(messageId: string, requesterId: string) {
   const acc: any = await RvbAccountModel.findOne({ id: requesterId }).lean();
-  if (!acc || acc.role !== "admin") throw codeError("RVB_FORBIDDEN", 403);
+  // Manager-only (transferred from retired admin role).
+  if (!acc || acc.role !== "manager") throw codeError("RVB_FORBIDDEN", 403);
   const audits = await MessageAuditModel.find({ messageId }).sort({ createdAt: 1 }).lean();
   const msg: any = await MessageModel.findOne({ id: messageId }).lean();
   return { message: msg, audits };
@@ -930,8 +935,8 @@ export async function listMessages(conversationId: string, requesterId: string, 
   const msgs = await MessageModel.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
   // Return oldest first for UI
   const reversed = msgs.reverse();
-  const isAdmin = (await RvbAccountModel.findOne({ id: requesterId }).lean() as any)?.role === "admin";
-  return reversed.map((m: any) => toSafeMessage(m, isAdmin));
+  const isManager = (await RvbAccountModel.findOne({ id: requesterId }).lean() as any)?.role === "manager";
+  return reversed.map((m: any) => toSafeMessage(m, isManager));
 }
 
 export async function getUnreadCounts(accountId: string) {

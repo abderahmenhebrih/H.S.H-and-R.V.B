@@ -20,12 +20,12 @@ router.get("/products", async (req: RvbAuthRequest, res) => {
     const role = req.rvbUser!.role;
     // Enforce catalog scope against role
     if (scope === "customer") {
-      if (!["customer", "manager", "admin", "supervisor"].includes(role)) {
+      if (!["customer", "manager", "supervisor"].includes(role)) {
         res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
         return;
       }
     } else if (scope === "supplier") {
-      if (!["supplier", "manager", "admin"].includes(role)) {
+      if (!["supplier", "manager"].includes(role)) {
         res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
         return;
       }

@@ -110,7 +110,7 @@ export async function createSupplierRequest(input: {
       route: "/rvb/requests",
       sourceEventId,
       audienceType: "role",
-      audienceIds: ["manager", "admin"],
+      audienceIds: ["manager"],
       priority: "high",
       category: "requests",
     } as any);

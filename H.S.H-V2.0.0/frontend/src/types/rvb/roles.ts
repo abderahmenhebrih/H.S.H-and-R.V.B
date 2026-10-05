@@ -1,6 +1,5 @@
 export const RVB_ROLES = [
   "manager",
-  "admin",
   "supervisor",
   "worker",
   "supplier",
@@ -9,7 +8,9 @@ export const RVB_ROLES = [
 
 export type RvbRole = typeof RVB_ROLES[number];
 
-export const RVB_MANAGEMENT_ROLES: readonly RvbRole[] = ["manager", "admin", "supervisor"] as const;
+// Manager is the only top-level management role (retired "admin"
+// consolidated into "manager"; "admin" is no longer a valid role).
+export const RVB_MANAGEMENT_ROLES: readonly RvbRole[] = ["manager", "supervisor"] as const;
 export const RVB_PORTAL_ROLES: readonly RvbRole[] = ["worker", "supplier", "customer"] as const;
 
 export function isManagementRole(role: string): boolean {

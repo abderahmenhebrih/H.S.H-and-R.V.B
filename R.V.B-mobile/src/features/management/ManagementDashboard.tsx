@@ -32,7 +32,7 @@ export function ManagementDashboard() {
   }, [role]);
 
   const isSupervisor = role === "supervisor";
-  const isManager = role === "manager" || role === "admin";
+  const isManager = role === "manager";
 
   const supervisorCards: CardDef[] = [
     { key: "customers", title: "Customers", hint: "List, create, edit, sales & orders", icon: "people", route: "/(app)/profile/customers" },

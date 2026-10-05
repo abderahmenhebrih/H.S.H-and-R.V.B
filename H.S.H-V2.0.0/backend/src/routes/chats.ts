@@ -293,8 +293,8 @@ router.delete("/messages/:messageId", async (req: RvbAuthRequest, res) => {
     const user = req.rvbUser!;
     const mid = String((req.params as any).messageId);
     const acc: any = await RvbAccountModel.findOne({ id: user.accountId }).lean();
-    const isAdmin = acc?.role === "admin";
-    const msg = await chatSvc.deleteMessage(mid, user.accountId, isAdmin);
+    const isManager = acc?.role === "manager";
+    const msg = await chatSvc.deleteMessage(mid, user.accountId, isManager);
     try {
       const { getIO } = await import("../lib/chat-socket");
       const io = getIO();
@@ -306,7 +306,7 @@ router.delete("/messages/:messageId", async (req: RvbAuthRequest, res) => {
   }
 });
 
-// GET /api/rvb/chats/messages/:messageId/audit  admin only
+// GET /api/rvb/chats/messages/:messageId/audit  manager only (transferred from retired admin)
 router.get("/messages/:messageId/audit", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;

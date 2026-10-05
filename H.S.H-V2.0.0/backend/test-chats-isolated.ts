@@ -48,7 +48,7 @@ async function run() {
 
   // Accounts
   const mgr = await RvbAccountModel.create({ id: `acc-mgr-${now}`, createdAt: now, updatedAt: now, tag: "mgr.test", displayName: "Manager", role: "manager", linkedEntityType: null, linkedEntityId: null, status: "active", onboardingStatus: "complete" } as any);
-  const adm = await RvbAccountModel.create({ id: `acc-adm-${now}`, createdAt: now, updatedAt: now, tag: "admin.test", displayName: "Admin", role: "admin", linkedEntityType: null, linkedEntityId: null, status: "active", onboardingStatus: "complete" } as any);
+  const adm = await RvbAccountModel.create({ id: `acc-adm-${now}`, createdAt: now, updatedAt: now, tag: "admin.test", displayName: "Second Manager", role: "manager", linkedEntityType: null, linkedEntityId: null, status: "active", onboardingStatus: "complete" } as any);
   const sup = await RvbAccountModel.create({ id: `acc-sup-${now}`, createdAt: now, updatedAt: now, tag: "sup.test", displayName: "Supervisor", role: "supervisor", linkedEntityType: "worker", linkedEntityId: (w1 as any).id, status: "active", onboardingStatus: "complete" } as any);
   const wAcc1 = await RvbAccountModel.create({ id: `acc-w1-${now}`, createdAt: now, updatedAt: now, tag: "ahmed.worker", displayName: "Ahmed Benali", role: "worker", linkedEntityType: "worker", linkedEntityId: (w1 as any).id, status: "active", onboardingStatus: "complete", profilePicture: null } as any);
   const wAcc2 = await RvbAccountModel.create({ id: `acc-w2-${now}`, createdAt: now, updatedAt: now, tag: "youssef.worker", displayName: "Youssef Worker", role: "worker", linkedEntityType: "worker", linkedEntityId: (w2 as any).id, status: "active", onboardingStatus: "complete" } as any);
@@ -80,8 +80,8 @@ async function run() {
   try {
     const admConvs = await chatSvc.listConversationsForUser((adm as any).id);
     const hasAll = ["main-workers","main-suppliers","main-customers"].every((id) => admConvs.some((c: any) => c.id === id));
-    record("2. Admin in all official groups", hasAll, "");
-  } catch (e: any) { record("2. Admin in all official groups", false, e.message); }
+    record("2. Second manager in all official groups", hasAll, "");
+  } catch (e: any) { record("2. Second manager in all official groups", false, e.message); }
 
   try {
     const supConvs = await chatSvc.listConversationsForUser((sup as any).id);
@@ -94,24 +94,24 @@ async function run() {
     const inWorkers = w1Convs.some((c: any) => c.id === "main-workers");
     const notInSuppliers = !w1Convs.some((c: any) => c.id === "main-suppliers");
     const hasPrivate = w1Convs.some((c: any) => c.type === "official_private" && c.officialKind === "admin_worker");
-    record("4. Worker in Workers group + admin private only", inWorkers && notInSuppliers && hasPrivate, `inWorkers=${inWorkers} notSup=${notInSuppliers} private=${hasPrivate}`);
-  } catch (e: any) { record("4. Worker in Workers group + admin private only", false, e.message); }
+    record("4. Worker in Workers group + manager private only", inWorkers && notInSuppliers && hasPrivate, `inWorkers=${inWorkers} notSup=${notInSuppliers} private=${hasPrivate}`);
+  } catch (e: any) { record("4. Worker in Workers group + manager private only", false, e.message); }
 
   try {
     const sConvs = await chatSvc.listConversationsForUser((sAcc1 as any).id);
     const inSup = sConvs.some((c: any) => c.id === "main-suppliers");
     const notInWorkers = !sConvs.some((c: any) => c.id === "main-workers");
     const hasPriv = sConvs.some((c: any) => c.type === "official_private" && c.officialKind === "admin_supplier");
-    record("5. Supplier in Suppliers group + admin private only", inSup && notInWorkers && hasPriv, "");
-  } catch (e: any) { record("5. Supplier in Suppliers group + admin private only", false, e.message); }
+    record("5. Supplier in Suppliers group + manager private only", inSup && notInWorkers && hasPriv, "");
+  } catch (e: any) { record("5. Supplier in Suppliers group + manager private only", false, e.message); }
 
   try {
     const cConvs = await chatSvc.listConversationsForUser((cAcc1 as any).id);
     const inCust = cConvs.some((c: any) => c.id === "main-customers");
     const notInWorkers = !cConvs.some((c: any) => c.id === "main-workers");
     const hasPriv = cConvs.some((c: any) => c.type === "official_private" && c.officialKind === "admin_customer");
-    record("6. Customer in Customers group + admin private only", inCust && notInWorkers && hasPriv, "");
-  } catch (e: any) { record("6. Customer in Customers group + admin private only", false, e.message); }
+    record("6. Customer in Customers group + manager private only", inCust && notInWorkers && hasPriv, "");
+  } catch (e: any) { record("6. Customer in Customers group + manager private only", false, e.message); }
 
   try {
     const w1Convs = await chatSvc.listConversationsForUser((wAcc1 as any).id);
@@ -200,7 +200,7 @@ async function run() {
     record("11d. Audit history retained for edit", audit.audits.some((a: any) => a.action === "edit"), `audits ${audit.audits.length}`);
   } catch (e: any) { record("11. Edit window", false, e.message); }
 
-  // 12 Delete soft + admin audit
+  // 12 Delete soft + manager audit (transferred from retired admin)
   try {
     const m = await chatSvc.sendMessage(g2.id, (wAcc1 as any).id, "To delete");
     const del = await chatSvc.deleteMessage(m.id, (wAcc1 as any).id);
@@ -213,33 +213,34 @@ async function run() {
     const list = await chatSvc.listMessages(g2.id, (wAcc2 as any).id);
     const fetched = list.find((x: any) => x.id === m.id);
     record("12c. Normal user sees Message deleted", fetched && fetched.content === "Message deleted" && fetched.isDeleted, fetched?.content);
-    // Admin audit can inspect original
+    // Manager audit can inspect original (transferred from retired admin)
     const audit = await chatSvc.getMessageAudit(m.id, (adm as any).id);
-    record("12d. Admin audit can inspect original", audit.message && audit.message.isDeleted && audit.audits.some((a: any) => a.action === "delete"), ``);
+    record("12d. Manager audit can inspect original", audit.message && audit.message.isDeleted && audit.audits.some((a: any) => a.action === "delete"), ``);
     try {
       await chatSvc.getMessageAudit(m.id, (wAcc1 as any).id);
       record("12e. Normal user cannot audit", false, "did not throw");
     } catch (e: any) { record("12e. Normal user cannot audit", e.code === "RVB_FORBIDDEN", e.code); }
   } catch (e: any) { record("12. Delete", false, e.message); }
 
-  // 12f-12j Delete policy matrix (existing sender+admin-only policy)
+  // 12f-12j Delete policy matrix (sender + manager moderation, transferred from retired admin)
   try {
     const target = await chatSvc.sendMessage(g2.id, (wAcc1 as any).id, "Policy target");
     try {
-      await chatSvc.deleteMessage(target.id, (mgr as any).id);
-      record("12f. Manager delete rejected", false, "did not throw");
-    } catch (e: any) { record("12f. Manager delete rejected", e.code === "RVB_FORBIDDEN", e.code); }
+      const mgrDel = await chatSvc.deleteMessage(target.id, (mgr as any).id, true);
+      record("12f. Manager moderation delete succeeds", (mgrDel as any).isDeleted === true, "");
+    } catch (e: any) { record("12f. Manager moderation delete succeeds", false, e.code); }
+    const target2 = await chatSvc.sendMessage(g2.id, (wAcc1 as any).id, "Policy target 2");
     try {
-      await chatSvc.deleteMessage(target.id, (sup as any).id);
+      await chatSvc.deleteMessage(target2.id, (sup as any).id);
       record("12g. Supervisor delete rejected", false, "did not throw");
     } catch (e: any) { record("12g. Supervisor delete rejected", e.code === "RVB_FORBIDDEN", e.code); }
     try {
       await chatSvc.deleteMessage("msg-does-not-exist", (wAcc1 as any).id);
       record("12h. Nonexistent delete 404", false, "did not throw");
     } catch (e: any) { record("12h. Nonexistent delete 404", e.code === "RVB_MESSAGE_NOT_FOUND", e.code); }
-    await chatSvc.deleteMessage(target.id, (wAcc1 as any).id);
+    await chatSvc.deleteMessage(target2.id, (wAcc1 as any).id);
     try {
-      await chatSvc.deleteMessage(target.id, (wAcc1 as any).id);
+      await chatSvc.deleteMessage(target2.id, (wAcc1 as any).id);
       record("12i. Double delete rejected", false, "did not throw");
     } catch (e: any) { record("12i. Double delete rejected", e.code === "RVB_ALREADY_DELETED", e.code); }
     // Media-bearing doc deleted: safe view hides content AND attachments/URLs

@@ -36,7 +36,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const role = user.role;
-    if (role === "manager" || role === "admin") {
+    if (role === "manager") {
       const { workerId } = req.query as any;
       const filter: any = {};
       if (workerId) filter.workerId = Array.isArray(workerId) ? workerId[0] : workerId;
@@ -68,7 +68,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
   }
 });
 
-router.post("/", requireRvbRole("manager", "admin") as any, async (req: RvbAuthRequest, res) => {
+router.post("/", requireRvbRole("manager") as any, async (req: RvbAuthRequest, res) => {
   const session = await mongoose.startSession();
   try {
     const { workerId, type, amount, note } = req.body as any;

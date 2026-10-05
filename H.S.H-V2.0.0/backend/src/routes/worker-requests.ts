@@ -19,7 +19,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
     const { workerId } = req.query as any;
     const wid = Array.isArray(workerId) ? workerId[0] : workerId;
     const role = user.role;
-    if (role === "manager" || role === "admin") {
+    if (role === "manager") {
       const docs = await listWorkerRequests(wid);
       res.json({ success: true, requests: docs });
       return;
@@ -51,7 +51,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const role = user.role;
-    if (role !== "manager" && role !== "admin" && role !== "worker" && role !== "supervisor") {
+    if (role !== "manager" && role !== "worker" && role !== "supervisor") {
       res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
       return;
     }
@@ -71,7 +71,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
       }
       effectiveWorkerId = linkedId;
     } else {
-      // manager/admin must supply workerId
+      // manager must supply workerId
       if (!effectiveWorkerId) {
         res.status(400).json({ success: false, code: "RVB_WORKER_REQUIRED" });
         return;
@@ -93,7 +93,7 @@ router.post("/", async (req: RvbAuthRequest, res) => {
 });
 
 // POST /api/rvb/worker-requests/:id/review  { status, notes }
-router.post("/:id/review", requireRvbRole("manager", "admin") as any, async (req: RvbAuthRequest, res) => {
+router.post("/:id/review", requireRvbRole("manager") as any, async (req: RvbAuthRequest, res) => {
   try {
     const rawId = (req.params as any).id;
     const id = Array.isArray(rawId) ? rawId[0] : rawId;

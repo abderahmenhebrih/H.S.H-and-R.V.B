@@ -89,8 +89,8 @@ async function main() {
   const cA=await createCustomer("CA");
   const mgrA=await createAccount("mgrA","manager",null,null);
   const mgrB=await createAccount("mgrB","manager",null,null);
-  const admin1=await createAccount("admin1","admin",null,null);
-  const admin2=await createAccount("admin2","admin",null,null);
+  const admin1=await createAccount("admin1","manager",null,null);
+  const admin2=await createAccount("admin2","manager",null,null);
   const workerAccA=await createAccount("workerA","worker","worker",wA.id);
   const workerAccB=await createAccount("workerB","worker","worker",wB.id);
   const supplierAccA=await createAccount("supplierA","supplier","supplier",sA.id);
@@ -312,7 +312,7 @@ async function main() {
   } else {
     assert(false, "@workers notification created", "not found");
   }
-  // @managers only manager/admin/supervisor
+  // @managers only manager/supervisor
   const msgManagers = await chatSvc.sendMessage(groupWorkers.id, workerAccA.id, "Hi @managers");
   const notifMan:any=await NotificationModel.findOne({ sourceEventId:`chat:msg:${msgManagers.id}:notif`}).lean();
   if(notifMan){

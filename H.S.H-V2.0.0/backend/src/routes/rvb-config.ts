@@ -49,9 +49,9 @@ router.get("/", async (req: RvbAuthRequest, res) => {
   }
 });
 
-// Mutation only manager/admin creates SyncChange
+// Mutation only manager creates SyncChange
 // PATCH /api/rvb/config { currency }
-router.patch("/", requireRvbRole("manager", "admin") as any, async (req: RvbAuthRequest, res) => {
+router.patch("/", requireRvbRole("manager") as any, async (req: RvbAuthRequest, res) => {
   try {
     const { currency, language, customerTypes, workerPositions } = req.body as any;
     // Validate currency if provided

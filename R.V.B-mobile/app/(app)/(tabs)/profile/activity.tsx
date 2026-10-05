@@ -27,7 +27,7 @@ export default function ActivityScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      if (role === "manager" || role === "admin" || role === "supervisor") {
+      if (role === "manager" || role === "supervisor") {
         // General activities for management (filtered by role)
         const res = await api.get<{ success: boolean; activities: any[] }>("/api/rvb/activities?limit=50");
         setActivities(res.activities || []);

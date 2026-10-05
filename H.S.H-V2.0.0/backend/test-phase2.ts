@@ -181,12 +181,11 @@ async function runIntegrationTests() {
     record("Create manager with password", !!manager && manager.mustChangePassword === true && !!manager.passwordHash, `tag=${manager.tag}`);
   } catch (e: any) { record("Create manager with password", false, e.code || e.message); }
 
-  // Create admin
-  let admin: any = null;
+  // Admin role retired (consolidated into manager): creation must be rejected
   try {
-    admin = await svc.createRvbAccount({ tag: `adm.int.${Date.now().toString().slice(-6)}`, displayName: "Int Admin", role: "admin", password: "AdminPass123", confirmPassword: "AdminPass123" } as any);
-    record("Create admin with password", !!admin, "");
-  } catch (e: any) { record("Create admin with password", false, e.code); }
+    await svc.createRvbAccount({ tag: `adm.int.${Date.now().toString().slice(-6)}`, displayName: "Int Admin", role: "admin", password: "AdminPass123", confirmPassword: "AdminPass123" } as any);
+    record("Create admin rejected (role retired)", false, "did not throw");
+  } catch (e: any) { record("Create admin rejected (role retired)", e.code === "RVB_ROLE_INVALID", `code=${e.code}`); }
 
   // Create worker linked
   let workerAcc: any = null;
@@ -352,12 +351,12 @@ async function runIntegrationTests() {
 
   // PasswordHash never serialized - check via accounts GET (need auth)
   try {
-    const freshLogin = await request(app).post("/api/rvb/auth/login").send({ tag: admin.tag, password: "AdminPass123" });
-    const adminToken = freshLogin.body.accessToken;
-    const accRes = await request(app).get("/api/rvb/accounts").set("Authorization", `Bearer ${adminToken}`);
+    const freshLogin = await request(app).post("/api/rvb/auth/login").send({ tag: manager.tag, password: "NewPass123" });
+    const mgrToken2 = freshLogin.body.accessToken;
+    const accRes = await request(app).get("/api/rvb/accounts").set("Authorization", `Bearer ${mgrToken2}`);
     const hasHash = accRes.body.accounts?.some((a: any) => "passwordHash" in a);
     record("26b passwordHash never serialized (accounts list)", !hasHash, `hasHash=${hasHash} status=${accRes.status}`);
-    const single = await request(app).get(`/api/rvb/accounts/${manager.id}`).set("Authorization", `Bearer ${adminToken}`);
+    const single = await request(app).get(`/api/rvb/accounts/${manager.id}`).set("Authorization", `Bearer ${mgrToken2}`);
     record("26c single account no hash", !("passwordHash" in (single.body.account || {})), `status=${single.status}`);
   } catch (e: any) { record("26 serialized", false, e.message); }
 
@@ -369,11 +368,9 @@ async function runIntegrationTests() {
     const mgrRes = await request(app).get("/api/rvb/accounts").set("Authorization", `Bearer ${mgrToken}`);
     record("27. Manager can access account admin API", mgrRes.status === 200, `status=${mgrRes.status}`);
 
-    // Admin can access
-    const admLogin = await request(app).post("/api/rvb/auth/login").send({ tag: admin.tag, password: "AdminPass123" });
-    const admToken = admLogin.body.accessToken;
-    const admRes = await request(app).get("/api/rvb/accounts").set("Authorization", `Bearer ${admToken}`);
-    record("28. Admin can access account admin API", admRes.status === 200, `status=${admRes.status}`);
+    // Retired admin role rejected at API creation
+    const admRes = await request(app).post("/api/rvb/accounts").set("Authorization", `Bearer ${mgrToken}`).send({ tag: `adm.api.${Date.now().toString().slice(-6)}`, displayName: "API Admin", role: "admin", password: "AdminPass123", confirmPassword: "AdminPass123" });
+    record("28. API rejects role=admin", admRes.status === 400 && admRes.body.code === "RVB_ROLE_INVALID", `status=${admRes.status} code=${admRes.body.code}`);
 
     // Supervisor cannot
     const supAcc: any = await svc.createRvbAccount({ tag: `sup.int.${Date.now().toString().slice(-6)}`, displayName: "Sup Test", role: "supervisor", password: "SupPass123", confirmPassword: "SupPass123" } as any);

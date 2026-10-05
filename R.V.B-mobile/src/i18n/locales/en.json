@@ -87,7 +87,11 @@
     "language": "Language",
     "theme": "Theme",
     "about": "About",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "signOutTitle": "Sign out",
+    "signOutConfirm": "Are you sure you want to sign out of this account?",
+    "cancel": "Cancel",
+    "signOutFailed": "Sign out failed. Please try again."
   },
   "profile": {
     "account": "Account",

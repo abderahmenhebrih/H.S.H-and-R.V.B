@@ -24,17 +24,41 @@ export function AppModal({ visible, onClose, title, children }: { visible: boole
   );
 }
 
-export function ConfirmModal({ visible, onClose, onConfirm, title, message, confirmLabel = "Confirm", variant = "primary" }: { visible: boolean; onClose: () => void; onConfirm: () => void; title: string; message?: string; confirmLabel?: string; variant?: "primary" | "danger" }) {
+export function ConfirmModal({
+  visible,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  variant = "primary",
+  confirmLoading = false,
+  error = null,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: "primary" | "danger";
+  confirmLoading?: boolean;
+  error?: string | null;
+}) {
   const { theme } = useTheme();
+  const busy = confirmLoading;
   return (
     <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={styles.backdrop} accessibilityViewIsModal>
         <View style={[styles.cardSmall, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }, theme.shadows.modal]}>
-          <Text style={[styles.title, { color: theme.colors.text, marginBottom: 8 }]}>{title}</Text>
-          {message ? <Text style={{ color: theme.colors.textSecondary, fontSize: 13, lineHeight: 18 }}>{message}</Text> : null}
+          <Text style={[styles.title, styles.centerText, { color: theme.colors.text, marginBottom: 8 }]}>{title}</Text>
+          {message ? <Text style={[styles.centerText, { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 18 }]}>{message}</Text> : null}
+          {error ? <Text style={[styles.centerText, { color: theme.colors.error, fontSize: 12, marginTop: 8 }]}>{error}</Text> : null}
           <View style={{ flexDirection: "row", gap: 12, marginTop: 16, justifyContent: "flex-end" }}>
-            <Button title="Cancel" variant="secondary" onPress={onClose} />
-            <Button title={confirmLabel} variant={variant} onPress={onConfirm} />
+            <Button title={cancelLabel} variant="secondary" onPress={onClose} disabled={busy} testID="confirm-modal-cancel" />
+            <Button title={confirmLabel} variant={variant} onPress={onConfirm} loading={busy} testID="confirm-modal-confirm" />
           </View>
         </View>
       </View>
@@ -45,7 +69,8 @@ export function ConfirmModal({ visible, onClose, onConfirm, title, message, conf
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", padding: 20 },
   card: { borderRadius: 16, borderWidth: 1, maxHeight: "85%", overflow: "hidden" },
-  cardSmall: { borderRadius: 16, borderWidth: 1, padding: 20 },
+  cardSmall: { borderRadius: 20, borderWidth: 1, padding: 20 },
+  centerText: { textAlign: "center" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1 },
   title: { fontSize: 16, fontWeight: "800" },
   close: { width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },

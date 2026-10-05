@@ -87,7 +87,11 @@
     "language": "اللغة",
     "theme": "المظهر",
     "about": "حول",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "signOutTitle": "تسجيل الخروج",
+    "signOutConfirm": "هل أنت متأكد أنك تريد تسجيل الخروج من هذا الحساب؟",
+    "cancel": "إلغاء",
+    "signOutFailed": "فشل تسجيل الخروج. حاول مرة أخرى."
   },
   "profile": {
     "account": "الحساب",

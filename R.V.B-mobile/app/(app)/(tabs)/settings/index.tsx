@@ -4,6 +4,7 @@ import { Screen } from "@/components/common/Screen";
 import { Button } from "@/components/common/Button";
 import { Card } from "@/components/common/Card";
 import { Avatar } from "@/components/common/Avatar";
+import { ConfirmModal } from "@/components/common/Modal";
 import { useTheme } from "@/theme/useTheme";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/api/client";
@@ -14,6 +15,9 @@ export default function SettingsScreen() {
   const { account, logout } = useAuthStore();
   const { t, isRTL: rtl } = useLanguage();
   const [prefs, setPrefs] = useState<{ language: string; theme: string } | null>(null);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -47,17 +51,31 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    Alert.alert("Sign out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-        },
-      },
-    ]);
+  const handleLogoutPress = () => {
+    setSignOutError(null);
+    setSignOutOpen(true);
+  };
+
+  const handleLogoutCancel = () => {
+    if (signingOut) return;
+    setSignOutOpen(false);
+  };
+
+  const handleLogoutConfirm = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError(null);
+    try {
+      // Identical semantics to the previous native-Alert flow: the shared
+      // logout clears locally regardless of server result; the modal only
+      // closes afterwards. Failure surfaces inside the modal, never Alert.
+      await logout();
+      setSignOutOpen(false);
+    } catch (e: any) {
+      setSignOutError(t("settings.signOutFailed", "Sign out failed. Please try again."));
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   return (
@@ -111,9 +129,21 @@ export default function SettingsScreen() {
         </Card>
 
         <View style={{ marginTop: 24 }}>
-          <Button title={t("settings.signOut", "Sign out")} onPress={handleLogout} variant="secondary" />
+          <Button title={t("settings.signOut", "Sign out")} onPress={handleLogoutPress} variant="secondary" testID="settings-signout" />
         </View>
         <Text style={[styles.hint, { color: theme.colors.textTertiary, textAlign: "center", marginTop: 12 }]}>Build: Hebrih Slaughter House • R.V.B</Text>
+        <ConfirmModal
+          visible={signOutOpen}
+          onClose={handleLogoutCancel}
+          onConfirm={handleLogoutConfirm}
+          title={t("settings.signOutTitle", "Sign out")}
+          message={t("settings.signOutConfirm", "Are you sure you want to sign out of this account?")}
+          cancelLabel={t("settings.cancel", "Cancel")}
+          confirmLabel={t("settings.signOut", "Sign out")}
+          variant="danger"
+          confirmLoading={signingOut}
+          error={signOutError}
+        />
       </ScrollView>
     </Screen>
   );

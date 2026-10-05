@@ -87,7 +87,11 @@
     "language": "Langue",
     "theme": "Thème",
     "about": "À propos",
-    "signOut": "Se déconnecter"
+    "signOut": "Se déconnecter",
+    "signOutTitle": "Déconnexion",
+    "signOutConfirm": "Êtes-vous sûr de vouloir vous déconnecter de ce compte ?",
+    "cancel": "Annuler",
+    "signOutFailed": "Échec de la déconnexion. Veuillez réessayer."
   },
   "profile": {
     "account": "Compte",

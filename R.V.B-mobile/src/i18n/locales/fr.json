@@ -6,6 +6,24 @@
     "changePassword": "Changer le mot de passe",
     "onboarding": "Intégration"
   },
+  "login": {
+    "signInTitle": "Se connecter",
+    "tagLabel": "@tag",
+    "passwordLabel": "Mot de passe",
+    "tagPlaceholder": "@abattoire",
+    "show": "Afficher",
+    "hide": "Masquer",
+    "forgot": "Identifiants oubliés ?",
+    "contactAdmin": "Contacter votre administrateur",
+    "linkOpenFailed": "Impossible d'ouvrir le lien. Veuillez réessayer plus tard.",
+    "tagRequired": "Tag requis",
+    "tagInvalid": "Tag invalide. Utilisez 3-30 car. : a-z 0-9 . _",
+    "passwordRequired": "Mot de passe requis",
+    "invalidCredentials": "Tag ou mot de passe invalide",
+    "temporarilyLocked": "Compte temporairement verrouillé (5 échecs, 15 min). Réessayez plus tard.",
+    "networkError": "Erreur réseau. Vérifiez la connexion et EXPO_PUBLIC_RVB_API_URL",
+    "loginFailed": "Échec de connexion"
+  },
   "tabs": {
     "mainChats": "Chats principaux",
     "secondaryChats": "Secondaire",

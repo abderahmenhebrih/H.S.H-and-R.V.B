@@ -3,6 +3,7 @@ import { View, TextInput, Text, StyleSheet, Pressable } from "react-native";
 import type {
   TextInput as RNTextInput,
   TextInputProps,
+  TextStyle,
   NativeSyntheticEvent,
   TargetedEvent,
 } from "react-native";
@@ -10,6 +11,13 @@ import { useTheme } from "@/theme/useTheme";
 
 interface Props {
   label?: string;
+  // Optional label/input style overrides (e.g. RTL alignment). Inert:
+  // defaults preserve the exact previous rendering.
+  labelStyle?: TextStyle;
+  inputStyle?: TextStyle;
+  // Optional password-toggle captions (default "Show"/"Hide"). Inert.
+  showLabel?: string;
+  hideLabel?: string;
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
@@ -40,6 +48,10 @@ interface Props {
 
 export function Input({
   label,
+  labelStyle,
+  inputStyle,
+  showLabel = "Show",
+  hideLabel = "Hide",
   value,
   onChangeText,
   placeholder,
@@ -80,6 +92,7 @@ export function Input({
             {
               color: theme.colors.textSecondary,
             },
+            labelStyle,
           ]}
         >
           {label}
@@ -104,6 +117,7 @@ export function Input({
             {
               color: theme.colors.text,
             },
+            inputStyle,
           ]}
           value={value}
           onChangeText={onChangeText}
@@ -148,7 +162,7 @@ export function Input({
                 },
               ]}
             >
-              {show ? "Hide" : "Show"}
+              {show ? hideLabel : showLabel}
             </Text>
           </Pressable>
         ) : null}

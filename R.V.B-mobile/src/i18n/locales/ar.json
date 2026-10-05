@@ -6,6 +6,24 @@
     "changePassword": "تغيير كلمة المرور",
     "onboarding": "الإعداد"
   },
+  "login": {
+    "signInTitle": "تسجيل الدخول",
+    "tagLabel": "@tag",
+    "passwordLabel": "كلمة المرور",
+    "tagPlaceholder": "@abattoire",
+    "show": "إظهار",
+    "hide": "إخفاء",
+    "forgot": "نسيت بيانات الدخول؟",
+    "contactAdmin": "اتصل بالمسؤول",
+    "linkOpenFailed": "تعذر فتح الرابط. حاول مرة أخرى لاحقًا.",
+    "tagRequired": "المعرّف مطلوب",
+    "tagInvalid": "معرّف غير صالح. استخدم 3-30 حرفًا: a-z 0-9 . _",
+    "passwordRequired": "كلمة المرور مطلوبة",
+    "invalidCredentials": "المعرّف أو كلمة المرور غير صحيحة",
+    "temporarilyLocked": "الحساب مقفل مؤقتًا (5 محاولات فاشلة، 15 دقيقة). حاول لاحقًا.",
+    "networkError": "خطأ في الشبكة. تحقق من الاتصال و EXPO_PUBLIC_RVB_API_URL",
+    "loginFailed": "فشل تسجيل الدخول"
+  },
   "tabs": {
     "mainChats": "الدردشات الرئيسية",
     "secondaryChats": "الثانوية",

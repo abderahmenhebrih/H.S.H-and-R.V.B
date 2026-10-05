@@ -6,6 +6,24 @@
     "changePassword": "Change Password",
     "onboarding": "Onboarding"
   },
+  "login": {
+    "signInTitle": "Sign in",
+    "tagLabel": "@tag",
+    "passwordLabel": "Password",
+    "tagPlaceholder": "@abattoire",
+    "show": "Show",
+    "hide": "Hide",
+    "forgot": "Forgot your credentials?",
+    "contactAdmin": "Contact your administrator",
+    "linkOpenFailed": "Could not open the link. Please try again later.",
+    "tagRequired": "Tag is required",
+    "tagInvalid": "Invalid tag. Use 3-30 chars: a-z 0-9 . _",
+    "passwordRequired": "Password is required",
+    "invalidCredentials": "Invalid tag or password",
+    "temporarilyLocked": "Account temporarily locked (5 failed attempts, 15m). Try later.",
+    "networkError": "Network error. Check connection and EXPO_PUBLIC_RVB_API_URL",
+    "loginFailed": "Login failed"
+  },
   "tabs": {
     "mainChats": "Main Chats",
     "secondaryChats": "Secondary",

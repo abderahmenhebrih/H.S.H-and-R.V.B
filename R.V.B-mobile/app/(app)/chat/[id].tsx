@@ -42,6 +42,7 @@ import {
   QUICK_SEND_EMOJI,
   REACTION_CATEGORIES,
   groupReactionCounts,
+  getMyReaction,
   isQuickEmojiMessage,
 } from "@/constants/reactions";
 import { getSocket } from "@/services/socket";
@@ -158,6 +159,12 @@ export default function ChatDetail() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [menuMsg, setMenuMsg] = useState<any | null>(null);
+  // Two-step in-menu delete confirmation (no OS Alert: Alert.alert fired
+  // right after a Modal close is swallowed on Android, and multi-button
+  // Alert is unreliable on Expo Web — both present as "delete does nothing").
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [stripMsg, setStripMsg] = useState<any | null>(null);
   const [stripAnchorY, setStripAnchorY] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -545,23 +552,23 @@ export default function ChatDetail() {
   };
 
   const handleDelete = async (m: any) => {
-    Alert.alert(t("conversation.delete", "Delete") + "?", contentLabel(m).slice(0, 60) || "…", [
-      { text: t("conversation.cancel", "Cancel"), style: "cancel" },
-      {
-        text: t("conversation.delete", "Delete"),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteMessage(msgId(m));
-            setMessages((prev) =>
-              prev.map((x) => (msgId(x) === msgId(m) ? { ...x, isDeleted: true, deletedAt: Date.now(), content: "Message deleted", attachments: [] } : x)),
-            );
-          } catch (e: any) {
-            Alert.alert("Failed", e?.message || "Delete failed");
-          }
-        },
-      },
-    ]);
+    const mid = msgId(m);
+    // Double-submit protection: one in-flight delete at a time.
+    if (!mid || deletingId) return;
+    setDeletingId(mid);
+    setDeleteError(null);
+    try {
+      await deleteMessage(mid);
+      setMessages((prev) =>
+        prev.map((x) => (msgId(x) === mid ? { ...x, isDeleted: true, deletedAt: Date.now(), content: "Message deleted", attachments: [] } : x)),
+      );
+      closeMenu();
+    } catch (e: any) {
+      // Menu stays open with a concise error; original message retained.
+      if (mountedRef.current) setDeleteError(e?.message || "Delete failed");
+    } finally {
+      if (mountedRef.current) setDeletingId(null);
+    }
   };
 
   const handleReact = async (m: any, emoji: string) => {
@@ -606,13 +613,18 @@ export default function ChatDetail() {
         R.tapTimer = null;
         R.tapTime = 0;
         const m = byIdRef.current.get(mid);
-        if (m) {
-          const v = R.view;
-          try {
-            v?.measureInWindow?.((x: number, y: number, w: number, h: number) => openStrip(m, y + h / 2));
-          } catch {
-            openStrip(m);
-          }
+        if (!m) return;
+        // Deleted messages have no reaction strip: fall back to the menu
+        // (which offers Cancel only), never a usable selector.
+        if (m.isDeleted || m.deletedAt) {
+          setMenuMsg(m);
+          return;
+        }
+        const v = R.view;
+        try {
+          v?.measureInWindow?.((x: number, y: number, w: number, h: number) => openStrip(m, y + h / 2));
+        } catch {
+          openStrip(m);
         }
         return;
       }
@@ -726,12 +738,18 @@ export default function ChatDetail() {
     [lang, t],
   );
 
-  const closeMenu = useCallback(() => setMenuMsg(null), []);
+  const closeMenu = useCallback(() => {
+    setMenuMsg(null);
+    setConfirmDeleteId(null);
+    setDeleteError(null);
+  }, []);
 
   if (loading) return <Loading message="Loading conversation..." />;
   if (error) return <ErrorState title="Could not load chat" message={error} onRetry={load} />;
 
   const menuIsPinned = menuMsg ? pinned.some((p: any) => p.messageId === msgId(menuMsg)) : false;
+  // Single source for "my active reaction" across strip, picker, and sheet.
+  const stripMine = getMyReaction(stripMsg, myId);
   // Reaction strip placement: anchored near the pressed message when its
   // window position was measured (above/below by available space, kept inside
   // the viewport with room for the composer); centered fallback otherwise.
@@ -846,6 +864,8 @@ export default function ChatDetail() {
               const showDay = index === 0 || dayKey(messages[index - 1]?.createdAt || 0) !== dayKey(item.createdAt || 0);
               const groups = groupReactionCounts(item.reactions, myId);
               const hasReactions = groups.length > 0;
+              // Cluster renders only on live messages (see below).
+              const showCluster = hasReactions && !isDeleted;
               // Standalone quick-send (content exactly 🤝): large emoji, no
               // bubble chrome — still a normal message semantically.
               const isQuick = isQuickEmojiMessage(item);
@@ -912,7 +932,7 @@ export default function ChatDetail() {
                       : null)}
                   >
                     {!own ? (
-                      <View style={[styles.avatarSlot, hasReactions && { marginBottom: 12 }]}>
+                      <View style={[styles.avatarSlot, showCluster && { marginBottom: 12 }]}>
                         {lastOfRun ? <Avatar uri={info.picture} name={info.name} size={30} /> : null}
                       </View>
                     ) : null}
@@ -923,7 +943,7 @@ export default function ChatDetail() {
                       style={[
                         styles.bubbleWrap,
                         own ? styles.bubbleWrapOwn : styles.bubbleWrapIncoming,
-                        hasReactions && { marginBottom: 12 },
+                        showCluster && { marginBottom: 12 },
                       ]}
                     >
                       {showName ? (
@@ -1113,7 +1133,10 @@ export default function ChatDetail() {
                         </Pressable>
                         )}
                         </Animated.View>
-                        {hasReactions ? (
+                        {/* No cluster on deleted placeholders: reactions stay in
+                            data (backend policy) but nothing floats on the
+                            placeholder. */}
+                        {showCluster ? (
                           <Pressable
                             onPress={() => registerTap(mid, () => setWhoMsg(item))}
                             onLongPress={() => setMenuMsg(item)}
@@ -1338,17 +1361,55 @@ export default function ChatDetail() {
                   </Pressable>
                 ) : null}
                 {menuMsg && (senderOf(menuMsg) === myId || account?.role === "admin") ? (
-                  <Pressable
-                    style={styles.sheetRow}
-                    onPress={() => {
-                      const m = menuMsg;
-                      closeMenu();
-                      if (m) void handleDelete(m);
-                    }}
-                  >
-                    <Ionicons name="trash" size={18} color={theme.colors.error} />
-                    <Text style={[styles.sheetLabel, { color: theme.colors.error }]}>{t("conversation.delete", "Delete")}</Text>
-                  </Pressable>
+                  confirmDeleteId === msgId(menuMsg) ? (
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}>
+                      <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>
+                        {t("conversation.deleteTitle", "Delete message?")}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                        {t("conversation.deleteHint", "This message will be removed from the conversation.")}
+                      </Text>
+                      {deleteError ? (
+                        <Text style={{ fontSize: 12, color: theme.colors.error }}>{deleteError}</Text>
+                      ) : null}
+                      <View style={{ flexDirection: "row", gap: 8, marginTop: 2 }}>
+                        <Pressable
+                          onPress={() => {
+                            setConfirmDeleteId(null);
+                            setDeleteError(null);
+                          }}
+                          disabled={deletingId === msgId(menuMsg)}
+                          style={[styles.smallBtn, { flex: 1, backgroundColor: theme.colors.surfaceHover, borderColor: theme.colors.border }]}
+                        >
+                          <Text style={[styles.smallBtnText, { color: theme.colors.text }]}>{t("conversation.cancel", "Cancel")}</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            if (menuMsg) void handleDelete(menuMsg);
+                          }}
+                          disabled={deletingId === msgId(menuMsg)}
+                          style={[styles.smallBtn, { flex: 1, backgroundColor: theme.colors.error, opacity: deletingId === msgId(menuMsg) ? 0.6 : 1 }]}
+                        >
+                          {deletingId === msgId(menuMsg) ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <Text style={styles.smallBtnText}>{t("conversation.delete", "Delete")}</Text>
+                          )}
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <Pressable
+                      style={styles.sheetRow}
+                      onPress={() => {
+                        setDeleteError(null);
+                        setConfirmDeleteId(msgId(menuMsg));
+                      }}
+                    >
+                      <Ionicons name="trash" size={18} color={theme.colors.error} />
+                      <Text style={[styles.sheetLabel, { color: theme.colors.error }]}>{t("conversation.delete", "Delete")}</Text>
+                    </Pressable>
+                  )
                 ) : null}
               </>
             ) : null}
@@ -1373,7 +1434,7 @@ export default function ChatDetail() {
             </Text>
             <View style={styles.stripRow}>
               {QUICK_REACTIONS.map((emoji) => {
-                const mine = (stripMsg?.reactions || []).some((r: any) => r?.accountId === myId && r?.emoji === emoji);
+                const mine = emoji === stripMine;
                 return (
                   <Pressable
                     key={emoji}
@@ -1426,7 +1487,7 @@ export default function ChatDetail() {
                         setPickerCat("frequent");
                         if (m) void handleReact(m, emoji);
                       }}
-                      style={styles.pickerCell}
+                      style={[styles.pickerCell, emoji === stripMine && { backgroundColor: theme.colors.primarySoft, borderRadius: 8 }]}
                       hitSlop={2}
                     >
                       <Text style={{ fontSize: 24 }} allowFontScaling={false}>
@@ -1459,12 +1520,33 @@ export default function ChatDetail() {
           <View style={[styles.strip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             {(whoMsg?.reactions || []).map((r: any, i: number) => {
               const info = senderInfo(r?.accountId);
-              return (
+              const isMineRow = !!myId && r?.accountId === myId;
+              // Own reaction row removes ONLY your reaction (server replaces
+              // just your entry; everyone else's entries are untouched).
+              return isMineRow ? (
+                <Pressable
+                  key={`${r?.accountId}-${r?.emoji}-${i}`}
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    const m = whoMsg;
+                    const mine = getMyReaction(m, myId);
+                    setWhoMsg(null);
+                    if (m && mine) void handleReact(m, mine);
+                  }}
+                >
+                  <Text style={{ fontSize: 18 }}>{r?.emoji}</Text>
+                  <Text style={[styles.sheetLabel, { color: theme.colors.text, flex: 1 }]} numberOfLines={1}>
+                    {info.name} (you)
+                  </Text>
+                  <Text style={{ color: theme.colors.error, fontSize: 12, fontWeight: "700" }}>
+                    {t("conversation.remove", "Remove")}
+                  </Text>
+                </Pressable>
+              ) : (
                 <View key={`${r?.accountId}-${r?.emoji}-${i}`} style={styles.sheetRow}>
                   <Text style={{ fontSize: 18 }}>{r?.emoji}</Text>
                   <Text style={[styles.sheetLabel, { color: theme.colors.text }]} numberOfLines={1}>
                     {info.name}
-                    {r?.accountId === myId ? " (you)" : ""}
                   </Text>
                 </View>
               );

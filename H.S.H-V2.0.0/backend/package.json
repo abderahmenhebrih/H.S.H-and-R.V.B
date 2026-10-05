@@ -39,6 +39,7 @@
     "dexie": "^4.4.6",
     "fake-indexeddb": "^6.2.5",
     "mongodb-memory-server": "^11.3.0",
+    "socket.io-client": "^4.8.4",
     "supertest": "^7.2.2",
     "tsx": "^4.23.12",
     "typescript": "^5"

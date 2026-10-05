@@ -76,9 +76,14 @@ export function groupReactionCounts(reactions: any[] | undefined, myId?: string)
     .sort((a, b) => b.count - a.count || (a.mine ? -1 : 0));
 }
 
-// Standalone quick-send messages (content exactly 🤝, no attachments) render
-// large without a bubble, Messenger Like-style — still normal messages
-// semantically (ordering, receipts, reply, delete all apply).
+// The viewer's own active reaction emoji on a message (one max, enforced
+// server-side). Single helper for the strip, the full picker, and the
+// who-reacted sheet — no duplicated lookup logic across UI paths.
+export function getMyReaction(message: any, accountId?: string | null): string | null {
+  if (!message || !accountId || !Array.isArray(message.reactions)) return null;
+  const mine = message.reactions.find((r: any) => r?.accountId === accountId && typeof r?.emoji === "string" && r.emoji);
+  return mine ? mine.emoji : null;
+}
 export function isQuickEmojiMessage(item: any): boolean {
   if (!item || item.isDeleted || item.deletedAt) return false;
   if (typeof item.content !== "string" || item.content.trim() !== QUICK_SEND_EMOJI) return false;

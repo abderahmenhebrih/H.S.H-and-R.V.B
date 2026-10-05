@@ -60,7 +60,9 @@
     "newMessages": "New messages",
     "photo": "Photo",
     "video": "Video",
-    "deleted": "Message deleted"
+    "deleted": "Message deleted",
+    "deleteTitle": "Delete message?",
+    "deleteHint": "This message will be removed from the conversation."
   },
   "settings": {
     "title": "Settings",

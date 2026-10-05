@@ -222,6 +222,48 @@ async function run() {
     } catch (e: any) { record("12e. Normal user cannot audit", e.code === "RVB_FORBIDDEN", e.code); }
   } catch (e: any) { record("12. Delete", false, e.message); }
 
+  // 12f-12j Delete policy matrix (existing sender+admin-only policy)
+  try {
+    const target = await chatSvc.sendMessage(g2.id, (wAcc1 as any).id, "Policy target");
+    try {
+      await chatSvc.deleteMessage(target.id, (mgr as any).id);
+      record("12f. Manager delete rejected", false, "did not throw");
+    } catch (e: any) { record("12f. Manager delete rejected", e.code === "RVB_FORBIDDEN", e.code); }
+    try {
+      await chatSvc.deleteMessage(target.id, (sup as any).id);
+      record("12g. Supervisor delete rejected", false, "did not throw");
+    } catch (e: any) { record("12g. Supervisor delete rejected", e.code === "RVB_FORBIDDEN", e.code); }
+    try {
+      await chatSvc.deleteMessage("msg-does-not-exist", (wAcc1 as any).id);
+      record("12h. Nonexistent delete 404", false, "did not throw");
+    } catch (e: any) { record("12h. Nonexistent delete 404", e.code === "RVB_MESSAGE_NOT_FOUND", e.code); }
+    await chatSvc.deleteMessage(target.id, (wAcc1 as any).id);
+    try {
+      await chatSvc.deleteMessage(target.id, (wAcc1 as any).id);
+      record("12i. Double delete rejected", false, "did not throw");
+    } catch (e: any) { record("12i. Double delete rejected", e.code === "RVB_ALREADY_DELETED", e.code); }
+    // Media-bearing doc deleted: safe view hides content AND attachments/URLs
+    const mediaDoc: any = await MessageModel.create({
+      id: `msg-media-${now}`, createdAt: Date.now(), updatedAt: Date.now(), conversationId: g2.id,
+      senderAccountId: (wAcc1 as any).id, content: "secret pic", replyToMessageId: null,
+      editedAt: null, deletedAt: null, deletedBy: null, isDeleted: false, editHistory: [],
+      reactions: [{ accountId: (wAcc2 as any).id, emoji: "❤️", createdAt: Date.now() }],
+      readBy: [], mentions: [], reminderAt: null,
+      attachments: [{ id: "att-1", kind: "image", url: "https://cdn.test/secret.jpg", publicId: "p1", mimeType: "image/jpeg", size: 100, width: 4, height: 3, duration: null }],
+    } as any);
+    await chatSvc.deleteMessage(mediaDoc.id, (wAcc1 as any).id);
+    const listed = await chatSvc.listMessages(g2.id, (wAcc2 as any).id);
+    const gotMedia: any = listed.find((x: any) => x.id === mediaDoc.id);
+    const wire = JSON.stringify(gotMedia || {});
+    record("12j. Deleted hides content+attachments+URLs", !!gotMedia && gotMedia.content === "Message deleted" && (gotMedia.attachments || []).length === 0 && !wire.includes("cdn.test") && !wire.includes("secret"), wire.slice(0, 80));
+    // Reply to a now-deleted message: accepted, original stays hidden
+    const reply = await chatSvc.sendMessage(g2.id, (wAcc2 as any).id, "replying", mediaDoc.id);
+    const listed2 = await chatSvc.listMessages(g2.id, (wAcc1 as any).id);
+    const orig: any = listed2.find((x: any) => x.id === mediaDoc.id);
+    const rep: any = listed2.find((x: any) => x.id === reply.id);
+    record("12k. Reply-to-deleted leaks nothing", !!rep && rep.replyToMessageId === mediaDoc.id && !!orig && orig.content === "Message deleted" && !JSON.stringify(listed2).includes("secret pic"), "");
+  } catch (e: any) { record("12f-12k. Delete policy", false, e.message); }
+
   // 13 Reaction 🤝
   try {
     const m = await chatSvc.sendMessage(g2.id, (wAcc1 as any).id, "React me");

@@ -1000,6 +1000,16 @@ export default function PurchaseEntryPage() {
                           step="1"
                           value={row.quantity}
                           onChange={(e) => updateRow(index, "quantity", e.target.value)}
+                          onFocus={(e) => {
+                            // Editing UX (same as sales entry): initial "0"
+                            // behaves like an empty default — clear it on focus
+                            // so typing starts fresh ("10", not "010").
+                            if (e.target.value === "0") updateRow(index, "quantity", "");
+                          }}
+                          onBlur={(e) => {
+                            // Clearing the field normalizes back to the "0" default.
+                            if (e.target.value.trim() === "") updateRow(index, "quantity", "0");
+                          }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -1020,6 +1030,12 @@ export default function PurchaseEntryPage() {
                             step="0.01"
                             value={row.weightKg}
                             onChange={(e) => updateRow(index, "weightKg", e.target.value)}
+                            onFocus={(e) => {
+                              if (e.target.value === "0") updateRow(index, "weightKg", "");
+                            }}
+                            onBlur={(e) => {
+                              if (e.target.value.trim() === "") updateRow(index, "weightKg", "0");
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
@@ -1041,6 +1057,15 @@ export default function PurchaseEntryPage() {
                             step="0.01"
                             value={row.price}
                             onChange={(e) => updateRow(index, "price", e.target.value)}
+                            onFocus={(e) => {
+                              // Same zero UX, but only when the value is actually
+                              // "0" — a preloaded product price (e.g. 670) is
+                              // meaningful and never auto-cleared.
+                              if (e.target.value === "0") updateRow(index, "price", "");
+                            }}
+                            onBlur={(e) => {
+                              if (e.target.value.trim() === "") updateRow(index, "price", "0");
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();

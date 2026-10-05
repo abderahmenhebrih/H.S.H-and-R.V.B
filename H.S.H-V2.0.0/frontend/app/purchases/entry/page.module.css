@@ -589,31 +589,48 @@ html[dir="rtl"] .drawerSidebarOpen {
   align-items: center;
 }
 
-.inputCell input {
+/* Inline editable table cells — same pattern as sales entry: true
+   editable-table feel. Scoped (0,3,1) to beat globals.css input:not()
+   (0,2,1) without !important, so no white input-card surface leaks in.
+   Unfocused: transparent, borderless, inherits the row background. Numbers
+   right-aligned with tabular figures. Focus = accent underline only: no
+   rectangular outline, box border, or ring (the underline is the indicator). */
+.tableBody .tableRow .inputCell input {
   width: 100%;
-  min-height: 32px;
-  padding: 4px 8px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 2px;
   box-sizing: border-box;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  outline: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  outline: none;
   background: transparent;
+  background-color: transparent;
   color: var(--text);
   font: inherit;
   font-size: 13px;
-  text-align: start;
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  font-weight: 600;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.inputCell input:hover {
+.tableBody .tableRow .inputCell input:hover {
   background: var(--panel-hover);
-  border-color: var(--border);
+  background-color: var(--panel-hover);
+  border-bottom-color: var(--border);
 }
 
-.inputCell input:focus {
-  background: var(--panel);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-ring);
+.tableBody .tableRow .inputCell input:focus,
+.tableBody .tableRow .inputCell input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+  border-bottom: 1px solid var(--accent);
+  border-radius: 0;
+  background: transparent;
+  background-color: transparent;
 }
 
 .inputCell input[type="number"]::-webkit-outer-spin-button,
@@ -633,8 +650,8 @@ html[dir="rtl"] .drawerSidebarOpen {
   width: 100%;
 }
 
-.inputWithSuffix input {
-  padding-inline-end: 28px;
+.tableBody .tableRow .inputWithSuffix input {
+  padding-inline-end: 30px;
 }
 
 .inputWithSuffix span {

@@ -632,17 +632,19 @@ html[dir="rtl"] .drawerSidebarOpen {
   border-bottom-color: var(--border);
 }
 
-.tableBody .tableRow .inputCell input:focus {
+/* Focus = underline only: no rectangular outline, no box border, no ring.
+   The accent bottom border is the focus indicator, so focused and unfocused
+   states stay distinguishable without any surrounding rectangle. Scoped above
+   globals.css input:focus-visible, which would otherwise draw the box. */
+.tableBody .tableRow .inputCell input:focus,
+.tableBody .tableRow .inputCell input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+  border-bottom: 1px solid var(--accent);
+  border-radius: 0;
   background: transparent;
   background-color: transparent;
-  border-bottom-color: var(--accent);
-  box-shadow: none;
-}
-
-/* Keyboard focus stays perceivable: thin underline (above) + accent outline. */
-.tableBody .tableRow .inputCell input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 .inputCell input[type="number"]::-webkit-outer-spin-button,

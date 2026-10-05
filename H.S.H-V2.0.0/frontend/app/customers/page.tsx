@@ -25,6 +25,7 @@ import {
   DEFAULT_SETTINGS,
   formatCurrency,
 } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Currency, Language } from "../../src/types/settings/settings";
 
 import type { Customer } from "../../src/types/entities/customer";
@@ -824,7 +825,7 @@ export default function CustomersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.customerTypes}</span>
-                <strong className={styles.summaryValue}>{distinctTypes}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(distinctTypes)}>{formatCompactNumber(distinctTypes)}</strong>
                 <small className={styles.summarySub}>{t.customerTypesSub}</small>
               </div>
             </div>
@@ -835,7 +836,7 @@ export default function CustomersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.withBalance}</span>
-                <strong className={styles.summaryValue}>{withBalance}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(withBalance)}>{formatCompactNumber(withBalance)}</strong>
                 <small className={styles.summarySub}>{t.withBalanceSub}</small>
               </div>
             </div>
@@ -846,7 +847,7 @@ export default function CustomersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalCustomers}</span>
-                <strong className={styles.summaryValue}>{totalCustomers}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(totalCustomers)}>{formatCompactNumber(totalCustomers)}</strong>
                 <small className={styles.summarySub}>{t.totalCustomersSub}</small>
               </div>
             </div>
@@ -857,7 +858,7 @@ export default function CustomersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalBalance}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalBalance, currency)}>{formatCompactCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>

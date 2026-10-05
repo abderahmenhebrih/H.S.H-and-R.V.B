@@ -35,6 +35,7 @@ import {
   formatCurrency,
   SETTINGS_EVENT,
 } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import { formatDate as formatDateLib } from "../../src/lib/datetime";
 
 import type { Product } from "../../src/types/entities/product";
@@ -693,7 +694,7 @@ export default function SalesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalSales}</span>
-                <strong className={styles.summaryValue}>{totalSales}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(totalSales)}>{formatCompactNumber(totalSales)}</strong>
                 <small className={styles.summarySub}>{t.totalSalesSub}</small>
               </div>
             </div>
@@ -704,7 +705,7 @@ export default function SalesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalValue}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalValue, currency)}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalValue, currency)}>{formatCompactCurrency(totalValue, currency)}</strong>
                 <small className={styles.summarySub}>{t.totalValueSub}</small>
               </div>
             </div>
@@ -715,7 +716,7 @@ export default function SalesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalWeight}</span>
-                <strong className={styles.summaryValue}>{totalWeight.toFixed(2)} {t.kg}</strong>
+                <strong className={styles.summaryValue} title={`${exactNumberLabel(totalWeight)} ${t.kg}`}>{formatCompactNumber(totalWeight)} {t.kg}</strong>
                 <small className={styles.summarySub}>{t.totalWeightSub}</small>
               </div>
             </div>
@@ -726,7 +727,7 @@ export default function SalesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.customersInvolved}</span>
-                <strong className={styles.summaryValue}>{customersInvolved}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(customersInvolved)}>{formatCompactNumber(customersInvolved)}</strong>
                 <small className={styles.summarySub}>{t.customersInvolvedSub}</small>
               </div>
             </div>

@@ -43,6 +43,7 @@ import {
   formatCurrency,
   SETTINGS_EVENT,
 } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import { formatDate as formatDateLib } from "../../src/lib/datetime";
 
 import type { Supplier } from "../../src/types/entities/supplier";
@@ -836,7 +837,7 @@ export default function PaymentsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalPayments}</span>
-                <strong className={styles.summaryValue}>{activeCountForKPI}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(activeCountForKPI)}>{formatCompactNumber(activeCountForKPI)}</strong>
                 <small className={styles.summarySub}>{t.totalPaymentsSub}</small>
               </div>
             </div>
@@ -847,7 +848,7 @@ export default function PaymentsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalPaid}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(activeTotalForKPI, currency)}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(activeTotalForKPI, currency)}>{formatCompactCurrency(activeTotalForKPI, currency)}</strong>
                 <small className={styles.summarySub}>{t.totalPaidSub}</small>
               </div>
             </div>
@@ -858,7 +859,7 @@ export default function PaymentsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.accountsInvolved}</span>
-                <strong className={styles.summaryValue}>{activeAccountsInvolved}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(activeAccountsInvolved)}>{formatCompactNumber(activeAccountsInvolved)}</strong>
                 <small className={styles.summarySub}>{t.accountsInvolvedSub}</small>
               </div>
             </div>
@@ -869,7 +870,7 @@ export default function PaymentsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.entitiesInvolved}</span>
-                <strong className={styles.summaryValue}>{activeEntitiesInvolved}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(activeEntitiesInvolved)}>{formatCompactNumber(activeEntitiesInvolved)}</strong>
                 <small className={styles.summarySub}>{t.entitiesInvolvedSub}</small>
               </div>
             </div>

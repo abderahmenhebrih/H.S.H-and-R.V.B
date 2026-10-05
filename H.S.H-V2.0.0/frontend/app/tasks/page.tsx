@@ -27,6 +27,7 @@ import { taskService } from "../../src/services/task.service";
 import { taskRepository } from "../../src/repositories/task.repository";
 import { settingsService } from "../../src/services/settings.service";
 import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Task } from "../../src/types/entities/task";
 import type { Language } from "../../src/types/settings/settings";
 import styles from "./page.module.css";
@@ -781,7 +782,7 @@ export default function TasksPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.total}</span>
-                <strong className={styles.summaryValue}>{stats.total}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(stats.total)}>{formatCompactNumber(stats.total)}</strong>
                 <small className={styles.summarySub}>{t.totalSub}</small>
               </div>
             </div>
@@ -792,7 +793,7 @@ export default function TasksPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.month}</span>
-                <strong className={styles.summaryValue}>{stats.month}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(stats.month)}>{formatCompactNumber(stats.month)}</strong>
                 <small className={styles.summarySub}>{t.monthSub}</small>
               </div>
             </div>
@@ -803,7 +804,7 @@ export default function TasksPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.week}</span>
-                <strong className={styles.summaryValue}>{stats.week}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(stats.week)}>{formatCompactNumber(stats.week)}</strong>
                 <small className={styles.summarySub}>{t.weekSub}</small>
               </div>
             </div>
@@ -814,7 +815,7 @@ export default function TasksPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.today}</span>
-                <strong className={styles.summaryValue}>{stats.today}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(stats.today)}>{formatCompactNumber(stats.today)}</strong>
                 <small className={styles.summarySub}>{t.todaySub}</small>
               </div>
             </div>
@@ -825,7 +826,7 @@ export default function TasksPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.missedLabel}</span>
-                <strong className={styles.summaryValue}>{stats.missed}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(stats.missed)}>{formatCompactNumber(stats.missed)}</strong>
                 <small className={styles.summarySub}>{t.missedSub}</small>
               </div>
             </div>

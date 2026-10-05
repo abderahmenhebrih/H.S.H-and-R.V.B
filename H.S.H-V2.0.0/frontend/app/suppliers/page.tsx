@@ -24,6 +24,7 @@ import {
   DEFAULT_SETTINGS,
   formatCurrency,
 } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Currency, Language } from "../../src/types/settings/settings";
 
 import type { Supplier } from "../../src/types/entities/supplier";
@@ -431,7 +432,7 @@ export default function SuppliersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalSuppliers}</span>
-                <strong className={styles.summaryValue}>{totalSuppliers}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(totalSuppliers)}>{formatCompactNumber(totalSuppliers)}</strong>
                 <small className={styles.summarySub}>{t.totalSuppliersSub}</small>
               </div>
             </div>
@@ -442,8 +443,8 @@ export default function SuppliersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.outstandingPayable}</span>
-                <strong className={styles.summaryValue}>
-                  {formatCurrency(outstandingPayable, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}
+                <strong className={styles.summaryValue} title={formatCurrency(outstandingPayable, currency)}>
+                  {formatCompactCurrency(outstandingPayable, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}
                 </strong>
                 <small className={styles.summarySub}>{t.outstandingPayableSub}</small>
               </div>
@@ -455,7 +456,7 @@ export default function SuppliersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.supplierContacts}</span>
-                <strong className={styles.summaryValue}>{contactsCount}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(contactsCount)}>{formatCompactNumber(contactsCount)}</strong>
                 <small className={styles.summarySub}>{t.supplierContactsSub}</small>
               </div>
             </div>
@@ -466,7 +467,7 @@ export default function SuppliersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.suppliersWithBalance}</span>
-                <strong className={styles.summaryValue}>{withBalance}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(withBalance)}>{formatCompactNumber(withBalance)}</strong>
                 <small className={styles.summarySub}>{t.suppliersWithBalanceSub}</small>
               </div>
             </div>

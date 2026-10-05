@@ -13,6 +13,7 @@ import { customerService } from "../src/services/customer.service";
 import { supplierService } from "../src/services/supplier.service";
 import { workerService } from "../src/services/worker.service";
 import { roundMoney } from "../src/lib/money";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../src/lib/compact-number";
 import {
   SETTINGS_EVENT,
   DEFAULT_SETTINGS,
@@ -684,8 +685,9 @@ export default function Dashboard() {
               accent="red"
               icon={TrendingUp}
               title={t.sales}
-              value={kpiLoading ? "…" : formatCurrency(kpi.salesToday, settings.currency)}
-              subtitle={kpiLoading ? "Loading…" : `${kpi.salesCount} ${t.transactions}`}
+              value={kpiLoading ? "…" : formatCompactCurrency(kpi.salesToday, settings.currency)}
+              valueTitle={kpiLoading ? undefined : formatCurrency(kpi.salesToday, settings.currency)}
+              subtitle={kpiLoading ? "Loading…" : `${formatCompactNumber(kpi.salesCount)} ${t.transactions}`}
               warning={kpiIntegrity.sales}
             />
 
@@ -693,8 +695,9 @@ export default function Dashboard() {
               accent="yellow"
               icon={ShoppingCart}
               title={t.purchases}
-              value={kpiLoading ? "…" : formatCurrency(kpi.purchasesToday, settings.currency)}
-              subtitle={kpiLoading ? "Loading…" : `${kpi.purchasesCount} ${t.transactions}`}
+              value={kpiLoading ? "…" : formatCompactCurrency(kpi.purchasesToday, settings.currency)}
+              valueTitle={kpiLoading ? undefined : formatCurrency(kpi.purchasesToday, settings.currency)}
+              subtitle={kpiLoading ? "Loading…" : `${formatCompactNumber(kpi.purchasesCount)} ${t.transactions}`}
               warning={kpiIntegrity.purchases}
             />
 
@@ -702,8 +705,9 @@ export default function Dashboard() {
               accent="black"
               icon={Wallet}
               title={t.outstanding}
-              value={kpiLoading ? "…" : formatCurrency(kpi.outstanding, settings.currency)}
-              subtitle={kpiLoading ? "Loading…" : `${kpi.outstandingCount} ${t.pending}`}
+              value={kpiLoading ? "…" : formatCompactCurrency(kpi.outstanding, settings.currency)}
+              valueTitle={kpiLoading ? undefined : formatCurrency(kpi.outstanding, settings.currency)}
+              subtitle={kpiLoading ? "Loading…" : `${formatCompactNumber(kpi.outstandingCount)} ${t.pending}`}
               warning={kpiIntegrity.outstanding}
             />
 
@@ -711,7 +715,8 @@ export default function Dashboard() {
               accent="light"
               icon={UsersRound}
               title={t.workers}
-              value={kpiLoading ? "…" : String(kpi.activeWorkers)}
+              value={kpiLoading ? "…" : formatCompactNumber(kpi.activeWorkers)}
+              valueTitle={kpiLoading ? undefined : exactNumberLabel(kpi.activeWorkers)}
               subtitle={t.activeWorkers}
             />
           </section>
@@ -908,6 +913,7 @@ function KpiCard({
   icon: Icon,
   title,
   value,
+  valueTitle,
   subtitle,
   warning,
 }: {
@@ -915,6 +921,7 @@ function KpiCard({
   icon: LucideIcon;
   title: string;
   value: string;
+  valueTitle?: string;
   subtitle: string;
   warning?: boolean;
 }) {
@@ -935,7 +942,7 @@ function KpiCard({
 
       <div className={styles.kpiContent}>
         <span>{title}</span>
-        <strong>{value}{warning && <span title="Invalid financial value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+        <strong title={valueTitle} aria-label={valueTitle ?? value}>{value}{warning && <span title="Invalid financial value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
         <small>{subtitle}</small>
       </div>
     </article>

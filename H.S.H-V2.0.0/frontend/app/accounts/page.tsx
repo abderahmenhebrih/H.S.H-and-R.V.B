@@ -29,6 +29,7 @@ import {
   formatCurrency,
   SETTINGS_EVENT,
 } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { BankAccount } from "../../src/types/entities/bank-account";
 import type { Currency, Language } from "../../src/types/settings/settings";
 import styles from "./page.module.css";
@@ -729,7 +730,7 @@ export default function AccountsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalAccounts}</span>
-                <strong className={styles.summaryValue}>{totalAccounts}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(totalAccounts)}>{formatCompactNumber(totalAccounts)}</strong>
                 <small className={styles.summarySub}>{t.totalAccountsSub}</small>
               </div>
             </div>
@@ -740,7 +741,7 @@ export default function AccountsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalBalance}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalBalance, currency)}>{formatCompactCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>
@@ -751,7 +752,7 @@ export default function AccountsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.bankAccounts}</span>
-                <strong className={styles.summaryValue}>{bankCount}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(bankCount)}>{formatCompactNumber(bankCount)}</strong>
                 <small className={styles.summarySub}>{t.bankAccountsSub}</small>
               </div>
             </div>
@@ -762,7 +763,7 @@ export default function AccountsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.cashAccounts}</span>
-                <strong className={styles.summaryValue}>{cashCount}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(cashCount)}>{formatCompactNumber(cashCount)}</strong>
                 <small className={styles.summarySub}>{t.cashAccountsSub}</small>
               </div>
             </div>

@@ -36,6 +36,7 @@ import {
   formatCurrency,
   SETTINGS_EVENT,
 } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import { formatDate as formatDateLib } from "../../src/lib/datetime";
 
 import type { Product } from "../../src/types/entities/product";
@@ -843,7 +844,7 @@ export default function PurchasesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalPurchases}</span>
-                <strong className={styles.summaryValue}>{totalPurchases}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(totalPurchases)}>{formatCompactNumber(totalPurchases)}</strong>
                 <small className={styles.summarySub}>{t.totalPurchasesSub}</small>
               </div>
             </div>
@@ -854,7 +855,7 @@ export default function PurchasesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalValue}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalValue, currency)}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalValue, currency)}>{formatCompactCurrency(totalValue, currency)}</strong>
                 <small className={styles.summarySub}>{t.totalValueSub}</small>
               </div>
             </div>
@@ -865,7 +866,7 @@ export default function PurchasesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalWeight}</span>
-                <strong className={styles.summaryValue}>{totalWeight.toFixed(2)} {t.kg}</strong>
+                <strong className={styles.summaryValue} title={`${exactNumberLabel(totalWeight)} ${t.kg}`}>{formatCompactNumber(totalWeight)} {t.kg}</strong>
                 <small className={styles.summarySub}>{t.totalWeightSub}</small>
               </div>
             </div>
@@ -876,7 +877,7 @@ export default function PurchasesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.suppliersInvolved}</span>
-                <strong className={styles.summaryValue}>{suppliersInvolved}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(suppliersInvolved)}>{formatCompactNumber(suppliersInvolved)}</strong>
                 <small className={styles.summarySub}>{t.suppliersInvolvedSub}</small>
               </div>
             </div>

@@ -26,6 +26,7 @@ import { workerEditOperation } from "../../src/services/operations/worker-edit.o
 import { workerLifecycleOperation } from "../../src/services/operations/worker-lifecycle.operation";
 import { settingsService } from "../../src/services/settings.service";
 import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Worker } from "../../src/types/entities/worker";
 import type { Currency, Language } from "../../src/types/settings/settings";
 import styles from "./page.module.css";
@@ -654,8 +655,8 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalWorkers}</span>
-                <strong className={styles.summaryValue}>{totalWorkers}</strong>
-                <small className={styles.summarySub}>{activeWorkers} {t.totalWorkersSub.toLowerCase()}</small>
+                <strong className={styles.summaryValue} title={exactNumberLabel(totalWorkers)}>{formatCompactNumber(totalWorkers)}</strong>
+                <small className={styles.summarySub}>{formatCompactNumber(activeWorkers)} {t.totalWorkersSub.toLowerCase()}</small>
               </div>
             </div>
 
@@ -665,7 +666,7 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalPayroll}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalPayroll, currency)}{hasInvalidPayroll && <span title="Invalid salary value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalPayroll, currency)}>{formatCompactCurrency(totalPayroll, currency)}{hasInvalidPayroll && <span title="Invalid salary value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
                 <small className={styles.summarySub}>{t.totalPayrollSub}</small>
               </div>
             </div>
@@ -676,7 +677,7 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.positions}</span>
-                <strong className={styles.summaryValue}>{positions.length}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(positions.length)}>{formatCompactNumber(positions.length)}</strong>
                 <small className={styles.summarySub}>{t.positionsSub}</small>
               </div>
             </div>
@@ -687,8 +688,8 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.outstandingBalance}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(totalOutstanding, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
-                <small className={styles.summarySub}>{workersWithBalance} {t.outstandingBalanceSub.toLowerCase()}</small>
+                <strong className={styles.summaryValue} title={formatCurrency(totalOutstanding, currency)}>{formatCompactCurrency(totalOutstanding, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <small className={styles.summarySub}>{formatCompactNumber(workersWithBalance)} {t.outstandingBalanceSub.toLowerCase()}</small>
               </div>
             </div>
           </section>

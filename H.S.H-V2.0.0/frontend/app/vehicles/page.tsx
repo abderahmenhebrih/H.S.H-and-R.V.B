@@ -25,6 +25,7 @@ import { vehicleDeleteOperation } from "../../src/services/operations/vehicle-de
 import { expenseService } from "../../src/services/expense.service";
 import { settingsService } from "../../src/services/settings.service";
 import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Vehicle } from "../../src/types/entities/vehicle";
 import type { Currency, Language } from "../../src/types/settings/settings";
 import type { Expense } from "../../src/types/entities/expense";
@@ -631,7 +632,7 @@ export default function VehiclesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalVehicles}</span>
-                <strong className={styles.summaryValue}>{totalVehicles}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(totalVehicles)}>{formatCompactNumber(totalVehicles)}</strong>
                 <small className={styles.summarySub}>{t.totalVehiclesSub}</small>
               </div>
             </div>
@@ -642,7 +643,7 @@ export default function VehiclesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.vehicleExpenses}</span>
-                <strong className={styles.summaryValue}>{formatCurrency(vehicleExpensesThisMonth, currency)}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(vehicleExpensesThisMonth, currency)}>{formatCompactCurrency(vehicleExpensesThisMonth, currency)}</strong>
                 <small className={styles.summarySub}>{t.vehicleExpensesSub}</small>
               </div>
             </div>
@@ -653,7 +654,7 @@ export default function VehiclesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.vehicleTypes}</span>
-                <strong className={styles.summaryValue}>{vehicleTypesCount}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(vehicleTypesCount)}>{formatCompactNumber(vehicleTypesCount)}</strong>
                 <small className={styles.summarySub}>{t.vehicleTypesSub}</small>
               </div>
             </div>
@@ -664,7 +665,7 @@ export default function VehiclesPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.typesInUse}</span>
-                <strong className={styles.summaryValue}>{typesInUse}</strong>
+                <strong className={styles.summaryValue} title={exactNumberLabel(typesInUse)}>{formatCompactNumber(typesInUse)}</strong>
                 <small className={styles.summarySub}>{t.typesInUseSub}</small>
               </div>
             </div>

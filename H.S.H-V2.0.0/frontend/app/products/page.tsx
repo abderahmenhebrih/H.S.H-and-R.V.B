@@ -29,6 +29,7 @@ import {
   formatCurrency,
   SETTINGS_EVENT,
 } from "../../src/lib/settings";
+import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 
 import type { Product } from "../../src/types/entities/product";
 import type { Currency, Language } from "../../src/types/settings/settings";
@@ -582,7 +583,7 @@ export default function ProductsPage() {
             </div>
             <div className={styles.summaryContent}>
               <span className={styles.summaryLabel}>{t.totalProducts}</span>
-              <strong className={styles.summaryValue}>{totalProducts}</strong>
+              <strong className={styles.summaryValue} title={exactNumberLabel(totalProducts)}>{formatCompactNumber(totalProducts)}</strong>
               <small className={styles.summarySub}>{t.totalProductsSub}</small>
             </div>
           </div>
@@ -593,8 +594,8 @@ export default function ProductsPage() {
             </div>
             <div className={styles.summaryContent}>
               <span className={styles.summaryLabel}>{t.totalStock}</span>
-              <strong className={styles.summaryValue}>
-                {totalStockKg.toLocaleString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { maximumFractionDigits: 2, numberingSystem: "latn" } as any)} {t.kg}
+              <strong className={styles.summaryValue} title={`${exactNumberLabel(totalStockKg)} ${t.kg}`}>
+                {formatCompactNumber(totalStockKg)} {t.kg}
               </strong>
               <small className={styles.summarySub}>{t.totalStockSub}</small>
             </div>
@@ -606,8 +607,8 @@ export default function ProductsPage() {
             </div>
             <div className={styles.summaryContent}>
               <span className={styles.summaryLabel}>{t.averagePrice}</span>
-              <strong className={styles.summaryValue}>
-                {formatCurrency(remainingProductsValue, currency)}
+              <strong className={styles.summaryValue} title={formatCurrency(remainingProductsValue, currency)}>
+                {formatCompactCurrency(remainingProductsValue, currency)}
               </strong>
               <small className={styles.summarySub}>{t.averagePriceSub}</small>
             </div>
@@ -619,7 +620,7 @@ export default function ProductsPage() {
             </div>
             <div className={styles.summaryContent}>
               <span className={styles.summaryLabel}>{t.lowStock}</span>
-              <strong className={styles.summaryValue}>{lowStockCount}</strong>
+              <strong className={styles.summaryValue} title={exactNumberLabel(lowStockCount)}>{formatCompactNumber(lowStockCount)}</strong>
               <small className={styles.summarySub}>{t.lowStockSub}</small>
             </div>
           </div>

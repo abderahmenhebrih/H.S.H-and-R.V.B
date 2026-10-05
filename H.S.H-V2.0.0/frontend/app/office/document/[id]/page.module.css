@@ -78,7 +78,29 @@
   border-radius: 6px;
   padding: 2px;
   background: var(--panel);
+  cursor: pointer;
 }
+.colorWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.colorClear {
+  position: absolute;
+  top: -7px;
+  inset-inline-end: -7px;
+  width: 15px; height: 15px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.colorClear:hover { color: var(--danger); border-color: var(--danger); }
 
 .workspace {
   flex: 1;
@@ -115,6 +137,11 @@
 .paper :global(.ProseMirror) h2 { font-size: 20px; font-weight: 700; margin: 14px 0 8px; }
 .paper :global(.ProseMirror) h3 { font-size: 16px; font-weight: 700; margin: 12px 0 6px; }
 .paper :global(.ProseMirror) blockquote { border-inline-start: 3px solid var(--border); margin: 12px 0; padding: 8px 12px; background: #f8f0e7; }
+.paper :global(.ProseMirror) ul, .paper :global(.ProseMirror) ol { margin: 8px 0; padding-inline-start: 24px; }
+.paper :global(.ProseMirror) li { margin: 2px 0; }
+.paper :global(.ProseMirror) li p { margin: 0; }
+.paper :global(.ProseMirror) img { max-width: 100%; height: auto; border-radius: 4px; }
+.paper :global(.ProseMirror) sup, .paper :global(.ProseMirror) sub { font-size: 0.75em; }
 :global(.themeDark) .paper :global(.ProseMirror) blockquote { background: #25272f; border-color: #343640; }
 .paper :global(.ProseMirror) table { border-collapse: collapse; width: 100%; margin: 12px 0; }
 .paper :global(.ProseMirror) th, .paper :global(.ProseMirror) td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 13px; }

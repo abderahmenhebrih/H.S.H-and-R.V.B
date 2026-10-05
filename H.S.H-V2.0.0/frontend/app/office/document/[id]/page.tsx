@@ -23,22 +23,28 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import { TextStyle } from "@tiptap/extension-text-style";
+import { FontSize } from "@tiptap/extension-text-style/font-size";
+import { FontFamily } from "@tiptap/extension-text-style/font-family";
+import { LineHeight } from "@tiptap/extension-text-style/line-height";
 import { Color } from "@tiptap/extension-color";
+import Superscript from "@tiptap/extension-superscript";
+import Subscript from "@tiptap/extension-subscript";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Indent, getUniformMarkValue } from "../../../../src/lib/office/tiptap-format";
 
 import StyledSelect from "../../../../src/components/common/StyledSelect";
 import {
-  Undo2, Redo2, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
+  Undo2, Redo2, Bold, Italic, Underline as UnderlineIcon, Strikethrough, Superscript as SuperscriptIcon, Subscript as SubscriptIcon,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, Quote, Minus, Table as TableIcon, Link as LinkIcon, Palette, Highlighter, Image as ImageIcon, Printer, Download, Database, Maximize2, Minimize2, Link2, AlertCircle, X
+  List, ListOrdered, Quote, Minus, Table as TableIcon, Link as LinkIcon, Image as ImageIcon, Printer, Download, Database, Maximize2, Minimize2, IndentIncrease, IndentDecrease, X
 } from "lucide-react";
 
 import { resolvePlaceholders as resolveSharedPlaceholders } from "../../../../src/lib/office/placeholder";
 
 const EDITOR_T = {
-  en: { loading:"Loading…", saved:"Saved", saving:"Saving...", offline:"Offline", focus:"Focus", exitFocus:"Exit Focus", toolbar:"Formatting toolbar", undo:"Undo", redo:"Redo", insertTable:"Insert table", link:"Link", image:"Image", textColor:"Text color", highlight:"Highlight", insertHebrihData:"Insert HEBRIH Data", print:"Print", exportHtml:"Export HTML", backToOffice:"Back to Office", documentTitle:"Document title" },
-  fr: { loading:"Chargement…", saved:"Enregistré", saving:"Enregistrement…", offline:"Hors ligne", focus:"Focus", exitFocus:"Quitter focus", toolbar:"Barre de mise en forme", undo:"Annuler", redo:"Rétablir", insertTable:"Insérer tableau", link:"Lien", image:"Image", textColor:"Couleur du texte", highlight:"Surligner", insertHebrihData:"Insérer données HEBRIH", print:"Imprimer", exportHtml:"Exporter HTML", backToOffice:"Retour au bureau", documentTitle:"Titre du document" },
-  ar: { loading:"جارٍ التحميل…", saved:"تم الحفظ", saving:"جارٍ الحفظ…", offline:"غير متصل", focus:"تركيز", exitFocus:"إنهاء التركيز", toolbar:"شريط التنسيق", undo:"تراجع", redo:"إعادة", insertTable:"إدراج جدول", link:"رابط", image:"صورة", textColor:"لون النص", highlight:"تمييز", insertHebrihData:"إدراج بيانات حبريح", print:"طباعة", exportHtml:"تصدير HTML", backToOffice:"العودة إلى المكتب", documentTitle:"عنوان المستند" },
+  en: { loading:"Loading…", saved:"Saved", saving:"Saving...", offline:"Offline", focus:"Focus", exitFocus:"Exit Focus", toolbar:"Formatting toolbar", undo:"Undo", redo:"Redo", style:"Style", paragraph:"Paragraph", heading1:"Heading 1", heading2:"Heading 2", heading3:"Heading 3", fontFamily:"Font", fontSize:"Size", mixed:"Mixed", defaultValue:"Default", bold:"Bold", italic:"Italic", underline:"Underline", strike:"Strikethrough", superscript:"Superscript", subscript:"Subscript", alignLeft:"Align left", alignCenter:"Center", alignRight:"Align right", alignJustify:"Justify",     bulletList:"Bulleted list", orderedList:"Numbered list", quote:"Quote", outdent:"Decrease indent", indent:"Increase indent", lineSpacing:"Line spacing", hr:"Horizontal rule", highlightColor:"Highlight color", clearColor:"Clear color", insertTable:"Insert table", link:"Link", image:"Image", textColor:"Text color", highlight:"Highlight", insertHebrihData:"Insert HEBRIH Data", print:"Print", printPreview:"Print preview", exportHtml:"Export HTML", backToOffice:"Back to Office", documentTitle:"Document title" },
+  fr: { loading:"Chargement…", saved:"Enregistré", saving:"Enregistrement…", offline:"Hors ligne", focus:"Focus", exitFocus:"Quitter focus", toolbar:"Barre de mise en forme", undo:"Annuler", redo:"Rétablir", style:"Style", paragraph:"Paragraphe", heading1:"Titre 1", heading2:"Titre 2", heading3:"Titre 3", fontFamily:"Police", fontSize:"Taille", mixed:"Mixte", defaultValue:"Défaut", bold:"Gras", italic:"Italique", underline:"Souligné", strike:"Barré", superscript:"Exposant", subscript:"Indice", alignLeft:"Aligner à gauche", alignCenter:"Centrer", alignRight:"Aligner à droite", alignJustify:"Justifier",     bulletList:"Liste à puces", orderedList:"Liste numérotée", quote:"Citation", outdent:"Réduire le retrait", indent:"Augmenter le retrait", lineSpacing:"Interligne", hr:"Ligne horizontale", highlightColor:"Couleur de surlignage", clearColor:"Effacer la couleur", insertTable:"Insérer tableau", link:"Lien", image:"Image", textColor:"Couleur du texte", highlight:"Surligner", insertHebrihData:"Insérer données HEBRIH", print:"Imprimer", printPreview:"Aperçu avant impression", exportHtml:"Exporter HTML", backToOffice:"Retour au bureau", documentTitle:"Titre du document" },
+  ar: { loading:"جارٍ التحميل…", saved:"تم الحفظ", saving:"جارٍ الحفظ…", offline:"غير متصل", focus:"تركيز", exitFocus:"إنهاء التركيز", toolbar:"شريط التنسيق", undo:"تراجع", redo:"إعادة", style:"النمط", paragraph:"فقرة", heading1:"عنوان 1", heading2:"عنوان 2", heading3:"عنوان 3", fontFamily:"الخط", fontSize:"الحجم", mixed:"مختلط", defaultValue:"افتراضي", bold:"عريض", italic:"مائل", underline:"تحته خط", strike:"يتوسطه خط", superscript:"مرتفع", subscript:"منخفض", alignLeft:"محاذاة لليسار", alignCenter:"توسيط", alignRight:"محاذاة لليمين", alignJustify:"ضبط",     bulletList:"قائمة نقطية", orderedList:"قائمة مرقمة", quote:"اقتباس", outdent:"تقليل المسافة البادئة", indent:"زيادة المسافة البادئة", lineSpacing:"تباعد الأسطر", hr:"خط أفقي", highlightColor:"لون التمييز", clearColor:"مسح اللون", insertTable:"إدراج جدول", link:"رابط", image:"صورة", textColor:"لون النص", highlight:"تمييز", insertHebrihData:"إدراج بيانات حبريح", print:"طباعة", printPreview:"معاينة الطباعة", exportHtml:"تصدير HTML", backToOffice:"العودة إلى المكتب", documentTitle:"عنوان المستند" },
 } as const;
 
 const HEBRIH_MODAL_T = {
@@ -106,7 +112,8 @@ export default function DocumentEditorPage() {
       Image.configure({ inline: true, allowBase64: true }),
       Table.configure({ resizable: true }),
       TableRow, TableHeader, TableCell,
-      TextStyle, Color,
+      TextStyle, FontSize, FontFamily, LineHeight, Color,
+      Superscript, Subscript, Indent,
       Placeholder.configure({ placeholder: language==="fr"?"Commencez à écrire...": language==="ar"?"ابدأ الكتابة...":"Start typing..." }),
     ],
     content: { type:"doc", content:[{ type:"paragraph", content:[] }] },
@@ -280,7 +287,11 @@ export default function DocumentEditorPage() {
     setLinkUrl("");
   };
 
-  const handlePrint = () => window.print();
+  // Print flows through the suite's custom print system: the editor routes to
+  // the dedicated office print-preview page (clean document layout + page
+  // settings), and the browser dialog is invoked ONLY from that print-ready
+  // view — never raw from the editor chrome.
+  const handlePrint = () => router.push(`/office/print-preview?docId=${encodeURIComponent(id)}`);
   const handleExportHTML = () => {
     if (!editor) return;
     const html = editor.getHTML();
@@ -293,15 +304,32 @@ export default function DocumentEditorPage() {
   };
   const handleExportPDF = () => handlePrint();
 
-  const handleColor = (color: string) => {
-    editor?.chain().focus().setColor(color).run();
-  };
 
   const DOC_T = EDITOR_T[language];
-  if (!file) return <AppShell activePage="office"><div style={{ padding:20 }}>{DOC_T.loading}</div></AppShell>;
+  // ---- Selection-derived toolbar state (marks-level, never global) ----
+  // TipTap applies setFontSize/setFontFamily/etc. to the current selection or
+  // to stored marks for future typing, so cases A–E hold by construction.
+  // Uniform values display as-is; divergent ("mixed") selections display an
+  // indeterminate placeholder and change nothing until the user picks.
+  const blockStyle: "p" | "h1" | "h2" | "h3" =
+    editor?.isActive("heading", { level: 1 }) ? "h1"
+    : editor?.isActive("heading", { level: 2 }) ? "h2"
+    : editor?.isActive("heading", { level: 3 }) ? "h3" : "p";
+  const uniformSize = getUniformMarkValue(editor, "fontSize");
+  const sizeValue = uniformSize && uniformSize !== "mixed" ? uniformSize.replace(/px$/i, "") : "";
+  const sizeOptions = ["8","9","10","11","12","14","16","18","20","24","28","32","36","48","72"];
+  if (sizeValue && !sizeOptions.includes(sizeValue)) sizeOptions.push(sizeValue);
+  const uniformFamily = getUniformMarkValue(editor, "fontFamily");
+  const familyValue = uniformFamily && uniformFamily !== "mixed" ? uniformFamily : "";
+  const fontOptions = ["Arial", "Calibri", "Times New Roman", "Georgia", "Verdana", "Courier New"];
+  const uniformColor = getUniformMarkValue(editor, "color");
+  const uniformHi = getUniformMarkValue(editor, "backgroundColor");
+  const uniformLine = getUniformMarkValue(editor, "lineHeight");
+  const lineValue = uniformLine && uniformLine !== "mixed" ? String(uniformLine) : "";
+  if (!file) return <AppShell activePage="office" showHeader={false}><div style={{ padding:20 }}>{DOC_T.loading}</div></AppShell>;
 
   return (
-    <AppShell activePage="office">
+    <AppShell activePage="office" showHeader={false}>
       <main className={styles.docPage} dir={dir}>
         <div className={styles.docHeader}>
           <button type="button" onClick={()=>router.push("/office")} style={{ border:"1px solid var(--border)", background:"var(--panel-hover)", borderRadius:8, padding:"6px 10px", cursor:"pointer" }} aria-label={DOC_T.backToOffice}>←</button>
@@ -319,39 +347,85 @@ export default function DocumentEditorPage() {
               <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().redo().run()} title={DOC_T.redo} aria-label={DOC_T.redo}><Redo2 size={16} strokeWidth={2} aria-hidden="true" /></button>
             </div>
             <div className={styles.toolGroup}>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("heading", { level:1 })? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleHeading({ level:1 }).run()}>H1</button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("heading", { level:2 })? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleHeading({ level:2 }).run()}>H2</button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("heading", { level:3 })? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleHeading({ level:3 }).run()}>H3</button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("paragraph")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().setParagraph().run()}>P</button>
+              <StyledSelect
+                value={blockStyle}
+                onChange={(v)=>{ if (!editor) return; if (v==="p") editor.chain().focus().setParagraph().run(); else editor.chain().focus().toggleHeading({ level: Number(v.slice(1)) as 1|2|3 }).run(); }}
+                ariaLabel={DOC_T.style}
+                fitContent
+                options={[
+                  { value:"p", label:DOC_T.paragraph },
+                  { value:"h1", label:DOC_T.heading1 },
+                  { value:"h2", label:DOC_T.heading2 },
+                  { value:"h3", label:DOC_T.heading3 },
+                ]}
+              />
+              <StyledSelect
+                value={familyValue}
+                onChange={(v)=>{ if (!editor) return; if (!v) editor.chain().focus().unsetFontFamily().run(); else editor.chain().focus().setFontFamily(v).run(); }}
+                placeholder={uniformFamily==="mixed" ? DOC_T.mixed : DOC_T.fontFamily}
+                ariaLabel={DOC_T.fontFamily}
+                fitContent
+                options={[{ value:"", label:DOC_T.defaultValue }, ...fontOptions.map((f)=>({ value:f, label:f }))]}
+              />
+              <StyledSelect
+                value={sizeValue}
+                onChange={(v)=>{ if (!editor) return; if (!v) editor.chain().focus().unsetFontSize().run(); else editor.chain().focus().setFontSize(`${v}px`).run(); }}
+                placeholder={uniformSize==="mixed" ? DOC_T.mixed : DOC_T.fontSize}
+                ariaLabel={DOC_T.fontSize}
+                fitContent
+                options={[{ value:"", label:DOC_T.defaultValue }, ...sizeOptions.map((s)=>({ value:s, label:s }))]}
+              />
             </div>
             <div className={styles.toolGroup}>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("bold")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleBold().run()}><Bold size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("italic")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleItalic().run()}><Italic size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("underline")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleUnderline().run()}><UnderlineIcon size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("strike")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleStrike().run()}><Strikethrough size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("bold")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleBold().run()} title={DOC_T.bold} aria-label={DOC_T.bold} aria-pressed={!!editor?.isActive("bold")}><Bold size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("italic")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleItalic().run()} title={DOC_T.italic} aria-label={DOC_T.italic} aria-pressed={!!editor?.isActive("italic")}><Italic size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("underline")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleUnderline().run()} title={DOC_T.underline} aria-label={DOC_T.underline} aria-pressed={!!editor?.isActive("underline")}><UnderlineIcon size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("strike")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleStrike().run()} title={DOC_T.strike} aria-label={DOC_T.strike} aria-pressed={!!editor?.isActive("strike")}><Strikethrough size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("superscript")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleSuperscript().run()} title={DOC_T.superscript} aria-label={DOC_T.superscript} aria-pressed={!!editor?.isActive("superscript")}><SuperscriptIcon size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("subscript")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleSubscript().run()} title={DOC_T.subscript} aria-label={DOC_T.subscript} aria-pressed={!!editor?.isActive("subscript")}><SubscriptIcon size={16} strokeWidth={2} aria-hidden="true" /></button>
             </div>
             <div className={styles.toolGroup}>
-              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().setTextAlign("left").run()} style={{ color: editor?.isActive({ textAlign:"left"})? "var(--accent)": undefined }}><AlignLeft size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().setTextAlign("center").run()} style={{ color: editor?.isActive({ textAlign:"center"})? "var(--accent)": undefined }}><AlignCenter size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().setTextAlign("right").run()} style={{ color: editor?.isActive({ textAlign:"right"})? "var(--accent)": undefined }}><AlignRight size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().setTextAlign("justify").run()} style={{ color: editor?.isActive({ textAlign:"justify"})? "var(--accent)": undefined }}><AlignJustify size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <span className={styles.colorWrap} title={DOC_T.textColor}>
+                <input type="color" className={styles.colorInput} value={uniformColor || "#000000"} onChange={(e)=>editor?.chain().focus().setColor(e.target.value).run()} aria-label={DOC_T.textColor} />
+                {uniformColor ? <button type="button" className={styles.colorClear} onClick={()=>editor?.chain().focus().unsetColor().run()} title={DOC_T.clearColor} aria-label={DOC_T.clearColor}>×</button> : null}
+              </span>
+              <span className={styles.colorWrap} title={DOC_T.highlightColor}>
+                <input type="color" className={styles.colorInput} value={uniformHi || "#ffff00"} onChange={(e)=>editor?.chain().focus().unsetHighlight().setHighlight({ color: e.target.value }).run()} aria-label={DOC_T.highlightColor} />
+                {uniformHi ? <button type="button" className={styles.colorClear} onClick={()=>editor?.chain().focus().unsetHighlight().run()} title={DOC_T.clearColor} aria-label={DOC_T.clearColor}>×</button> : null}
+              </span>
             </div>
             <div className={styles.toolGroup}>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("bulletList")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleBulletList().run()}><List size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("orderedList")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleOrderedList().run()}><ListOrdered size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("blockquote")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleBlockquote().run()}><Quote size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().setHorizontalRule().run()}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive({ textAlign:"left"})? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().setTextAlign("left").run()} title={DOC_T.alignLeft} aria-label={DOC_T.alignLeft}><AlignLeft size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive({ textAlign:"center"})? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().setTextAlign("center").run()} title={DOC_T.alignCenter} aria-label={DOC_T.alignCenter}><AlignCenter size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive({ textAlign:"right"})? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().setTextAlign("right").run()} title={DOC_T.alignRight} aria-label={DOC_T.alignRight}><AlignRight size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive({ textAlign:"justify"})? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().setTextAlign("justify").run()} title={DOC_T.alignJustify} aria-label={DOC_T.alignJustify}><AlignJustify size={16} strokeWidth={2} aria-hidden="true" /></button>
+            </div>
+            <div className={styles.toolGroup}>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("bulletList")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleBulletList().run()} title={DOC_T.bulletList} aria-label={DOC_T.bulletList}><List size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("orderedList")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleOrderedList().run()} title={DOC_T.orderedList} aria-label={DOC_T.orderedList}><ListOrdered size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().outdent().run()} title={DOC_T.outdent} aria-label={DOC_T.outdent}><IndentDecrease size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().indent().run()} title={DOC_T.indent} aria-label={DOC_T.indent}><IndentIncrease size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={`${styles.toolBtn} ${editor?.isActive("blockquote")? styles.toolBtnActive:""}`} onClick={()=>editor?.chain().focus().toggleBlockquote().run()} title={DOC_T.quote} aria-label={DOC_T.quote}><Quote size={16} strokeWidth={2} aria-hidden="true" /></button>
+            </div>
+            <div className={styles.toolGroup}>
+              <StyledSelect
+                value={lineValue}
+                onChange={(v)=>{ if (!editor) return; if (!v) editor.chain().focus().unsetLineHeight().run(); else editor.chain().focus().setLineHeight(v).run(); }}
+                placeholder={uniformLine==="mixed" ? DOC_T.mixed : DOC_T.lineSpacing}
+                ariaLabel={DOC_T.lineSpacing}
+                fitContent
+                options={[{ value:"", label:DOC_T.defaultValue }, ...["1.0","1.15","1.5","2.0"].map((s)=>({ value:s, label:s }))]}
+              />
+              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().setHorizontalRule().run()} title={DOC_T.hr} aria-label={DOC_T.hr}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
             </div>
             <div className={styles.toolGroup}>
               <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().insertTable({ rows:3, cols:3, withHeaderRow:true }).run()} title={DOC_T.insertTable} aria-label={DOC_T.insertTable}><TableIcon size={16} strokeWidth={2} aria-hidden="true" /></button>
               <button type="button" className={styles.toolBtn} onClick={handleLink} title={DOC_T.link} aria-label={DOC_T.link}><LinkIcon size={16} strokeWidth={2} aria-hidden="true" /></button>
               <button type="button" className={styles.toolBtn} onClick={handleImageInsert} title={DOC_T.image} aria-label={DOC_T.image}><ImageIcon size={16} strokeWidth={2} aria-hidden="true" /></button>
-              <input type="color" className={styles.colorInput} onChange={(e)=>handleColor(e.target.value)} title={DOC_T.textColor} aria-label={DOC_T.textColor} defaultValue="#000000" />
-              <button type="button" className={styles.toolBtn} onClick={()=>editor?.chain().focus().toggleHighlight().run()} title={DOC_T.highlight} aria-label={DOC_T.highlight}><Highlighter size={16} strokeWidth={2} aria-hidden="true" /></button>
             </div>
             <div className={styles.toolGroup} style={{ borderInlineEnd:"none" }}>
               <button type="button" className={styles.toolBtn} onClick={()=>setShowHebrih(true)} title={DOC_T.insertHebrihData} aria-label={DOC_T.insertHebrihData} style={{ width:"auto", padding:"0 8px", gap:6, display:"inline-flex" }}><Database size={16} strokeWidth={2} aria-hidden="true" /> HEBRIH</button>
-              <button type="button" className={styles.toolBtn} onClick={handlePrint} title={DOC_T.print} aria-label={DOC_T.print}><Printer size={16} strokeWidth={2} aria-hidden="true" /></button>
+              <button type="button" className={styles.toolBtn} onClick={handlePrint} title={DOC_T.printPreview} aria-label={DOC_T.printPreview}><Printer size={16} strokeWidth={2} aria-hidden="true" /></button>
               <button type="button" className={styles.toolBtn} onClick={handleExportHTML} title={DOC_T.exportHtml} aria-label={DOC_T.exportHtml}><Download size={16} strokeWidth={2} aria-hidden="true" /></button>
             </div>
           </div>

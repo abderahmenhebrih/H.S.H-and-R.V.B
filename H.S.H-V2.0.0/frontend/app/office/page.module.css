@@ -193,8 +193,21 @@
   border: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  /* Root cause of the stray scrollbar: this grid always fits its container
+     (minmax(0,1fr) shrinks to fit), so overflow-x:auto serves no purpose on
+     desktop — subpixel rounding of the fractional columns + padding could
+     exceed clientWidth by 1px and summon a permanent thin scrollbar.
+     Keep it unscrollable here; genuinely narrow viewports get an intentional
+     touch-friendly scroll strip (scrollbar visuals hidden) below. */
+  overflow-x: hidden;
+}
+/* Hide any scrollbar chrome on the tab strip itself (all engines). */
+.tabBar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tabBar::-webkit-scrollbar {
+  display: none;
 }
 .tab {
   position: relative;
@@ -213,6 +226,7 @@
   cursor: pointer;
   white-space: nowrap;
   min-width: 0;
+  overflow: hidden;
 }
 .tab:hover {
   color: var(--text);
@@ -487,7 +501,9 @@
   .officeHeaderActions { grid-column: 1 / -1; }
   .officeHeaderActions .primaryBtn,
   .officeHeaderActions .secondaryBtn { flex: 1 1 0; justify-content: center; }
-  .tabBar { display: flex; }
+  /* Narrow viewports: tabs may genuinely overflow → flex strip with momentum
+     scrolling (mouse-wheel / touch), no ugly native scrollbar visuals. */
+  .tabBar { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tab { flex: 0 0 auto; justify-content: flex-start; margin-inline-end: 20px; }
   .fileCard { flex-wrap: wrap; }
   .fileRowRight { margin-inline-start: 0; flex-wrap: wrap; width: 100%; }

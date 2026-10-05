@@ -4,8 +4,8 @@ import { Screen } from "@/components/common/Screen";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { useTheme } from "@/theme/useTheme";
 import { useLanguage } from "@/i18n";
-import MainChatsScreen from "../main-chats";
-import SecondaryChatsScreen from "../secondary-chats";
+import MainChatsScreen from "../main-chats/index";
+import SecondaryChatsScreen from "../secondary-chats/index";
 
 type Tab = "main" | "secondary";
 

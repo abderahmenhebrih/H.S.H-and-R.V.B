@@ -1,4 +1,5 @@
 import type { Language } from "../../types/settings/settings";
+import { formatDateObjectToDisplay } from "../date-format";
 
 export type PlaceholderContext = {
   language: Language;
@@ -22,7 +23,8 @@ export type PlaceholderContext = {
  */
 export function resolvePlaceholders(template: string, ctx: PlaceholderContext): string {
   let out = template;
-  const today = ctx.today ?? new Date().toLocaleDateString(ctx.language==="ar"?"ar-DZ-u-nu-latn": ctx.language==="fr"?"fr-FR":"en-GB", { numberingSystem:"latn"} as any);
+  // Deterministic application-wide numeric standard: DD/MM/YYYY (same for all languages).
+  const today = ctx.today ?? formatDateObjectToDisplay(new Date());
   out = out.replace(/\{\{\s*today\s*\}\}/g, today);
   out = out.replace(/\{\{\s*currency\s*\}\}/g, ctx.currency ?? "DA");
 

@@ -4,6 +4,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Language } from "../../types/settings/settings";
+import {
+  DATE_DISPLAY_PLACEHOLDER,
+  formatIsoDateToDisplay,
+  isValidIsoDate,
+  parseDisplayDateToIso,
+} from "../../lib/date-format";
 import styles from "./StyledDatePicker.module.css";
 
 function toISODate(date: Date): string {
@@ -15,19 +21,13 @@ function toISODate(date: Date): string {
 
 function parseISODate(iso: string): Date | null {
   if (!iso) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  // Strict real-date validation (rejects 2026-02-31 etc.); local-midnight
+  // construction avoids UTC day-shift for date-only values.
+  if (!isValidIsoDate(iso)) return null;
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
   if (Number.isNaN(dt.getTime())) return null;
   return dt;
-}
-
-function formatInputValue(date: Date | null): string {
-  if (!date) return "";
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const yyyy = date.getFullYear();
-  return `${mm}/${dd}/${yyyy}`;
 }
 
 type Props = {
@@ -49,7 +49,16 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
   const [viewDate, setViewDate] = useState<Date>(() => parsed ?? new Date());
   const [viewMode, setViewMode] = useState<CalendarView>("days");
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  // Manual-entry draft: null = show canonical formatted value; a string =
+  // user is typing DD/MM/YYYY. Committed strictly on blur/Enter, reverted on
+  // Escape or invalid input — invalid text never reaches the form (ISO stays).
+  const [draft, setDraft] = useState<string | null>(null);
+
+  // External value changes discard any in-progress draft.
+  useEffect(() => {
+    setDraft(null);
+  }, [value]);
   const menuRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const yearGridRef = useRef<HTMLDivElement>(null);
@@ -190,10 +199,26 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
     };
   }, [open]);
 
-  const display = useMemo(() => {
-    if (!parsed) return placeholder ?? "";
-    return formatInputValue(parsed);
-  }, [parsed, placeholder]);
+  // Visible numeric field is always DD/MM/YYYY, regardless of browser/OS locale.
+  const formatted = useMemo(() => formatIsoDateToDisplay(value), [value]);
+  const effectivePlaceholder = placeholder ?? DATE_DISPLAY_PLACEHOLDER;
+  const visibleText = draft ?? formatted;
+
+  function commitDraft(text: string) {
+    const iso = parseDisplayDateToIso(text);
+    if (iso) {
+      if (iso !== value) onChange(iso);
+      setDraft(null);
+    } else if (text.trim() === "") {
+      // Clearing the field clears the date (same as calendar Clear).
+      if (value !== "") onChange("");
+      setDraft(null);
+    } else {
+      // Invalid (e.g. 31/02/2026, 12/13/2026, abc): revert to last valid —
+      // never propagate ambiguous text upstream.
+      setDraft(null);
+    }
+  }
 
   const monthLabel = useMemo(() => {
     const locale = language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB";
@@ -307,20 +332,47 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
 
   return (
     <div ref={wrapperRef} className={`${styles.wrapper} ${className ?? ""}`.trim()}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`${styles.trigger} ${open ? styles.triggerOpen : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={ariaLabel ?? display}
-      >
-        <span className={styles.icon} aria-hidden="true">
-          <CalendarDays size={16} strokeWidth={2} />
-        </span>
-        <span className={parsed ? styles.label : styles.placeholder}>{display || placeholder || "Select date"}</span>
-      </button>
+      <div ref={triggerRef} className={`${styles.trigger} ${open ? styles.triggerOpen : ""}`}>
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          spellCheck={false}
+          className={`${styles.textInput} ${parsed || draft !== null ? "" : styles.textInputEmpty}`}
+          value={visibleText}
+          placeholder={effectivePlaceholder}
+          aria-label={ariaLabel ?? effectivePlaceholder}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => commitDraft(e.target.value)}
+          onFocus={(e) => {
+            // Select-all on focus for quick overwrite (Escape reverts).
+            e.target.select();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitDraft((e.target as HTMLInputElement).value);
+              (e.target as HTMLInputElement).blur();
+            } else if (e.key === "Escape") {
+              setDraft(null);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+        <button
+          type="button"
+          className={styles.iconButton}
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={ariaLabel ? `${ariaLabel} — open calendar` : "Open calendar"}
+          tabIndex={-1}
+        >
+          <span className={styles.icon} aria-hidden="true">
+            <CalendarDays size={16} strokeWidth={2} />
+          </span>
+        </button>
+      </div>
       <input
         type="date"
         value={value}

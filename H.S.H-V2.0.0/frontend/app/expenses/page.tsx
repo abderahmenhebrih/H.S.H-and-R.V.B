@@ -6,6 +6,7 @@ import { useDbSync } from "../../src/hooks/useDbSync";
 import { AlertTriangle, Receipt, Search, X } from "lucide-react";
 import StyledSelect from "../../src/components/common/StyledSelect";
 import StyledDatePicker from "../../src/components/common/StyledDatePicker";
+import { formatTimestampToDisplay } from "../../src/lib/date-format";
 import AppShell from "../../src/components/layout/AppShell";
 import { useCircularDeleteCountdown } from "../../src/hooks/useCircularDeleteCountdown";
 import countdownStyles from "../../src/components/common/ProtectedDeleteModal.module.css";
@@ -394,7 +395,7 @@ export default function ExpensesPage() {
                 {e.note && <p className={styles.note}>{e.note}</p>}
                 <div className={styles.metaRow}>
                   <span>{t.account}: <strong>{accountName(e.accountId)}</strong></span>
-                  <span>{t.date}: <strong>{new Date(e.date).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}</strong></span>
+                  <span>{t.date}: <strong>{formatTimestampToDisplay(e.date)}</strong></span>
                 </div>
                 <div className={styles.amount}>
                   <span>{t.amount}</span>

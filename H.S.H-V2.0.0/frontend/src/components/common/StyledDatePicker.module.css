@@ -48,6 +48,58 @@
   flex: 0 0 auto;
 }
 
+/* Manual DD/MM/YYYY entry field — borderless inside the trigger frame.
+   Scoped (0,3,1) to beat globals.css input:not() (0,2,1) without !important. */
+.wrapper .trigger .textInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+}
+
+.wrapper .trigger .textInput::placeholder {
+  color: var(--subtle);
+}
+
+.textInputEmpty {
+  color: var(--subtle);
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.iconButton:hover .icon {
+  color: var(--text);
+}
+
+.iconButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
 .label {
   flex: 1;
   min-width: 0;

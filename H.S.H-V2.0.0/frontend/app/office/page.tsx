@@ -25,6 +25,7 @@ import {
 import { officeFileService, getBlankDocumentContent, getBlankSpreadsheetContent, getLocalizedSheetName } from "../../src/services/office-file.service";
 import { settingsService } from "../../src/services/settings.service";
 import { DEFAULT_SETTINGS, getDirection } from "../../src/lib/settings";
+import { formatTimestampToDisplay } from "../../src/lib/date-format";
 import { useDbSync } from "../../src/hooks/useDbSync";
 import { resolvePlaceholdersInObject } from "../../src/lib/office/placeholder";
 import type { OfficeFile, OfficeFileType } from "../../src/types/entities/office-file";
@@ -625,7 +626,8 @@ export default function OfficePage() {
   }
 
   function formatDate(ts: number) {
-    try { return new Date(ts).toLocaleDateString(language==="ar" ? "ar-DZ-u-nu-latn" : language==="fr" ? "fr-FR" : "en-GB", { numberingSystem:"latn"} as any); } catch { return new Date(ts).toLocaleDateString("en-GB"); }
+    // Deterministic application-wide numeric standard: DD/MM/YYYY.
+    return formatTimestampToDisplay(ts);
   }
 
   const displayFilesForTab = () => {

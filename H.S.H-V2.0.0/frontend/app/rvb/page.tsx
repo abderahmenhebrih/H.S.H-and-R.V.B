@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { formatTimestampToDisplay } from "../../src/lib/date-format";
+
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import RvbShell from "../../src/components/rvb/RvbShell";
 import RvbKpiCard from "../../src/components/rvb/dashboard/RvbKpiCard";
@@ -327,7 +329,7 @@ function formatDate(ts: number | null | undefined, lang: string) {
     const d = new Date(ts);
     const locale = lang === "ar" ? "ar-DZ-u-nu-latn" : lang === "fr" ? "fr-FR" : "en-GB";
     return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric", numberingSystem: "latn" } as any).format(d);
-  } catch { return new Date(ts!).toLocaleDateString(); }
+  } catch { return formatTimestampToDisplay(ts); }
 }
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);

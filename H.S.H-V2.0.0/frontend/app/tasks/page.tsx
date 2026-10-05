@@ -24,6 +24,7 @@ import {
 
 import AppShell from "../../src/components/layout/AppShell";
 import StyledDatePicker from "../../src/components/common/StyledDatePicker";
+import { formatTimestampToDisplay } from "../../src/lib/date-format";
 import { taskService } from "../../src/services/task.service";
 import { taskRepository } from "../../src/repositories/task.repository";
 import { settingsService } from "../../src/services/settings.service";
@@ -889,7 +890,7 @@ export default function TasksPage() {
                         </span>
                         <strong>{task.name}</strong>
                       </span>
-                      <span className={styles.deadlineText}>{new Date(task.deadline).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}</span>
+                      <span className={styles.deadlineText}>{formatTimestampToDisplay(task.deadline)}</span>
                       <span className={`${styles.statusBadge} ${badgeClass}`}>{statusLabel}</span>
                       <div className={styles.rowActions}>
                         <button
@@ -984,7 +985,7 @@ export default function TasksPage() {
                 <h2 id="delete-title">{t.deleteTask}</h2>
                 <p className={styles.deleteDescription}>{t.deleteWarning}</p>
                 <p className={styles.deleteContext}>
-                  {deleteTarget.name} · {new Date(deleteTarget.deadline).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}
+                  {deleteTarget.name} · {formatTimestampToDisplay(deleteTarget.deadline)}
                 </p>
                 <div className={styles.circularCountdown} aria-live="polite">
                   <div className={styles.circleWrapper} aria-hidden="true">

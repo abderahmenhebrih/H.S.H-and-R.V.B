@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { formatTimestampToDisplay } from "../../../src/lib/date-format";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import RvbShell from "../../../src/components/rvb/RvbShell";
@@ -292,7 +294,7 @@ function formatDateShort(ts: number, lang: string) {
   try {
     const locale = lang === "ar" ? "ar-DZ-u-nu-latn" : lang === "fr" ? "fr-FR" : "en-GB";
     return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", numberingSystem: "latn" } as any).format(new Date(ts));
-  } catch { return new Date(ts).toLocaleDateString(); }
+  } catch { return formatTimestampToDisplay(ts); }
 }
 
 function getConversationDisplayName(conv: Conversation, myId: string, t: any): string {

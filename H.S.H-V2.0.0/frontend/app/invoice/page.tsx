@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "../../src/components/layout/AppShell";
 import StyledSelect from "../../src/components/common/StyledSelect";
 import StyledDatePicker from "../../src/components/common/StyledDatePicker";
+import { formatTimestampToDisplay } from "../../src/lib/date-format";
 import ProtectedDeleteModal from "../../src/components/common/ProtectedDeleteModal";
 import CancelInvoiceModal from "../../src/components/common/CancelInvoiceModal";
 import { 
@@ -1460,7 +1461,7 @@ export default function InvoicePage() {
                     ariaLabel={t.sourceSale}
                     options={filteredSales.map(s => {
                       const total = s.items.reduce((sum, it) => sum + it.total, 0);
-                      return { value: s.id, label: `${new Date(s.date).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)} — ${formatCurrency(total, currency)}` };
+                      return { value: s.id, label: `${formatTimestampToDisplay(s.date)} — ${formatCurrency(total, currency)}` };
                     })}
                   />
                   {selectedCustomerId && filteredSales.length === 0 && (
@@ -1572,7 +1573,7 @@ export default function InvoicePage() {
                     <strong>{inv.invoiceNumber || "DRAFT"}</strong>
                     <span>{sellerProfiles.find(s => s.id === inv.sellerProfileId)?.commercialName || inv.sellerProfileId}</span>
                     <span>{inv.customerSnapshot.name}</span>
-                    <span>{new Date(inv.invoiceDate).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}</span>
+                    <span>{formatTimestampToDisplay(inv.invoiceDate)}</span>
                     <strong>{formatCurrency(inv.totalTTC, inv.currencyCode as Currency)}</strong>
                     <span>{inv.currencyCode}</span>
                     <div className={styles.rowActions}>
@@ -1617,7 +1618,7 @@ export default function InvoicePage() {
                     <strong>{inv.invoiceNumber}</strong>
                     <span>{sellerProfiles.find(s => s.id === inv.sellerProfileId)?.commercialName || inv.sellerSnapshot.commercialName}</span>
                     <span>{inv.customerSnapshot.name}</span>
-                    <span>{new Date(inv.invoiceDate).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}</span>
+                    <span>{formatTimestampToDisplay(inv.invoiceDate)}</span>
                     <strong>{formatCurrency(inv.totalTTC, inv.currencyCode as Currency)}</strong>
                     <div className={styles.rowActions}>
                       <button type="button" className={styles.iconButton} title={t.view} onClick={() => router.push(`/invoice/print-preview?invoiceId=${inv.id}`)}><Eye size={16} strokeWidth={2} aria-hidden="true" /></button>
@@ -1659,7 +1660,7 @@ export default function InvoicePage() {
                   <div key={inv.id} className={styles.tableRow}>
                     <span>{(suppliers as any[]).find((s: any)=>s.id===inv.supplierId)?.name || inv.supplierId}</span>
                     <span>{inv.supplierInvoiceNumber}</span>
-                    <span>{new Date(inv.invoiceDate).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}</span>
+                    <span>{formatTimestampToDisplay(inv.invoiceDate)}</span>
                     <span>{formatCurrency(inv.amountHT, inv.currencyCode as Currency)}</span>
                     <span>{formatCurrency(inv.amountTTC, inv.currencyCode as Currency)}</span>
                     <div className={styles.rowActions}>
@@ -1700,7 +1701,7 @@ export default function InvoicePage() {
                     <span>{sellerProfiles.find(s=>s.id===inv.sellerProfileId)?.commercialName || inv.sellerSnapshot.commercialName}</span>
                     <span>{inv.customerSnapshot.name}</span>
                     <span>{inv.sourceSaleIds[0]?.slice(0,8) || "—"}</span>
-                    <span>{new Date(inv.invoiceDate).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn": language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any)}</span>
+                    <span>{formatTimestampToDisplay(inv.invoiceDate)}</span>
                     <strong>{formatCurrency(inv.totalTTC, inv.currencyCode as Currency)}</strong>
                     <div className={styles.rowActions}>
                       <button type="button" className={styles.iconButton} title={(t as any).editDraft || "Edit"} aria-label={(t as any).editDraft || "Edit"} onClick={() => {
@@ -1800,7 +1801,7 @@ export default function InvoicePage() {
                   </div>
                   <div><strong>{t.supplier}:</strong> {(suppliers as any[]).find((s:any)=> s.id===(viewingInvoice as any).supplierId)?.name || (viewingInvoice as any).supplierId}</div>
                   <div><strong>{t.supplierInvoiceNumber}:</strong> {(viewingInvoice as any).supplierInvoiceNumber}</div>
-                  <div><strong>{t.invoiceDate}:</strong> {new Date((viewingInvoice as any).invoiceDate).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn": language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any)}</div>
+                  <div><strong>{t.invoiceDate}:</strong> {formatTimestampToDisplay((viewingInvoice as any).invoiceDate)}</div>
                   <div><strong>{t.amountHT}:</strong> {formatCurrency((viewingInvoice as any).amountHT, (viewingInvoice as any).currencyCode as Currency)} — <strong>{t.amountTTC}:</strong> {formatCurrency((viewingInvoice as any).amountTTC, (viewingInvoice as any).currencyCode as Currency)}</div>
                   {(viewingInvoice as any).notes && <div><strong>{t.notes}:</strong> {(viewingInvoice as any).notes}</div>}
                 </div>
@@ -1849,7 +1850,7 @@ export default function InvoicePage() {
       <ProtectedDeleteModal
         isOpen={!!draftDeleteTarget}
         title={(t as any).deleteDraft || "Delete Draft"}
-        entityName={draftDeleteTarget?.id ? `${(draftDeleteTarget as any).customerSnapshot?.name || draftDeleteTarget.customerId} · ${new Date((draftDeleteTarget as any).invoiceDate).toLocaleDateString(language==="ar"?"ar-DZ-u-nu-latn": language==="fr"?"fr-FR":"en-GB", {numberingSystem:"latn"} as any)}` : draftDeleteTarget?.id}
+        entityName={draftDeleteTarget?.id ? `${(draftDeleteTarget as any).customerSnapshot?.name || draftDeleteTarget.customerId} · ${formatTimestampToDisplay((draftDeleteTarget as any).invoiceDate)}` : draftDeleteTarget?.id}
         description={(t as any).draftsDesc || "Unfinished invoices — edit or delete before issuing."}
         confirmLabel={t.confirmDelete}
         cancelLabel={t.cancel}

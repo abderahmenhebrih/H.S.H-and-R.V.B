@@ -8,6 +8,7 @@ import AppShell from "../../../src/components/layout/AppShell";
 import { taskService } from "../../../src/services/task.service";
 import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { formatTimestampToDisplay } from "../../../src/lib/date-format";
 import { useDbSync } from "../../../src/hooks/useDbSync";
 import type { Task } from "../../../src/types/entities/task";
 import type { Language } from "../../../src/types/settings/settings";
@@ -176,9 +177,9 @@ export default function FinishedTasksPage() {
                       </span>
                       <strong>{task.name}</strong>
                     </span>
-                    <span className={styles.deadlineText}>{new Date(task.deadline).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}</span>
+                    <span className={styles.deadlineText}>{formatTimestampToDisplay(task.deadline)}</span>
                     <span className={styles.deadlineText}>
-                      {task.completedAt ? new Date(task.completedAt).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any) : new Date(task.updatedAt).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any)}
+                      {task.completedAt ? formatTimestampToDisplay(task.completedAt) : formatTimestampToDisplay(task.updatedAt)}
                     </span>
                     <span className={`${styles.statusBadge} ${styles.statusCompleted}`}>{t.completedStatus}</span>
                   </article>

@@ -6,6 +6,7 @@ import AppShell from "../../src/components/layout/AppShell";
 import StyledSelect from "../../src/components/common/StyledSelect";
 import { CalendarRange } from "lucide-react";
 import StyledDatePicker from "../../src/components/common/StyledDatePicker";
+import { formatTimestampToDisplay } from "../../src/lib/date-format";
 import { productService } from "../../src/services/product.service";
 import { supplierService } from "../../src/services/supplier.service";
 import { customerService } from "../../src/services/customer.service";
@@ -153,8 +154,11 @@ const TRANSLATIONS = {
   },
 } as const;
 
-function formatDate(ts: number, language: string = "en") {
-  return new Date(ts).toLocaleDateString(language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB", { numberingSystem: "latn" } as any);
+function formatDate(ts: number, _language?: string) {
+  // Deterministic application-wide numeric standard: DD/MM/YYYY (same for all
+  // languages — the language argument is accepted for call-site compatibility).
+  void _language;
+  return formatTimestampToDisplay(ts);
 }
 
 function serialForDate(date: number, index: number) {

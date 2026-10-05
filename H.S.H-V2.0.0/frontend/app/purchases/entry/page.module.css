@@ -865,6 +865,20 @@ html[dir="rtl"] .drawerSidebarOpen {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
+/* Slaughter Calculations: hide native number spinner arrows (Weight Before /
+   Weight After / Amount stay type="number" — numeric semantics, validation,
+   min/step and mobile keyboards unchanged). Scoped to this modal only. */
+.calcForm input[type="number"]::-webkit-outer-spin-button,
+.calcForm input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.calcForm input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* SUMMARY CARD - FULL WIDTH */
 .summaryCard {
   width: 100%;

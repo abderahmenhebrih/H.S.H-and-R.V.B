@@ -1,4 +1,6 @@
 ﻿"use client";
+
+import { formatTimestampToDisplay } from "../../../src/lib/date-format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import RvbShell from "../../../src/components/rvb/RvbShell";
@@ -203,7 +205,7 @@ function formatActivityDate(ts: number, lang: string): string {
   const d = new Date(ts);
   try {
     return new Intl.DateTimeFormat(lang === "ar" ? "ar-DZ-u-nu-latn" : lang === "fr" ? "fr-FR" : "en-GB", { day: "2-digit", month: "short", year: "numeric", numberingSystem: "latn" } as any).format(d);
-  } catch { return d.toLocaleDateString(); }
+  } catch { return formatTimestampToDisplay(ts); }
 }
 function groupLabel(ts: number, lang: string, t: any): string {
   const now = new Date(); const d = new Date(ts);

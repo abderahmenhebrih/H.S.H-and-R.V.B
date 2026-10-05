@@ -372,8 +372,23 @@ async function runIntegrationTests() {
     const admRes = await request(app).post("/api/rvb/accounts").set("Authorization", `Bearer ${mgrToken}`).send({ tag: `adm.api.${Date.now().toString().slice(-6)}`, displayName: "API Admin", role: "admin", password: "AdminPass123", confirmPassword: "AdminPass123" });
     record("28. API rejects role=admin", admRes.status === 400 && admRes.body.code === "RVB_ROLE_INVALID", `status=${admRes.status} code=${admRes.body.code}`);
 
-    // Supervisor cannot
-    const supAcc: any = await svc.createRvbAccount({ tag: `sup.int.${Date.now().toString().slice(-6)}`, displayName: "Sup Test", role: "supervisor", password: "SupPass123", confirmPassword: "SupPass123" } as any);
+    // Supervisor cannot (supervisor must link to a Worker — dedicated entity)
+    const supWorkerNow = Date.now();
+    const supWorker: any = await WorkerModel.create({
+      id: `w-sup-int-${supWorkerNow}`,
+      createdAt: supWorkerNow,
+      updatedAt: supWorkerNow,
+      syncStatus: "synced",
+      name: `Int Supervisor Worker ${supWorkerNow}`,
+      phone: "0123456789",
+      employmentDate: supWorkerNow,
+      position: "Shift Lead",
+      startingSalary: 12000,
+      monthlySalary: 12000,
+      status: "active",
+      balance: 12000,
+    }).then((d: any) => d.toObject ? d.toObject() : d);
+    const supAcc: any = await svc.createRvbAccount({ tag: `sup.int.${Date.now().toString().slice(-6)}`, displayName: "Sup Test", role: "supervisor", linkedEntityType: "worker", linkedEntityId: supWorker.id, password: "SupPass123", confirmPassword: "SupPass123" } as any);
     const supLogin = await request(app).post("/api/rvb/auth/login").send({ tag: supAcc.tag, password: "SupPass123" });
     const supToken = supLogin.body.accessToken;
     const supRes = await request(app).get("/api/rvb/accounts").set("Authorization", `Bearer ${supToken}`);

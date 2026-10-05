@@ -56,11 +56,13 @@ export default function AccountsScreen() {
     }
   }, [search, accounts]);
 
+  // Supervisor links to a Worker (canonical supervisor → worker mapping).
+  const linkEntityType = form.role === "supervisor" ? "worker" : form.role;
   useEffect(() => {
-    if (form.role === "worker" || form.role === "supplier" || form.role === "customer") {
-      getLinkable(form.role as any).then(setLinkables).catch(() => setLinkables([]));
+    if (form.role === "worker" || form.role === "supplier" || form.role === "customer" || form.role === "supervisor") {
+      getLinkable(linkEntityType as any).then(setLinkables).catch(() => setLinkables([]));
     } else setLinkables([]);
-  }, [form.role]);
+  }, [form.role, linkEntityType]);
 
   const handleCreate = async () => {
     if (!form.tag.trim() || !form.displayName.trim() || !form.role.trim() || !form.password.trim()) {
@@ -71,6 +73,11 @@ export default function AccountsScreen() {
       Alert.alert("Invalid", "Passwords do not match");
       return;
     }
+    const needsLink = form.role === "worker" || form.role === "supplier" || form.role === "customer" || form.role === "supervisor";
+    if (needsLink && !form.linkedEntityId) {
+      Alert.alert("Invalid", "Linked worker is required for this role");
+      return;
+    }
     setSubmitting(true);
     try {
       await createAccount({
@@ -79,7 +86,7 @@ export default function AccountsScreen() {
         role: form.role as any,
         password: form.password,
         confirmPassword: form.confirmPassword,
-        ...(form.linkedEntityId ? { linkedEntityType: form.role, linkedEntityId: form.linkedEntityId } : {}),
+        ...(form.linkedEntityId ? { linkedEntityType: linkEntityType, linkedEntityId: form.linkedEntityId } : {}),
       });
       setShowCreate(false);
       setForm({ tag: "", displayName: "", role: "worker", password: "", confirmPassword: "", linkedEntityType: "", linkedEntityId: "" });
@@ -193,9 +200,9 @@ export default function AccountsScreen() {
           </View>
           <TextInput placeholder="Password" value={form.password} onChangeText={(v) => setForm({ ...form, password: v })} secureTextEntry style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]} placeholderTextColor={theme.colors.textTertiary} testID="account-create-password" />
           <TextInput placeholder="Confirm Password" value={form.confirmPassword} onChangeText={(v) => setForm({ ...form, confirmPassword: v })} secureTextEntry style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.text }]} placeholderTextColor={theme.colors.textTertiary} testID="account-create-confirm" />
-          {(form.role === "worker" || form.role === "supplier" || form.role === "customer") && linkables.length > 0 ? (
+          {(form.role === "worker" || form.role === "supplier" || form.role === "customer" || form.role === "supervisor") && linkables.length > 0 ? (
             <View>
-              <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Linkable {form.role} (optional)</Text>
+              <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Linkable {linkEntityType} (required)</Text>
               <ScrollView style={{ maxHeight: 120, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, marginTop: 6 }}>
                 {linkables.map((e) => (
                   <Pressable key={e.id} onPress={() => setForm({ ...form, linkedEntityId: e.id })} style={[styles.linkableRow, { backgroundColor: form.linkedEntityId === e.id ? theme.colors.primarySoft : theme.colors.surface }]}>

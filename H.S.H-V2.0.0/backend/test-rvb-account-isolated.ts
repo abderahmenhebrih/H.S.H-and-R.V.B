@@ -189,10 +189,47 @@ async function run() {
   }
 
   try {
-    const supAcc = await svc.createRvbAccount({ tag: `sup.${Date.now().toString().slice(-6)}`, displayName: "Test Supervisor", role: "supervisor" });
-    record("G3. Supervisor account", !!supAcc && supAcc.role === "supervisor", `id=${supAcc?.id}`);
+    await svc.createRvbAccount({ tag: `sup.${Date.now().toString().slice(-6)}`, displayName: "Test Supervisor", role: "supervisor" });
+    record("G3. Supervisor without Worker rejected", false, "did not throw");
   } catch (e: any) {
-    record("G3. Supervisor account", false, e?.code || e?.message);
+    record("G3. Supervisor without Worker rejected", e?.code === "RVB_LINKED_ENTITY_REQUIRED", `code=${e?.code}`);
+  }
+
+  try {
+    await svc.createRvbAccount({ tag: `sup2.${Date.now().toString().slice(-6)}`, displayName: "Test Supervisor", role: "supervisor", linkedEntityType: "supplier", linkedEntityId: (supplier as any).id });
+    record("G3b. Supervisor linked to Supplier rejected", false, "did not throw");
+  } catch (e: any) {
+    record("G3b. Supervisor linked to Supplier rejected", e?.code === "RVB_ENTITY_ROLE_MISMATCH", `code=${e?.code}`);
+  }
+
+  try {
+    await svc.createRvbAccount({ tag: `sup3.${Date.now().toString().slice(-6)}`, displayName: "Test Supervisor", role: "supervisor", linkedEntityType: "worker", linkedEntityId: "nonexistent-worker-id" });
+    record("G3c. Supervisor linked to invalid Worker rejected", false, "did not throw");
+  } catch (e: any) {
+    record("G3c. Supervisor linked to invalid Worker rejected", e?.code === "RVB_LINKED_ENTITY_NOT_FOUND", `code=${e?.code}`);
+  }
+
+  try {
+    const now2 = Date.now();
+    const supWorker: any = await WorkerModel.create({
+      id: `w-sup-${now2}`, createdAt: now2, updatedAt: now2, syncStatus: "synced",
+      name: `Supervisor Worker ${now2}`, phone: "0123456789", employmentDate: now2,
+      position: "Shift Lead", startingSalary: 12000, monthlySalary: 12000, status: "active", balance: 12000,
+    });
+    const supWorkerId = supWorker.toObject ? supWorker.toObject().id : supWorker.id;
+    const supAcc = await svc.createRvbAccount({ tag: `sup.${Date.now().toString().slice(-6)}`, displayName: "Test Supervisor", role: "supervisor", linkedEntityType: "worker", linkedEntityId: supWorkerId });
+    record("G3d. Supervisor linked to Worker", !!supAcc && supAcc.role === "supervisor" && (supAcc as any).linkedEntityType === "worker" && (supAcc as any).linkedEntityId === supWorkerId, `id=${supAcc?.id}`);
+    try {
+      await svc.createRvbAccount({ tag: `supdup.${Date.now().toString().slice(-6)}`, displayName: "Dup Supervisor", role: "supervisor", linkedEntityType: "worker", linkedEntityId: supWorkerId });
+      record("G3e. Second account on same Worker rejected", false, "did not throw");
+    } catch (e2: any) {
+      record("G3e. Second account on same Worker rejected", e2?.code === "RVB_ENTITY_ALREADY_LINKED", `code=${e2?.code}`);
+    }
+    // Unlink disables the supervisor (same orphan rule as portal roles); re-link restores access
+    const unlinked: any = await svc.unlinkRvbAccount((supAcc as any).id);
+    record("G3f. Unlink disables Supervisor", unlinked.status === "disabled" && !unlinked.linkedEntityId, `status=${unlinked.status}`);
+  } catch (e: any) {
+    record("G3d. Supervisor linked to Worker", false, e?.code || e?.message);
   }
 
   if (mgrAcc) {

@@ -13,7 +13,7 @@ function buildRoleFilter(role: DirectoryRoleFilter): any {
   if (role === "supervisor") return { role: "supervisor" };
   if (role === "supplier") return { role: "supplier" };
   if (role === "customer") return { role: "customer" };
-  if (role === "management") return { role: { $in: ["manager", "supervisor"] } };
+  if (role === "management") return { role: "manager" };
   return {};
 }
 

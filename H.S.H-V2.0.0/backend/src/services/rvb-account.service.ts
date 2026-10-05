@@ -116,8 +116,10 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
   const linkedEntityId = input.linkedEntityId ? String(input.linkedEntityId).trim() : null;
 
   const isSupervisor = role === "supervisor";
-  const needsLink = isPortalRoleRole(role);
-  // Supervisor may optionally link to a worker entity
+  // Supervisor must represent an existing Worker: same required-linkage path
+  // as portal roles. validateLinkCompatibility restricts supervisor to
+  // linkedEntityType "worker" (supplier/customer → RVB_ENTITY_ROLE_MISMATCH).
+  const needsLink = isPortalRoleRole(role) || isSupervisor;
   if (needsLink) {
     if (!linkedEntityType || !linkedEntityId) {
       throw codeError("RVB_LINKED_ENTITY_REQUIRED", 400);
@@ -131,18 +133,6 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
       linkedEntityId,
     }).lean();
     if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
-  } else if (isSupervisor) {
-    // Supervisor: linkage optional, but if provided must be worker
-    if (linkedEntityType || linkedEntityId) {
-      if (!linkedEntityType || !linkedEntityId) throw codeError("RVB_LINKED_ENTITY_REQUIRED", 400);
-      if (!validateLinkCompatibility(role, linkedEntityType)) throw codeError("RVB_ENTITY_ROLE_MISMATCH", 400);
-      await assertLinkedEntityExists(linkedEntityType, linkedEntityId);
-      const existingLink = await (RvbAccountModel as any).findOne({
-        linkedEntityType,
-        linkedEntityId,
-      }).lean();
-      if (existingLink) throw codeError("RVB_ENTITY_ALREADY_LINKED", 409);
-    }
   } else {
     // manager: must not have linkage
     if (linkedEntityType || linkedEntityId) {
@@ -177,13 +167,10 @@ export async function createRvbAccount(input: CreateRvbAccountInput) {
   }
 
   const now = Date.now();
-  // Persist supervisor optional worker linkage (needsLink is false for supervisor)
+  // Persist required linkage for worker/supplier/customer/supervisor
   let finalLinkedType: string | null = null;
   let finalLinkedId: string | null = null;
   if (needsLink) {
-    finalLinkedType = linkedEntityType as string;
-    finalLinkedId = linkedEntityId as string;
-  } else if (isSupervisor && linkedEntityType && linkedEntityId) {
     finalLinkedType = linkedEntityType as string;
     finalLinkedId = linkedEntityId as string;
   }
@@ -466,12 +453,13 @@ export async function unlinkRvbAccount(accountId: string) {
   account.linkedEntityId = null;
   account.linkedEntityLifecyclePriorStatus = null;
   account.updatedAt = Date.now();
-  // Security: orphan portal account must not remain active
-  if (previousRole === "worker" || previousRole === "supplier" || previousRole === "customer") {
+  // Security: orphan linked account must not remain active. Supervisor requires
+  // a Worker linkage, so it follows the same rule as portal roles (re-link via
+  // the link endpoint to restore access).
+  if (previousRole === "worker" || previousRole === "supplier" || previousRole === "customer" || previousRole === "supervisor") {
     account.status = "disabled";
     account.archivedAt = null;
   }
-  // Supervisor retains management access even without worker link — keep status as is (handled above: supervisor not in list)
   await account.save();
   if (account.status === "disabled" || account.status === "archived") safeDisconnectAccount(account.id);
   if (entityType === "worker") {

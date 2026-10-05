@@ -372,8 +372,10 @@ function RvbAccountsInner() {
   }, [accounts]);
 
   // Fetch linkable entities through the account service so failures are distinguishable from an empty result.
+  // Supervisor links to a Worker (canonical supervisor → worker mapping).
+  const linkEntityType = createRole === "supervisor" ? "worker" : createRole;
   useEffect(() => {
-    if (!createRole || !["worker","supplier","customer"].includes(createRole)) {
+    if (!createRole || !["worker","supplier","customer","supervisor"].includes(createRole)) {
       setLinkableEntities([]);
       setLinkableLoading(false);
       setLinkableLoadFailed(false);
@@ -383,18 +385,18 @@ function RvbAccountsInner() {
     setLinkableEntities([]);
     setLinkableLoading(true);
     setLinkableLoadFailed(false);
-    void rvbAccountService.getLinkableEntities(createRole as "worker" | "supplier" | "customer")
+    void rvbAccountService.getLinkableEntities(linkEntityType as "worker" | "supplier" | "customer")
       .then((entities) => { if (!cancelled) setLinkableEntities(entities); })
       .catch(() => { if (!cancelled) setLinkableLoadFailed(true); })
       .finally(() => { if (!cancelled) setLinkableLoading(false); });
     return () => { cancelled = true; };
-  }, [createRole, linkableRetryKey]);
+  }, [createRole, linkEntityType, linkableRetryKey]);
 
   const entityOptions = useMemo(() => {
     if (!createRole) return [];
     // linkableEntities already filtered to available (not linked) by backend
-    return linkableEntities.map((e:any)=>({ value:e.id, label:e.name, sublabel: e.type || createRole }));
-  }, [createRole, linkableEntities, linkedIdsUsed]);
+    return linkableEntities.map((e:any)=>({ value:e.id, label:e.name, sublabel: e.type || linkEntityType }));
+  }, [createRole, linkEntityType, linkableEntities, linkedIdsUsed]);
 
   const roleOptions = useMemo(() => {
     return (RVB_ROLES as readonly string[]).map((r) => ({ value: r, label: (t.roles as any)[r] ?? r }));
@@ -425,7 +427,7 @@ function RvbAccountsInner() {
     if (!isValidTag(tagNorm)) { setCreateError(t.validation.tagInvalid); return; }
     const dn = createDisplayName.trim();
     if (!dn) { setCreateError(t.validation.displayNameRequired); return; }
-    const needsLink = role === "worker" || role === "supplier" || role === "customer";
+    const needsLink = role === "worker" || role === "supplier" || role === "customer" || role === "supervisor";
     if (needsLink && !createLinkedId) { setCreateError(t.validation.linkedRequired); return; }
     if (!createPassword) { setCreateError(t.errors.RVB_PASSWORD_REQUIRED || "Password is required"); return; }
     if (createPassword.length < 8) { setCreateError(t.errors.RVB_PASSWORD_TOO_SHORT || "Password too short"); return; }
@@ -438,7 +440,7 @@ function RvbAccountsInner() {
         tag: tagNorm,
         displayName: dn,
         role,
-        linkedEntityType: needsLink ? role : null,
+        linkedEntityType: needsLink ? (role === "supervisor" ? "worker" : role) : null,
         linkedEntityId: needsLink ? createLinkedId : null,
         password: createPassword,
         confirmPassword: createConfirm,
@@ -546,7 +548,7 @@ function RvbAccountsInner() {
     return { typeLabel, name: a.linkedEntityId.slice(0, 8) + "…" };
   };
 
-  const needsLinkForRole = (r: string) => r === "worker" || r === "supplier" || r === "customer";
+  const needsLinkForRole = (r: string) => r === "worker" || r === "supplier" || r === "customer" || r === "supervisor";
   const isCreateLinkedRole = needsLinkForRole(createRole);
 
   const createTagNormalized = useMemo(() => normalizeTag(createTag), [createTag]);

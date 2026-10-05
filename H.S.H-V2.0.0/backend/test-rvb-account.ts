@@ -223,15 +223,48 @@ async function main() {
     record("G2. Admin creation rejected", e?.code === "RVB_ROLE_INVALID", `code=${e?.code}`);
   }
 
+  // Supervisor must link to a Worker (canonical supervisor → worker mapping)
   try {
-    const supAcc = await createRvbAccount({
+    await createRvbAccount({
       tag: `sup.${Date.now().toString().slice(-6)}`,
       displayName: "Test Supervisor",
       role: "supervisor",
     });
-    record("G3. Supervisor account without link", !!supAcc && supAcc.role === "supervisor", `id=${supAcc?.id}`);
+    record("G3. Supervisor without Worker rejected", false, "did not throw");
   } catch (e: any) {
-    record("G3. Supervisor account without link", false, e?.code || e?.message);
+    record("G3. Supervisor without Worker rejected", e?.code === "RVB_LINKED_ENTITY_REQUIRED", `code=${e?.code}`);
+  }
+
+  try {
+    await createRvbAccount({
+      tag: `supm.${Date.now().toString().slice(-6)}`,
+      displayName: "Test Supervisor",
+      role: "supervisor",
+      linkedEntityType: "supplier",
+      linkedEntityId: (supplier as any).id,
+    });
+    record("G3b. Supervisor linked to Supplier rejected", false, "did not throw");
+  } catch (e: any) {
+    record("G3b. Supervisor linked to Supplier rejected", e?.code === "RVB_ENTITY_ROLE_MISMATCH", `code=${e?.code}`);
+  }
+
+  try {
+    const now2 = Date.now();
+    const supWorker: any = await WorkerModel.create({
+      id: `w-sup-${now2}`, createdAt: now2, updatedAt: now2, syncStatus: "synced",
+      name: `Supervisor Worker ${now2}`, phone: "0123456789", employmentDate: now2,
+      position: "Shift Lead", startingSalary: 12000, monthlySalary: 12000, status: "active", balance: 12000,
+    } as any).then((d: any) => d.toObject ? d.toObject() : d);
+    const supAcc = await createRvbAccount({
+      tag: `sup.${Date.now().toString().slice(-6)}`,
+      displayName: "Test Supervisor",
+      role: "supervisor",
+      linkedEntityType: "worker",
+      linkedEntityId: supWorker.id,
+    });
+    record("G3c. Supervisor linked to Worker", !!supAcc && supAcc.role === "supervisor" && (supAcc as any).linkedEntityType === "worker", `id=${supAcc?.id}`);
+  } catch (e: any) {
+    record("G3c. Supervisor linked to Worker", false, e?.code || e?.message);
   }
 
   // H: Archive → archived

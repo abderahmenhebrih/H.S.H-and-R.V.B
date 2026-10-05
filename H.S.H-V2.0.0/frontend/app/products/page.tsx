@@ -505,20 +505,22 @@ export default function ProductsPage() {
     setError("");
 
     try {
-      const input: any = {
+      // Product creation defines no tax override: taxProfileId is omitted entirely
+      // so the backend default (seller default tax hierarchy) applies. No tax
+      // value is invented here — notably no silent 0%.
+      const baseInput: any = {
         name: form.name.trim(),
         price: Number(form.price),
         quantity: Number(form.quantity),
         weightKg: Number(form.weightKg),
         description: form.description.trim() || undefined,
-        taxProfileId: form.taxProfileId?.trim() || undefined,
       };
-      // For edit, "Not configured" must explicitly clear taxProfileId with undefined/null handling in operation (null sentinel)
-      // For create, undefined means no profile (field absent)
+      // For edit, "Not configured" must explicitly clear taxProfileId with undefined/null handling in operation (null sentinel).
+      // Edit retains its Tax Profile control; only create drops it.
       if (editingId) {
-        await productEditOperation.edit({ productId: editingId, ...input, taxProfileId: form.taxProfileId?.trim() || undefined });
+        await productEditOperation.edit({ productId: editingId, ...baseInput, taxProfileId: form.taxProfileId?.trim() || undefined });
       } else {
-        await productService.create(input);
+        await productService.create(baseInput);
       }
 
       await loadProducts();
@@ -944,25 +946,31 @@ export default function ProductsPage() {
                   />
                 </label>
 
-                <label>
-                  <span>
-                    {t.taxProfile}{" "}
-                    <small>{t.optional}</small>
-                  </span>
-                  <StyledSelect
-                    value={form.taxProfileId}
-                    onChange={(value) =>
-                      setForm((current) => ({
-                        ...current,
-                        taxProfileId: value,
-                      }))
-                    }
-                    options={taxProfileOptions}
-                    placeholder={t.notConfigured}
-                    ariaLabel={t.taxProfile}
-                  />
-                  <small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 500 }}>{t.taxProfileHelp}</small>
-                </label>
+                {/* Tax Profile override is edit-only. Creation defines no tax
+                    override (backend/seller default applies), so the control,
+                    its label, helper text and container are absent here — the
+                    modal shrinks with Description as the last field. */}
+                {editingId && (
+                  <label>
+                    <span>
+                      {t.taxProfile}{" "}
+                      <small>{t.optional}</small>
+                    </span>
+                    <StyledSelect
+                      value={form.taxProfileId}
+                      onChange={(value) =>
+                        setForm((current) => ({
+                          ...current,
+                          taxProfileId: value,
+                        }))
+                      }
+                      options={taxProfileOptions}
+                      placeholder={t.notConfigured}
+                      ariaLabel={t.taxProfile}
+                    />
+                    <small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 500 }}>{t.taxProfileHelp}</small>
+                  </label>
+                )}
 
                 {error && (
                   <div className={styles.formError}>

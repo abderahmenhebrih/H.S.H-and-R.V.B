@@ -307,18 +307,18 @@ function DirectoryInner() {
               {items.map((acc) => {
                 const isSelf = acc.id === myId;
                 return (
-                  <div key={acc.id} className={styles.card} onClick={() => void handleOpenProfile(acc)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") void handleOpenProfile(acc); }} aria-label={`${acc.displayName} profile`}>
-                    <div className={styles.cardHeader}>
+                  <div key={acc.id} className={styles.account} onClick={() => void handleOpenProfile(acc)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") void handleOpenProfile(acc); }} aria-label={`${acc.displayName} profile`}>
+                    <div className={styles.identity}>
                       <span className={styles.avatar}>
                         {acc.profilePicture ? <img src={acc.profilePicture} alt="" /> : initials(acc.displayName)}
                       </span>
-                      <span className={styles.cardMeta}>
+                      <span className={styles.identityText}>
                         <strong className={styles.displayName}>{acc.displayName} {isSelf && <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 11 }}>· {t.self}</span>}</strong>
                         <span className={styles.tag} dir="ltr">@{acc.tag}</span>
                         <span className={`${styles.roleBadge} ${styles["role_" + acc.role]}`}>{(t.roleLabels as any)[acc.role] || acc.role}</span>
                       </span>
                     </div>
-                    <div className={styles.cardActions}>
+                    <div className={styles.actions}>
                       {!isSelf && (
                         <button className={styles.messageButton} onClick={(e) => { e.stopPropagation(); void handleMessage(acc.id); }} disabled={!!msgLoading} aria-label={`Message ${acc.displayName}`}>
                           <MessageSquare size={14} /> {msgLoading === acc.id ? "…" : t.message}

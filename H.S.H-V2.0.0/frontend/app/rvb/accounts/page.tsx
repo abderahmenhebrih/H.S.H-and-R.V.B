@@ -588,7 +588,9 @@ function RvbAccountsInner() {
   }, [showCreate, creating]);
 
   return (
-    <RvbShell activePage="accounts">
+    // hideHeader (same mechanism as /rvb/directory): this page renders its
+    // own command card, so the shared CompactHeader would duplicate it.
+    <RvbShell activePage="accounts" hideHeader>
       <div className={styles.rvbAccountsRoot} dir={isRtl ? "rtl" : "ltr"}>
         {/* Unified command card (My Office proportions): brand + integrated
             search + create. Replaces the old duplicate title + separate

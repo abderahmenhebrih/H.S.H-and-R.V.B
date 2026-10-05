@@ -29,12 +29,19 @@ import {
   uploadAttachment,
   editMessage,
   deleteMessage,
-  toggleReaction,
+  setReaction,
   pinMessage,
   unpinMessage,
   markRead,
   type ChatAttachment,
 } from "@/services/chat.service";
+import {
+  QUICK_REACTIONS,
+  QUICK_SEND_EMOJI,
+  REACTION_CATEGORIES,
+  groupReactionCounts,
+  isQuickEmojiMessage,
+} from "@/constants/reactions";
 import { getSocket } from "@/services/socket";
 import { Loading } from "@/components/common/Loading";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -130,6 +137,10 @@ export default function ChatDetail() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [menuMsg, setMenuMsg] = useState<any | null>(null);
+  const [stripMsg, setStripMsg] = useState<any | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerCat, setPickerCat] = useState<string>("frequent");
+  const [whoMsg, setWhoMsg] = useState<any | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [newArrived, setNewArrived] = useState(false);
   const [sending, setSending] = useState(false);
@@ -519,12 +530,12 @@ export default function ChatDetail() {
     ]);
   };
 
-  const handleReaction = async (m: any) => {
+  const handleReact = async (m: any, emoji: string) => {
     const mid = msgId(m);
-    if (reactingId) return; // serialize toggles: backend atomic, client stays calm
+    if (reactingId) return; // serialize: one in-flight reaction at a time
     setReactingId(mid);
     try {
-      const updated = await toggleReaction(mid);
+      const updated = await setReaction(mid, emoji);
       setMessages((prev) => prev.map((x) => (msgId(x) === mid ? updated : x)));
     } catch (e: any) {
       Alert.alert("Failed", e?.message || "Reaction failed");
@@ -532,6 +543,33 @@ export default function ChatDetail() {
       setReactingId(null);
     }
   };
+
+  const openStrip = useCallback((m: any | null) => {
+    setPickerCat("frequent");
+    setPickerOpen(false);
+    setStripMsg(m);
+  }, []);
+
+  // Quick 🤝 = Messenger Like: a STANDALONE normal message containing only
+  // 🤝, sent through the existing sendMessage path (never the reaction
+  // endpoint, never attached to another message id).
+  const handleQuickSend = useCallback(async () => {
+    if (sending || picking || uploading) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      const msg = await sendMessage(convId, QUICK_SEND_EMOJI, replyTo ? msgId(replyTo) : null);
+      setMessages((prev) => mergeMessages(prev, [msg]));
+      setReplyTo(null);
+      newArrivedRef.current = false;
+      setNewArrived(false);
+      setTimeout(() => scrollToEnd(true), 80);
+    } catch (e: any) {
+      setSendError(e?.message || "Send failed");
+    } finally {
+      setSending(false);
+    }
+  }, [sending, picking, uploading, convId, replyTo, t, scrollToEnd]);
 
   const handlePin = async (m: any) => {
     const mid = msgId(m);
@@ -718,7 +756,11 @@ export default function ChatDetail() {
               const info = senderInfo(senderOf(item));
               const showName = !own && isGroup && firstOfRun;
               const showDay = index === 0 || dayKey(messages[index - 1]?.createdAt || 0) !== dayKey(item.createdAt || 0);
-              const reactionCount = Array.isArray(item.reactions) ? item.reactions.length : 0;
+              const groups = groupReactionCounts(item.reactions, myId);
+              const hasReactions = groups.length > 0;
+              // Standalone quick-send (content exactly 🤝): large emoji, no
+              // bubble chrome — still a normal message semantically.
+              const isQuick = isQuickEmojiMessage(item);
               // NOTE: row direction is ALWAYS conversation-semantic (own right,
               // incoming left) — never row-reversed for RTL. Only text aligns.
               return (
@@ -736,18 +778,20 @@ export default function ChatDetail() {
                   >
                     {!own ? (
                       lastOfRun ? (
-                        <View style={styles.avatarSlot}>
-                          <Avatar uri={info.picture} name={info.name} size={28} />
+                        // Avatar bottom-attached to the bubble unit: the slot
+                        // lifts by the reaction-cluster height when present so
+                        // the avatar never floats below the bubble.
+                        <View style={[styles.avatarSlot, hasReactions && { paddingBottom: 24 }]}>
+                          <Avatar uri={info.picture} name={info.name} size={30} />
                         </View>
                       ) : (
-                        <View style={styles.avatarSlot} />
+                        <View style={[styles.avatarSlot, hasReactions && { paddingBottom: 24 }]} />
                       )
                     ) : null}
                     <View style={[styles.bubbleCol, own ? styles.bubbleColOwn : styles.bubbleColIncoming]}>
                       {showName ? (
                         <Text style={[styles.senderName, { color: theme.colors.primary }]} numberOfLines={1}>
                           {info.name}
-                          {info.tag ? `  @${info.tag}` : ""}
                         </Text>
                       ) : null}
                       <View style={styles.bubbleRow}>
@@ -758,11 +802,38 @@ export default function ChatDetail() {
                             accessibilityLabel={t("conversation.reply", "Reply")}
                             style={styles.gutterBtn}
                           >
-                            <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.textTertiary} style={{ opacity: 0.6 }} />
+                            <Ionicons name="ellipsis-horizontal" size={14} color={theme.colors.textTertiary} style={{ opacity: 0.35 }} />
                           </Pressable>
                         ) : null}
+                        {isQuick ? (
+                          // Quick 🤝: no bubble chrome, large standalone emoji.
+                          <Pressable onLongPress={() => openStrip(item)} delayLongPress={350} style={styles.quickWrap}>
+                            {item.replyToMessageId && !isDeleted ? (
+                              <Pressable
+                                onPress={() => scrollToMessage(String(item.replyToMessageId))}
+                                style={[styles.quote, styles.quoteQuick, { borderLeftColor: theme.colors.primary }]}
+                              >
+                                <Text style={[styles.quoteName, { color: theme.colors.primary }]} numberOfLines={1}>
+                                  {replyOrig ? senderInfo(senderOf(replyOrig)).name : "…"}
+                                </Text>
+                                <Text style={[styles.quoteText, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+                                  {replyOrig ? contentLabel(replyOrig).slice(0, 80) : "…"}
+                                </Text>
+                              </Pressable>
+                            ) : null}
+                            <Text style={styles.quickEmoji} allowFontScaling={false}>
+                              {QUICK_SEND_EMOJI}
+                            </Text>
+                            <Text style={[styles.meta, styles.metaQuick, { color: theme.colors.textTertiary }]}>
+                              {formatTime(item.createdAt, lang)}
+                              {edited ? ` · ${t("conversation.edited", "edited")}` : ""}
+                              {isPinned ? "  📌" : ""}
+                              {own ? (readByOthers ? "  ✓✓" : "  ✓") : ""}
+                            </Text>
+                          </Pressable>
+                        ) : (
                         <Pressable
-                          onLongPress={() => setMenuMsg(item)}
+                          onLongPress={() => openStrip(item)}
                           delayLongPress={350}
                           style={[
                             styles.bubble,
@@ -792,13 +863,22 @@ export default function ChatDetail() {
                             const url = typeof a?.url === "string" && /^https?:\/\//i.test(a.url) ? a.url : null;
                             if (!url) return null;
                             if (a?.kind === "image") {
-                              const aw = Number(a.width) || 4;
-                              const ah = Number(a.height) || 3;
+                              // JS-capped display box (bubble max width, 420px
+                              // portrait cap): exact width/height keep the ratio
+                              // so cover never crops meaningful content.
+                              const aw = Number(a.width) > 0 ? Number(a.width) : 4;
+                              const ah = Number(a.height) > 0 ? Number(a.height) : 3;
+                              let dw = 232;
+                              let dh = Math.round((232 * ah) / aw);
+                              if (dh > 420) {
+                                dh = 420;
+                                dw = Math.round((420 * aw) / ah);
+                              }
                               return (
                                 <Pressable key={idx} onPress={() => setPreviewImg(url)} accessibilityLabel={t("conversation.openPreview", "Open preview")}>
                                   <Image
                                     source={{ uri: url }}
-                                    style={[styles.attachmentImage, { aspectRatio: aw / ah > 0 ? aw / ah : 4 / 3 }]}
+                                    style={[styles.attachmentImage, { width: dw, height: dh }]}
                                     resizeMode="cover"
                                   />
                                 </Pressable>
@@ -864,7 +944,18 @@ export default function ChatDetail() {
                               {t("conversation.deleted", "Message deleted") as string}
                             </Text>
                           ) : null}
+                          {!isDeleted && editingId !== msgId(item) ? (
+                            <View style={styles.metaIn}>
+                              <Text style={[styles.meta, { color: own ? "rgba(252,246,239,0.8)" : theme.colors.textTertiary }]}>
+                                {formatTime(item.createdAt, lang)}
+                                {edited ? ` · ${t("conversation.edited", "edited")}` : ""}
+                                {isPinned ? "  📌" : ""}
+                                {own ? (readByOthers ? "  ✓✓" : "  ✓") : ""}
+                              </Text>
+                            </View>
+                          ) : null}
                         </Pressable>
+                        )}
                         {!own ? (
                           <Pressable
                             onPress={() => setMenuMsg(item)}
@@ -872,31 +963,32 @@ export default function ChatDetail() {
                             accessibilityLabel={t("conversation.reply", "Reply")}
                             style={styles.gutterBtn}
                           >
-                            <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.textTertiary} style={{ opacity: 0.6 }} />
+                            <Ionicons name="ellipsis-horizontal" size={14} color={theme.colors.textTertiary} style={{ opacity: 0.35 }} />
                           </Pressable>
                         ) : null}
                       </View>
                     </View>
-                    {reactionCount > 0 ? (
+                    {hasReactions ? (
                       <View style={[styles.chipRow, own ? styles.chipRowOwn : styles.chipRowIncoming]}>
                         {!own ? <View style={styles.avatarSlot} /> : null}
-                        <View style={[styles.chip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-                          <Text style={styles.chipText}>
-                            🤝 {reactionCount}
-                            {reactingId === msgId(item) ? "…" : ""}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : null}
-                    {!isDeleted ? (
-                      <View style={[styles.metaRow, own ? styles.metaRowOwn : styles.metaRowIncoming]}>
-                        {!own ? <View style={styles.avatarSlot} /> : null}
-                        <Text style={[styles.meta, { color: theme.colors.textTertiary }]}>
-                          {formatTime(item.createdAt, lang)}
-                          {edited ? ` · ${t("conversation.edited", "edited")}` : ""}
-                          {isPinned ? "  📌" : ""}
-                          {own ? (readByOthers ? "  ✓✓" : "  ✓") : ""}
-                        </Text>
+                        <Pressable
+                          onPress={() => setWhoMsg(item)}
+                          style={[styles.cluster, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                        >
+                          {groups.slice(0, 4).map((g) => (
+                            <Text
+                              key={g.emoji}
+                              style={[
+                                styles.clusterText,
+                                g.mine && { color: theme.colors.primary, fontWeight: "800" },
+                              ]}
+                            >
+                              {g.emoji}
+                              {g.count > 1 ? ` ${g.count}` : ""}
+                              {reactingId === msgId(item) ? "…" : ""}
+                            </Text>
+                          ))}
+                        </Pressable>
                       </View>
                     ) : null}
                   </View>
@@ -1010,20 +1102,34 @@ export default function ChatDetail() {
               multiline
               maxLength={2000}
             />
-            <Pressable
-              testID="chat-send-button"
-              accessibilityRole="button"
-              accessibilityLabel={t("conversation.send", "Send")}
-              onPress={handleSend}
-              disabled={sending || picking || uploading || (!composer.trim() && !attachment && !uploaded)}
-              style={[styles.sendBtn, { backgroundColor: composer.trim() || attachment || uploaded ? theme.colors.primary : theme.colors.border }]}
-            >
-              {sending || uploading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Ionicons name="send" size={17} color="#fff" style={rtl && { transform: [{ scaleX: -1 }] } as any} />
-              )}
-            </Pressable>
+            {(() => {
+              // Empty composer + nothing staged = quick 🤝 (Messenger Like).
+              // Any text or staged attachment = normal Send icon.
+              const showQuick = !composer.trim() && !attachment && !uploaded;
+              return (
+                <Pressable
+                  testID="chat-send-button"
+                  accessibilityRole="button"
+                  accessibilityLabel={showQuick ? QUICK_SEND_EMOJI : t("conversation.send", "Send")}
+                  onPress={showQuick ? handleQuickSend : handleSend}
+                  disabled={sending || picking || uploading || (!showQuick && !composer.trim() && !attachment && !uploaded)}
+                  style={styles.sendBtn}
+                >
+                  {sending || uploading ? (
+                    <ActivityIndicator color={theme.colors.primary} size="small" />
+                  ) : showQuick ? (
+                    <Text style={{ fontSize: 24 }}>🤝</Text>
+                  ) : (
+                    <Ionicons
+                      name="send"
+                      size={20}
+                      color={composer.trim() || attachment || uploaded ? theme.colors.primary : theme.colors.textTertiary}
+                      style={rtl && { transform: [{ scaleX: -1 }] } as any}
+                    />
+                  )}
+                </Pressable>
+              );
+            })()}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -1052,11 +1158,11 @@ export default function ChatDetail() {
                   style={styles.sheetRow}
                   onPress={() => {
                     const m = menuMsg;
-                    closeMenu();
-                    if (m) void handleReaction(m);
+                    setMenuMsg(null);
+                    openStrip(m);
                   }}
                 >
-                  <Text style={{ fontSize: 18 }}>🤝</Text>
+                  <Text style={{ fontSize: 18 }}>❤️</Text>
                   <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>{t("conversation.react", "React")}</Text>
                 </Pressable>
                 <Pressable
@@ -1110,6 +1216,121 @@ export default function ChatDetail() {
         </Pressable>
       </Modal>
 
+      {/* Instagram-style reaction strip: long-press opens it directly;
+          the context menu's React row opens it too. + swaps to the full
+          picker (same modal, pure-JS dataset, no native deps). */}
+      <Modal visible={!!stripMsg} transparent animationType="fade" onRequestClose={() => setStripMsg(null)}>
+        <Pressable style={styles.stripBackdrop} onPress={() => setStripMsg(null)}>
+          <View style={[styles.strip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.stripPreview, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+              {stripMsg ? contentLabel(stripMsg).slice(0, 100) : ""}
+            </Text>
+            <View style={styles.stripRow}>
+              {QUICK_REACTIONS.map((emoji) => {
+                const mine = (stripMsg?.reactions || []).some((r: any) => r?.accountId === myId && r?.emoji === emoji);
+                return (
+                  <Pressable
+                    key={emoji}
+                    onPress={() => {
+                      const m = stripMsg;
+                      setStripMsg(null);
+                      if (m) void handleReact(m, emoji);
+                    }}
+                    style={[styles.stripEmoji, mine && { backgroundColor: theme.colors.primarySoft, borderRadius: 999 }]}
+                    hitSlop={6}
+                  >
+                    <Text style={{ fontSize: 26 }} allowFontScaling={false}>
+                      {emoji}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                onPress={() => setPickerOpen((v) => !v)}
+                style={[styles.stripPlus, { borderColor: theme.colors.border }]}
+                hitSlop={6}
+                accessibilityLabel="+"
+              >
+                <Ionicons name={pickerOpen ? "chevron-down" : "add"} size={20} color={theme.colors.text} />
+              </Pressable>
+            </View>
+            {pickerOpen ? (
+              <View style={styles.pickerWrap}>
+                <View style={styles.pickerTabs}>
+                  {REACTION_CATEGORIES.map((c) => (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => setPickerCat(c.id)}
+                      style={[styles.pickerTab, pickerCat === c.id && { backgroundColor: theme.colors.primarySoft, borderRadius: 999 }]}
+                    >
+                      <Text style={[styles.pickerTabText, { color: pickerCat === c.id ? theme.colors.primary : theme.colors.textSecondary }]}>
+                        {c.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={styles.pickerGrid}>
+                  {(REACTION_CATEGORIES.find((c) => c.id === pickerCat)?.emojis || []).map((emoji) => (
+                    <Pressable
+                      key={emoji}
+                      onPress={() => {
+                        const m = stripMsg;
+                        setStripMsg(null);
+                        setPickerOpen(false);
+                        setPickerCat("frequent");
+                        if (m) void handleReact(m, emoji);
+                      }}
+                      style={styles.pickerCell}
+                      hitSlop={2}
+                    >
+                      <Text style={{ fontSize: 24 }} allowFontScaling={false}>
+                        {emoji}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+            <Pressable
+              style={[styles.sheetRow, styles.stripMore]}
+              onPress={() => {
+                const m = stripMsg;
+                setStripMsg(null);
+                setMenuMsg(m);
+              }}
+            >
+              <Ionicons name="ellipsis-horizontal" size={18} color={theme.colors.text} />
+              <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>{t("conversation.reply", "Reply")}…</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Who reacted: emoji + names from existing conversation accounts. */}
+      <Modal visible={!!whoMsg} transparent animationType="fade" onRequestClose={() => setWhoMsg(null)}>
+        <Pressable style={styles.stripBackdrop} onPress={() => setWhoMsg(null)}>
+          <View style={[styles.strip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            {(whoMsg?.reactions || []).map((r: any, i: number) => {
+              const info = senderInfo(r?.accountId);
+              return (
+                <View key={`${r?.accountId}-${r?.emoji}-${i}`} style={styles.sheetRow}>
+                  <Text style={{ fontSize: 18 }}>{r?.emoji}</Text>
+                  <Text style={[styles.sheetLabel, { color: theme.colors.text }]} numberOfLines={1}>
+                    {info.name}
+                    {r?.accountId === myId ? " (you)" : ""}
+                  </Text>
+                </View>
+              );
+            })}
+            <Pressable style={[styles.sheetRow, styles.sheetCancel]} onPress={() => setWhoMsg(null)}>
+              <Text style={[styles.sheetLabel, { color: theme.colors.textSecondary, textAlign: "center", flex: 1 }]}>
+                {t("conversation.cancel", "Cancel")}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
       <Modal visible={!!previewImg} transparent animationType="fade" onRequestClose={() => setPreviewImg(null)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setPreviewImg(null)}>
           <View style={styles.modalBody}>
@@ -1152,37 +1373,42 @@ const styles = StyleSheet.create({
   loadOlderText: { fontSize: 12, fontWeight: "700" },
   daySep: { alignItems: "center", marginVertical: 10 },
   daySepText: { fontSize: 11, fontWeight: "600", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, overflow: "hidden" },
-  // Message rows: compact vertical flow, semantic alignment (own right,
-  // incoming left) on ALL languages — never row-reversed for RTL.
-  row: { flexDirection: "row", alignItems: "flex-end", marginTop: 2 },
-  rowGrouped: { marginTop: 1 },
+  // Message rows: compact Messenger flow. Tighter inside a sender run,
+  // breathing room on sender change. Semantic alignment on ALL languages.
+  row: { flexDirection: "row", alignItems: "flex-end", marginTop: 10 },
+  rowGrouped: { marginTop: 2 },
   rowOwn: { justifyContent: "flex-end" },
   rowIncoming: { justifyContent: "flex-start" },
-  avatarSlot: { width: 28, marginRight: 6, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
+  avatarSlot: { width: 30, marginRight: 7, alignItems: "center", justifyContent: "flex-end" },
   bubbleCol: { flexShrink: 1, maxWidth: "80%" },
   bubbleColOwn: { alignItems: "flex-end" },
   bubbleColIncoming: { alignItems: "flex-start" },
-  senderName: { fontSize: 11, fontWeight: "700", marginBottom: 2, marginLeft: 34 },
+  senderName: { fontSize: 11, fontWeight: "700", marginBottom: 3, marginLeft: 37 },
   bubbleRow: { flexDirection: "row", alignItems: "flex-end" },
   bubble: { borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, flexShrink: 1 },
   bubbleOwn: {},
   bubbleIncoming: { borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" },
-  gutterBtn: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
+  gutterBtn: { width: 26, height: 26, alignItems: "center", justifyContent: "center" },
   content: { fontSize: 14, lineHeight: 19 },
+  // Standalone quick-send: no bubble chrome, Messenger Like-style.
+  quickWrap: { alignItems: "flex-end", paddingVertical: 2 },
+  quickEmoji: { fontSize: 38, lineHeight: 44 },
+  metaQuick: { marginTop: 2 },
   quote: { borderLeftWidth: 3, borderRadius: 4, paddingLeft: 8, paddingVertical: 4, marginBottom: 6, backgroundColor: "rgba(0,0,0,0.08)" },
+  quoteQuick: { marginBottom: 4, minWidth: 120 },
   quoteName: { fontSize: 11, fontWeight: "800" },
   quoteText: { fontSize: 12, marginTop: 1 },
-  attachmentImage: { width: 220, maxWidth: "100%", borderRadius: 12, marginBottom: 4, backgroundColor: "#00000010" },
+  attachmentImage: { borderRadius: 12, marginBottom: 4, backgroundColor: "#00000010" },
   videoBox: { width: 220, maxWidth: "100%", borderRadius: 12, marginBottom: 4, paddingVertical: 16, paddingHorizontal: 12, alignItems: "center", gap: 4 },
   videoText: { fontSize: 11, fontWeight: "600", textAlign: "center" },
-  chipRow: { flexDirection: "row", marginTop: -8 },
+  // Reaction cluster: small, attached under the bubble edge. Nothing at zero.
+  chipRow: { flexDirection: "row", marginTop: -7 },
   chipRowOwn: { justifyContent: "flex-end" },
   chipRowIncoming: { justifyContent: "flex-start" },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
-  chipText: { fontSize: 11, fontWeight: "700" },
-  metaRow: { flexDirection: "row", alignItems: "center", marginTop: 1, marginBottom: 1 },
-  metaRowOwn: { justifyContent: "flex-end" },
-  metaRowIncoming: { justifyContent: "flex-start" },
+  cluster: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, marginTop: 2 },
+  clusterText: { fontSize: 12, fontWeight: "600" },
+  // Subtle in-bubble metadata (time · edited · pin · receipts).
+  metaIn: { flexDirection: "row", justifyContent: "flex-end", marginTop: 3 },
   meta: { fontSize: 10 },
   typing: { paddingVertical: 4, paddingHorizontal: 12, alignItems: "flex-start" },
   newChip: { alignSelf: "center", borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, marginVertical: 6 },
@@ -1214,6 +1440,20 @@ const styles = StyleSheet.create({
   sheetRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 12 },
   sheetLabel: { fontSize: 14, fontWeight: "600" },
   sheetCancel: { marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)" },
+  // Instagram-style reaction strip: floating card, quick six + full picker.
+  stripBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center", padding: 20 },
+  strip: { width: "100%", maxWidth: 360, borderRadius: 16, borderWidth: 1, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8 },
+  stripPreview: { fontSize: 12, paddingHorizontal: 6, paddingBottom: 6 },
+  stripRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
+  stripEmoji: { paddingHorizontal: 4, paddingVertical: 6 },
+  stripPlus: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  stripMore: { marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)" },
+  pickerWrap: { marginTop: 6, maxHeight: 300 },
+  pickerTabs: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginBottom: 6 },
+  pickerTab: { paddingHorizontal: 10, paddingVertical: 5 },
+  pickerTabText: { fontSize: 11, fontWeight: "700" },
+  pickerGrid: { flexDirection: "row", flexWrap: "wrap" },
+  pickerCell: { width: "12.5%", alignItems: "center", paddingVertical: 6 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", alignItems: "center", justifyContent: "center", padding: 16 },
   modalBody: { width: "100%", maxWidth: 640, alignItems: "center", gap: 12 },
   modalImage: { width: "100%", height: 420, borderRadius: 12 },

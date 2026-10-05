@@ -769,6 +769,7 @@ export async function toggleReaction(messageId: string, accountId: string) {
   // rapid toggles from the same user can no longer interleave a
   // read-modify-write and duplicate the entry. Membership was verified above;
   // the toggle itself is a single atomic document update.
+  // LEGACY path (pre-generalized clients send no emoji): preserved verbatim.
   const isMine = {
     $and: [{ $eq: ["$$r.accountId", accountId] }, { $eq: ["$$r.emoji", emoji] }],
   };
@@ -785,6 +786,68 @@ export async function toggleReaction(messageId: string, accountId: string) {
               { $filter: { input: current, as: "r", cond: { $not: [isMine] } } },
               { $concatArrays: [current, [{ accountId, emoji, createdAt: now }]] },
             ],
+          },
+          updatedAt: now,
+        },
+      },
+    ],
+    { returnDocument: "after", updatePipeline: true } as any,
+  ).lean();
+  if (!updated) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
+  return updated;
+}
+
+// ---- General emoji reactions (one active reaction per account) ----
+// Semantics: the caller's previous reaction (any emoji) is always removed
+// first; the new emoji is added unless it was already the active one (tap
+// again = remove). At most ONE entry per account, enforced inside a SINGLE
+// atomic aggregation-pipeline update — the atomicity guarantee of the legacy
+// toggle is preserved, extended to replacement.
+export function validateReactionEmoji(input: unknown): string {
+  if (typeof input !== "string") throw codeError("RVB_REACTION_INVALID", 400, "Emoji required");
+  const emoji = input.normalize("NFC").trim();
+  if (!emoji) throw codeError("RVB_REACTION_INVALID", 400, "Emoji required");
+  // Hard size bound first (rejects enormous strings / payload abuse).
+  if (emoji.length > 12) throw codeError("RVB_REACTION_INVALID", 400, "Single emoji only");
+  // No markup/script carriers, no plain ASCII letters/digits (normal words).
+  if (/[<>&]/.test(emoji)) throw codeError("RVB_REACTION_INVALID", 400, "Invalid reaction");
+  if (/^[A-Za-z0-9 ]$/.test(emoji)) throw codeError("RVB_REACTION_INVALID", 400, "Invalid reaction");
+  // Exactly one grapheme cluster (allows VS16/ZWJ/skin-tone sequences).
+  let count = 0;
+  try {
+    const seg = new (Intl as any).Segmenter(undefined, { granularity: "grapheme" });
+    for (const _ of seg.segment(emoji)) {
+      count++;
+      if (count > 1) break;
+    }
+  } catch {
+    count = Array.from(emoji).length > 1 ? 2 : 1;
+  }
+  if (count !== 1) throw codeError("RVB_REACTION_INVALID", 400, "Single emoji only");
+  return emoji;
+}
+
+export async function setReaction(messageId: string, accountId: string, emojiInput: unknown) {
+  const emoji = validateReactionEmoji(emojiInput);
+  const existing: any = await MessageModel.findOne({ id: messageId }).lean();
+  if (!existing) throw codeError("RVB_MESSAGE_NOT_FOUND", 404);
+  const conv: any = await ConversationModel.findOne({ id: existing.conversationId }).lean();
+  if (!isParticipant(conv, accountId)) throw codeError("RVB_FORBIDDEN", 403);
+  const now = Date.now();
+  const isMineAny = { $eq: ["$$r.accountId", accountId] };
+  const isMineThis = {
+    $and: [{ $eq: ["$$r.accountId", accountId] }, { $eq: ["$$r.emoji", emoji] }],
+  };
+  const current = { $ifNull: ["$reactions", []] };
+  const others = { $filter: { input: current, as: "r", cond: { $not: [isMineAny] } } };
+  const hasThis = { $gt: [{ $size: { $filter: { input: current, as: "r", cond: isMineThis } } }, 0] };
+  const updated: any = await MessageModel.findOneAndUpdate(
+    { id: messageId },
+    [
+      {
+        $set: {
+          reactions: {
+            $cond: [hasThis, others, { $concatArrays: [others, [{ accountId, emoji, createdAt: now }]] }],
           },
           updatedAt: now,
         },

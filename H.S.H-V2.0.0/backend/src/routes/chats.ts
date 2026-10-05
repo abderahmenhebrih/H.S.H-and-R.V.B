@@ -318,12 +318,17 @@ router.get("/messages/:messageId/audit", async (req: RvbAuthRequest, res) => {
   }
 });
 
-// POST /api/rvb/chats/messages/:messageId/reaction  toggle 🤝
+// POST /api/rvb/chats/messages/:messageId/reaction  { emoji? }
+// General emoji reactions (one active per account, replace/remove on re-tap).
+// No emoji in body = legacy 🤝 toggle (old clients keep working verbatim).
 router.post("/messages/:messageId/reaction", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const mid = String((req.params as any).messageId);
-    const msg = await chatSvc.toggleReaction(mid, user.accountId);
+    const { emoji } = (req.body as any) || {};
+    const msg = emoji === undefined || emoji === null
+      ? await chatSvc.toggleReaction(mid, user.accountId)
+      : await chatSvc.setReaction(mid, user.accountId, emoji);
     try {
       const { getIO } = await import("../lib/chat-socket");
       const io = getIO();

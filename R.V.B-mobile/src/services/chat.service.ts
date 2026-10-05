@@ -116,8 +116,8 @@ export async function deleteMessage(messageId: string) {
   const res = await api.del<{ success: boolean; message: any }>(`/api/rvb/chats/messages/${messageId}`);
   return res.message;
 }
-export async function toggleReaction(messageId: string) {
-  const res = await api.post<{ success: boolean; message: any }>(`/api/rvb/chats/messages/${messageId}/reaction`, {});
+export async function setReaction(messageId: string, emoji: string) {
+  const res = await api.post<{ success: boolean; message: any }>(`/api/rvb/chats/messages/${messageId}/reaction`, { emoji });
   return res.message;
 }
 export async function pinMessage(conversationId: string, messageId: string) {

@@ -7,6 +7,7 @@ import RvbShell from "../../../src/components/rvb/RvbShell";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
 import { DEFAULT_SETTINGS, formatCurrency } from "../../../src/lib/settings";
+import { exactNumberLabel, formatCompactNumber, formatCompactCurrency } from "../../../src/lib/compact-number";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbSupplierService } from "../../../src/services/rvb-supplier.service";
 import { rvbConfigService } from "../../../src/services/rvb-config.service";
@@ -440,46 +441,74 @@ function RvbSuppliersInner() {
   };
 
   return (
-    <RvbShell activePage="suppliers">
+    // hideHeader (same mechanism as /rvb/accounts, /rvb/workers and
+    // /rvb/directory): this page renders its own command card, so the shared
+    // CompactHeader would duplicate it.
+    <RvbShell activePage="suppliers" hideHeader>
       <div className={styles.rvbAccountsRoot} dir={isRtl ? "rtl" : "ltr"}>
-        <div className={styles.headerWrap}>
-          <h1 className={styles.headerTitle}>{t.headerTitle}</h1>
-          <p className={styles.headerSubtitle}>{t.headerSubtitle}</p>
+        {/* Unified command card (Accounts & Access proportions): brand +
+            integrated search + create. Replaces the old duplicate title +
+            separate search toolbar — same search state/behavior, new
+            composition. */}
+        <div className={styles.commandCard}>
+          <div className={styles.commandBrand}>
+            <div className={styles.commandLogo}>
+              <img src="/chicken.jpg" alt="" />
+            </div>
+            <div className={styles.commandTitle}>
+              <h1>{t.headerTitle}</h1>
+              <span>{t.headerSubtitle}</span>
+            </div>
+          </div>
+          <div className={styles.searchBox}>
+            <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
+            <input
+              className={styles.searchInput}
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              aria-label={t.searchPlaceholder}
+            />
+          </div>
+          {isManager && (
+            <button type="button" className={styles.primaryButton} onClick={openAdd}>
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              {t.addSupplier}
+            </button>
+          )}
         </div>
 
         <div className={styles.kpiRow}>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "var(--accent-soft)", border: "1px solid var(--accent-ring)", color: "var(--accent)", flex: "0 0 44px" }}><Truck size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.total}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : String(kpi.total)}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.total}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : exactNumberLabel(kpi.total)}>{loading ? "—" : formatCompactNumber(kpi.total)}</strong></div>
           </div>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(58,125,82,0.10)", border: "1px solid rgba(58,125,82,0.18)", color: "#3A7D52", flex: "0 0 44px" }}><Wallet size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.outstanding}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : formatCurrency(kpi.outstanding, settings.currency as any)}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.outstanding}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : formatCurrency(kpi.outstanding, settings.currency as any)}>{loading ? "—" : formatCompactCurrency(kpi.outstanding, settings.currency as any)}</strong></div>
           </div>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(175,149,75,0.11)", border: "1px solid rgba(175,149,75,0.16)", color: "#8a6d1b", flex: "0 0 44px" }}><ShieldCheck size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.linked}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : String(kpi.linked)}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.linked}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : exactNumberLabel(kpi.linked)}>{loading ? "—" : formatCompactNumber(kpi.linked)}</strong></div>
           </div>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(120,120,130,0.10)", border: "1px solid rgba(120,120,130,0.18)", color: "var(--muted)", flex: "0 0 44px" }}><Archive size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.unlinked}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : String(kpi.unlinked)}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.unlinked}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : exactNumberLabel(kpi.unlinked)}>{loading ? "—" : formatCompactNumber(kpi.unlinked)}</strong></div>
           </div>
         </div>
 
+        {/* Filter toolbar — portal/status dropdowns only (search + create
+            moved into the command card above). */}
         <div className={styles.toolbar}>
-          <div className={styles.searchBox}>
-            <span aria-hidden="true"><Search size={18} /></span>
-            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} />
-          </div>
           <div className={styles.filterGroup}>
-            <div style={{ minWidth: 160 }}>
+            <div className={styles.filterSelect}>
               <StyledSelect value={portalFilter} onChange={setPortalFilter} options={[{ value: "", label: t.allPortal }, { value: "linked", label: t.portal.linked }, { value: "notLinked", label: t.portal.notLinked }]} placeholder={t.allPortal} ariaLabel={t.allPortal} />
             </div>
-            <div style={{ minWidth: 160 }}>
+            <div className={styles.filterSelect}>
               <StyledSelect value={portalStatusFilter} onChange={setPortalStatusFilter} options={[{ value: "", label: t.allStatus }, { value: "active", label: t.portalStatus.active }, { value: "disabled", label: t.portalStatus.disabled }, { value: "archived", label: t.portalStatus.archived }]} placeholder={t.allStatus} ariaLabel={t.allStatus} />
             </div>
           </div>
-          {isManager && <button type="button" className={styles.primaryButton} onClick={openAdd}><Plus size={16} />{t.addSupplier}</button>}
         </div>
 
         {error && <div className={styles.errorBox}>{error}</div>}
@@ -532,7 +561,7 @@ function RvbSuppliersInner() {
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setDetails(s); setActiveTab("portal" as any); setSelectedLink(null); setLinkSearch(""); setLinkModal(true); }}
-                                  style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 26, padding: "0 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--accent)", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                                  className={styles.linkNowButton}
                                   aria-label={`${(t.table as any).linkNow ?? "Link now"} ${s.name}`}
                                 >
                                   <Link2 size={12} aria-hidden="true" />{(t.table as any).linkNow ?? "Link now"}

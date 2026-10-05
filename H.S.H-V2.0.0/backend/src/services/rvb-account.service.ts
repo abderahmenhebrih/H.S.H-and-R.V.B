@@ -1,5 +1,9 @@
+import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { RvbAccountModel } from "../models/rvb-account.model";
+import { RvbSessionModel } from "../models/rvb-session.model";
+import { RvbNotificationRecipientModel } from "../models/rvb-notification-recipient.model";
+import { RvbChatReminderModel } from "../models/rvb-chat-reminder.model";
 import { WorkerModel } from "../models/worker.model";
 import { SupplierModel } from "../models/supplier.model";
 import { CustomerModel } from "../models/customer.model";
@@ -65,6 +69,11 @@ function validateLinkCompatibility(role: string, entityType: string): boolean {
   if (role === entityType) return true;
   if (role === "supervisor" && entityType === "worker") return true;
   return false;
+}
+
+function isTransactionsUnsupported(err: any): boolean {
+  const msg = String(err?.message || "") + String(err?.code || "");
+  return /transaction numbers|retryable writes|replica set|replset|IllegalOperation/i.test(msg) || err?.code === 20;
 }
 
 function isDuplicateKeyError(err: any): boolean {
@@ -276,6 +285,69 @@ export async function disableRvbAccount(id: string) {
   await account.save();
   safeDisconnectAccount(account.id);
   return account.toObject ? account.toObject() : account;
+}
+
+/**
+ * Permanently delete an RVB login identity. Removes ONLY account-scoped data:
+ * - the account document itself
+ * - its persisted sessions/refresh records (existing tokens become unusable;
+ *   requireRvbAuth and socket auth already 401 unknown accounts/sessions)
+ * - its notification-inbox rows and chat-reminder timers (per-account state)
+ *
+ * Explicitly preserved: linked Worker/Supplier/Customer records, all business
+ * history (sales, purchases, payments, requests, activities, audits), chat
+ * conversations and messages (sender rendering falls back downstream), and the
+ * tag namespace itself (unique index on live accounts only, so the tag becomes
+ * reusable — no historical reservation table exists).
+ */
+export async function deleteRvbAccount(id: string, actorAccountId?: string) {
+  const account: any = await RvbAccountModel.findOne({ id });
+  if (!account) throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
+
+  // Self-delete protection: a logged-in account can never delete itself here.
+  if (actorAccountId && account.id === actorAccountId) {
+    throw codeError("RVB_CANNOT_DELETE_SELF", 403);
+  }
+
+  // Last-management-account protection: deleting the final usable
+  // manager/admin would lock administration out. Backend-enforced (frontend
+  // also hides, but this is the authority). Archived/disabled targets are
+  // already unusable, so they never trip this guard.
+  if (account.status === "active" && (account.role === "manager" || account.role === "admin")) {
+    const remaining = await RvbAccountModel.countDocuments({
+      status: "active",
+      role: { $in: ["manager", "admin"] },
+      id: { $ne: account.id },
+    });
+    if (remaining === 0) throw codeError("RVB_LAST_MANAGER", 409);
+  }
+
+  const tag = account.tag;
+  // Atomic transaction where supported (production replica sets); ordered
+  // fallback otherwise (account first so a partial failure can never leave a
+  // deleted-account-with-live-access state — orphan session rows without an
+  // account document are rejected by auth middleware regardless).
+  const runDependentDeletes = async (session: any) => {
+    const withSession = (q: any) => (session ? q.session(session) : q);
+    await withSession(RvbAccountModel.deleteOne({ id: account.id }));
+    await withSession(RvbSessionModel.deleteMany({ accountId: account.id }));
+    await withSession(RvbNotificationRecipientModel.deleteMany({ accountId: account.id }));
+    await withSession(RvbChatReminderModel.deleteMany({ recipientAccountId: account.id }));
+  };
+  let session: any = null;
+  try {
+    session = await mongoose.startSession();
+    await session.withTransaction(() => runDependentDeletes(session));
+  } catch (e: any) {
+    if (!isTransactionsUnsupported(e)) throw e;
+    await runDependentDeletes(null);
+  } finally {
+    try { await session?.endSession(); } catch {}
+  }
+  // Kick live sockets; even without this, auth middleware rejects unknown
+  // accounts and deleted sessions on the next request/handshake.
+  safeDisconnectAccount(account.id);
+  return { id: account.id, tag };
 }
 
 export async function setInitialPassword(accountId: string, password: string, confirmPassword: string) {

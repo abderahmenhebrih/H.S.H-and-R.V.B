@@ -117,6 +117,12 @@ export const rvbAccountService = {
     return data.account;
   },
 
+  async deleteAccount(id: string): Promise<{ deletedId: string; tag: string }> {
+    const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}`, { method: "DELETE", headers: { ...getAuthHeaders() }, credentials: "include" });
+    const data = await handleResponse<{ success: boolean; deletedId: string; tag: string }>(res);
+    return { deletedId: data.deletedId, tag: data.tag };
+  },
+
   async setInitialPassword(id: string, password: string, confirmPassword: string): Promise<RvbAccount> {
     const res = await rvbAuthService.authFetch(`${ACCOUNTS_BASE}/${encodeURIComponent(id)}/set-initial-password`, {
       method: "POST",

@@ -44,6 +44,7 @@ const TR: Record<Language, any> = {
     reply: "Reply",
     edited: "Edited",
     deleted: "Message deleted",
+    deletedAccount: "Deleted account",
     pinned: "Pinned",
     typing: "is typing…",
     enterToSend: "Press Enter to send, Shift+Enter for new line",
@@ -130,6 +131,7 @@ const TR: Record<Language, any> = {
     reply: "Répondre",
     edited: "Modifié",
     deleted: "Message supprimé",
+    deletedAccount: "Compte supprimé",
     pinned: "Épinglé",
     typing: "est en train d'écrire…",
     enterToSend: "Entrée pour envoyer, Maj+Entrée nouvelle ligne",
@@ -216,6 +218,7 @@ const TR: Record<Language, any> = {
     reply: "رد",
     edited: "تم التعديل",
     deleted: "تم حذف الرسالة",
+    deletedAccount: "حساب محذوف",
     pinned: "مثبت",
     typing: "يكتب…",
     enterToSend: "Enter للإرسال، Shift+Enter سطر جديد",
@@ -973,7 +976,7 @@ function ChatsInner() {
                               const el = document.getElementById(`msg-${m.replyToMessageId}`);
                               el?.scrollIntoView({ behavior: "smooth", block: "center" });
                             }}>
-                              <strong>{replyOrig ? (replyOrig.senderAccountId === myId ? "You" : (selectedConv.participants as any[]).find((p: any) => p.accountId === replyOrig.senderAccountId)?.account?.displayName || "…") : "…"}: </strong>
+                              <strong>{replyOrig ? (replyOrig.senderAccountId === myId ? "You" : (selectedConv.participants as any[]).find((p: any) => p.accountId === replyOrig.senderAccountId)?.account?.displayName || t.deletedAccount) : "…"}: </strong>
                               {replyOrig ? (replyOrig.isDeleted ? t.deleted : messagePreview(replyOrig.content, replyOrig.attachments) || t.deleted) : t.deleted}
                             </div>
                           )}
@@ -1162,7 +1165,7 @@ function ChatsInner() {
                       <div key={p.accountId} className={styles.memberRow}>
                         <span className={styles.memberAvatar}>{p.account?.profilePicture ? <img src={p.account.profilePicture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials(p.account?.displayName || "?")}</span>
                         <span style={{ flex: 1, minWidth: 0 }}>
-                          <strong style={{ display: "block", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.account?.displayName || p.accountId.slice(0, 8)}</strong>
+                          <strong style={{ display: "block", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.account?.displayName || t.deletedAccount}</strong>
                           <small dir="ltr" style={{ fontSize: 11, color: "var(--muted)" }}>@{p.account?.tag || "—"} · {p.role}</small>
                         </span>
                       </div>

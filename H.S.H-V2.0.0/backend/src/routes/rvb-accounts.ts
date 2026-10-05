@@ -9,6 +9,7 @@ import {
   archiveRvbAccount,
   reactivateRvbAccount,
   disableRvbAccount,
+  deleteRvbAccount,
   setInitialPassword,
   linkRvbAccount,
   unlinkRvbAccount,
@@ -35,6 +36,8 @@ function handleError(res: any, err: any) {
     "RVB_LINKED_ENTITY_REQUIRED",
     "RVB_ENTITY_ALREADY_LINKED",
     "RVB_ACCOUNT_NOT_FOUND",
+    "RVB_CANNOT_DELETE_SELF",
+    "RVB_LAST_MANAGER",
     "RVB_ONBOARDING_INVALID",
     "RVB_FIELD_NOT_ALLOWED",
     "RVB_PASSWORD_REQUIRED",
@@ -206,6 +209,20 @@ router.post("/:id/disable", async (req, res) => {
     const { id } = req.params;
     const updated: any = await disableRvbAccount(id);
     res.json({ success: true, account: toSafeRvbAccount(updated) });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+});
+
+// DELETE /api/rvb/accounts/:id — permanent login-identity removal.
+// Manager/Admin only (router-level). Linked business entities, business
+// history, chats and audits are explicitly preserved by the service.
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const actorAccountId = (req as any).rvbUser?.accountId as string | undefined;
+    const deleted: any = await deleteRvbAccount(id, actorAccountId);
+    res.json({ success: true, deletedId: deleted.id, tag: deleted.tag });
   } catch (err: any) {
     handleError(res, err);
   }

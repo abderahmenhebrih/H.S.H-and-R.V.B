@@ -23,7 +23,7 @@ import {
   Eye,
   Archive,
   ArchiveRestore,
-  Ban,
+  Trash2,
   X,
   UsersRound,
   Truck,
@@ -87,9 +87,9 @@ const TR: Record<Language, any> = {
       displayName: "Display Name",
       role: "Role",
     },
-    actions: { archive: "Archive", reactivate: "Reactivate", disable: "Disable", cancel: "Cancel", close: "Close" },
+    actions: { archive: "Archive", reactivate: "Reactivate", delete: "Delete", cancel: "Cancel", close: "Close" },
     archiveConfirm: { title: "Archive Account", desc: "This account will be frozen and lose access until reactivated.", warning: "You can reactivate it later. History is preserved." },
-    disableConfirm: { title: "Disable Account", desc: "This account will be blocked from access immediately.", warning: "Reactivation is manual. Use carefully." },
+    deleteConfirm: { title: "Delete Account", desc: "This account will be permanently removed and lose access to RVB. The linked Worker/Supplier/Customer record and business history will be kept.", warning: "This action cannot be undone.", confirm: "Delete account", countdown: "Confirm deletion" },
     create: {
       title: "Create RVB Account",
       role: "Role",
@@ -134,6 +134,8 @@ const TR: Record<Language, any> = {
       RVB_LINKED_ENTITY_NOT_FOUND: "Linked entity not found",
       RVB_LINKED_ENTITY_REQUIRED: "Linked entity is required for this role",
       RVB_ACCOUNT_NOT_FOUND: "Account not found",
+      RVB_CANNOT_DELETE_SELF: "You cannot permanently delete your own account",
+      RVB_LAST_MANAGER: "Cannot delete the last active Manager/Admin account",
       RVB_PASSWORD_REQUIRED: "Password is required",
       RVB_PASSWORD_TOO_SHORT: "Password must be at least 8 characters",
       RVB_PASSWORD_TOO_LONG: "Password must be at most 128 characters",
@@ -167,12 +169,14 @@ const TR: Record<Language, any> = {
     view: "Voir",
     management: "Direction",
     details: { title: "Détails du compte", identity: "Identité", link: "Lien", access: "Accès", linkedEntityType: "Type d’entité liée", linkedEntityName: "Nom / ID entité liée", status: "Statut", onboardingStatus: "Statut d’onboarding", created: "Créé", lastLogin: "Dernière connexion", tag: "Tag", displayName: "Nom d’affichage", role: "Rôle" },
-    actions: { archive: "Archiver", reactivate: "Réactiver", disable: "Désactiver", cancel: "Annuler", close: "Fermer" },
+    actions: { archive: "Archiver", reactivate: "Réactiver", delete: "Supprimer", cancel: "Annuler", close: "Fermer" },
     archiveConfirm: { title: "Archiver le compte", desc: "Ce compte sera gelé et perdra l’accès jusqu’à réactivation.", warning: "Vous pourrez le réactiver plus tard. L’historique est conservé." },
-    disableConfirm: { title: "Désactiver le compte", desc: "Ce compte sera bloqué immédiatement.", warning: "La réactivation est manuelle. Utilisez avec prudence." },
+    deleteConfirm: { title: "Supprimer le compte", desc: "Ce compte sera définitivement supprimé et perdra l’accès RVB. L’entité liée (Travailleur/Fournisseur/Client) et l’historique métier seront conservés.", warning: "Cette action est irréversible.", confirm: "Supprimer le compte", countdown: "Confirmer la suppression" },
     create: { title: "Créer un compte RVB", role: "Rôle", linkedEntity: "Entité liée", displayName: "Nom d’affichage", tag: "Tag", tagHint: "3–30 car. : lettres, chiffres, point, underscore. Stocké sans @.", password: "Mot de passe", confirmPassword: "Confirmer", passwordHint: "8–128 caractères, mot de passe temporaire communiqué hors app", show: "Afficher", hide: "Masquer", selectRole: "Sélectionner un rôle", selectEntity: "Sélectionner une entité", creating: "Création...", cancel: "Annuler", create: "Créer le compte", autoFilled: "Rempli automatiquement depuis l’entité", noEntities: "Aucune entité disponible — toutes sont déjà liées.", loadingEntities: "Chargement des entités disponibles…", linkableLoadError: "Impossible de charger les entités associables. Vérifiez la connexion ou les autorisations, puis réessayez.", retry: "Réessayer" },
     validation: { tagRequired: "Tag requis", tagInvalid: "Tag invalide (3–30 car., a-z 0-9 . _ , commence par lettre/chiffre)", roleRequired: "Rôle requis", displayNameRequired: "Nom d’affichage requis", linkedRequired: "Entité liée requise pour ce rôle" },
-    errors: { RVB_TAG_REQUIRED: "Tag requis", RVB_TAG_INVALID: "Tag invalide", RVB_TAG_ALREADY_EXISTS: "Tag déjà existant", RVB_TAG_IMMUTABLE: "Tag immuable", RVB_FIELD_NOT_ALLOWED: "Champ non autorisé", RVB_DISPLAY_NAME_REQUIRED: "Nom d’affichage requis", RVB_ROLE_INVALID: "Rôle invalide", RVB_ENTITY_ALREADY_LINKED: "Cette entité a déjà un compte RVB", RVB_ENTITY_ROLE_MISMATCH: "Rôle et type d’entité incompatibles", RVB_LINKED_ENTITY_INACTIVE: "Restaurez cette entité H.S.H avant de lui donner un accès portail.", RVB_LINKED_ENTITY_NOT_FOUND: "Entité liée introuvable", RVB_LINKED_ENTITY_REQUIRED: "Entité liée requise pour ce rôle", RVB_ACCOUNT_NOT_FOUND: "Compte introuvable", RVB_PASSWORD_REQUIRED: "Mot de passe requis", RVB_PASSWORD_TOO_SHORT: "Au moins 8 caractères", RVB_PASSWORD_TOO_LONG: "Au plus 128 caractères", RVB_PASSWORD_CONFIRM_MISMATCH: "Mots de passe différents", RVB_PASSWORD_ALREADY_SET: "Mot de passe déjà défini", RVB_PASSWORD_NOT_SET: "Mot de passe non défini", RVB_UNAUTHENTICATED: "Authentification requise", RVB_FORBIDDEN: "Permissions insuffisantes" },
+    errors: { RVB_TAG_REQUIRED: "Tag requis", RVB_TAG_INVALID: "Tag invalide", RVB_TAG_ALREADY_EXISTS: "Tag déjà existant", RVB_TAG_IMMUTABLE: "Tag immuable", RVB_FIELD_NOT_ALLOWED: "Champ non autorisé", RVB_DISPLAY_NAME_REQUIRED: "Nom d’affichage requis", RVB_ROLE_INVALID: "Rôle invalide", RVB_ENTITY_ALREADY_LINKED: "Cette entité a déjà un compte RVB", RVB_ENTITY_ROLE_MISMATCH: "Rôle et type d’entité incompatibles", RVB_LINKED_ENTITY_INACTIVE: "Restaurez cette entité H.S.H avant de lui donner un accès portail.", RVB_LINKED_ENTITY_NOT_FOUND: "Entité liée introuvable", RVB_LINKED_ENTITY_REQUIRED: "Entité liée requise pour ce rôle",       RVB_ACCOUNT_NOT_FOUND: "Compte introuvable",
+      RVB_CANNOT_DELETE_SELF: "Vous ne pouvez pas supprimer définitivement votre propre compte",
+      RVB_LAST_MANAGER: "Impossible de supprimer le dernier compte Manager/Admin actif", RVB_PASSWORD_REQUIRED: "Mot de passe requis", RVB_PASSWORD_TOO_SHORT: "Au moins 8 caractères", RVB_PASSWORD_TOO_LONG: "Au plus 128 caractères", RVB_PASSWORD_CONFIRM_MISMATCH: "Mots de passe différents", RVB_PASSWORD_ALREADY_SET: "Mot de passe déjà défini", RVB_PASSWORD_NOT_SET: "Mot de passe non défini", RVB_UNAUTHENTICATED: "Authentification requise", RVB_FORBIDDEN: "Permissions insuffisantes" },
     search: "Rechercher des comptes",
     linkedNone: "—",
     setInitial: { title: "Définir le mot de passe initial", desc: "Définir un mot de passe temporaire. L’utilisateur doit le changer à la première connexion.", password: "Nouveau mot de passe", confirm: "Confirmer", hint: "8–128 caractères", cancel: "Annuler", confirmBtn: "Définir", setting: "Définition...", credentialsNotConfigured: "Identifiants non configurés", credentialsConfigured: "Identifiants configurés", mustChange: "Changement requis à la première connexion" },
@@ -197,12 +201,14 @@ const TR: Record<Language, any> = {
     view: "عرض",
     management: "الإدارة",
     details: { title: "تفاصيل الحساب", identity: "الهوية", link: "الربط", access: "الوصول", linkedEntityType: "نوع الجهة المرتبطة", linkedEntityName: "اسم / معرّف الجهة المرتبطة", status: "الحالة", onboardingStatus: "حالة الإعداد", created: "تاريخ الإنشاء", lastLogin: "آخر تسجيل دخول", tag: "المعرّف", displayName: "الاسم المعروض", role: "الدور" },
-    actions: { archive: "أرشفة", reactivate: "إعادة التفعيل", disable: "تعطيل", cancel: "إلغاء", close: "إغلاق" },
+    actions: { archive: "أرشفة", reactivate: "إعادة التفعيل", delete: "حذف", cancel: "إلغاء", close: "إغلاق" },
     archiveConfirm: { title: "أرشفة الحساب", desc: "سيتم تجميد هذا الحساب وفقدان الوصول حتى إعادة التفعيل.", warning: "يمكنك إعادة تفعيله لاحقاً. السجل محفوظ." },
-    disableConfirm: { title: "تعطيل الحساب", desc: "سيتم حظر هذا الحساب فوراً.", warning: "إعادة التفعيل يدوية. استخدم بحذر." },
+    deleteConfirm: { title: "حذف الحساب", desc: "سيتم حذف هذا الحساب نهائياً وفقدان الوصول إلى RVB. سيبقى سجل الجهة المرتبطة (عامل/مورد/زبون) وسجل الأعمال.", warning: "لا يمكن التراجع عن هذا الإجراء.", confirm: "حذف الحساب", countdown: "تأكيد الحذف" },
     create: { title: "إنشاء حساب RVB", role: "الدور", linkedEntity: "الجهة المرتبطة", displayName: "الاسم المعروض", tag: "المعرّف", tagHint: "3–30 حرف: أحرف، أرقام، نقطة، شرطة سفلية. يُخزّن بدون @.", password: "كلمة المرور", confirmPassword: "تأكيد كلمة المرور", passwordHint: "8–128 حرفاً، كلمة مرور مؤقتة تُتواصل خارج التطبيق", show: "إظهار", hide: "إخفاء", selectRole: "اختر الدور", selectEntity: "اختر الجهة", creating: "جارٍ الإنشاء...", cancel: "إلغاء", create: "إنشاء الحساب", autoFilled: "تعبئة تلقائية من الجهة", noEntities: "لا توجد جهات متاحة — جميعها مرتبطة بالفعل.", loadingEntities: "جارٍ تحميل الجهات المتاحة…", linkableLoadError: "تعذر تحميل الجهات القابلة للربط. تحقق من الاتصال أو الصلاحيات ثم أعد المحاولة.", retry: "إعادة المحاولة" },
     validation: { tagRequired: "المعرّف مطلوب", tagInvalid: "المعرّف غير صالح (3–30 حرف، a-z 0-9 . _ يبدأ بحرف/رقم)", roleRequired: "الدور مطلوب", displayNameRequired: "الاسم المعروض مطلوب", linkedRequired: "الجهة المرتبطة مطلوبة لهذا الدور" },
-    errors: { RVB_TAG_REQUIRED: "المعرّف مطلوب", RVB_TAG_INVALID: "المعرّف غير صالح", RVB_TAG_ALREADY_EXISTS: "المعرّف موجود مسبقاً", RVB_TAG_IMMUTABLE: "المعرّف غير قابل للتغيير", RVB_FIELD_NOT_ALLOWED: "حقل غير مسموح", RVB_DISPLAY_NAME_REQUIRED: "الاسم المعروض مطلوب", RVB_ROLE_INVALID: "دور غير صالح", RVB_ENTITY_ALREADY_LINKED: "هذه الجهة لديها حساب RVB بالفعل", RVB_ENTITY_ROLE_MISMATCH: "عدم تطابق الدور ونوع الجهة", RVB_LINKED_ENTITY_INACTIVE: "أعد تفعيل كيان H.S.H قبل منحه وصول البوابة.", RVB_LINKED_ENTITY_NOT_FOUND: "الجهة المرتبطة غير موجودة", RVB_LINKED_ENTITY_REQUIRED: "الجهة المرتبطة مطلوبة لهذا الدور", RVB_ACCOUNT_NOT_FOUND: "الحساب غير موجود", RVB_PASSWORD_REQUIRED: "كلمة المرور مطلوبة", RVB_PASSWORD_TOO_SHORT: "8 أحرف على الأقل", RVB_PASSWORD_TOO_LONG: "128 حرفاً على الأكثر", RVB_PASSWORD_CONFIRM_MISMATCH: "كلمتا المرور غير متطابقتين", RVB_PASSWORD_ALREADY_SET: "كلمة المرور مضبوطة مسبقاً", RVB_PASSWORD_NOT_SET: "كلمة المرور غير مضبوطة", RVB_UNAUTHENTICATED: "يلزم تسجيل الدخول", RVB_FORBIDDEN: "صلاحيات غير كافية" },
+    errors: { RVB_TAG_REQUIRED: "المعرّف مطلوب", RVB_TAG_INVALID: "المعرّف غير صالح", RVB_TAG_ALREADY_EXISTS: "المعرّف موجود مسبقاً", RVB_TAG_IMMUTABLE: "المعرّف غير قابل للتغيير", RVB_FIELD_NOT_ALLOWED: "حقل غير مسموح", RVB_DISPLAY_NAME_REQUIRED: "الاسم المعروض مطلوب", RVB_ROLE_INVALID: "دور غير صالح", RVB_ENTITY_ALREADY_LINKED: "هذه الجهة لديها حساب RVB بالفعل", RVB_ENTITY_ROLE_MISMATCH: "عدم تطابق الدور ونوع الجهة", RVB_LINKED_ENTITY_INACTIVE: "أعد تفعيل كيان H.S.H قبل منحه وصول البوابة.", RVB_LINKED_ENTITY_NOT_FOUND: "الجهة المرتبطة غير موجودة", RVB_LINKED_ENTITY_REQUIRED: "الجهة المرتبطة مطلوبة لهذا الدور",       RVB_ACCOUNT_NOT_FOUND: "الحساب غير موجود",
+      RVB_CANNOT_DELETE_SELF: "لا يمكنك حذف حسابك نهائياً",
+      RVB_LAST_MANAGER: "لا يمكن حذف آخر حساب مدير/إداري نشط", RVB_PASSWORD_REQUIRED: "كلمة المرور مطلوبة", RVB_PASSWORD_TOO_SHORT: "8 أحرف على الأقل", RVB_PASSWORD_TOO_LONG: "128 حرفاً على الأكثر", RVB_PASSWORD_CONFIRM_MISMATCH: "كلمتا المرور غير متطابقتين", RVB_PASSWORD_ALREADY_SET: "كلمة المرور مضبوطة مسبقاً", RVB_PASSWORD_NOT_SET: "كلمة المرور غير مضبوطة", RVB_UNAUTHENTICATED: "يلزم تسجيل الدخول", RVB_FORBIDDEN: "صلاحيات غير كافية" },
     search: "ابحث عن الحسابات",
     linkedNone: "—",
     setInitial: { title: "تعيين كلمة المرور الأولية", desc: "تعيين كلمة مرور مؤقتة. يجب على المستخدم تغييرها عند أول تسجيل دخول.", password: "كلمة المرور الجديدة", confirm: "تأكيد", hint: "8–128 حرفاً", cancel: "إلغاء", confirmBtn: "تعيين", setting: "جارٍ التعيين...", credentialsNotConfigured: "بيانات الاعتماد غير مضبوطة", credentialsConfigured: "بيانات الاعتماد مضبوطة", mustChange: "يجب التغيير عند أول دخول" },
@@ -272,9 +278,12 @@ function RvbAccountsInner() {
 
   // Protected modals
   const [archiveTarget, setArchiveTarget] = useState<RvbAccount | null>(null);
-  const [disableTarget, setDisableTarget] = useState<RvbAccount | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RvbAccount | null>(null);
   const [reactivateTarget, setReactivateTarget] = useState<RvbAccount | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  // Current session user — Delete is never offered for your own account
+  // (backend also rejects self-delete; this only hides the action).
+  const { user } = useRvbAuth();
 
   const lang = (settings.language as Language) || "en";
   const t = (TR as any)[lang] ?? TR.en;
@@ -495,16 +504,18 @@ function RvbAccountsInner() {
     } finally { setActionLoading(false); }
   };
 
-  const doDisable = async () => {
-    if (!disableTarget) return;
+  const doDelete = async () => {
+    if (!deleteTarget) return;
     setActionLoading(true);
     try {
-      await rvbAccountService.disable(disableTarget.id);
-      setDisableTarget(null);
+      await rvbAccountService.deleteAccount(deleteTarget.id);
+      setDeleteTarget(null);
       setDetailsAccount(null);
       await load();
     } catch (e: any) {
-      setError(e?.data?.code || e?.message || t.failedLoad);
+      const code = e?.data?.code || e?.code || "";
+      const translated = (t.errors as any)[code] || code || e?.message || t.failedLoad;
+      setError(translated);
     } finally { setActionLoading(false); }
   };
 
@@ -963,15 +974,30 @@ function RvbAccountsInner() {
               </div>
 
               <div className={styles.drawerActions}>
-                {detailsAccount.status === "active" && (
-                  <>
-                    <button type="button" className={`${styles.actionButton} ${styles.actionDanger}`} onClick={() => setArchiveTarget(detailsAccount)}><Archive size={14} strokeWidth={2} />{t.actions.archive}</button>
-                    <button type="button" className={`${styles.actionButton} ${styles.actionDanger}`} onClick={() => setDisableTarget(detailsAccount)}><Ban size={14} strokeWidth={2} />{t.actions.disable}</button>
-                  </>
-                )}
-                {(detailsAccount.status === "archived" || detailsAccount.status === "disabled") && (
-                  <button type="button" className={styles.actionButton} onClick={() => setReactivateTarget(detailsAccount)}><ArchiveRestore size={14} strokeWidth={2} />{t.actions.reactivate}</button>
-                )}
+                {(() => {
+                  // Self-delete is never offered; backend rejects it regardless.
+                  const isSelf = !!user && detailsAccount.id === (user as any).id;
+                  return (
+                    <>
+                      {detailsAccount.status === "active" && (
+                        <>
+                          <button type="button" className={`${styles.actionButton} ${styles.actionDanger}`} onClick={() => setArchiveTarget(detailsAccount)}><Archive size={14} strokeWidth={2} />{t.actions.archive}</button>
+                          {!isSelf && (
+                            <button type="button" className={`${styles.actionButton} ${styles.actionDanger}`} onClick={() => setDeleteTarget(detailsAccount)}><Trash2 size={14} strokeWidth={2} />{t.actions.delete}</button>
+                          )}
+                        </>
+                      )}
+                      {(detailsAccount.status === "archived" || detailsAccount.status === "disabled") && (
+                        <>
+                          <button type="button" className={styles.actionButton} onClick={() => setReactivateTarget(detailsAccount)}><ArchiveRestore size={14} strokeWidth={2} />{t.actions.reactivate}</button>
+                          {!isSelf && (
+                            <button type="button" className={`${styles.actionButton} ${styles.actionDanger}`} onClick={() => setDeleteTarget(detailsAccount)}><Trash2 size={14} strokeWidth={2} />{t.actions.delete}</button>
+                          )}
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
                 <button type="button" className={styles.actionButton} onClick={() => setDetailsAccount(null)} style={{ marginInlineStart: "auto" }}>{t.actions.close}</button>
               </div>
             </div>
@@ -998,20 +1024,20 @@ function RvbAccountsInner() {
       />
 
       <ProtectedDeleteModal
-        isOpen={!!disableTarget}
-        title={t.disableConfirm.title}
-        entityName={disableTarget ? `${disableTarget.displayName} @${disableTarget.tag}` : undefined}
-        description={t.disableConfirm.desc}
-        warning={t.disableConfirm.warning}
-        confirmLabel={t.actions.disable}
+        isOpen={!!deleteTarget}
+        title={t.deleteConfirm.title}
+        entityName={deleteTarget ? `${deleteTarget.displayName} @${deleteTarget.tag}` : undefined}
+        description={t.deleteConfirm.desc}
+        warning={t.deleteConfirm.warning}
+        confirmLabel={t.deleteConfirm.confirm}
         cancelLabel={t.actions.cancel}
-        deletingLabel={t.actions.disable}
-        eyebrowLabel={lang === "fr" ? "ACTION PROTÉGÉE" : lang === "ar" ? "إجراء محمي" : "PROTECTED ACTION"}
-        countdownWaitingLabel={lang === "fr" ? "Confirmer la désactivation" : lang === "ar" ? "تأكيد التعطيل" : "Confirm disable"}
+        deletingLabel={t.deleteConfirm.confirm}
+        eyebrowLabel={lang === "fr" ? "ACTION IRRÉVERSIBLE" : lang === "ar" ? "إجراء لا يمكن التراجع عنه" : "IRREVERSIBLE ACTION"}
+        countdownWaitingLabel={t.deleteConfirm.countdown}
         isDeleting={actionLoading}
-        onCancel={() => setDisableTarget(null)}
-        onConfirm={doDisable}
-        resetKey={disableTarget?.id ?? null}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={doDelete}
+        resetKey={deleteTarget?.id ?? null}
       />
 
       {/* Reactivate simple */}

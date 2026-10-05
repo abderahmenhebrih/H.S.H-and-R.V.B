@@ -155,24 +155,30 @@ async function main() {
     }
   }
 
-  try {
-    await workerLifecycleOperation.restore({
-      workerId: worker.id,
-      startingSalary: -1,
-      monthlySalary: 50000,
-    });
-
-    throw new Error("Negative starting salary was accepted.");
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "Starting salary cannot be negative."
-    ) {
-      console.log("Negative starting salary rejection passed.");
-    } else {
-      throw error;
-    }
+  // Restore with negative startingSalary = opening balance owing: MUST be accepted.
+  // Archive a fresh zero-balance worker, then restore it with -500.
+  const restoreWorker = await workerService.create({
+    name: `__TEST_WORKER_RESTORE_NEG_${now}__`,
+    phone: "0000000009",
+    employmentDate: now,
+    position: "Butcher",
+    startingSalary: 0,
+    monthlySalary: 50000,
+  });
+  await db.workers.update(restoreWorker.id, { balance: 0 });
+  await workerLifecycleOperation.archive(restoreWorker.id);
+  await workerLifecycleOperation.restore({
+    workerId: restoreWorker.id,
+    startingSalary: -500,
+    monthlySalary: 50000,
+  });
+  const restored = await db.workers.get(restoreWorker.id);
+  if (!restored || restored.status !== "active" || restored.startingSalary !== -500) {
+    throw new Error(
+      `Negative startingSalary restore failed. Got ${restored?.startingSalary}/${restored?.status}`,
+    );
   }
+  console.log("Negative starting salary restore acceptance passed.");
 
   try {
     await workerLifecycleOperation.restore({

@@ -28,8 +28,14 @@ export class WorkerEditOperation {
         throw new Error("Worker position is required.");
       }
 
-      if (input.startingSalary < 0) {
-        throw new Error("Starting salary cannot be negative.");
+      // startingSalary = initial worker balance (opening balance): signed finite
+      // number allowed (negative / zero / positive). Monthly stays >= 0.
+      if (!Number.isFinite(input.startingSalary)) {
+        throw new Error("Starting salary must be a valid number.");
+      }
+
+      if (!Number.isFinite(input.monthlySalary)) {
+        throw new Error("Monthly salary must be a valid number.");
       }
 
       if (input.monthlySalary < 0) {

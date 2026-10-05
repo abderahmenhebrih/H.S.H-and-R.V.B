@@ -38,8 +38,14 @@ export class WorkerLifecycleOperation {
     monthlySalary: number;
   }) {
     return runDatabaseTransaction(async () => {
-      if (input.startingSalary < 0) {
-        throw new Error("Starting salary cannot be negative.");
+      // startingSalary = opening balance: signed finite allowed (negative/zero/positive).
+      // Monthly salary policy preserved: zero or positive only.
+      if (!Number.isFinite(input.startingSalary)) {
+        throw new Error("Starting salary must be a valid number.");
+      }
+
+      if (!Number.isFinite(input.monthlySalary)) {
+        throw new Error("Monthly salary must be a valid number.");
       }
 
       if (input.monthlySalary < 0) {

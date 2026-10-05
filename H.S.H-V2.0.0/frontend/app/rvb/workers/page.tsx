@@ -432,9 +432,11 @@ function RvbWorkersInner() {
     if (!form.name.trim()) { setFormError(t.validation.nameRequired); return; }
     if (!form.phone.trim()) { setFormError(t.validation.phoneRequired); return; }
     if (!form.position.trim()) { setFormError(t.validation.positionRequired); return; }
+    // startingSalary = opening balance: signed finite allowed (negative/zero/positive).
+    // Monthly salary policy preserved: zero or positive only.
     const starting = Number(form.startingSalary || 0);
     const monthly = Number(form.monthlySalary || 0);
-    if (!Number.isFinite(starting) || starting < 0 || !Number.isFinite(monthly) || monthly < 0) { setFormError(t.validation.salaryInvalid); return; }
+    if (!Number.isFinite(starting) || !Number.isFinite(monthly) || monthly < 0) { setFormError(t.validation.salaryInvalid); return; }
     setSaving(true);
     try {
       const employmentDate = form.employmentDate ? new Date(`${form.employmentDate}T12:00:00`).getTime() : Date.now();
@@ -757,7 +759,7 @@ function RvbWorkersInner() {
               <div className={styles.field}><label>{t.create.employmentDate} *</label><StyledDatePicker value={form.employmentDate} onChange={(v) => setForm({ ...form, employmentDate: v })} language={lang} placeholder={t.create.employmentDate} ariaLabel={t.create.employmentDate} /></div>
               <div className={styles.field}><label>{t.create.birthDate}</label><StyledDatePicker value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} language={lang} placeholder={t.create.birthDate} ariaLabel={t.create.birthDate} /></div>
               <div className={styles.field}><label>{t.create.address}</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-              <div className={styles.field}><label>{t.create.startingSalary} *</label><div style={{ display: "flex", gap: 8 }}><input type="number" min="0" step="0.01" value={form.startingSalary} onChange={(e) => setForm({ ...form, startingSalary: e.target.value })} style={{ flex: 1 }} /><span style={{ display: "grid", placeItems: "center", padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel-hover)", fontSize: 12, fontWeight: 700 }}>{settings.currency}</span></div></div>
+              <div className={styles.field}><label>{t.create.startingSalary} *</label><div style={{ display: "flex", gap: 8 }}><input type="number" step="0.01" value={form.startingSalary} onChange={(e) => setForm({ ...form, startingSalary: e.target.value })} style={{ flex: 1 }} /><span style={{ display: "grid", placeItems: "center", padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel-hover)", fontSize: 12, fontWeight: 700 }}>{settings.currency}</span></div></div>
               <div className={styles.field}><label>{t.create.monthlySalary} *</label><div style={{ display: "flex", gap: 8 }}><input type="number" min="0" step="0.01" value={form.monthlySalary} onChange={(e) => setForm({ ...form, monthlySalary: e.target.value })} style={{ flex: 1 }} /><span style={{ display: "grid", placeItems: "center", padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel-hover)", fontSize: 12, fontWeight: 700 }}>{settings.currency}</span></div></div>
               <div className={styles.field}><label>{t.create.notes}</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} style={{ width: "100%", padding: 10, border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} /></div>
               {formError && <div className={styles.formError}>{formError}</div>}
@@ -1154,7 +1156,7 @@ function RvbWorkersInner() {
             <div className={styles.modalHeader}><h2>Reactivate Worker</h2><button type="button" className={styles.closeButton} onClick={() => setShowReactivate(null)}><X size={16} /></button></div>
             <div className={styles.formBody}>
               <p style={{ margin: 0, color: "var(--muted)", fontSize: 12 }}>Restoring requires starting and monthly salary.</p>
-              <div className={styles.field}><label>Starting Salary *</label><input type="number" min="0" step="0.01" value={reactivateForm.startingSalary} onChange={(e) => setReactivateForm({ ...reactivateForm, startingSalary: e.target.value })} /></div>
+              <div className={styles.field}><label>Starting Salary *</label><input type="number" step="0.01" value={reactivateForm.startingSalary} onChange={(e) => setReactivateForm({ ...reactivateForm, startingSalary: e.target.value })} /></div>
               <div className={styles.field}><label>Monthly Salary *</label><input type="number" min="0" step="0.01" value={reactivateForm.monthlySalary} onChange={(e) => setReactivateForm({ ...reactivateForm, monthlySalary: e.target.value })} /></div>
             </div>
             <div className={styles.modalFooter}>

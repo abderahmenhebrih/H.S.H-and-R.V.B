@@ -1120,9 +1120,11 @@ export function validateHshPayload(
         if (monthlyRaw === undefined || monthlyRaw === null) return "WORKER_MONTHLY_SALARY_REQUIRED";
         if (balRaw === undefined || balRaw === null) return "WORKER_BALANCE_REQUIRED";
       }
+      // startingSalary = opening balance: signed finite allowed (negative/zero/positive).
+      // Monthly salary policy preserved: zero or positive only.
       if (startRaw !== undefined && startRaw !== null) {
         const n = toFiniteNumber(startRaw);
-        if (!Number.isFinite(n) || n < 0) return "WORKER_SALARY_INVALID";
+        if (!Number.isFinite(n)) return "WORKER_SALARY_INVALID";
       }
       if (monthlyRaw !== undefined && monthlyRaw !== null) {
         const n = toFiniteNumber(monthlyRaw);

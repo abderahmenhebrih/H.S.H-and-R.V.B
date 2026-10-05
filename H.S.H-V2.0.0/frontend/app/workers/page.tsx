@@ -500,9 +500,11 @@ export default function WorkersPage() {
       setError(t.positionRequired);
       return;
     }
+    // startingSalary = opening balance: signed finite allowed (negative/zero/positive).
+    // Monthly salary policy preserved: zero or positive only.
     const starting = Number(form.startingSalary || 0);
     const monthly = Number(form.monthlySalary || 0);
-    if (!Number.isFinite(starting) || starting < 0 || !Number.isFinite(monthly) || monthly < 0) {
+    if (!Number.isFinite(starting) || !Number.isFinite(monthly) || monthly < 0) {
       setError(t.failedSave);
       return;
     }
@@ -564,7 +566,8 @@ export default function WorkersPage() {
     if (!restoreTarget) return;
     const s = Number(restoreStarting);
     const m = Number(restoreMonthly);
-    if (!Number.isFinite(s) || s < 0 || !Number.isFinite(m) || m < 0) {
+    // Restore startingSalary follows same opening-balance rule: signed finite allowed.
+    if (!Number.isFinite(s) || !Number.isFinite(m) || m < 0) {
       setError(t.failedSave);
       return;
     }
@@ -879,7 +882,7 @@ export default function WorkersPage() {
                   <label>
                     <span>{t.startingSalary} *</span>
                     <div className={styles.inputWithSuffix}>
-                      <input type="number" min="0" step="0.01" value={form.startingSalary} onChange={(e) => setForm({ ...form, startingSalary: e.target.value })} />
+                      <input type="number" step="0.01" value={form.startingSalary} onChange={(e) => setForm({ ...form, startingSalary: e.target.value })} />
                       <span>{currency}</span>
                     </div>
                   </label>
@@ -945,7 +948,7 @@ export default function WorkersPage() {
                   <p className={styles.fullWidth}>{t.restoreWarning}</p>
                   <label>
                     <span>{t.startingSalary} *</span>
-                    <input type="number" min="0" step="0.01" value={restoreStarting} onChange={(e) => setRestoreStarting(e.target.value)} />
+                    <input type="number" step="0.01" value={restoreStarting} onChange={(e) => setRestoreStarting(e.target.value)} />
                   </label>
                   <label>
                     <span>{t.monthlySalary} *</span>

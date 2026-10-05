@@ -70,6 +70,9 @@ const workerSchema = new Schema(
       required: false,
     },
 
+    // Semantic: startingSalary = initial worker balance at creation (opening balance).
+    // Signed value allowed: negative (worker enters owing money) / zero / positive.
+    // No min validator on purpose — MongoDB Number already supports signed values.
     startingSalary: {
       type: Number,
       required: true,

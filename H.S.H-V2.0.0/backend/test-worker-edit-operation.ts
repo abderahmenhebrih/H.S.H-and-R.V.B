@@ -199,29 +199,28 @@ async function main() {
     }
   }
 
-  // Negative starting salary.
-  try {
-    await workerEditOperation.edit({
-      workerId: worker.id,
-      name: updated.name,
-      phone: updated.phone,
-      employmentDate: updated.employmentDate,
-      position: updated.position,
-      startingSalary: -1,
-      monthlySalary: updated.monthlySalary,
-    });
-
-    throw new Error("Negative starting salary was accepted.");
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "Starting salary cannot be negative."
-    ) {
-      console.log("Negative starting salary rejection passed.");
-    } else {
-      throw error;
-    }
+  // Negative starting salary = opening balance owing: MUST be accepted.
+  await workerEditOperation.edit({
+    workerId: worker.id,
+    name: updated.name,
+    phone: updated.phone,
+    employmentDate: updated.employmentDate,
+    position: updated.position,
+    startingSalary: -1,
+    monthlySalary: updated.monthlySalary,
+  });
+  updated = await db.workers.get(worker.id);
+  if (!updated || updated.startingSalary !== -1) {
+    throw new Error(
+      `Negative starting salary was not persisted. Got ${updated?.startingSalary}`,
+    );
   }
+  if (updated.balance !== 15000) {
+    throw new Error(
+      `Edit to negative startingSalary must preserve balance. Got ${updated.balance}`,
+    );
+  }
+  console.log("Negative starting salary acceptance passed.");
 
   // Negative monthly salary.
   try {

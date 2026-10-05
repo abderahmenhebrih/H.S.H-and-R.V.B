@@ -31,14 +31,18 @@ export class WorkerService extends BaseService {
     if (!trimmedPosition) {
       throw new Error("Worker position is required.");
     }
+    // startingSalary = initial worker balance at creation (opening balance).
+    // It MAY be negative (worker enters owing money), zero, or positive.
+    // Must still be a finite number — reject NaN / Infinity / -Infinity.
     if (!Number.isFinite(input.startingSalary) || Number.isNaN(input.startingSalary)) {
       throw new Error("Worker starting salary must be a valid number.");
     }
     if (!Number.isFinite(input.monthlySalary) || Number.isNaN(input.monthlySalary)) {
       throw new Error("Worker monthly salary must be a valid number.");
     }
-    if (input.startingSalary < 0 || input.monthlySalary < 0) {
-      throw new Error("Worker salary cannot be negative.");
+    // Monthly salary policy preserved: zero or positive only, never negative.
+    if (input.monthlySalary < 0) {
+      throw new Error("Worker monthly salary cannot be negative.");
     }
 
     const existing = await workerRepository.getByName(trimmedName);

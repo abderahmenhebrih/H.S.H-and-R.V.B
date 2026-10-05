@@ -134,7 +134,9 @@ router.post("/", async (req: RvbAuthRequest, res) => {
     }
     const startSal = Number(startingSalary);
     const monthSal = Number(monthlySalary);
-    if (!Number.isFinite(startSal) || startSal < 0) {
+    // startingSalary = initial worker balance (opening balance): signed finite
+    // allowed (negative / zero / positive). Monthly stays zero-or-positive.
+    if (!Number.isFinite(startSal)) {
       res.status(400).json({ success: false, code: "RVB_WORKER_SALARY_INVALID" });
       return;
     }
@@ -245,7 +247,8 @@ router.patch("/:id", async (req: RvbAuthRequest, res) => {
       res.status(400).json({ success: false, code: "RVB_WORKER_POSITION_REQUIRED" });
       return;
     }
-    if (startingSalary !== undefined && (!Number.isFinite(Number(startingSalary)) || Number(startingSalary) < 0)) {
+    // startingSalary = opening balance: signed finite allowed. Monthly stays >= 0.
+    if (startingSalary !== undefined && !Number.isFinite(Number(startingSalary))) {
       res.status(400).json({ success: false, code: "RVB_WORKER_SALARY_INVALID" });
       return;
     }
@@ -411,7 +414,8 @@ router.post("/:id/reactivate", async (req: RvbAuthRequest, res) => {
     const { startingSalary, monthlySalary } = req.body as any;
     const startSal = startingSalary !== undefined ? Number(startingSalary) : undefined;
     const monthSal = monthlySalary !== undefined ? Number(monthlySalary) : undefined;
-    if (startSal !== undefined && (!Number.isFinite(startSal) || startSal < 0)) {
+    // Reactivate startingSalary follows same opening-balance rule: signed finite allowed.
+    if (startSal !== undefined && !Number.isFinite(startSal)) {
       res.status(400).json({ success: false, code: "RVB_WORKER_SALARY_INVALID" });
       return;
     }
@@ -429,8 +433,9 @@ router.post("/:id/reactivate", async (req: RvbAuthRequest, res) => {
         if (worker.status === "active") throw codeError("RVB_WORKER_ALREADY_ACTIVE", 400);
         if (startSal !== undefined) worker.startingSalary = startSal;
         if (monthSal !== undefined) worker.monthlySalary = monthSal;
-        // If not provided, keep existing but ensure they are valid
-        if (!Number.isFinite(Number(worker.startingSalary)) || Number(worker.startingSalary) < 0) throw codeError("RVB_WORKER_SALARY_INVALID", 400);
+        // If not provided, keep existing but ensure they are valid.
+        // startingSalary = opening balance: signed finite allowed.
+        if (!Number.isFinite(Number(worker.startingSalary))) throw codeError("RVB_WORKER_SALARY_INVALID", 400);
         if (!Number.isFinite(Number(worker.monthlySalary)) || Number(worker.monthlySalary) < 0) throw codeError("RVB_WORKER_SALARY_INVALID", 400);
         worker.status = "active";
         worker.updatedAt = Date.now();

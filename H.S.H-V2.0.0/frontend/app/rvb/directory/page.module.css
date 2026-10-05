@@ -3,7 +3,7 @@
 .pageRoot {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
   min-height: 0;
   flex: 1;
@@ -13,6 +13,77 @@
   box-sizing: border-box;
   min-height: calc(100dvh - 168px);
   padding: 4px 0 8px;
+}
+
+/* Unified command card (My Office proportions): brand + integrated search.
+   Single surface — the only card in the header area. */
+.commandCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 15px var(--shadow);
+  box-sizing: border-box;
+}
+.commandBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 0 1 320px;
+}
+.commandLogo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+}
+.commandLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.commandTitle {
+  min-width: 0;
+}
+.commandTitle h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.commandTitle span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.commandCard .searchBar {
+  flex: 1 1 auto;
+  min-width: 200px;
+}
+@media (max-width: 860px) {
+  .commandCard {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .commandBrand {
+    flex-basis: auto;
+  }
 }
 
 .searchBar {
@@ -87,42 +158,66 @@
   flex: none;
 }
 
-.filterBar {
+/* Slim office-style tab strip: transparent tabs, brown underline indicator.
+   Horizontally scrollable with hidden scrollbar on narrow widths. */
+.tabBar {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--border);
   flex: none;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.filterPill {
-  min-height: 44px;
-  padding: 0 16px;
-  box-sizing: border-box;
+.tabBar::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  position: relative;
+  min-height: 40px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel);
+  justify-content: center;
+  gap: 8px;
+  flex: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.18s ease, border-color 0.18s ease;
-  flex: none;
 }
-.filterPill:hover { border-color: var(--border-strong); background: var(--panel-hover); }
-.filterPill:focus-visible {
+.tab:hover {
+  color: var(--text);
+}
+.tab:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-ring);
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--accent-ring);
+  border-radius: 8px;
 }
-.filterActive {
+.tabActive {
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+}
+.tabActive::after {
+  content: "";
+  position: absolute;
+  inset-inline: 8px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
   background: var(--accent);
-  border-color: var(--accent);
+}
+:global(.themeDark) .tabActive {
   color: #fff;
-  box-shadow: 0 2px 8px var(--accent-ring);
 }
 
 .resultsArea {
@@ -143,13 +238,19 @@
 
 .grid {
   display: grid;
-  /* Responsive 1/2/3 columns: cards stay ≥340px, grid fills available width. */
-  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+  /* Responsive columns: cards stay ≥400px (2 at laptop, 3 very-wide). */
+  grid-template-columns: repeat(auto-fill, minmax(min(400px, 100%), 1fr));
   gap: 12px;
   min-width: 0;
+  align-content: start;
+}
+/* A lone result keeps a normal column instead of stretching full width. */
+.gridSingle {
+  grid-template-columns: minmax(min(420px, 100%), 560px);
+  justify-content: start;
 }
 @media (max-width: 768px) {
-  .grid { grid-template-columns: 1fr; }
+  .grid, .gridSingle { grid-template-columns: 1fr; }
 }
 
 .card {
@@ -242,9 +343,38 @@
   flex-wrap: wrap;
   align-items: center;
 }
-/* Profile stays integrated bottom-right; Message keeps the left slot. */
+/* Profile is an integrated text action bottom-right — no second surface.
+   Message keeps its button (existing functionality). */
 .profileButton {
   margin-inline-start: auto;
+  min-height: 0;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.profileButton:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.profileButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+.profileArrow {
+  display: inline-block;
+  line-height: 1;
+}
+html[dir="rtl"] .profileArrow {
+  transform: scaleX(-1);
 }
 .messageButton, .profileButton {
   min-height: 34px;
@@ -300,12 +430,7 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.resultDone {
-  color: var(--subtle);
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
+
 
 .skeletonCard {
   height: 118px;
@@ -415,9 +540,7 @@
 /* Mobile */
 @media (max-width: 768px) {
   .pageRoot { min-height: calc(100dvh - 140px); }
-  .filterBar { gap: 6px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .filterBar::-webkit-scrollbar { display: none; }
-  .filterPill { flex: none; }
+  .tab { flex: none; }
 }
 @media (max-width: 375px) {
   .searchBar { height: 40px; }

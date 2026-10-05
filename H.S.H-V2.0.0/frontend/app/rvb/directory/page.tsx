@@ -29,6 +29,7 @@ const TR: Record<Language, any> = {
     noAccounts: "No accounts found.",
     noMatch: "No accounts match your search.",
     showing: "Showing {a} of {b} accounts",
+    showingRange: "Showing {a}–{b} of {c} accounts",
     noWorkers: "No Workers found.",
     noSuppliers: "No Suppliers found.",
     noCustomers: "No Customers found.",
@@ -62,6 +63,7 @@ const TR: Record<Language, any> = {
     noAccounts: "Aucun compte trouvé.",
     noMatch: "Aucun compte ne correspond à votre recherche.",
     showing: "Affichage de {a} sur {b} comptes",
+    showingRange: "Affichage de {a}–{b} sur {c} comptes",
     noWorkers: "Aucun Travailleur trouvé.",
     noSuppliers: "Aucun Fournisseur trouvé.",
     noCustomers: "Aucun Client trouvé.",
@@ -95,6 +97,7 @@ const TR: Record<Language, any> = {
     noAccounts: "لم يتم العثور على حسابات.",
     noMatch: "لا توجد حسابات مطابقة للبحث.",
     showing: "عرض {a} من أصل {b} من الحسابات",
+    showingRange: "عرض {a}–{b} من أصل {c} من الحسابات",
     noWorkers: "لا يوجد عمال.",
     noSuppliers: "لا يوجد موردون.",
     noCustomers: "لا يوجد زبائن.",
@@ -252,15 +255,28 @@ function DirectoryInner() {
 
   return (
     <div className={styles.pageRoot} dir={isRtl ? "rtl" : "ltr"}>
-      <div className={styles.searchBar}>
-        <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
-        <input className={styles.searchInput} type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} />
-        {search && <button className={styles.clearButton} onClick={() => setSearch("")} aria-label="Clear"><X size={14} /></button>}
+      {/* Unified command card (My Office proportions): brand + integrated
+          search. No separate search row beneath this. */}
+      <div className={styles.commandCard}>
+        <div className={styles.commandBrand}>
+          <div className={styles.commandLogo}>
+            <img src="/chicken.jpg" alt="" />
+          </div>
+          <div className={styles.commandTitle}>
+            <h1>{t.title}</h1>
+            <span>{t.subtitle}</span>
+          </div>
+        </div>
+        <div className={styles.searchBar}>
+          <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
+          <input className={styles.searchInput} type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} />
+          {search && <button className={styles.clearButton} onClick={() => setSearch("")} aria-label="Clear"><X size={14} /></button>}
+        </div>
       </div>
 
-      <div className={styles.filterBar} role="tablist" aria-label="Role filters">
+      <div className={styles.tabBar} role="tablist" aria-label="Role filters">
         {ROLE_FILTERS.map((f) => (
-          <button key={f.key} role="tab" aria-selected={role === f.key} className={`${styles.filterPill} ${role === f.key ? styles.filterActive : ""}`} onClick={() => handleSearchRole(f.key)}>
+          <button key={f.key} role="tab" aria-selected={role === f.key} className={`${styles.tab} ${role === f.key ? styles.tabActive : ""}`} onClick={() => handleSearchRole(f.key)}>
             {(t as any)[f.labelKey]}
           </button>
         ))}
@@ -287,7 +303,7 @@ function DirectoryInner() {
           </div>
         ) : (
           <>
-            <div className={styles.grid}>
+            <div className={`${styles.grid} ${items.length === 1 ? styles.gridSingle : ""}`}>
               {items.map((acc) => {
                 const isSelf = acc.id === myId;
                 return (
@@ -308,8 +324,8 @@ function DirectoryInner() {
                           <MessageSquare size={14} /> {msgLoading === acc.id ? "…" : t.message}
                         </button>
                       )}
-                      <button className={styles.profileButton} onClick={(e) => { e.stopPropagation(); void handleOpenProfile(acc); }}>
-                        <User size={14} /> {t.profile}
+                      <button className={styles.profileButton} onClick={(e) => { e.stopPropagation(); void handleOpenProfile(acc); }} aria-label={`${t.profile} — ${acc.displayName}`}>
+                        {t.profile} <span className={styles.profileArrow} aria-hidden="true">→</span>
                       </button>
                     </div>
                     {canOpenWorkspace(acc) && (
@@ -322,11 +338,13 @@ function DirectoryInner() {
               })}
             </div>
             <div className={styles.resultFooter}>
-              <small className={styles.resultSummary}>{(t.showing as string).replace("{a}", String(filteredCount)).replace("{b}", String(total))}</small>
-              {page < totalPages ? (
+              <small className={styles.resultSummary}>
+                {totalPages > 1
+                  ? (t.showingRange as string).replace("{a}", "1").replace("{b}", String(filteredCount)).replace("{c}", String(total))
+                  : (t.showing as string).replace("{a}", String(filteredCount)).replace("{b}", String(total))}
+              </small>
+              {page < totalPages && (
                 <button className={styles.secondaryButton} onClick={() => void load(false, page + 1)} disabled={loading}>{loading ? t.loading : t.loadMore}</button>
-              ) : (
-                <small className={styles.resultDone}>{page} / {totalPages}</small>
               )}
             </div>
           </>
@@ -384,7 +402,8 @@ function DirectoryInner() {
 export default function RvbDirectoryPage() {
   return (
     <RvbAuthGuard>
-      <RvbShell activePage="directory">
+      {/* hideHeader: Directory renders its own Office-style command card. */}
+      <RvbShell activePage="directory" hideHeader>
         <DirectoryInner />
       </RvbShell>
     </RvbAuthGuard>

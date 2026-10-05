@@ -210,9 +210,16 @@ const translations = {
 export default function RvbShell({
   children,
   activePage,
+  hideHeader = false,
 }: {
   children: React.ReactNode;
   activePage: RvbActivePage;
+  /**
+   * Page-specific header composition: when true the shared CompactHeader is
+   * omitted so the page can render its own command header (e.g. Directory).
+   * Default false — every other RVB page is unaffected.
+   */
+  hideHeader?: boolean;
 }) {
   const router = useRouter();
 
@@ -880,16 +887,18 @@ export default function RvbShell({
         </header>
 
         <div className={dashboardStyles.content}>
-          <CompactHeader
-            title={hero.title}
-            description={hero.description}
-            dark={dark}
-            onToggleTheme={toggleTheme}
-            language={settings.language}
-            settingsHref="/rvb/settings"
-            showUtilities={false}
-            notificationBell={<RvbNotificationBell language={settings.language} dark={dark} />}
-          />
+          {!hideHeader && (
+            <CompactHeader
+              title={hero.title}
+              description={hero.description}
+              dark={dark}
+              onToggleTheme={toggleTheme}
+              language={settings.language}
+              settingsHref="/rvb/settings"
+              showUtilities={false}
+              notificationBell={<RvbNotificationBell language={settings.language} dark={dark} />}
+            />
+          )}
           {children}
         </div>
       </section>

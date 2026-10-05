@@ -6,8 +6,10 @@ import {
   getNotificationIcon,
   getNotificationImportance,
   getNotificationRoute,
+  getNotificationTone,
   getUnreadCount,
   groupNotificationsByDay,
+  isCriticalAlert,
   notifLabel,
   visibleNotifications,
 } from "./src/lib/notification-presentation";
@@ -101,6 +103,20 @@ async function main() {
   eq(notifLabel("important", "ar"), "المهمة", "label ar");
   eq(notifLabel("yesterday", "en"), "Yesterday", "label yesterday");
   eq(notifLabel("review", "fr"), "Examiner", "label review");
+
+  // Red is reserved for true system failures (sync/system critical).
+  // Business-actionable criticals (overdue tasks, out-of-stock) stay amber.
+  assert(isCriticalAlert(notif({ type: "sync", severity: "critical" })), "sync critical is red");
+  assert(isCriticalAlert(notif({ type: "system", severity: "critical" })), "system critical is red");
+  assert(!isCriticalAlert(notif({ type: "task", severity: "critical" })), "task overdue not red");
+  assert(!isCriticalAlert(notif({ type: "inventory", severity: "critical" })), "out-of-stock not red");
+  assert(!isCriticalAlert(notif({ type: "customer_order", severity: "info" })), "order not red");
+  eq(getNotificationTone(notif({ type: "sync", severity: "critical" })), "red", "sync tone red");
+  eq(getNotificationTone(notif({ type: "task", severity: "critical" })), "amber", "overdue tone amber");
+  eq(getNotificationTone(notif({ type: "customer_order", severity: "info" })), "amber", "order tone amber");
+  eq(getNotificationTone(notif({ type: "sale", severity: "success" })), "green", "sale tone green");
+  eq(getNotificationTone(notif({ type: "payment", severity: "success" })), "green", "payment tone green");
+  eq(getNotificationTone(notif({ type: "worker", severity: "info" })), "neutral", "worker tone neutral");
 
   // Relative time sanity.
   eq(formatRelativeTime(Date.now() - 10000, "en"), "Just now", "relative now");

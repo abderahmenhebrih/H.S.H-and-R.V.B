@@ -86,9 +86,25 @@
 
 .topRow {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+/* Full-page variant: roomier row (~72–90px natural height). */
+.itemPage {
+  padding: 12px 14px;
+  gap: 12px;
+  border-color: var(--border);
+  background: var(--panel);
+}
+
+.itemPage:hover {
+  border-color: var(--border-strong);
+}
+
+.itemPage.itemUnread {
+  border-color: var(--border-strong);
 }
 
 .title {
@@ -132,6 +148,28 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Date + CTA share one compact metadata line (no standalone clutter,
+   no floating pills). CTA is a text hint; the row performs the action. */
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.metaRow .detailDate:only-child {
+  margin-inline-start: 0;
+}
+
+.actionHint {
+  margin-inline-start: auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
 .actionRow {
   margin-top: 2px;
 }
@@ -160,15 +198,6 @@
   box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
-.tail {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding-top: 4px;
-}
-
 .unreadDot {
   width: 8px;
   height: 8px;
@@ -178,7 +207,7 @@
 }
 
 .importantMark {
-  display: grid;
+  display: inline-grid;
   place-items: center;
   color: #9a7326;
   flex: 0 0 auto;

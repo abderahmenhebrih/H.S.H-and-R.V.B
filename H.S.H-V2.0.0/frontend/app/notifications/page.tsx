@@ -225,7 +225,10 @@ export default function NotificationsPage() {
   const unreadCount = counts.unread;
 
   return (
-    <AppShell activePage="settings">
+    // No AppShell hero here: this page owns a dedicated Notifications header.
+    // (activePage stays "settings" so sidebar/nav architecture is untouched.)
+    <AppShell activePage="settings" showHeader={false}>
+      <div className={styles.feed}>
       <div className={styles.header}>
         <div>
           <h1>
@@ -305,6 +308,7 @@ export default function NotificationsPage() {
                   notification={n}
                   language={settings.language}
                   showDetailDate
+                  variant="page"
                   onOpen={(item) => void handleMarkRead(item)}
                 />
               ))}
@@ -312,6 +316,7 @@ export default function NotificationsPage() {
           </section>
         ))
       )}
+      </div>
     </AppShell>
   );
 }

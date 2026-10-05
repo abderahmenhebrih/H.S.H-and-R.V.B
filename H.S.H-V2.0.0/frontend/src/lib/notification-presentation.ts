@@ -88,9 +88,19 @@ export function getNotificationIcon(n: Notification): LucideIcon {
   return TYPE_ICONS[n.type] ?? Bell;
 }
 
+/**
+ * True system-failure red: severity critical on sync/system channels only
+ * (sync terminal, system faults). Business-actionable criticals (overdue
+ * tasks, out-of-stock) stay amber — half the feed must not look like an
+ * outage. Single place where "red" is decided.
+ */
+export function isCriticalAlert(n: Notification): boolean {
+  return n.severity === "critical" && (n.type === "sync" || n.type === "system");
+}
+
 /** Severity accent for the icon container (info/neutral, never alarmist). */
 export function getNotificationTone(n: Notification): "neutral" | "amber" | "red" | "green" {
-  if (n.severity === "critical") return "red";
+  if (isCriticalAlert(n)) return "red";
   if (getNotificationImportance(n) === "important") return "amber";
   if (n.severity === "success") return "green";
   return "neutral";

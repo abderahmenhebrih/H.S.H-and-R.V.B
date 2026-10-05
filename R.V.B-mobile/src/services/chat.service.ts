@@ -54,21 +54,35 @@ export async function sendMessage(conversationId: string, content: string, reply
   return res.message;
 }
 
-// Authenticated multipart upload. Sends the local file URI as binary
-// (FormData) — never base64. Returns the trusted attachment record whose id
-// is then referenced in sendMessage (reusable for immediate retry).
-export async function uploadAttachment(
-  conversationId: string,
-  file: { uri: string; mimeType: string; name?: string },
-): Promise<ChatAttachment> {
+// Authenticated multipart upload. Sends file bytes (FormData) — never base64.
+// Platform-aware part construction:
+// - NATIVE (Android/iOS): React Native FormData file object {uri, type, name}.
+// - WEB: browsers stringify plain objects (multer then sees no file), so a
+//   real Blob/File MUST be appended. The screen resolves it from the picker
+//   asset (asset.file when provided, else fetch(asset.uri) -> Blob).
+// Returns the trusted attachment record whose id is then referenced in
+// sendMessage (reusable for immediate retry).
+export type UploadableFile = {
+  uri: string;
+  mimeType: string;
+  name?: string;
+  blob?: Blob | null;
+};
+
+export async function uploadAttachment(conversationId: string, file: UploadableFile): Promise<ChatAttachment> {
   const base = getApiBaseUrl();
   const token = getAccessTokenMemory();
+  const fname = file.name || (file.mimeType.startsWith("video/") ? "video.mp4" : "image.jpg");
   const form = new FormData();
-  form.append("file", {
-    uri: file.uri,
-    type: file.mimeType,
-    name: file.name || (file.mimeType.startsWith("video/") ? "video.mp4" : "image.jpg"),
-  } as any);
+  if (file.blob) {
+    form.append("file", file.blob, fname);
+  } else {
+    form.append("file", {
+      uri: file.uri,
+      type: file.mimeType,
+      name: fname,
+    } as any);
+  }
   const headers: Record<string, string> = { "X-RVB-Client": "native" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   // NOTE: no Content-Type header — fetch sets multipart boundary itself.

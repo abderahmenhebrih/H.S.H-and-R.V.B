@@ -52,7 +52,15 @@
     "unsupportedType": "Type de média non pris en charge",
     "openVideo": "Ouvrir la vidéo",
     "openVideoFailed": "Impossible d'ouvrir la vidéo",
-    "ready": "Prêt"
+    "ready": "Prêt",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "reply": "Répondre",
+    "react": "Réagir",
+    "newMessages": "Nouveaux messages",
+    "photo": "Photo",
+    "video": "Vidéo",
+    "deleted": "Message supprimé"
   },
   "settings": {
     "title": "Paramètres",

@@ -52,7 +52,15 @@
     "unsupportedType": "Unsupported media type",
     "openVideo": "Open video",
     "openVideoFailed": "Could not open video",
-    "ready": "Ready"
+    "ready": "Ready",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "reply": "Reply",
+    "react": "React",
+    "newMessages": "New messages",
+    "photo": "Photo",
+    "video": "Video",
+    "deleted": "Message deleted"
   },
   "settings": {
     "title": "Settings",

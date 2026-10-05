@@ -38,8 +38,9 @@ import {
 import { getSocket } from "@/services/socket";
 import { Loading } from "@/components/common/Loading";
 import { ErrorState } from "@/components/common/ErrorState";
+import { Avatar } from "@/components/common/Avatar";
 import { useLanguage } from "@/i18n";
-import { formatDateTime } from "@/utils/date";
+import { formatDate, type Language } from "@/utils/date";
 
 const PAGE_LIMIT = 30;
 // Production caps mirror the backend (images 8 MB, videos 25 MB). The client
@@ -59,6 +60,11 @@ type PendingAttachment = {
   name: string;
   width?: number | null;
   height?: number | null;
+  // WEB ONLY: browsers stringify plain {uri,type,name} objects (multer then
+  // sees no file part), so the screen resolves a real Blob at pick time
+  // (picker File when provided, else fetch(objectUrl) -> Blob) and the
+  // service appends it. Native keeps the {uri,type,name} file object.
+  blob?: Blob | null;
 };
 
 function msgId(m: any): string {
@@ -86,9 +92,24 @@ function contentLabel(m: any): string {
   return "";
 }
 
+function dayKey(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function formatTime(ms: number | null | undefined, lang: Language): string {
+  if (!ms) return "";
+  try {
+    const locale = lang === "fr" ? "fr-FR" : lang === "ar" ? "ar-DZ" : "en-GB";
+    return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(ms));
+  } catch {
+    return "";
+  }
+}
+
 export default function ChatDetail() {
   const { theme } = useTheme();
-  const { t, isRTL } = useLanguage();
+  const { t, lang, isRTL } = useLanguage();
   const rtl = isRTL;
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -105,8 +126,12 @@ export default function ChatDetail() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [composer, setComposer] = useState("");
+  const [replyTo, setReplyTo] = useState<any | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [menuMsg, setMenuMsg] = useState<any | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [newArrived, setNewArrived] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [typing, setTyping] = useState<string | null>(null);
@@ -119,13 +144,19 @@ export default function ChatDetail() {
   const [reactingId, setReactingId] = useState<string | null>(null);
   const flatRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const nearBottomRef = useRef(true);
+  const newArrivedRef = useRef(false);
+  const initialAnchoredRef = useRef(false);
+  const rowY = useRef(new Map<string, number>());
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (hlTimer.current) clearTimeout(hlTimer.current);
     };
   }, []);
 
@@ -147,6 +178,28 @@ export default function ChatDetail() {
   // list automatically (conversation lives outside Tabs). No custom BackHandler
   // is registered so the two mechanisms cannot fight.
 
+  const scrollToEnd = useCallback((animated = true) => {
+    try {
+      (flatRef.current as any)?.scrollToEnd?.({ animated });
+    } catch {}
+  }, []);
+
+  const scrollToMessage = useCallback(
+    (mid: string) => {
+      const y = rowY.current.get(String(mid));
+      if (typeof y !== "number") return;
+      try {
+        (flatRef.current as any)?.scrollToOffset?.({ offset: Math.max(0, y - 90), animated: true });
+      } catch {}
+      setHighlightId(String(mid));
+      if (hlTimer.current) clearTimeout(hlTimer.current);
+      hlTimer.current = setTimeout(() => {
+        if (mountedRef.current) setHighlightId(null);
+      }, 1400);
+    },
+    [],
+  );
+
   const load = useCallback(async () => {
     setError(null);
     setLoading(true);
@@ -157,6 +210,11 @@ export default function ChatDetail() {
       // Backend listMessages already returns oldest-first; do NOT reverse.
       const msgs = await getMessages(convId, { limit: PAGE_LIMIT });
       if (!mountedRef.current) return;
+      rowY.current.clear();
+      initialAnchoredRef.current = false;
+      nearBottomRef.current = true;
+      newArrivedRef.current = false;
+      setNewArrived(false);
       setMessages(Array.isArray(msgs) ? msgs : []);
       setHasMore((msgs || []).length >= PAGE_LIMIT);
       // Mark the whole conversation read (no upTo = all messages).
@@ -183,6 +241,7 @@ export default function ChatDetail() {
         setHasMore(false);
         return;
       }
+      // maintainVisibleContentPosition on the list preserves visual position.
       setMessages((prev) => mergeMessages(older, prev));
       if (older.length < PAGE_LIMIT) setHasMore(false);
     } catch (e: any) {
@@ -206,7 +265,14 @@ export default function ChatDetail() {
       setMessages((prev) => mergeMessages(prev, [p.message]));
       // The open conversation must not remain unread.
       markRead(convId).catch(() => {});
-      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 120);
+      const mine = senderOf(p.message) === myId;
+      if (mine || nearBottomRef.current) {
+        setTimeout(() => scrollToEnd(true), 120);
+      } else if (!newArrivedRef.current) {
+        // Reading older history: never yank scroll; offer a chip instead.
+        newArrivedRef.current = true;
+        setNewArrived(true);
+      }
     };
     const onEdited = (p: any) => {
       if (!p?.message) return;
@@ -263,7 +329,7 @@ export default function ChatDetail() {
         s.emit("chat:leave", { conversationId: convId });
       } catch {}
     };
-  }, [convId, myId]);
+  }, [convId, myId, scrollToEnd]);
 
   const pickAttachment = useCallback(async () => {
     if (picking || sending || uploading) return;
@@ -285,6 +351,41 @@ export default function ChatDetail() {
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0] as any;
       const isVideo = asset.type === "video" || String(asset.mimeType || "").startsWith("video/");
+      const onWeb = Platform.OS === "web";
+      if (onWeb) {
+        // WEB: resolve a real Blob now (never a plain object in FormData).
+        // Prefer the picker-provided File; else fetch the object/blob URL.
+        // Original bytes are uploaded (no manipulator pass on web); the
+        // backend caps + magic-byte sniffing remain authoritative.
+        let blob: Blob | null = null;
+        const maybeFile = asset.file;
+        if (typeof Blob !== "undefined" && maybeFile instanceof Blob) {
+          blob = maybeFile;
+        } else {
+          const fetched = await fetch(asset.uri);
+          blob = await fetched.blob();
+        }
+        const kind: "image" | "video" = isVideo ? "video" : "image";
+        const mimeType = String(blob.type || asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg")).split(";")[0].trim().toLowerCase();
+        const cap = isVideo ? CLIENT_VIDEO_MAX_BYTES : CLIENT_IMAGE_MAX_BYTES;
+        if (blob.size <= 0 || blob.size > cap) {
+          setAttachError(t("conversation.mediaTooLarge", "Media too large (images 8 MB, videos 25 MB max)"));
+          return;
+        }
+        const webName =
+          asset.fileName || (maybeFile && typeof maybeFile.name === "string" && maybeFile.name) || (isVideo ? "video.mp4" : "image.jpg");
+        setAttachment({
+          kind,
+          localUri: asset.uri,
+          mimeType,
+          name: webName,
+          width: asset.width ?? null,
+          height: asset.height ?? null,
+          blob,
+        });
+        setUploaded(null);
+        return;
+      }
       if (isVideo) {
         // Video binary uploads via multipart at send time — never read into
         // JS memory as base64. Oversized clips fail fast here AND server-side.
@@ -352,27 +453,31 @@ export default function ChatDetail() {
             uri: attachment.localUri,
             mimeType: attachment.mimeType,
             name: attachment.name,
+            blob: attachment.blob ?? null,
           });
           if (mountedRef.current) setUploaded(record);
         } finally {
           if (mountedRef.current) setUploading(false);
         }
       }
-      const msg = await sendMessage(convId, text, null, record ? [record.id] : undefined);
+      const msg = await sendMessage(convId, text, replyTo ? msgId(replyTo) : null, record ? [record.id] : undefined);
       // Upsert (not blind append): safe even if the socket echo arrived first.
       setMessages((prev) => mergeMessages(prev, [msg]));
       setComposer("");
       setAttachment(null);
       setUploaded(null);
+      setReplyTo(null);
       setAttachError(null);
-      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
+      newArrivedRef.current = false;
+      setNewArrived(false);
+      setTimeout(() => scrollToEnd(true), 80);
     } catch (e: any) {
       // Keep composer + staged/uploaded attachment so nothing is silently discarded.
       setSendError(e?.message || "Send failed");
     } finally {
       setSending(false);
     }
-  }, [composer, attachment, uploaded, sending, picking, uploading, convId, t]);
+  }, [composer, attachment, uploaded, replyTo, sending, picking, uploading, convId, t, scrollToEnd]);
 
   const handleEdit = async (m: any) => {
     if (!editText.trim()) {
@@ -395,7 +500,7 @@ export default function ChatDetail() {
   };
 
   const handleDelete = async (m: any) => {
-    Alert.alert("Delete message", "Delete this message?", [
+    Alert.alert(t("conversation.delete", "Delete") + "?", contentLabel(m).slice(0, 60) || "…", [
       { text: t("conversation.cancel", "Cancel"), style: "cancel" },
       {
         text: t("conversation.delete", "Delete"),
@@ -416,7 +521,7 @@ export default function ChatDetail() {
 
   const handleReaction = async (m: any) => {
     const mid = msgId(m);
-    if (reactingId) return; // serialize toggles: backend read-modify-write races otherwise
+    if (reactingId) return; // serialize toggles: backend atomic, client stays calm
     setReactingId(mid);
     try {
       const updated = await toggleReaction(mid);
@@ -463,11 +568,50 @@ export default function ChatDetail() {
     return `${count} ${unit}${pinned ? ` • ${pinned}/3 ${t("conversation.pinned", "Pinned").toLowerCase()}` : ""}`;
   }, [conv, t]);
 
+  const activeParticipants = useMemo(
+    () => (conv?.participants || []).filter((p: any) => !p?.leftAt),
+    [conv],
+  );
+  const isGroup = useMemo(
+    () => conv?.type === "group" || activeParticipants.length > 2,
+    [conv, activeParticipants],
+  );
+  const senderInfo = useCallback(
+    (accountId: string | undefined) => {
+      const p = (conv?.participants || []).find((x: any) => x?.accountId === accountId);
+      const acc = p?.account || {};
+      return {
+        name: acc.displayName || acc.tag || "…",
+        tag: acc.tag || "",
+        picture: acc.profilePicture || null,
+      };
+    },
+    [conv],
+  );
+
+  const dayLabel = useCallback(
+    (ms: number) => {
+      const now = new Date();
+      const d = new Date(ms);
+      const sameDay = (a: Date, b: Date) =>
+        a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+      if (sameDay(d, now)) return t("conversation.today", "Today");
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      if (sameDay(d, y)) return t("conversation.yesterday", "Yesterday");
+      return formatDate(ms, lang);
+    },
+    [lang, t],
+  );
+
+  const closeMenu = useCallback(() => setMenuMsg(null), []);
+
   if (loading) return <Loading message="Loading conversation..." />;
   if (error) return <ErrorState title="Could not load chat" message={error} onRetry={load} />;
 
   const pinned = conv?.pinnedMessages || [];
   const byId = new Map(messages.map((m) => [msgId(m), m]));
+  const menuIsPinned = menuMsg ? pinned.some((p: any) => p.messageId === msgId(menuMsg)) : false;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]} edges={["top", "bottom"]}>
@@ -476,7 +620,8 @@ export default function ChatDetail() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
-        <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
+        {/* Compact dedicated header: Back + name + members. Preserved. */}
+        <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
           <Pressable
             onPress={handleBack}
             accessibilityRole="button"
@@ -504,14 +649,12 @@ export default function ChatDetail() {
             {pinned.map((p: any) => {
               const msg = byId.get(String(p.messageId));
               return (
-                <View key={String(p.messageId)} style={styles.pinnedRow}>
+                <Pressable key={String(p.messageId)} style={styles.pinnedRow} onPress={() => scrollToMessage(String(p.messageId))}>
                   <Text style={[styles.pinnedText, { color: theme.colors.text }]} numberOfLines={1}>
                     {msg ? contentLabel(msg) || String(p.messageId) : String(p.messageId)}
                   </Text>
-                  <Pressable onPress={() => handlePin({ id: p.messageId })}>
-                    <Text style={{ color: theme.colors.primary, fontWeight: "700", fontSize: 11 }}>{t("conversation.unpin", "Unpin")}</Text>
-                  </Pressable>
-                </View>
+                  <Ionicons name="pin" size={12} color={theme.colors.warning} />
+                </Pressable>
               );
             })}
           </View>
@@ -525,6 +668,26 @@ export default function ChatDetail() {
             style={styles.flex}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
+            initialNumToRender={25}
+            scrollEventThrottle={16}
+            // Older-page prepends keep visual position (no yank while reading).
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            onScroll={(e) => {
+              const { contentSize, layoutMeasurement, contentOffset } = e.nativeEvent;
+              const dist = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+              nearBottomRef.current = dist < 120;
+              if (nearBottomRef.current && newArrivedRef.current) {
+                newArrivedRef.current = false;
+                setNewArrived(false);
+              }
+            }}
+            onContentSizeChange={() => {
+              // First paint anchors near the newest message.
+              if (!initialAnchoredRef.current && messages.length > 0) {
+                initialAnchoredRef.current = true;
+                setTimeout(() => scrollToEnd(false), 50);
+              }
+            }}
             ListHeaderComponent={
               hasMore && messages.length > 0 ? (
                 <Pressable onPress={loadOlder} disabled={loadingOlder} style={[styles.loadOlder, { borderColor: theme.colors.border }]}>
@@ -536,168 +699,259 @@ export default function ChatDetail() {
                 </Pressable>
               ) : null
             }
-            onContentSizeChange={() => {
-              // Only auto-anchor on first paint; live arrivals scroll explicitly.
-            }}
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const own = senderOf(item) === myId;
               const isDeleted = !!(item.isDeleted || item.deletedAt);
               const edited = item.editedAt && !isDeleted;
               const atts: any[] = Array.isArray(item.attachments) ? item.attachments : [];
               const replyOrig = item.replyToMessageId ? byId.get(String(item.replyToMessageId)) : null;
               const readByOthers = Array.isArray(item.readBy) && item.readBy.some((r: any) => r?.accountId && r.accountId !== myId);
+              const isPinned = pinned.some((p: any) => p.messageId === msgId(item));
+              const highlighted = highlightId === msgId(item);
+              // Sender-run grouping (consecutive same-sender, same day).
+              const prev = index > 0 ? messages[index - 1] : null;
+              const next = index < messages.length - 1 ? messages[index + 1] : null;
+              const sameAsPrev = !!prev && senderOf(prev) === senderOf(item) && dayKey(prev.createdAt || 0) === dayKey(item.createdAt || 0) && !prev.isDeleted;
+              const sameAsNext = !!next && senderOf(next) === senderOf(item) && dayKey(next.createdAt || 0) === dayKey(item.createdAt || 0) && !item.isDeleted;
+              const firstOfRun = !sameAsPrev;
+              const lastOfRun = !sameAsNext;
+              const info = senderInfo(senderOf(item));
+              const showName = !own && isGroup && firstOfRun;
+              const showDay = index === 0 || dayKey(messages[index - 1]?.createdAt || 0) !== dayKey(item.createdAt || 0);
+              const reactionCount = Array.isArray(item.reactions) ? item.reactions.length : 0;
+              // NOTE: row direction is ALWAYS conversation-semantic (own right,
+              // incoming left) — never row-reversed for RTL. Only text aligns.
               return (
-                <View style={[styles.bubbleWrap, own ? styles.ownWrap : styles.otherWrap, rtl && { flexDirection: "row-reverse" }]}>
-                  <View
-                    style={[
-                      styles.bubble,
-                      {
-                        backgroundColor: own ? theme.colors.primary : theme.colors.surface,
-                        borderColor: theme.colors.border,
-                      },
-                      isDeleted && { opacity: 0.6 },
-                    ]}
-                  >
-                    {item.replyToMessageId ? (
-                      <Text style={[styles.reply, { color: own ? "#FCF6EF" : theme.colors.textSecondary }]} numberOfLines={2}>
-                        ↳ {replyOrig ? contentLabel(replyOrig).slice(0, 60) : String(item.replyToMessageId).slice(0, 40)}
+                <View>
+                  {showDay ? (
+                    <View style={styles.daySep}>
+                      <Text style={[styles.daySepText, { color: theme.colors.textSecondary, backgroundColor: theme.colors.surfaceHover }]}>
+                        {dayLabel(item.createdAt || 0)}
                       </Text>
+                    </View>
+                  ) : null}
+                  <View
+                    onLayout={(e) => rowY.current.set(msgId(item), e.nativeEvent.layout.y)}
+                    style={[styles.row, own ? styles.rowOwn : styles.rowIncoming, !firstOfRun && styles.rowGrouped]}
+                  >
+                    {!own ? (
+                      lastOfRun ? (
+                        <View style={styles.avatarSlot}>
+                          <Avatar uri={info.picture} name={info.name} size={28} />
+                        </View>
+                      ) : (
+                        <View style={styles.avatarSlot} />
+                      )
                     ) : null}
-                    {atts.map((a, idx) => {
-                      // URL-based attachments only. Anything without an http(s)
-                      // url (e.g. legacy inline payloads) is skipped, never
-                      // rendered as binary.
-                      const url = typeof a?.url === "string" && /^https?:\/\//i.test(a.url) ? a.url : null;
-                      if (!url) return null;
-                      if (a?.kind === "image") {
-                        const aw = Number(a.width) || 4;
-                        const ah = Number(a.height) || 3;
-                        const ratio = Math.min(Math.max(ah / aw, 0.4), 1.4);
-                        return (
-                          <Pressable key={idx} onPress={() => setPreviewImg(url)} accessibilityLabel={t("conversation.openPreview", "Open preview")}>
-                            <Image
-                              source={{ uri: url }}
-                              style={[styles.attachmentImage, { aspectRatio: aw / ah > 0 ? aw / ah : 4 / 3, minHeight: 120 * ratio + 60 }]}
-                              resizeMode="cover"
-                            />
-                          </Pressable>
-                        );
-                      }
-                      if (a?.kind === "video") {
-                        // No native video player installed (expo-video would
-                        // force a dev-client rebuild): system/browser playback
-                        // via Linking. Reported as a known limitation.
-                        return (
+                    <View style={[styles.bubbleCol, own ? styles.bubbleColOwn : styles.bubbleColIncoming]}>
+                      {showName ? (
+                        <Text style={[styles.senderName, { color: theme.colors.primary }]} numberOfLines={1}>
+                          {info.name}
+                          {info.tag ? `  @${info.tag}` : ""}
+                        </Text>
+                      ) : null}
+                      <View style={styles.bubbleRow}>
+                        {own ? (
                           <Pressable
-                            key={idx}
-                            onPress={() => {
-                              Linking.openURL(url).catch(() =>
-                                Alert.alert(
-                                  t("conversation.videoAttachment", "Video attachment"),
-                                  t("conversation.openVideoFailed", "Could not open video"),
-                                ),
+                            onPress={() => setMenuMsg(item)}
+                            hitSlop={10}
+                            accessibilityLabel={t("conversation.reply", "Reply")}
+                            style={styles.gutterBtn}
+                          >
+                            <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.textTertiary} style={{ opacity: 0.6 }} />
+                          </Pressable>
+                        ) : null}
+                        <Pressable
+                          onLongPress={() => setMenuMsg(item)}
+                          delayLongPress={350}
+                          style={[
+                            styles.bubble,
+                            own ? styles.bubbleOwn : styles.bubbleIncoming,
+                            {
+                              backgroundColor: isDeleted ? theme.colors.surfaceHover : own ? theme.colors.primary : theme.colors.surface,
+                            },
+                            highlighted && { borderWidth: 2, borderColor: theme.colors.warning },
+                          ]}
+                        >
+                          {item.replyToMessageId && !isDeleted ? (
+                            <Pressable
+                              onPress={() => scrollToMessage(String(item.replyToMessageId))}
+                              style={[styles.quote, { borderLeftColor: own ? "#FCF6EF" : theme.colors.primary }]}
+                            >
+                              <Text style={[styles.quoteName, { color: own ? "#FCF6EF" : theme.colors.primary }]} numberOfLines={1}>
+                                {replyOrig ? senderInfo(senderOf(replyOrig)).name : "…"}
+                              </Text>
+                              <Text style={[styles.quoteText, { color: own ? "rgba(252,246,239,0.85)" : theme.colors.textSecondary }]} numberOfLines={2}>
+                                {replyOrig ? contentLabel(replyOrig).slice(0, 80) : "…"}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {atts.map((a, idx) => {
+                            // URL-based attachments only. Anything without an
+                            // http(s) url is skipped, never rendered as binary.
+                            const url = typeof a?.url === "string" && /^https?:\/\//i.test(a.url) ? a.url : null;
+                            if (!url) return null;
+                            if (a?.kind === "image") {
+                              const aw = Number(a.width) || 4;
+                              const ah = Number(a.height) || 3;
+                              return (
+                                <Pressable key={idx} onPress={() => setPreviewImg(url)} accessibilityLabel={t("conversation.openPreview", "Open preview")}>
+                                  <Image
+                                    source={{ uri: url }}
+                                    style={[styles.attachmentImage, { aspectRatio: aw / ah > 0 ? aw / ah : 4 / 3 }]}
+                                    resizeMode="cover"
+                                  />
+                                </Pressable>
                               );
-                            }}
-                            style={[styles.videoBox, { borderColor: own ? "rgba(252,246,239,0.5)" : theme.colors.border }]}
-                          >
-                            <Ionicons name="play-circle" size={30} color={own ? "#FCF6EF" : theme.colors.primary} />
-                            <Text style={[styles.videoText, { color: own ? "#FCF6EF" : theme.colors.text }]}>
-                              {t("conversation.openVideo", "Open video")}
-                              {a?.size ? ` • ${Math.max(1, Math.round(Number(a.size) / 1024))} KB` : ""}
+                            }
+                            if (a?.kind === "video") {
+                              // No native video player installed (expo-video
+                              // would force a dev-client rebuild):
+                              // system/browser playback via Linking.
+                              return (
+                                <Pressable
+                                  key={idx}
+                                  onPress={() => {
+                                    Linking.openURL(url).catch(() =>
+                                      Alert.alert(
+                                        t("conversation.videoAttachment", "Video attachment"),
+                                        t("conversation.openVideoFailed", "Could not open video"),
+                                      ),
+                                    );
+                                  }}
+                                  style={[styles.videoBox, { backgroundColor: own ? "rgba(0,0,0,0.18)" : theme.colors.surfaceHover }]}
+                                >
+                                  <Ionicons name="play-circle" size={30} color={own ? "#FCF6EF" : theme.colors.primary} />
+                                  <Text style={[styles.videoText, { color: own ? "#FCF6EF" : theme.colors.text }]} numberOfLines={1}>
+                                    {t("conversation.openVideo", "Open video")}
+                                  </Text>
+                                </Pressable>
+                              );
+                            }
+                            return null;
+                          })}
+                          {editingId === msgId(item) ? (
+                            <View>
+                              <TextInput
+                                value={editText}
+                                onChangeText={setEditText}
+                                style={[styles.editInput, { borderColor: own ? "rgba(252,246,239,0.5)" : theme.colors.border, color: own ? "#FCF6EF" : theme.colors.text }]}
+                                multiline
+                              />
+                              <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
+                                <Pressable onPress={() => handleEdit(item)} style={[styles.smallBtn, { backgroundColor: theme.colors.success }]}>
+                                  <Text style={styles.smallBtnText}>{t("conversation.save", "Save")}</Text>
+                                </Pressable>
+                                <Pressable
+                                  onPress={() => setEditingId(null)}
+                                  style={[styles.smallBtn, { backgroundColor: theme.colors.surfaceHover, borderColor: theme.colors.border }]}
+                                >
+                                  <Text style={[styles.smallBtnText, { color: theme.colors.text }]}>{t("conversation.cancel", "Cancel")}</Text>
+                                </Pressable>
+                              </View>
+                            </View>
+                          ) : item.content ? (
+                            <Text style={[styles.content, { color: own ? "#FCF6EF" : theme.colors.text, textAlign: rtl ? "right" : "left" }]}>
+                              {item.content}
                             </Text>
-                          </Pressable>
-                        );
-                      }
-                      return null;
-                    })}
-                    {editingId === msgId(item) ? (
-                      <View>
-                        <TextInput
-                          value={editText}
-                          onChangeText={setEditText}
-                          style={[styles.editInput, { borderColor: theme.colors.border, color: own ? "#FCF6EF" : theme.colors.text }]}
-                          multiline
-                        />
-                        <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
-                          <Pressable onPress={() => handleEdit(item)} style={[styles.smallBtn, { backgroundColor: theme.colors.success }]}>
-                            <Text style={styles.smallBtnText}>{t("conversation.save", "Save")}</Text>
-                          </Pressable>
+                          ) : !isDeleted && atts.length === 0 ? (
+                            <Text style={[styles.content, { color: own ? "#FCF6EF" : theme.colors.textSecondary }]}>
+                              {contentLabel(item) || "…"}
+                            </Text>
+                          ) : null}
+                          {isDeleted ? (
+                            <Text style={[styles.content, { color: theme.colors.textTertiary, fontStyle: "italic" }]}>
+                              {t("conversation.deleted", "Message deleted") as string}
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                        {!own ? (
                           <Pressable
-                            onPress={() => setEditingId(null)}
-                            style={[styles.smallBtn, { backgroundColor: theme.colors.surfaceHover, borderColor: theme.colors.border }]}
+                            onPress={() => setMenuMsg(item)}
+                            hitSlop={10}
+                            accessibilityLabel={t("conversation.reply", "Reply")}
+                            style={styles.gutterBtn}
                           >
-                            <Text style={[styles.smallBtnText, { color: theme.colors.text }]}>{t("conversation.cancel", "Cancel")}</Text>
+                            <Ionicons name="ellipsis-horizontal" size={16} color={theme.colors.textTertiary} style={{ opacity: 0.6 }} />
                           </Pressable>
+                        ) : null}
+                      </View>
+                    </View>
+                    {reactionCount > 0 ? (
+                      <View style={[styles.chipRow, own ? styles.chipRowOwn : styles.chipRowIncoming]}>
+                        {!own ? <View style={styles.avatarSlot} /> : null}
+                        <View style={[styles.chip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                          <Text style={styles.chipText}>
+                            🤝 {reactionCount}
+                            {reactingId === msgId(item) ? "…" : ""}
+                          </Text>
                         </View>
                       </View>
-                    ) : item.content ? (
-                      <Text style={[styles.content, { color: own ? "#FCF6EF" : theme.colors.text }]}>{item.content}</Text>
                     ) : null}
-                    <View style={{ flexDirection: "row", gap: 6, marginTop: 4, alignItems: "center" }}>
-                      <Text style={[styles.meta, { color: own ? "rgba(252,246,239,0.8)" : theme.colors.textTertiary }]}>
-                        {formatDateTime(item.createdAt, "en")}
-                        {edited ? ` • ${t("conversation.edited", "edited")}` : ""}
-                      </Text>
-                      {own && readByOthers ? <Text style={{ color: own ? "#FCF6EF" : theme.colors.success, fontSize: 10 }}>✓✓</Text> : null}
-                    </View>
-                    <View style={{ flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                      {!isDeleted ? (
-                        <>
-                          <Pressable onPress={() => handleReaction(item)} disabled={reactingId === msgId(item)} style={styles.action}>
-                            <Text style={{ fontSize: 12 }}>
-                              🤝 {item.reactions?.length || 0}
-                              {reactingId === msgId(item) ? "…" : ""}
-                            </Text>
-                          </Pressable>
-                          <Pressable onPress={() => handlePin(item)} style={styles.action}>
-                            <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: "600" }}>
-                              {conv?.pinnedMessages?.some((p: any) => p.messageId === msgId(item)) ? t("conversation.unpin", "Unpin") : t("conversation.pin", "Pin")}
-                            </Text>
-                          </Pressable>
-                          {canEdit(item) ? (
-                            <Pressable
-                              onPress={() => {
-                                setEditingId(msgId(item));
-                                setEditText(item.content || "");
-                              }}
-                              style={styles.action}
-                            >
-                              <Text style={{ color: theme.colors.primary, fontSize: 11 }}>{t("conversation.edit", "Edit")}</Text>
-                            </Pressable>
-                          ) : null}
-                          {(own || account?.role === "admin") ? (
-                            <Pressable onPress={() => handleDelete(item)} style={styles.action}>
-                              <Text style={{ color: theme.colors.error, fontSize: 11 }}>{t("conversation.delete", "Delete")}</Text>
-                            </Pressable>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </View>
+                    {!isDeleted ? (
+                      <View style={[styles.metaRow, own ? styles.metaRowOwn : styles.metaRowIncoming]}>
+                        {!own ? <View style={styles.avatarSlot} /> : null}
+                        <Text style={[styles.meta, { color: theme.colors.textTertiary }]}>
+                          {formatTime(item.createdAt, lang)}
+                          {edited ? ` · ${t("conversation.edited", "edited")}` : ""}
+                          {isPinned ? "  📌" : ""}
+                          {own ? (readByOthers ? "  ✓✓" : "  ✓") : ""}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               );
             }}
           />
+          {newArrived ? (
+            <Pressable
+              onPress={() => {
+                newArrivedRef.current = false;
+                setNewArrived(false);
+                scrollToEnd(true);
+              }}
+              style={[styles.newChip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            >
+              <Text style={[styles.newChipText, { color: theme.colors.primary }]}>↓ {t("conversation.newMessages", "New messages")}</Text>
+            </Pressable>
+          ) : null}
           {typing ? (
-            <View style={[styles.typing, { backgroundColor: theme.colors.surfaceHover }]}>
+            <View style={styles.typing}>
               <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>
                 {typing} {t("conversation.typing", "typing...")}
               </Text>
             </View>
           ) : null}
+          {replyTo ? (
+            <View style={[styles.replyStrip, { backgroundColor: theme.colors.surfaceHover }]}>
+              <View style={[styles.replyStripBar, { backgroundColor: theme.colors.primary }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.replyStripName, { color: theme.colors.primary }]} numberOfLines={1}>
+                  {senderInfo(senderOf(replyTo)).name}
+                </Text>
+                <Text style={[styles.replyStripText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                  {contentLabel(replyTo).slice(0, 80)}
+                </Text>
+              </View>
+              <Pressable onPress={() => setReplyTo(null)} hitSlop={8} accessibilityLabel={t("conversation.cancel", "Cancel")}>
+                <Ionicons name="close" size={16} color={theme.colors.textSecondary} />
+              </Pressable>
+            </View>
+          ) : null}
           {attachment ? (
-            <View style={[styles.previewBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.previewBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
               {attachment.kind === "image" ? (
                 <Image source={{ uri: attachment.localUri }} style={styles.previewThumb} />
               ) : (
                 <View style={[styles.previewThumb, styles.previewVideo, { borderColor: theme.colors.border }]}>
-                  <Ionicons name="videocam" size={20} color={theme.colors.primary} />
+                  <Ionicons name="videocam" size={18} color={theme.colors.primary} />
                 </View>
               )}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.previewLabel, { color: theme.colors.text }]} numberOfLines={1}>
-                  {attachment.kind === "image" ? t("conversation.imageAttachment", "Image attachment") : t("conversation.videoAttachment", "Video attachment")}
-                  {uploaded ? ` • ${t("conversation.ready", "Ready")}` : uploading ? ` • ${t("conversation.uploading", "Uploading…")}` : ""}
+                  {attachment.name}
+                  {uploaded ? ` · ${t("conversation.ready", "Ready")}` : uploading ? ` · ${t("conversation.uploading", "Uploading…")}` : ""}
                 </Text>
                 {attachError ? <Text style={[styles.previewError, { color: theme.colors.error }]}>{attachError}</Text> : null}
               </View>
@@ -710,7 +964,7 @@ export default function ChatDetail() {
                 accessibilityLabel={t("conversation.removeAttachment", "Remove attachment")}
                 style={[styles.previewRemove, { borderColor: theme.colors.border }]}
               >
-                <Ionicons name="close" size={16} color={theme.colors.text} />
+                <Ionicons name="close" size={15} color={theme.colors.text} />
               </Pressable>
             </View>
           ) : null}
@@ -724,13 +978,13 @@ export default function ChatDetail() {
               <Text style={[styles.inlineErrorText, { color: theme.colors.error }]}>{sendError}</Text>
             </View>
           ) : null}
-          <View style={[styles.composer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }, rtl && { flexDirection: "row-reverse" }]}>
+          <View style={[styles.composer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
             <Pressable
               onPress={pickAttachment}
               disabled={picking || sending || uploading}
               accessibilityRole="button"
               accessibilityLabel={t("conversation.attach", "Attach photo or video")}
-              style={[styles.attachBtn, { borderColor: theme.colors.border, opacity: picking || sending || uploading ? 0.5 : 1 }]}
+              style={[styles.attachBtn, { opacity: picking || sending || uploading ? 0.5 : 1 }]}
             >
               {picking ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Ionicons name="add" size={22} color={theme.colors.primary} />}
             </Pressable>
@@ -747,7 +1001,9 @@ export default function ChatDetail() {
                   } catch {}
                 }
               }}
-              onFocus={() => setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 250)}
+              onFocus={() => {
+                if (nearBottomRef.current) setTimeout(() => scrollToEnd(true), 250);
+              }}
               placeholder={t("conversation.messagePlaceholder", "Message… @tag supported")}
               style={[styles.input, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.inputBorder, color: theme.colors.text }, rtl && { textAlign: "right" }]}
               placeholderTextColor={theme.colors.textTertiary}
@@ -757,15 +1013,102 @@ export default function ChatDetail() {
             <Pressable
               testID="chat-send-button"
               accessibilityRole="button"
+              accessibilityLabel={t("conversation.send", "Send")}
               onPress={handleSend}
               disabled={sending || picking || uploading || (!composer.trim() && !attachment && !uploaded)}
               style={[styles.sendBtn, { backgroundColor: composer.trim() || attachment || uploaded ? theme.colors.primary : theme.colors.border }]}
             >
-              {sending || uploading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{t("conversation.send", "Send")}</Text>}
+              {sending || uploading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Ionicons name="send" size={17} color="#fff" style={rtl && { transform: [{ scaleX: -1 }] } as any} />
+              )}
             </Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Contextual message menu: long-press / ellipsis. Only permitted actions. */}
+      <Modal visible={!!menuMsg} transparent animationType="fade" onRequestClose={closeMenu}>
+        <Pressable style={styles.sheetBackdrop} onPress={closeMenu}>
+          <View style={[styles.sheet, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.sheetPreview, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+              {menuMsg ? contentLabel(menuMsg).slice(0, 100) : ""}
+            </Text>
+            {menuMsg && !menuMsg.isDeleted && !menuMsg.deletedAt ? (
+              <>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    const m = menuMsg;
+                    closeMenu();
+                    setReplyTo(m);
+                  }}
+                >
+                  <Ionicons name="arrow-undo" size={18} color={theme.colors.text} />
+                  <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>{t("conversation.reply", "Reply")}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    const m = menuMsg;
+                    closeMenu();
+                    if (m) void handleReaction(m);
+                  }}
+                >
+                  <Text style={{ fontSize: 18 }}>🤝</Text>
+                  <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>{t("conversation.react", "React")}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    const m = menuMsg;
+                    closeMenu();
+                    if (m) void handlePin(m);
+                  }}
+                >
+                  <Ionicons name="pin" size={18} color={theme.colors.text} />
+                  <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>
+                    {menuIsPinned ? t("conversation.unpin", "Unpin") : t("conversation.pin", "Pin")}
+                  </Text>
+                </Pressable>
+                {menuMsg && canEdit(menuMsg) ? (
+                  <Pressable
+                    style={styles.sheetRow}
+                    onPress={() => {
+                      const m = menuMsg;
+                      closeMenu();
+                      setEditingId(msgId(m));
+                      setEditText(m.content || "");
+                    }}
+                  >
+                    <Ionicons name="pencil" size={18} color={theme.colors.text} />
+                    <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>{t("conversation.edit", "Edit")}</Text>
+                  </Pressable>
+                ) : null}
+                {menuMsg && (senderOf(menuMsg) === myId || account?.role === "admin") ? (
+                  <Pressable
+                    style={styles.sheetRow}
+                    onPress={() => {
+                      const m = menuMsg;
+                      closeMenu();
+                      if (m) void handleDelete(m);
+                    }}
+                  >
+                    <Ionicons name="trash" size={18} color={theme.colors.error} />
+                    <Text style={[styles.sheetLabel, { color: theme.colors.error }]}>{t("conversation.delete", "Delete")}</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
+            <Pressable style={[styles.sheetRow, styles.sheetCancel]} onPress={closeMenu}>
+              <Text style={[styles.sheetLabel, { color: theme.colors.textSecondary, textAlign: "center", flex: 1 }]}>
+                {t("conversation.cancel", "Cancel")}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       <Modal visible={!!previewImg} transparent animationType="fade" onRequestClose={() => setPreviewImg(null)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setPreviewImg(null)}>
@@ -784,54 +1127,93 @@ export default function ChatDetail() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
+  // Compact dedicated header (Back + name + members). Preserved.
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderBottomWidth: 1,
     gap: 8,
+    minHeight: 52,
   },
-  backBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  backBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerText: { flex: 1 },
   title: { fontSize: 16, fontWeight: "800" },
-  subtitle: { fontSize: 11, marginTop: 2 },
-  pinnedSection: { margin: 8, borderRadius: 8, padding: 10, borderWidth: 1 },
-  pinnedTitle: { fontWeight: "700", fontSize: 11, marginBottom: 4 },
-  pinnedRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
+  subtitle: { fontSize: 11, marginTop: 1 },
+  pinnedSection: { marginHorizontal: 10, marginTop: 8, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1 },
+  pinnedTitle: { fontWeight: "700", fontSize: 11, marginBottom: 2 },
+  pinnedRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, paddingVertical: 3 },
   pinnedText: { fontSize: 12, flex: 1 },
   column: { flex: 1, width: "100%", alignSelf: "center" },
-  columnWide: { maxWidth: 760 },
-  listContent: { padding: 12, paddingBottom: 12, flexGrow: 1 },
-  loadOlder: { alignSelf: "center", borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 10 },
+  columnWide: { maxWidth: 840 },
+  listContent: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 10, flexGrow: 1 },
+  loadOlder: { alignSelf: "center", borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, marginVertical: 8 },
   loadOlderText: { fontSize: 12, fontWeight: "700" },
-  bubbleWrap: { flexDirection: "row", marginTop: 8 },
-  ownWrap: { justifyContent: "flex-end" },
-  otherWrap: { justifyContent: "flex-start" },
-  bubble: { maxWidth: "78%", minWidth: 64, borderRadius: 12, padding: 10, borderWidth: 1 },
-  content: { fontSize: 13, lineHeight: 18 },
-  reply: { fontSize: 11, fontStyle: "italic", marginBottom: 4 },
-  meta: { fontSize: 10, marginTop: 4 },
-  action: { paddingHorizontal: 6, paddingVertical: 2 },
-  attachmentImage: { width: 220, maxWidth: "100%", borderRadius: 8, marginBottom: 6, backgroundColor: "#00000010" },
-  videoBox: { width: 220, maxWidth: "100%", borderRadius: 8, marginBottom: 6, padding: 14, borderWidth: 1, alignItems: "center", gap: 6 },
+  daySep: { alignItems: "center", marginVertical: 10 },
+  daySepText: { fontSize: 11, fontWeight: "600", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, overflow: "hidden" },
+  // Message rows: compact vertical flow, semantic alignment (own right,
+  // incoming left) on ALL languages — never row-reversed for RTL.
+  row: { flexDirection: "row", alignItems: "flex-end", marginTop: 2 },
+  rowGrouped: { marginTop: 1 },
+  rowOwn: { justifyContent: "flex-end" },
+  rowIncoming: { justifyContent: "flex-start" },
+  avatarSlot: { width: 28, marginRight: 6, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
+  bubbleCol: { flexShrink: 1, maxWidth: "80%" },
+  bubbleColOwn: { alignItems: "flex-end" },
+  bubbleColIncoming: { alignItems: "flex-start" },
+  senderName: { fontSize: 11, fontWeight: "700", marginBottom: 2, marginLeft: 34 },
+  bubbleRow: { flexDirection: "row", alignItems: "flex-end" },
+  bubble: { borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, flexShrink: 1 },
+  bubbleOwn: {},
+  bubbleIncoming: { borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" },
+  gutterBtn: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
+  content: { fontSize: 14, lineHeight: 19 },
+  quote: { borderLeftWidth: 3, borderRadius: 4, paddingLeft: 8, paddingVertical: 4, marginBottom: 6, backgroundColor: "rgba(0,0,0,0.08)" },
+  quoteName: { fontSize: 11, fontWeight: "800" },
+  quoteText: { fontSize: 12, marginTop: 1 },
+  attachmentImage: { width: 220, maxWidth: "100%", borderRadius: 12, marginBottom: 4, backgroundColor: "#00000010" },
+  videoBox: { width: 220, maxWidth: "100%", borderRadius: 12, marginBottom: 4, paddingVertical: 16, paddingHorizontal: 12, alignItems: "center", gap: 4 },
   videoText: { fontSize: 11, fontWeight: "600", textAlign: "center" },
-  typing: { padding: 6, alignItems: "center" },
-  previewBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1 },
-  previewThumb: { width: 48, height: 48, borderRadius: 8 },
+  chipRow: { flexDirection: "row", marginTop: -8 },
+  chipRowOwn: { justifyContent: "flex-end" },
+  chipRowIncoming: { justifyContent: "flex-start" },
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
+  chipText: { fontSize: 11, fontWeight: "700" },
+  metaRow: { flexDirection: "row", alignItems: "center", marginTop: 1, marginBottom: 1 },
+  metaRowOwn: { justifyContent: "flex-end" },
+  metaRowIncoming: { justifyContent: "flex-start" },
+  meta: { fontSize: 10 },
+  typing: { paddingVertical: 4, paddingHorizontal: 12, alignItems: "flex-start" },
+  newChip: { alignSelf: "center", borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, marginVertical: 6 },
+  newChipText: { fontSize: 12, fontWeight: "700" },
+  replyStrip: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 10, marginBottom: 6, borderRadius: 10, padding: 8 },
+  replyStripBar: { width: 3, alignSelf: "stretch", borderRadius: 2 },
+  replyStripName: { fontSize: 11, fontWeight: "800" },
+  replyStripText: { fontSize: 12, marginTop: 1 },
+  // Compact staging preview (~64px): thumbnail + name + remove.
+  previewBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingVertical: 6, borderTopWidth: 1, minHeight: 60, maxHeight: 76 },
+  previewThumb: { width: 44, height: 44, borderRadius: 8 },
   previewVideo: { borderWidth: 1, alignItems: "center", justifyContent: "center" },
   previewLabel: { fontSize: 12, fontWeight: "600" },
   previewError: { fontSize: 11, marginTop: 2 },
-  previewRemove: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  inlineError: { paddingHorizontal: 12, paddingVertical: 7 },
+  previewRemove: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  inlineError: { paddingHorizontal: 12, paddingVertical: 6 },
   inlineErrorText: { fontSize: 11, fontWeight: "600" },
-  composer: { flexDirection: "row", alignItems: "flex-end", padding: 8, borderTopWidth: 1, gap: 8 },
-  attachBtn: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  input: { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, maxHeight: 110 },
-  sendBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, minWidth: 60, minHeight: 42, alignItems: "center", justifyContent: "center" },
-  editInput: { borderWidth: 1, borderRadius: 8, padding: 8, fontSize: 13, minHeight: 40 },
+  // Compact Messenger-style composer (~48-56px at rest).
+  composer: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 8, paddingVertical: 6, borderTopWidth: 1, gap: 6, minHeight: 52 },
+  attachBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  input: { flex: 1, borderWidth: 1, borderRadius: 19, paddingHorizontal: 13, paddingVertical: 8, fontSize: 14, maxHeight: 100, minHeight: 38 },
+  sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  editInput: { borderWidth: 1, borderRadius: 8, padding: 8, fontSize: 13, minHeight: 40, minWidth: 140 },
   smallBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: "center" },
   smallBtnText: { color: "#fff", fontWeight: "700", fontSize: 11 },
+  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, paddingHorizontal: 8, paddingTop: 10, paddingBottom: 20 },
+  sheetPreview: { fontSize: 12, paddingHorizontal: 12, paddingBottom: 8 },
+  sheetRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 12 },
+  sheetLabel: { fontSize: 14, fontWeight: "600" },
+  sheetCancel: { marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", alignItems: "center", justifyContent: "center", padding: 16 },
   modalBody: { width: "100%", maxWidth: 640, alignItems: "center", gap: 12 },
   modalImage: { width: "100%", height: 420, borderRadius: 12 },

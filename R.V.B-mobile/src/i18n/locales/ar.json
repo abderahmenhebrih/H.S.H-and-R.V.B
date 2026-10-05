@@ -52,7 +52,15 @@
     "unsupportedType": "نوع الوسائط غير مدعوم",
     "openVideo": "فتح الفيديو",
     "openVideoFailed": "تعذر فتح الفيديو",
-    "ready": "جاهز"
+    "ready": "جاهز",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "reply": "رد",
+    "react": "تفاعل",
+    "newMessages": "رسائل جديدة",
+    "photo": "صورة",
+    "video": "فيديو",
+    "deleted": "تم حذف الرسالة"
   },
   "settings": {
     "title": "الإعدادات",

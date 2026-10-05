@@ -253,21 +253,25 @@
   .grid, .gridSingle { grid-template-columns: 1fr; }
 }
 
+/* ONE clean surface: the outer card owns the only background/border/shadow.
+   Every structural wrapper inside is explicitly transparent — no inset
+   rectangles, strips, or nested-card illusions regardless of theme. */
 .card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 14px;
+  padding: 16px 16px 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--panel);
-  box-shadow: 0 1px 6px var(--shadow);
+  background-color: var(--panel);
+  box-shadow: 0 1px 2px var(--shadow);
   cursor: pointer;
   min-width: 0;
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
   text-align: start;
 }
-.card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px var(--shadow); border-color: var(--border-strong); }
+.card:hover { transform: translateY(-1px); box-shadow: 0 6px 16px var(--shadow); border-color: var(--border-strong); }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .cardHeader {
@@ -275,6 +279,10 @@
   gap: 12px;
   align-items: center;
   min-width: 0;
+  background: transparent;
+  background-color: transparent;
+  border: 0;
+  box-shadow: none;
 }
 .avatar {
   width: 48px; height: 48px;
@@ -294,7 +302,12 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  background-color: transparent;
+  border: 0;
+  box-shadow: none;
 }
 .displayName {
   font-size: 14px;
@@ -342,6 +355,10 @@
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+  background: transparent;
+  background-color: transparent;
+  border: 0;
+  box-shadow: none;
 }
 /* Profile is an integrated text action bottom-right — no second surface.
    Message keeps its button (existing functionality). */

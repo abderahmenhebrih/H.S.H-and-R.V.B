@@ -28,6 +28,7 @@ const TR: Record<Language, any> = {
     openWorkspace: "Open in Workspace",
     noAccounts: "No accounts found.",
     noMatch: "No accounts match your search.",
+    showing: "Showing {a} of {b} accounts",
     noWorkers: "No Workers found.",
     noSuppliers: "No Suppliers found.",
     noCustomers: "No Customers found.",
@@ -60,6 +61,7 @@ const TR: Record<Language, any> = {
     openWorkspace: "Ouvrir dans l’espace de gestion",
     noAccounts: "Aucun compte trouvé.",
     noMatch: "Aucun compte ne correspond à votre recherche.",
+    showing: "Affichage de {a} sur {b} comptes",
     noWorkers: "Aucun Travailleur trouvé.",
     noSuppliers: "Aucun Fournisseur trouvé.",
     noCustomers: "Aucun Client trouvé.",
@@ -92,6 +94,7 @@ const TR: Record<Language, any> = {
     openWorkspace: "فتح في مساحة الإدارة",
     noAccounts: "لم يتم العثور على حسابات.",
     noMatch: "لا توجد حسابات مطابقة للبحث.",
+    showing: "عرض {a} من أصل {b} من الحسابات",
     noWorkers: "لا يوجد عمال.",
     noSuppliers: "لا يوجد موردون.",
     noCustomers: "لا يوجد زبائن.",
@@ -250,8 +253,8 @@ function DirectoryInner() {
   return (
     <div className={styles.pageRoot} dir={isRtl ? "rtl" : "ltr"}>
       <div className={styles.searchBar}>
-        <Search size={16} />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} />
+        <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
+        <input className={styles.searchInput} type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} />
         {search && <button className={styles.clearButton} onClick={() => setSearch("")} aria-label="Clear"><X size={14} /></button>}
       </div>
 
@@ -318,12 +321,14 @@ function DirectoryInner() {
                 );
               })}
             </div>
-            {page < totalPages && (
-              <div style={{ display: "flex", justifyContent: "center", paddingTop: 12 }}>
-                <button className={styles.secondaryButton} onClick={() => void load(false, page + 1)} disabled={loading}>{t.loadMore}</button>
-              </div>
-            )}
-            <small style={{ display: "block", textAlign: "center", color: "var(--subtle)", fontSize: 11, paddingTop: 8 }}>{filteredCount} / {total}</small>
+            <div className={styles.resultFooter}>
+              <small className={styles.resultSummary}>{(t.showing as string).replace("{a}", String(filteredCount)).replace("{b}", String(total))}</small>
+              {page < totalPages ? (
+                <button className={styles.secondaryButton} onClick={() => void load(false, page + 1)} disabled={loading}>{loading ? t.loading : t.loadMore}</button>
+              ) : (
+                <small className={styles.resultDone}>{page} / {totalPages}</small>
+              )}
+            </div>
           </>
         )}
       </div>

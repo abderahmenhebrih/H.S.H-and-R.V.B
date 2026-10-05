@@ -49,20 +49,31 @@
 }
 
 .markAllButton {
-  padding: 8px 14px;
+  min-height: 44px;
+  padding: 0 18px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--panel);
   color: var(--accent);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .markAllButton:hover {
   background: var(--panel-hover);
   border-color: var(--accent);
+}
+
+.markAllButton:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .controls {
@@ -82,15 +93,29 @@
 
 .filter,
 .filterActive {
-  padding: 6px 12px;
-  border-radius: 999px;
+  min-height: 44px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   border: 1px solid var(--border);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.filter:hover {
+  border-color: var(--border-strong);
+}
+
+.filter:focus-visible,
+.filterActive:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .filterCount {
@@ -122,25 +147,75 @@
   border-color: var(--accent);
 }
 
+/* Integrated search field — My Office pattern: ONE container, icon inside,
+   no separate icon box, no double border. Same 44px control family as tabs. */
 .searchBox {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  height: 36px;
+  gap: 12px;
+  height: 44px;
+  flex: 0 1 380px;
+  min-width: 240px;
+  padding-inline: 16px;
+  box-sizing: border-box;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--panel);
+  color: var(--muted);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.searchBox:focus-within {
+  border-color: var(--accent);
+  background: var(--panel-hover);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+:global(.themeDark) .searchBox {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+:global(.themeDark) .searchBox:focus-within {
+  background: var(--panel-hover);
+  border-color: var(--accent);
+}
+
+.searchIcon {
+  flex: 0 0 auto;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+}
+
+/* Specificity (0,3,1) beats globals.css input:not() (0,2,1) without !important. */
+.feed .controls .searchBox input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.feed .controls .searchBox input::placeholder {
   color: var(--muted);
 }
 
-.searchBox input {
-  border: none;
-  background: transparent;
-  outline: none;
-  color: var(--text);
-  font-size: 13px;
-  width: 180px;
+.feed .controls .searchBox input[type="search"]::-webkit-search-decoration,
+.feed .controls .searchBox input[type="search"]::-webkit-search-cancel-button,
+.feed .controls .searchBox input[type="search"]::-webkit-search-results-button,
+.feed .controls .searchBox input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 
 @media (max-width: 720px) {
@@ -156,11 +231,8 @@
   }
   .searchBox {
     width: 100%;
+    flex-basis: auto;
     box-sizing: border-box;
-  }
-  .searchBox input {
-    width: 100%;
-    flex: 1;
   }
   .feed {
     padding: 4px 12px 24px;

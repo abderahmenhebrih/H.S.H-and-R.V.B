@@ -264,7 +264,7 @@ export default function NotificationsPage() {
           })}
         </div>
         <div className={styles.searchBox}>
-          <Search size={16} strokeWidth={2} aria-hidden="true" />
+          <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
           <input
             type="search"
             placeholder={t("Search notifications...", "Rechercher...", "البحث...")}

@@ -9,6 +9,7 @@ import ProtectedDeleteModal from "../../../src/components/common/ProtectedDelete
 import { useCircularDeleteCountdown } from "../../../src/hooks/useCircularDeleteCountdown";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
 import { DEFAULT_SETTINGS } from "../../../src/lib/settings";
+import { exactNumberLabel, formatCompactNumber } from "../../../src/lib/compact-number";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbAccountService } from "../../../src/services/rvb-account.service";
 import { rvbConfigService } from "../../../src/services/rvb-config.service";
@@ -39,8 +40,8 @@ import styles from "./page.module.css";
 // ---- Translations ----
 const TR: Record<Language, any> = {
   en: {
-    headerTitle: "Account & Access Management",
-    headerSubtitle: "Manage RVB identities, roles, linked entities and access lifecycle",
+    headerTitle: "Accounts & Access",
+    headerSubtitle: "Manage RVB accounts, roles, @tags and access lifecycle.",
     kpi: { total: "Total Accounts", active: "Active", pending: "Pending Onboarding", archived: "Archived" },
     searchPlaceholder: "Search accounts by name or @tag",
     allRoles: "All Roles",
@@ -147,8 +148,8 @@ const TR: Record<Language, any> = {
     setInitial: { title: "Set Initial Password", desc: "Set a temporary password for this account. User must change it on first login.", password: "New Password", confirm: "Confirm Password", hint: "8–128 characters", cancel: "Cancel", confirmBtn: "Set Password", setting: "Setting...", credentialsNotConfigured: "Credentials not configured", credentialsConfigured: "Credentials configured", mustChange: "Must change on first login" },
   },
   fr: {
-    headerTitle: "Gestion des comptes et des accès",
-    headerSubtitle: "Gérez les identités RVB, les rôles, les entités liées et le cycle d’accès",
+    headerTitle: "Comptes et accès",
+    headerSubtitle: "Gérez les comptes RVB, les rôles, les @tags et le cycle de vie des accès.",
     kpi: { total: "Total Comptes", active: "Actifs", pending: "En attente d’onboarding", archived: "Archivés" },
     searchPlaceholder: "Rechercher par nom ou @tag",
     allRoles: "Tous les rôles",
@@ -177,8 +178,8 @@ const TR: Record<Language, any> = {
     setInitial: { title: "Définir le mot de passe initial", desc: "Définir un mot de passe temporaire. L’utilisateur doit le changer à la première connexion.", password: "Nouveau mot de passe", confirm: "Confirmer", hint: "8–128 caractères", cancel: "Annuler", confirmBtn: "Définir", setting: "Définition...", credentialsNotConfigured: "Identifiants non configurés", credentialsConfigured: "Identifiants configurés", mustChange: "Changement requis à la première connexion" },
   },
   ar: {
-    headerTitle: "إدارة الحسابات والصلاحيات",
-    headerSubtitle: "إدارة هويات RVB والأدوار والجهات المرتبطة ودورة الوصول",
+    headerTitle: "الحسابات والصلاحيات",
+    headerSubtitle: "إدارة حسابات RVB والأدوار والصلاحيات ودورة حياة الوصول.",
     kpi: { total: "إجمالي الحسابات", active: "النشطة", pending: "بانتظار الإعداد", archived: "المؤرشفة" },
     searchPlaceholder: "ابحث بالاسم أو @tag",
     allRoles: "جميع الأدوار",
@@ -589,37 +590,23 @@ function RvbAccountsInner() {
   return (
     <RvbShell activePage="accounts">
       <div className={styles.rvbAccountsRoot} dir={isRtl ? "rtl" : "ltr"}>
-        {/* Header — managed by RvbShell CompactHeader, but keep spec subtitle visibility inside page for non-shell? Shell already shows, so keep minimal */}
-        <div className={styles.headerWrap}>
-          <h1 className={styles.headerTitle}>{t.headerTitle}</h1>
-          <p className={styles.headerSubtitle}>{t.headerSubtitle}</p>
-        </div>
-
-        {/* KPI */}
-        <div className={styles.kpiRow}>
-          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
-            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "var(--accent-soft)", border: "1px solid var(--accent-ring)", color: "var(--accent)", flex: "0 0 44px" }}><ShieldCheck size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.total}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : String(kpi.total)}</strong></div>
+        {/* Unified command card (My Office proportions): brand + integrated
+            search + create. Replaces the old duplicate title + separate
+            search toolbar — same search state/behavior, new composition. */}
+        <div className={styles.commandCard}>
+          <div className={styles.commandBrand}>
+            <div className={styles.commandLogo}>
+              <img src="/chicken.jpg" alt="" />
+            </div>
+            <div className={styles.commandTitle}>
+              <h1>{t.headerTitle}</h1>
+              <span>{t.headerSubtitle}</span>
+            </div>
           </div>
-          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
-            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(58,125,82,0.10)", border: "1px solid rgba(58,125,82,0.18)", color: "#3A7D52", flex: "0 0 44px" }}><ShieldCheck size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.active}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : String(kpi.active)}</strong></div>
-          </div>
-          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
-            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(175,149,75,0.11)", border: "1px solid rgba(175,149,75,0.16)", color: "#8a6d1b", flex: "0 0 44px" }}><AlertTriangle size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.pending}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : String(kpi.pending)}</strong></div>
-          </div>
-          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
-            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(120,120,130,0.10)", border: "1px solid rgba(120,120,130,0.18)", color: "var(--muted)", flex: "0 0 44px" }}><Archive size={20} strokeWidth={2} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.archived}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{loading ? "—" : String(kpi.archived)}</strong></div>
-          </div>
-        </div>
-
-        {/* Toolbar */}
-        <div className={styles.toolbar}>
           <div className={styles.searchBox}>
-            <span aria-hidden="true"><Search size={18} strokeWidth={2} /></span>
+            <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
             <input
+              className={styles.searchInput}
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -627,9 +614,37 @@ function RvbAccountsInner() {
               aria-label={t.search}
             />
           </div>
+          <button type="button" className={styles.primaryButton} onClick={() => { setCreateError(""); setShowCreate(true); }}>
+            <Plus size={16} strokeWidth={2} aria-hidden="true" />
+            {t.createAccount}
+          </button>
+        </div>
 
+        {/* KPI */}
+        <div className={styles.kpiRow}>
+          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
+            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "var(--accent-soft)", border: "1px solid var(--accent-ring)", color: "var(--accent)", flex: "0 0 44px" }}><ShieldCheck size={20} strokeWidth={2} /></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.total}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : exactNumberLabel(kpi.total)}>{loading ? "—" : formatCompactNumber(kpi.total)}</strong></div>
+          </div>
+          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
+            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(58,125,82,0.10)", border: "1px solid rgba(58,125,82,0.18)", color: "#3A7D52", flex: "0 0 44px" }}><ShieldCheck size={20} strokeWidth={2} /></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.active}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : exactNumberLabel(kpi.active)}>{loading ? "—" : formatCompactNumber(kpi.active)}</strong></div>
+          </div>
+          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
+            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(175,149,75,0.11)", border: "1px solid rgba(175,149,75,0.16)", color: "#8a6d1b", flex: "0 0 44px" }}><AlertTriangle size={20} strokeWidth={2} /></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.pending}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : exactNumberLabel(kpi.pending)}>{loading ? "—" : formatCompactNumber(kpi.pending)}</strong></div>
+          </div>
+          <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
+            <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(120,120,130,0.10)", border: "1px solid rgba(120,120,130,0.18)", color: "var(--muted)", flex: "0 0 44px" }}><Archive size={20} strokeWidth={2} /></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.archived}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={loading ? undefined : exactNumberLabel(kpi.archived)}>{loading ? "—" : formatCompactNumber(kpi.archived)}</strong></div>
+          </div>
+        </div>
+
+        {/* Filter toolbar — role/status dropdowns only (search + create
+            moved into the command card above). */}
+        <div className={styles.toolbar}>
           <div className={styles.filterGroup}>
-            <div style={{ minWidth: 160 }}>
+            <div className={styles.filterSelect}>
               <StyledSelect
                 value={roleFilter}
                 onChange={setRoleFilter}
@@ -638,7 +653,7 @@ function RvbAccountsInner() {
                 ariaLabel={t.allRoles}
               />
             </div>
-            <div style={{ minWidth: 160 }}>
+            <div className={styles.filterSelect}>
               <StyledSelect
                 value={statusFilter}
                 onChange={setStatusFilter}
@@ -648,11 +663,6 @@ function RvbAccountsInner() {
               />
             </div>
           </div>
-
-          <button type="button" className={styles.primaryButton} onClick={() => { setCreateError(""); setShowCreate(true); }}>
-            <Plus size={16} strokeWidth={2} aria-hidden="true" />
-            {t.createAccount}
-          </button>
         </div>
 
         {error && <div className={styles.errorBox}>{error}</div>}
@@ -737,7 +747,7 @@ function RvbAccountsInner() {
                           <div className={styles.actionsCell}>
                             <button type="button" className={styles.viewButton} onClick={() => setDetailsAccount(a)} aria-label={`${t.view} ${a.displayName}`}>
                               <Eye size={14} strokeWidth={2} aria-hidden="true" />
-                              {t.view}
+                              {t.view} <span className={styles.viewArrow} aria-hidden="true">→</span>
                             </button>
                           </div>
                         </td>

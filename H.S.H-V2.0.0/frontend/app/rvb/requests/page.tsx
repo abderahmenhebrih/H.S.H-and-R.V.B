@@ -12,6 +12,7 @@ import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { rvbRequestService, type NormalizedRequest, type RvbRequestDetail } from "../../../src/services/rvb-request.service";
 import { Search, Inbox, Eye, X, CheckCircle, XCircle, Clock, FileQuestion, PackageCheck, Truck as TruckIcon } from "lucide-react";
+import { exactNumberLabel, formatCompactNumber } from "../../../src/lib/compact-number";
 import styles from "./page.module.css";
 
 const TR: Record<Language, any> = {
@@ -54,6 +55,7 @@ const TR: Record<Language, any> = {
     error: "Failed to load requests",
     emptyAll: "No requests found.",
     emptyUnderReview: "No requests under review.",
+    emptyUnderReviewHint: "There are no requests waiting for review.",
     emptyWorker: "No Worker requests under review.",
     emptySupplier: "No Supplier requests under review.",
     emptyCustomer: "No Customer requests under review.",
@@ -148,6 +150,7 @@ const TR: Record<Language, any> = {
     error: "Échec chargement",
     emptyAll: "Aucune demande trouvée.",
     emptyUnderReview: "Aucune demande en examen.",
+    emptyUnderReviewHint: "Aucune demande en attente de révision.",
     emptyWorker: "Aucune demande Travailleur en examen.",
     emptySupplier: "Aucune demande Fournisseur en examen.",
     emptyCustomer: "Aucune demande Client en examen.",
@@ -242,6 +245,7 @@ const TR: Record<Language, any> = {
     error: "فشل التحميل",
     emptyAll: "لا توجد طلبات.",
     emptyUnderReview: "لا توجد طلبات قيد المراجعة.",
+    emptyUnderReviewHint: "لا توجد طلبات بانتظار المراجعة.",
     emptyWorker: "لا توجد طلبات عمال قيد المراجعة.",
     emptySupplier: "لا توجد طلبات موردين قيد المراجعة.",
     emptyCustomer: "لا توجد طلبات زبائن قيد المراجعة.",
@@ -492,11 +496,19 @@ function RequestsInner() {
   }, [loading, statusFilter, sourceFilter, t]);
 
   const kpiCards = useMemo(() => {
-    const totalV = kpi ? String(kpi.total) : loading ? "—" : "0";
-    const underV = kpi ? String(kpi.underReview) : loading ? "—" : "0";
-    const accV = kpi ? String(kpi.accepted) : loading ? "—" : "0";
-    const rejV = kpi ? String(kpi.rejected) : loading ? "—" : "0";
-    return { totalV, underV, accV, rejV };
+    const fmt = (v: number | null) => (v === null ? (loading ? "—" : "0") : formatCompactNumber(v));
+    const tip = (v: number | null) => (v === null ? undefined : exactNumberLabel(v));
+    const totalV = fmt(kpi ? kpi.total : loading ? null : 0);
+    const underV = fmt(kpi ? kpi.underReview : loading ? null : 0);
+    const accV = fmt(kpi ? kpi.accepted : loading ? null : 0);
+    const rejV = fmt(kpi ? kpi.rejected : loading ? null : 0);
+    return {
+      totalV, underV, accV, rejV,
+      totalT: tip(kpi ? kpi.total : loading ? null : 0),
+      underT: tip(kpi ? kpi.underReview : loading ? null : 0),
+      accT: tip(kpi ? kpi.accepted : loading ? null : 0),
+      rejT: tip(kpi ? kpi.rejected : loading ? null : 0),
+    };
   }, [kpi, loading]);
 
   const handleReview = async (status: "accepted" | "rejected", notes?: string) => {
@@ -575,41 +587,64 @@ function RequestsInner() {
   }, [detail, reviewDialog, t, settings.currency]);
 
   return (
-    <RvbShell activePage="requests">
+    // hideHeader (same mechanism as /rvb/accounts, /rvb/workers and
+    // /rvb/directory): this page renders its own command card, so the shared
+    // CompactHeader would duplicate it.
+    <RvbShell activePage="requests" hideHeader>
       <div className={styles.rvbAccountsRoot} dir={isRtl ? "rtl" : "ltr"}>
-        <div className={styles.headerWrap}>
-          <h1 className={styles.headerTitle}>{t.title}</h1>
-          <p className={styles.headerSubtitle}>{t.subtitle}</p>
+        {/* Unified command card (Accounts & Access proportions): brand +
+            integrated search. No primary CTA — requests are created by
+            portal users, not management. Replaces the old duplicate title +
+            separate search toolbar — same search state/behavior, new
+            composition. */}
+        <div className={styles.commandCard}>
+          <div className={styles.commandBrand}>
+            <div className={styles.commandLogo}>
+              <img src="/chicken.jpg" alt="" />
+            </div>
+            <div className={styles.commandTitle}>
+              <h1>{t.title}</h1>
+              <span>{t.subtitle}</span>
+            </div>
+          </div>
+          <div className={styles.searchBox}>
+            <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
+            <input
+              className={styles.searchInput}
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              aria-label={t.searchPlaceholder}
+            />
+          </div>
         </div>
 
         {/* KPI Cards */}
         <div className={styles.kpiRow}>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "var(--accent-soft)", border: "1px solid var(--accent-ring)", color: "var(--accent)", flex: "0 0 44px" }}><Inbox size={20} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.total}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{kpiCards.totalV}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.total}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={kpiCards.totalT}>{kpiCards.totalV}</strong></div>
           </div>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(175,149,75,0.11)", border: "1px solid rgba(175,149,75,0.16)", color: "#8a6d1b", flex: "0 0 44px" }}><Clock size={20} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.underReview}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{kpiCards.underV}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.underReview}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={kpiCards.underT}>{kpiCards.underV}</strong></div>
           </div>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(58,125,82,0.10)", border: "1px solid rgba(58,125,82,0.18)", color: "#3A7D52", flex: "0 0 44px" }}><CheckCircle size={20} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.accepted}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{kpiCards.accV}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.accepted}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={kpiCards.accT}>{kpiCards.accV}</strong></div>
           </div>
           <div className={styles.card} style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, minHeight: 92 }}>
             <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 10, background: "rgba(185,58,66,0.09)", border: "1px solid rgba(185,58,66,0.12)", color: "#C0392B", flex: "0 0 44px" }}><XCircle size={20} /></div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.rejected}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{kpiCards.rejV}</strong></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted)" }}>{t.kpi.rejected}</span><strong style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }} title={kpiCards.rejT}>{kpiCards.rejV}</strong></div>
           </div>
         </div>
 
-        {/* Toolbar */}
+        {/* Toolbar — status/source/type dropdowns only (search moved into
+            the command card above). */}
         <div className={styles.toolbar}>
-          <div className={styles.searchBox}>
-            <span aria-hidden="true"><Search size={18} /></span>
-            <input type="search" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} />
-          </div>
           <div className={styles.filterGroup}>
-            <div style={{ minWidth: 150 }}>
+            <div className={styles.filterSelect}>
               <StyledSelect value={statusFilter} onChange={setStatusFilter} options={[
                 { value: "under_review", label: t.filters.statusUnderReview },
                 { value: "all", label: t.filters.statusAll },
@@ -617,10 +652,10 @@ function RequestsInner() {
                 { value: "rejected", label: t.filters.statusRejected },
               ]} placeholder={t.filters.statusLabel} ariaLabel={t.filters.statusLabel} />
             </div>
-            <div style={{ minWidth: 150 }}>
+            <div className={styles.filterSelect}>
               <StyledSelect value={sourceFilter} onChange={(v) => { setSourceFilter(v); setTypeFilter("all"); }} options={sourceOptionsFiltered} placeholder={t.filters.sourceLabel} ariaLabel={t.filters.sourceLabel} />
             </div>
-            <div style={{ minWidth: 170 }}>
+            <div className={styles.filterSelect}>
               <StyledSelect value={typeFilter} onChange={setTypeFilter} options={typeOptions} placeholder={t.filters.typeLabel} ariaLabel={t.filters.typeLabel} />
             </div>
           </div>
@@ -636,7 +671,7 @@ function RequestsInner() {
               <div className={styles.emptyIcon} aria-hidden="true"><Inbox size={26} /></div>
               <h3 className={styles.emptyTitle}>{emptyTitle}</h3>
               <p className={styles.emptyDesc} style={{ maxWidth: 480 }}>
-                {statusFilter === "under_review" ? (sourceFilter !== "all" ? "" : t.emptyUnderReview) : ""}
+                {statusFilter === "under_review" ? (sourceFilter !== "all" ? "" : t.emptyUnderReviewHint) : ""}
               </p>
             </div>
           ) : (
@@ -680,7 +715,7 @@ function RequestsInner() {
                         </td>
                         <td title={formatDate(r.submittedAt, lang)} style={{ fontSize: 12, fontWeight: 500, color: "var(--muted)", whiteSpace: "nowrap" }}>{formatDateShort(r.submittedAt, lang)}</td>
                         <td>
-                          <span className={`${styles.badge} ${r.status === "under_review" ? styles.badgeOnboardingPending : r.status === "accepted" ? styles.badgeStatusActive : styles.badgeStatusArchived}`}>
+                          <span className={`${styles.badge} ${r.status === "under_review" ? styles.badgeOnboardingPending : r.status === "accepted" ? styles.badgeStatusActive : r.status === "rejected" ? styles.badgeStatusDisabled : styles.badgeStatusArchived}`}>
                             {(t.statuses as any)[r.status] ?? r.status}
                           </span>
                         </td>

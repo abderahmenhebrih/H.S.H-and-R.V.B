@@ -757,10 +757,23 @@ html[dir="rtl"] .filterAction {
   border-color: rgba(47, 38, 31, 0.15);
 }
 
+/* Completed = purple (scoped triplet; the suite has no purple design tokens).
+   Restrained enterprise purple with readable contrast in both themes. */
 .statusCompleted {
-  background: var(--success-soft);
-  color: var(--success);
-  border-color: var(--success-border);
+  background: rgba(109, 88, 246, 0.12);
+  color: #5746c4;
+  border-color: rgba(109, 88, 246, 0.28);
+}
+
+/* Completed rows stay normal table rows: details fully readable, only the
+   task name is slightly muted. No strikethrough, no hiding. */
+.taskRowCompleted {
+  background: var(--panel);
+}
+
+.taskNameCompleted {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 :global([class*="themeDark"]) .statusFar {
@@ -794,9 +807,13 @@ html[dir="rtl"] .filterAction {
 }
 
 :global([class*="themeDark"]) .statusCompleted {
-  background: rgba(58, 125, 82, 0.14);
-  color: #4AA06A;
-  border-color: rgba(58, 125, 82, 0.18);
+  background: rgba(139, 124, 246, 0.16);
+  color: #b3a7f7;
+  border-color: rgba(139, 124, 246, 0.32);
+}
+
+:global([class*="themeDark"]) .taskNameCompleted {
+  color: var(--muted);
 }
 
 .rowActions {

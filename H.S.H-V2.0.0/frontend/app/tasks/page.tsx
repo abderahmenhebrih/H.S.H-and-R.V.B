@@ -2,14 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDbSync } from "../../src/hooks/useDbSync";
-import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CalendarCheck,
   CalendarDays,
   CalendarRange,
   Check,
-  CheckCheck,
   ChevronDown,
   CircleAlert,
   CircleCheck,
@@ -52,7 +50,8 @@ const TRANSLATIONS = {
     newToOld: "New to Old",
     closestDeadline: "Closest Deadline",
     addTask: "Add Task",
-    finishedTasks: "Finished Tasks",
+    noCompleted: "No completed tasks",
+    noCompletedHint: "Tasks you complete will appear here.",
     total: "Total tasks",
     totalSub: "All recorded tasks",
     month: "This month",
@@ -119,7 +118,8 @@ const TRANSLATIONS = {
     newToOld: "New to Old",
     closestDeadline: "Closest Deadline",
     addTask: "Ajouter une tâche",
-    finishedTasks: "Tâches Terminées",
+    noCompleted: "Aucune tâche terminée",
+    noCompletedHint: "Les tâches terminées apparaîtront ici.",
     total: "Total tâches",
     totalSub: "Toutes les tâches",
     month: "Ce mois",
@@ -186,7 +186,8 @@ const TRANSLATIONS = {
     newToOld: "New to Old",
     closestDeadline: "Closest Deadline",
     addTask: "إضافة مهمة",
-    finishedTasks: "المهام المكتملة",
+    noCompleted: "لا توجد مهام مكتملة",
+    noCompletedHint: "ستظهر المهام المكتملة هنا.",
     total: "مجموع المهام",
     totalSub: "جميع المهام المسجلة",
     month: "هذا الشهر",
@@ -286,13 +287,11 @@ function getStatusLabel(deadline: number, t: (typeof TRANSLATIONS)[Language]): s
 function StatusFilter({
   value,
   onChange,
-  onFinishedTasks,
   t,
 }: {
   value: string;
   onChange: (v: string) => void;
-  onFinishedTasks: () => void;
-  t: { allStatuses: string; newToOld: string; closestDeadline: string; missed: string; finishedTasks: string };
+  t: { allStatuses: string; newToOld: string; closestDeadline: string; missed: string; completed: string };
 }) {
   const options = useMemo(
     () => [
@@ -300,12 +299,11 @@ function StatusFilter({
       { value: "newToOld", label: t.newToOld },
       { value: "closest", label: t.closestDeadline },
       { value: "missed", label: t.missed },
+      { value: "completed", label: t.completed },
     ],
     [t],
   );
-  // Extra non-filter row: navigation action, never a selected value.
-  const actionIndex = options.length;
-  const itemCount = options.length + 1;
+  const itemCount = options.length;
 
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
@@ -347,11 +345,6 @@ function StatusFilter({
   }, [open ]);
 
   function activate(idx: number) {
-    if (idx === actionIndex) {
-      closeMenu();
-      onFinishedTasks();
-      return;
-    }
     const opt = options[idx];
     if (opt) {
       onChange(opt.value);
@@ -425,17 +418,6 @@ function StatusFilter({
               {opt.label}
             </button>
           ))}
-          <div className={styles.filterDivider} role="separator" aria-hidden="true" />
-          <button
-            type="button"
-            tabIndex={-1}
-            className={`${styles.filterAction} ${highlighted === actionIndex ? styles.filterActionActive : ""}`}
-            onMouseEnter={() => setHighlighted(actionIndex)}
-            onClick={() => activate(actionIndex)}
-          >
-            <CheckCheck size={14} strokeWidth={2} aria-hidden="true" />
-            {t.finishedTasks}
-          </button>
         </div>
       )}
     </div>
@@ -464,7 +446,6 @@ export default function TasksPage() {
   const [completing, setCompleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  const router = useRouter();
   const t = TRANSLATIONS[language];
 
   async function loadSettings() {
@@ -488,6 +469,12 @@ export default function TasksPage() {
   useEffect(() => {
     void loadSettings();
     void loadTasks();
+    // Deep link support (e.g. retired /tasks/finished redirects here):
+    // ?status=completed preselects the Completed filter.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("status") === "completed") setStatusFilter("completed");
+    } catch {}
     const h = () => void loadSettings();
     window.addEventListener(SETTINGS_EVENT, h);
     return () => window.removeEventListener(SETTINGS_EVENT, h);
@@ -544,8 +531,10 @@ export default function TasksPage() {
       if (task.deadline < todayStart) missedCount++;
     }
 
+    // TOTAL = every recorded task including completed. Month/week/today/missed
+    // keep their existing active-workload semantics (completed excluded).
     return {
-      total: activeTasks.length,
+      total: tasks.length,
       month: monthCount,
       week: weekCount,
       today: todayCount,
@@ -555,8 +544,15 @@ export default function TasksPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let result = [...tasks].filter((task) => (task.status ?? "pending") !== "completed");
-    if (statusFilter === "newToOld") {
+    // All statuses (including completed) load together; only the "missed"
+    // filter excludes completed tasks (a finished task is done, not missed).
+    const isCompleted = (task: Task) => (task.status ?? "pending") === "completed";
+    let result = [...tasks];
+    if (statusFilter === "completed") {
+      result = result
+        .filter(isCompleted)
+        .sort((a, b) => (b.completedAt ?? b.updatedAt) - (a.completedAt ?? a.updatedAt));
+    } else if (statusFilter === "newToOld") {
       result = [...result].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     } else if (statusFilter === "closest") {
       const today = new Date();
@@ -583,6 +579,7 @@ export default function TasksPage() {
       const todayStart = today.getTime();
       result = result
         .filter((task) => {
+          if (isCompleted(task)) return false;
           const d = new Date(task.deadline);
           d.setHours(0, 0, 0, 0);
           return d.getTime() < todayStart;
@@ -735,7 +732,7 @@ export default function TasksPage() {
     <AppShell activePage="tasks" showHeader={false}>
       <main className={styles.tasksPage}>
         <div className={styles.tasksShell}>
-          {/* Unified Tasks header — brand / search / status filter / finished / add */}
+          {/* Unified Tasks header — brand / search / status filter / add */}
           <div className={styles.headerContainer}>
           <section className={styles.tasksHeader}>
             <div className={styles.tasksHeaderBrand}>
@@ -765,8 +762,7 @@ export default function TasksPage() {
               <StatusFilter
                 value={statusFilter}
                 onChange={setStatusFilter}
-                onFinishedTasks={() => router.push("/tasks/finished")}
-                t={{ allStatuses: t.allStatuses, newToOld: t.newToOld, closestDeadline: t.closestDeadline, missed: t.missed, finishedTasks: t.finishedTasks }}
+                t={{ allStatuses: t.allStatuses, newToOld: t.newToOld, closestDeadline: t.closestDeadline, missed: t.missed, completed: t.completed }}
               />
             </div>
 
@@ -856,8 +852,22 @@ export default function TasksPage() {
                 <div className={styles.emptyIcon} aria-hidden="true">
                   <ClipboardCheck size={32} strokeWidth={2} />
                 </div>
-                <strong>{tasks.length === 0 ? t.noTasks : t.noTasksFound}</strong>
-                <p>{tasks.length === 0 ? t.addFirst : t.tryAnother}</p>
+                <strong>
+                  {tasks.length === 0
+                    ? t.noTasks
+                    : statusFilter === "completed" && !search.trim()
+                      ? t.noCompleted
+                      : t.noTasksFound}
+                </strong>
+                <p>
+                  {tasks.length === 0
+                    ? t.addFirst
+                    : search.trim()
+                      ? t.tryAnother
+                      : statusFilter === "completed"
+                        ? t.noCompletedHint
+                        : ""}
+                </p>
                 {tasks.length === 0 && (
                   <button type="button" className={styles.primaryButton} onClick={openCreate}>
                     <Plus size={16} strokeWidth={2} aria-hidden="true" />
@@ -868,9 +878,9 @@ export default function TasksPage() {
             ) : (
               <div className={styles.taskRows}>
                 {filtered.map((task) => {
-                  const statusLabel = getStatusLabel(task.deadline, t);
-                  const urgency = getTaskUrgency(task.deadline);
                   const isCompleted = (task.status ?? "pending") === "completed";
+                  const statusLabel = isCompleted ? t.completed : getStatusLabel(task.deadline, t);
+                  const urgency = getTaskUrgency(task.deadline);
                   const badgeClass = isCompleted
                     ? styles.statusCompleted
                     : urgency === "missed"
@@ -883,28 +893,30 @@ export default function TasksPage() {
                             ? styles.statusUpcoming
                             : styles.statusFar;
                   return (
-                    <article key={task.id} className={styles.taskRow} onDoubleClick={() => openEdit(task)}>
+                    <article key={task.id} className={`${styles.taskRow} ${isCompleted ? styles.taskRowCompleted : ""}`} onDoubleClick={() => openEdit(task)}>
                       <span className={styles.taskNameCell} title={task.name}>
                         <span className={styles.taskIcon} aria-hidden="true">
                           <ClipboardCheck size={16} strokeWidth={2} />
                         </span>
-                        <strong>{task.name}</strong>
+                        <strong className={isCompleted ? styles.taskNameCompleted : ""}>{task.name}</strong>
                       </span>
                       <span className={styles.deadlineText}>{formatTimestampToDisplay(task.deadline)}</span>
                       <span className={`${styles.statusBadge} ${badgeClass}`}>{statusLabel}</span>
                       <div className={styles.rowActions}>
-                        <button
-                          type="button"
-                          className={styles.rowCompleteButton}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openComplete(task);
-                          }}
-                          title={t.completeTask}
-                          aria-label={`${t.completeTask} ${task.name}`}
-                        >
-                          <CircleCheck size={16} strokeWidth={2} aria-hidden="true" />
-                        </button>
+                        {!isCompleted && (
+                          <button
+                            type="button"
+                            className={styles.rowCompleteButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openComplete(task);
+                            }}
+                            title={t.completeTask}
+                            aria-label={`${t.completeTask} ${task.name}`}
+                          >
+                            <CircleCheck size={16} strokeWidth={2} aria-hidden="true" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className={styles.rowEditButton}

@@ -13,6 +13,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Linking,
+  Animated,
+  PanResponder,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -50,6 +52,25 @@ import { useLanguage } from "@/i18n";
 import { formatDate, type Language } from "@/utils/date";
 
 const PAGE_LIMIT = 30;
+// Instagram-style gesture arbitration (built-in PanResponder only — no
+// native gesture dependency, no dev-client rebuild):
+//   SWIPE (right,|dx| dominant + threshold) -> Reply
+//   LONG PRESS (~450ms, no swipe)           -> full action menu
+//   DOUBLE TAP (two taps < 300ms)           -> quick reaction strip
+//   SINGLE TAP                              -> content action (image/quote/…)
+// Single taps route through the same per-message tap registry so a first tap
+// never fires its action early when a double-tap is coming.
+const SWIPE_THRESHOLD = 55;
+const DOUBLE_TAP_MS = 300;
+const LONG_PRESS_MS = 450;
+
+type RowFx = {
+  tx: Animated.Value;
+  tapTime: number;
+  tapTimer: ReturnType<typeof setTimeout> | null;
+  fired: boolean;
+  view: any;
+};
 // Production caps mirror the backend (images 8 MB, videos 25 MB). The client
 // pre-checks picker fileSize so oversized media fails fast with a clear label;
 // the backend re-validates authoritatively.
@@ -123,7 +144,7 @@ export default function ChatDetail() {
   const convId = String(id);
   const account = useAuthStore((s) => s.account);
   const myId = account?.id;
-  const { width: winWidth } = useWindowDimensions();
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
   const wide = winWidth >= 700;
 
   const [conv, setConv] = useState<any>(null);
@@ -138,6 +159,7 @@ export default function ChatDetail() {
   const [editText, setEditText] = useState("");
   const [menuMsg, setMenuMsg] = useState<any | null>(null);
   const [stripMsg, setStripMsg] = useState<any | null>(null);
+  const [stripAnchorY, setStripAnchorY] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerCat, setPickerCat] = useState<string>("frequent");
   const [whoMsg, setWhoMsg] = useState<any | null>(null);
@@ -153,7 +175,18 @@ export default function ChatDetail() {
   const [attachError, setAttachError] = useState<string | null>(null);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [reactingId, setReactingId] = useState<string | null>(null);
+  // Per-message gesture scratch (Animated values, tap windows, row views).
+  // Screen-level maps: renderItem must stay hook-free.
+  const rowFx = useRef(new Map<string, RowFx>());
   const flatRef = useRef<FlatList>(null);
+  const fx = (mid: string): RowFx => {
+    let r = rowFx.current.get(mid);
+    if (!r) {
+      r = { tx: new Animated.Value(0), tapTime: 0, tapTimer: null, fired: false, view: null };
+      rowFx.current.set(mid, r);
+    }
+    return r;
+  };
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
@@ -222,6 +255,7 @@ export default function ChatDetail() {
       const msgs = await getMessages(convId, { limit: PAGE_LIMIT });
       if (!mountedRef.current) return;
       rowY.current.clear();
+      rowFx.current.clear();
       initialAnchoredRef.current = false;
       nearBottomRef.current = true;
       newArrivedRef.current = false;
@@ -544,11 +578,54 @@ export default function ChatDetail() {
     }
   };
 
-  const openStrip = useCallback((m: any | null) => {
+  const openStrip = useCallback((m: any | null, anchorY?: number) => {
     setPickerCat("frequent");
     setPickerOpen(false);
+    setStripAnchorY(typeof anchorY === "number" ? anchorY : null);
     setStripMsg(m);
   }, []);
+
+  const cancelTap = useCallback((mid: string) => {
+    const R = rowFx.current.get(mid);
+    if (R?.tapTimer) clearTimeout(R.tapTimer);
+    if (R) {
+      R.tapTimer = null;
+      R.tapTime = 0;
+    }
+  }, []);
+
+  // Single/double-tap arbitration for one message: a first tap schedules its
+  // action after the double-tap window; a second tap in-window cancels it and
+  // opens the reaction strip instead.
+  const registerTap = useCallback(
+    (mid: string, action: (() => void) | null) => {
+      const R = fx(mid);
+      const now = Date.now();
+      if (now - R.tapTime < DOUBLE_TAP_MS) {
+        if (R.tapTimer) clearTimeout(R.tapTimer);
+        R.tapTimer = null;
+        R.tapTime = 0;
+        const m = byIdRef.current.get(mid);
+        if (m) {
+          const v = R.view;
+          try {
+            v?.measureInWindow?.((x: number, y: number, w: number, h: number) => openStrip(m, y + h / 2));
+          } catch {
+            openStrip(m);
+          }
+        }
+        return;
+      }
+      R.tapTime = now;
+      if (R.tapTimer) clearTimeout(R.tapTimer);
+      R.tapTimer = setTimeout(() => {
+        R.tapTimer = null;
+        R.tapTime = 0;
+        if (action) action();
+      }, DOUBLE_TAP_MS);
+    },
+    [openStrip],
+  );
 
   // Quick 🤝 = Messenger Like: a STANDALONE normal message containing only
   // 🤝, sent through the existing sendMessage path (never the reaction
@@ -606,6 +683,13 @@ export default function ChatDetail() {
     return `${count} ${unit}${pinned ? ` • ${pinned}/3 ${t("conversation.pinned", "Pinned").toLowerCase()}` : ""}`;
   }, [conv, t]);
 
+  const pinned = conv?.pinnedMessages || [];
+  const byId = new Map(messages.map((m) => [msgId(m), m]));
+  const byIdRef = useRef(new Map<string, any>());
+  useEffect(() => {
+    byIdRef.current = byId;
+  });
+
   const activeParticipants = useMemo(
     () => (conv?.participants || []).filter((p: any) => !p?.leftAt),
     [conv],
@@ -647,9 +731,13 @@ export default function ChatDetail() {
   if (loading) return <Loading message="Loading conversation..." />;
   if (error) return <ErrorState title="Could not load chat" message={error} onRetry={load} />;
 
-  const pinned = conv?.pinnedMessages || [];
-  const byId = new Map(messages.map((m) => [msgId(m), m]));
   const menuIsPinned = menuMsg ? pinned.some((p: any) => p.messageId === msgId(menuMsg)) : false;
+  // Reaction strip placement: anchored near the pressed message when its
+  // window position was measured (above/below by available space, kept inside
+  // the viewport with room for the composer); centered fallback otherwise.
+  const stripAbove = stripAnchorY != null && stripAnchorY > winHeight * 0.55;
+  const stripTop =
+    stripAnchorY == null ? 0 : stripAbove ? Math.max(60, stripAnchorY - 340) : Math.min(stripAnchorY + 12, winHeight - 380);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.colors.background }]} edges={["top", "bottom"]}>
@@ -761,6 +849,40 @@ export default function ChatDetail() {
               // Standalone quick-send (content exactly 🤝): large emoji, no
               // bubble chrome — still a normal message semantically.
               const isQuick = isQuickEmojiMessage(item);
+              const mid = msgId(item);
+              const F = fx(mid);
+              // Swipe-to-reply driver (right-only, ownership-safe in RTL).
+              // Claims the responder ONLY on horizontal-dominant movement, so
+              // FlatList vertical scrolling stays perfectly smooth.
+              const pan = PanResponder.create({
+                onStartShouldSetPanResponder: () => false,
+                onMoveShouldSetPanResponder: (_e, gs) => {
+                  if (isDeleted || editingId === mid) return false;
+                  return gs.dx > 18 && gs.dx > Math.abs(gs.dy) * 1.6;
+                },
+                onPanResponderGrant: () => {
+                  F.fired = false;
+                  cancelTap(mid);
+                },
+                onPanResponderMove: (_e, gs) => {
+                  F.tx.setValue(Math.max(0, Math.min(64, gs.dx)));
+                  if (gs.dx >= SWIPE_THRESHOLD && !F.fired) {
+                    F.fired = true;
+                    const original = byId.get(mid) || item;
+                    setReplyTo(original);
+                    Animated.spring(F.tx, { toValue: 0, useNativeDriver: true, speed: 26, bounciness: 0 }).start();
+                  }
+                },
+                onPanResponderRelease: () => {
+                  Animated.spring(F.tx, { toValue: 0, useNativeDriver: true, speed: 26, bounciness: 0 }).start();
+                  F.fired = false;
+                },
+                onPanResponderTerminate: () => {
+                  F.tx.setValue(0);
+                  F.fired = false;
+                  cancelTap(mid);
+                },
+              });
               // NOTE: row direction is ALWAYS conversation-semantic (own right,
               // incoming left) — never row-reversed for RTL. Only text aligns.
               return (
@@ -773,44 +895,65 @@ export default function ChatDetail() {
                     </View>
                   ) : null}
                   <View
-                    onLayout={(e) => rowY.current.set(msgId(item), e.nativeEvent.layout.y)}
+                    ref={(v) => {
+                      fx(mid).view = v || fx(mid).view;
+                    }}
+                    onLayout={(e) => rowY.current.set(mid, e.nativeEvent.layout.y)}
                     style={[styles.row, own ? styles.rowOwn : styles.rowIncoming, !firstOfRun && styles.rowGrouped]}
+                    {...(Platform.OS === "web"
+                      ? ({
+                          onContextMenu: (e: any) => {
+                            try {
+                              e.preventDefault();
+                            } catch {}
+                            setMenuMsg(item);
+                          },
+                        } as any)
+                      : null)}
                   >
                     {!own ? (
-                      lastOfRun ? (
-                        // Avatar bottom-attached to the bubble unit: the slot
-                        // lifts by the reaction-cluster height when present so
-                        // the avatar never floats below the bubble.
-                        <View style={[styles.avatarSlot, hasReactions && { paddingBottom: 24 }]}>
-                          <Avatar uri={info.picture} name={info.name} size={30} />
-                        </View>
-                      ) : (
-                        <View style={[styles.avatarSlot, hasReactions && { paddingBottom: 24 }]} />
-                      )
+                      <View style={[styles.avatarSlot, hasReactions && { marginBottom: 12 }]}>
+                        {lastOfRun ? <Avatar uri={info.picture} name={info.name} size={30} /> : null}
+                      </View>
                     ) : null}
-                    <View style={[styles.bubbleCol, own ? styles.bubbleColOwn : styles.bubbleColIncoming]}>
+                    {/* Bubble-anchored unit: name + swipe mover + absolute
+                        cluster. The cluster positions against THIS wrapper
+                        (the bubble), never the row or screen. */}
+                    <View
+                      style={[
+                        styles.bubbleWrap,
+                        own ? styles.bubbleWrapOwn : styles.bubbleWrapIncoming,
+                        hasReactions && { marginBottom: 12 },
+                      ]}
+                    >
                       {showName ? (
                         <Text style={[styles.senderName, { color: theme.colors.primary }]} numberOfLines={1}>
                           {info.name}
                         </Text>
                       ) : null}
-                      <View style={styles.bubbleRow}>
-                        {own ? (
-                          <Pressable
-                            onPress={() => setMenuMsg(item)}
-                            hitSlop={10}
-                            accessibilityLabel={t("conversation.reply", "Reply")}
-                            style={styles.gutterBtn}
-                          >
-                            <Ionicons name="ellipsis-horizontal" size={14} color={theme.colors.textTertiary} style={{ opacity: 0.35 }} />
-                          </Pressable>
-                        ) : null}
+                      <Animated.View
+                        style={[
+                          styles.swipeIcon,
+                          { opacity: F.tx.interpolate({ inputRange: [18, 50], outputRange: [0, 1], extrapolate: "clamp" }) },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <Ionicons name="arrow-undo" size={18} color={theme.colors.primary} />
+                      </Animated.View>
+                      <Animated.View {...pan.panHandlers} style={{ transform: [{ translateX: F.tx }] }}>
                         {isQuick ? (
                           // Quick 🤝: no bubble chrome, large standalone emoji.
-                          <Pressable onLongPress={() => openStrip(item)} delayLongPress={350} style={styles.quickWrap}>
+                          <Pressable
+                            onPress={() => registerTap(mid, null)}
+                            onLongPress={() => setMenuMsg(item)}
+                            delayLongPress={LONG_PRESS_MS}
+                            style={styles.quickWrap}
+                          >
                             {item.replyToMessageId && !isDeleted ? (
                               <Pressable
-                                onPress={() => scrollToMessage(String(item.replyToMessageId))}
+                                onPress={() => registerTap(mid, () => scrollToMessage(String(item.replyToMessageId)))}
+                                onLongPress={() => setMenuMsg(item)}
+                                delayLongPress={LONG_PRESS_MS}
                                 style={[styles.quote, styles.quoteQuick, { borderLeftColor: theme.colors.primary }]}
                               >
                                 <Text style={[styles.quoteName, { color: theme.colors.primary }]} numberOfLines={1}>
@@ -833,8 +976,9 @@ export default function ChatDetail() {
                           </Pressable>
                         ) : (
                         <Pressable
-                          onLongPress={() => openStrip(item)}
-                          delayLongPress={350}
+                          onPress={() => registerTap(mid, null)}
+                          onLongPress={() => setMenuMsg(item)}
+                          delayLongPress={LONG_PRESS_MS}
                           style={[
                             styles.bubble,
                             own ? styles.bubbleOwn : styles.bubbleIncoming,
@@ -846,7 +990,9 @@ export default function ChatDetail() {
                         >
                           {item.replyToMessageId && !isDeleted ? (
                             <Pressable
-                              onPress={() => scrollToMessage(String(item.replyToMessageId))}
+                              onPress={() => registerTap(mid, () => scrollToMessage(String(item.replyToMessageId)))}
+                              onLongPress={() => setMenuMsg(item)}
+                              delayLongPress={LONG_PRESS_MS}
                               style={[styles.quote, { borderLeftColor: own ? "#FCF6EF" : theme.colors.primary }]}
                             >
                               <Text style={[styles.quoteName, { color: own ? "#FCF6EF" : theme.colors.primary }]} numberOfLines={1}>
@@ -875,7 +1021,13 @@ export default function ChatDetail() {
                                 dw = Math.round((420 * aw) / ah);
                               }
                               return (
-                                <Pressable key={idx} onPress={() => setPreviewImg(url)} accessibilityLabel={t("conversation.openPreview", "Open preview")}>
+                                <Pressable
+                                  key={idx}
+                                  onPress={() => registerTap(mid, () => setPreviewImg(url))}
+                                  onLongPress={() => setMenuMsg(item)}
+                                  delayLongPress={LONG_PRESS_MS}
+                                  accessibilityLabel={t("conversation.openPreview", "Open preview")}
+                                >
                                   <Image
                                     source={{ uri: url }}
                                     style={[styles.attachmentImage, { width: dw, height: dh }]}
@@ -891,14 +1043,18 @@ export default function ChatDetail() {
                               return (
                                 <Pressable
                                   key={idx}
-                                  onPress={() => {
-                                    Linking.openURL(url).catch(() =>
-                                      Alert.alert(
-                                        t("conversation.videoAttachment", "Video attachment"),
-                                        t("conversation.openVideoFailed", "Could not open video"),
-                                      ),
-                                    );
-                                  }}
+                                  onPress={() =>
+                                    registerTap(mid, () => {
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert(
+                                          t("conversation.videoAttachment", "Video attachment"),
+                                          t("conversation.openVideoFailed", "Could not open video"),
+                                        ),
+                                      );
+                                    })
+                                  }
+                                  onLongPress={() => setMenuMsg(item)}
+                                  delayLongPress={LONG_PRESS_MS}
                                   style={[styles.videoBox, { backgroundColor: own ? "rgba(0,0,0,0.18)" : theme.colors.surfaceHover }]}
                                 >
                                   <Ionicons name="play-circle" size={30} color={own ? "#FCF6EF" : theme.colors.primary} />
@@ -956,45 +1112,34 @@ export default function ChatDetail() {
                           ) : null}
                         </Pressable>
                         )}
-                        {!own ? (
+                        </Animated.View>
+                        {hasReactions ? (
                           <Pressable
-                            onPress={() => setMenuMsg(item)}
-                            hitSlop={10}
-                            accessibilityLabel={t("conversation.reply", "Reply")}
-                            style={styles.gutterBtn}
+                            onPress={() => registerTap(mid, () => setWhoMsg(item))}
+                            onLongPress={() => setMenuMsg(item)}
+                            delayLongPress={LONG_PRESS_MS}
+                            style={[styles.cluster, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
                           >
-                            <Ionicons name="ellipsis-horizontal" size={14} color={theme.colors.textTertiary} style={{ opacity: 0.35 }} />
+                            {groups.slice(0, 4).map((g) => (
+                              <Text
+                                key={g.emoji}
+                                style={[
+                                  styles.clusterText,
+                                  g.mine && { color: theme.colors.primary, fontWeight: "800" },
+                                ]}
+                              >
+                                {g.emoji}
+                                {g.count > 1 ? ` ${g.count}` : ""}
+                                {reactingId === msgId(item) ? "…" : ""}
+                              </Text>
+                            ))}
                           </Pressable>
                         ) : null}
                       </View>
                     </View>
-                    {hasReactions ? (
-                      <View style={[styles.chipRow, own ? styles.chipRowOwn : styles.chipRowIncoming]}>
-                        {!own ? <View style={styles.avatarSlot} /> : null}
-                        <Pressable
-                          onPress={() => setWhoMsg(item)}
-                          style={[styles.cluster, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-                        >
-                          {groups.slice(0, 4).map((g) => (
-                            <Text
-                              key={g.emoji}
-                              style={[
-                                styles.clusterText,
-                                g.mine && { color: theme.colors.primary, fontWeight: "800" },
-                              ]}
-                            >
-                              {g.emoji}
-                              {g.count > 1 ? ` ${g.count}` : ""}
-                              {reactingId === msgId(item) ? "…" : ""}
-                            </Text>
-                          ))}
-                        </Pressable>
-                      </View>
-                    ) : null}
                   </View>
-                </View>
-              );
-            }}
+                );
+              }}
           />
           {newArrived ? (
             <Pressable
@@ -1221,6 +1366,7 @@ export default function ChatDetail() {
           picker (same modal, pure-JS dataset, no native deps). */}
       <Modal visible={!!stripMsg} transparent animationType="fade" onRequestClose={() => setStripMsg(null)}>
         <Pressable style={styles.stripBackdrop} onPress={() => setStripMsg(null)}>
+          <View style={stripAnchorY == null ? styles.stripCenter : [styles.stripFloat, { top: stripTop }]}>
           <View style={[styles.strip, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.stripPreview, { color: theme.colors.textSecondary }]} numberOfLines={2}>
               {stripMsg ? contentLabel(stripMsg).slice(0, 100) : ""}
@@ -1303,6 +1449,7 @@ export default function ChatDetail() {
               <Text style={[styles.sheetLabel, { color: theme.colors.text }]}>{t("conversation.reply", "Reply")}…</Text>
             </Pressable>
           </View>
+          </View>
         </Pressable>
       </Modal>
 
@@ -1380,15 +1527,16 @@ const styles = StyleSheet.create({
   rowOwn: { justifyContent: "flex-end" },
   rowIncoming: { justifyContent: "flex-start" },
   avatarSlot: { width: 30, marginRight: 7, alignItems: "center", justifyContent: "flex-end" },
-  bubbleCol: { flexShrink: 1, maxWidth: "80%" },
-  bubbleColOwn: { alignItems: "flex-end" },
-  bubbleColIncoming: { alignItems: "flex-start" },
-  senderName: { fontSize: 11, fontWeight: "700", marginBottom: 3, marginLeft: 37 },
-  bubbleRow: { flexDirection: "row", alignItems: "flex-end" },
+  // Bubble-anchored unit: shrink-wrapped to the bubble itself. The reaction
+  // cluster positions absolute against THIS wrapper — never row/screen.
+  bubbleWrap: { position: "relative", flexShrink: 1, maxWidth: "80%" },
+  bubbleWrapOwn: { alignSelf: "flex-end" },
+  bubbleWrapIncoming: { alignSelf: "flex-start" },
+  swipeIcon: { position: "absolute", left: -30, top: "50%", marginTop: -11, width: 22, height: 22, alignItems: "center", justifyContent: "center" },
+  senderName: { fontSize: 11, fontWeight: "700", marginBottom: 3, marginLeft: 10 },
   bubble: { borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, flexShrink: 1 },
   bubbleOwn: {},
   bubbleIncoming: { borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" },
-  gutterBtn: { width: 26, height: 26, alignItems: "center", justifyContent: "center" },
   content: { fontSize: 14, lineHeight: 19 },
   // Standalone quick-send: no bubble chrome, Messenger Like-style.
   quickWrap: { alignItems: "flex-end", paddingVertical: 2 },
@@ -1401,11 +1549,27 @@ const styles = StyleSheet.create({
   attachmentImage: { borderRadius: 12, marginBottom: 4, backgroundColor: "#00000010" },
   videoBox: { width: 220, maxWidth: "100%", borderRadius: 12, marginBottom: 4, paddingVertical: 16, paddingHorizontal: 12, alignItems: "center", gap: 4 },
   videoText: { fontSize: 11, fontWeight: "600", textAlign: "center" },
-  // Reaction cluster: small, attached under the bubble edge. Nothing at zero.
-  chipRow: { flexDirection: "row", marginTop: -7 },
-  chipRowOwn: { justifyContent: "flex-end" },
-  chipRowIncoming: { justifyContent: "flex-start" },
-  cluster: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, marginTop: 2 },
+  // Reaction cluster: tiny pill overlapping the bubble's lower edge,
+  // anchored absolute to the bubble wrapper. Nothing at zero reactions.
+  cluster: {
+    position: "absolute",
+    bottom: -9,
+    right: 10,
+    zIndex: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 24,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+  },
   clusterText: { fontSize: 12, fontWeight: "600" },
   // Subtle in-bubble metadata (time · edited · pin · receipts).
   metaIn: { flexDirection: "row", justifyContent: "flex-end", marginTop: 3 },
@@ -1442,6 +1606,9 @@ const styles = StyleSheet.create({
   sheetCancel: { marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)" },
   // Instagram-style reaction strip: floating card, quick six + full picker.
   stripBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center", padding: 20 },
+  // Centered fallback (no anchor measured) vs anchored-near-message card.
+  stripCenter: { width: "100%", maxWidth: 360 },
+  stripFloat: { position: "absolute", left: 20, right: 20 },
   strip: { width: "100%", maxWidth: 360, borderRadius: 16, borderWidth: 1, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8 },
   stripPreview: { fontSize: 12, paddingHorizontal: 6, paddingBottom: 6 },
   stripRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },

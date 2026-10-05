@@ -5,12 +5,15 @@ import { v4 as uuidv4 } from "uuid";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 import { MongoClient } from "mongodb";
+import { assertLiveQaTarget } from "../src/lib/test-db-guard";
 
 const SUPPLIER_ID = "sup-r484-b8c3";
 const TARGET_BALANCE = 20000;
 
 async function main(){
   const uri = process.env.MONGODB_URI!;
+  // Intentional live-QA writer (fixed QA supplier id only): requires explicit opt-in.
+  assertLiveQaTarget(uri, { liveQa: true });
   const client = new MongoClient(uri, { serverSelectionTimeoutMS: 15000 });
   await client.connect();
   const db = client.db();

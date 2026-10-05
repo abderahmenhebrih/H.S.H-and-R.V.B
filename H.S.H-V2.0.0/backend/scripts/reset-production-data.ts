@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { configureDatabaseDns } from "../src/config/dns";
+import { assertRealManagerDeletable } from "../src/lib/test-db-guard";
 
 dotenv.config();
 configureDatabaseDns();
@@ -83,6 +84,15 @@ async function main() {
   await mongoose.connect(uri);
   const db = mongoose.connection.db as any;
   console.log("TARGET DATABASE:", db.databaseName);
+
+  // Phase 9: never wipe a real management account without an explicit override.
+  try {
+    await assertRealManagerDeletable(db.collection("rvb_accounts"));
+  } catch (e: any) {
+    console.error(e?.message || e);
+    await mongoose.disconnect().catch(() => {});
+    process.exit(2);
+  }
 
   const before: Record<string, number> = {};
   for (const name of DELETE_ORDER) {

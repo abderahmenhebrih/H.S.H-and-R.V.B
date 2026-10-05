@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 import { MongoClient } from "mongodb";
+import { assertLiveQaTarget } from "../src/lib/test-db-guard";
 
 const WORKER_ID = "worker-r484-xrac";
 const TARGET_BALANCE = 50000;
@@ -13,6 +14,8 @@ const STARTING_SALARY = 35000;
 
 async function main() {
   const uri = process.env.MONGODB_URI!;
+  // Intentional live-QA writer (fixed QA worker id only): requires explicit opt-in.
+  assertLiveQaTarget(uri, { liveQa: true });
   const client = new MongoClient(uri, { serverSelectionTimeoutMS: 15000 });
   await client.connect();
   const db = client.db();

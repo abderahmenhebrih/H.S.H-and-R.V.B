@@ -34,6 +34,9 @@ async function main() {
     process.exit(tests.every(([, ok]) => ok) ? 0 : 1);
   }
 
+  // Fail-closed: this suite wipes rvb_accounts. Never run against production.
+  const { assertSafeTestDatabase } = await import("./src/lib/test-db-guard");
+  assertSafeTestDatabase(uri);
   await mongoose.connect(uri);
   console.log("Connected to DB for RVB account tests");
 

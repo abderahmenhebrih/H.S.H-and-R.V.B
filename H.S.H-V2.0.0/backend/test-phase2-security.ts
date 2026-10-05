@@ -32,6 +32,9 @@ async function createApp() {
 }
 
 async function tryConnect() {
+  // Fail-closed: never let this suite touch the production database.
+  const { assertSafeTestDatabase } = await import("./src/lib/test-db-guard");
+  assertSafeTestDatabase(process.env.MONGODB_URI);
   try { await connectDatabase(); hasDb = true; }
   catch {
     const { MongoMemoryServer } = await import("mongodb-memory-server");

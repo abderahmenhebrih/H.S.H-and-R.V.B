@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 import { MongoClient } from "mongodb";
+import { assertLiveQaTarget } from "../src/lib/test-db-guard";
 
 const QA_ACCOUNTS = [
   { tag: "qa.worker.mobile", displayName: "QA Worker Mobile", role: "worker", linkedEntityType: "worker", linkedEntityId: "worker-r484-xrac" },
@@ -19,6 +20,8 @@ const QA_ACCOUNTS = [
 
 async function main() {
   const uri = process.env.MONGODB_URI!;
+  // Intentional live-QA writer: requires explicit opt-in. Uses exact qa.* tags only.
+  assertLiveQaTarget(uri, { liveQa: true });
   const client = new MongoClient(uri, { serverSelectionTimeoutMS: 15000 });
   await client.connect();
   const db = client.db();

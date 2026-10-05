@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Search } from "lucide-react";
+import { getImportantCount, getNotificationImportance, getUnreadCount, groupNotificationsByDay, notifLabel, visibleNotifications } from "../../src/lib/notification-presentation";
 import AppShell from "../../src/components/layout/AppShell";
 import { notificationService } from "../../src/services/notification.service";
 import type { Notification } from "../../src/types/entities/notification";
@@ -11,27 +12,13 @@ import { settingsService } from "../../src/services/settings.service";
 import { getDirection } from "../../src/lib/settings";
 import type { Settings } from "../../src/types/settings/settings";
 import { DEFAULT_SETTINGS } from "../../src/lib/settings";
+import NotificationItem from "../../src/components/notifications/NotificationItem";
 import styles from "./page.module.css";
 
-const FILTERS = [
-  { key: "all", label: { en: "All", fr: "Tous", ar: "الكل" } },
-  { key: "unread", label: { en: "Unread", fr: "Non lus", ar: "غير مقروءة" } },
-  { key: "orders", label: { en: "Orders", fr: "Commandes", ar: "الطلبات" } },
-  { key: "task", label: { en: "Tasks", fr: "Tâches", ar: "المهام" } },
-  { key: "financial", label: { en: "Financial", fr: "Financier", ar: "المالية" } },
-  { key: "inventory", label: { en: "Inventory", fr: "Stock", ar: "المخزون" } },
-  { key: "system", label: { en: "System", fr: "Système", ar: "النظام" } },
-] as const;
-
-function formatDateGroup(ts: number, lang: string): string {
-  const d = new Date(ts);
-  const now = new Date();
-  if (now.toDateString() === d.toDateString()) return lang === "ar" ? "اليوم" : lang === "fr" ? "Aujourd'hui" : "Today";
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (yesterday.toDateString() === d.toDateString()) return lang === "ar" ? "أمس" : lang === "fr" ? "Hier" : "Yesterday";
-  return lang === "ar" ? "سابقا" : lang === "fr" ? "Plus tôt" : "Earlier";
-}
+const FILTERS = ["all", "unread", "important"] as const;
+type PageFilter = (typeof FILTERS)[number];
+// Control-center tabs shared with the sidebar popover: All / Unread /
+// Important (important ≠ unread — read important items stay in Important).
 
 function formatTime(ts: number, lang: string): string {
   try {
@@ -79,9 +66,12 @@ export default function NotificationsPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<PageFilter>("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  // Authoritative header counts from the full non-archived dataset (not the
+  // filtered view) — same source the sidebar badge uses, no second count.
+  const [counts, setCounts] = useState({ unread: 0, important: 0, total: 0 });
 
   // PBS-BUG-038: latest-load-wins generation guard + unmount safety.
   // filter/search are captured once per load (coherent snapshot); only the
@@ -121,17 +111,29 @@ export default function NotificationsPage() {
     const activeSearch = view.search;
     setLoading(true);
     try {
+      const searchParam = activeSearch || undefined;
       if (activeFilter === "unread") {
-        const all = await notificationService.getFiltered({ type: "all", search: activeSearch || undefined });
+        const all = await notificationService.getFiltered({ type: "all", search: searchParam });
         if (!notifGuard.isCurrent(seq)) return;
         setNotifications(all.filter((n) => !n.readAt));
+      } else if (activeFilter === "important") {
+        const all = await notificationService.getFiltered({ type: "all", search: searchParam });
+        if (!notifGuard.isCurrent(seq)) return;
+        setNotifications(all.filter((n) => getNotificationImportance(n) === "important"));
       } else {
-        // Normalize legacy "tasks" to correct type "task"
-        const typeParam = activeFilter === "tasks" ? "task" : activeFilter;
-        const all = await notificationService.getFiltered({ type: typeParam, search: activeSearch || undefined });
+        const all = await notificationService.getFiltered({ type: "all", search: searchParam });
         if (!notifGuard.isCurrent(seq)) return;
         setNotifications(all);
       }
+      // Header counts always come from the unfiltered working set.
+      const full = await notificationService.getAll();
+      if (!notifGuard.isCurrent(seq)) return;
+      const vis = visibleNotifications(full);
+      setCounts({
+        unread: vis.filter((n) => !n.readAt).length,
+        important: vis.filter((n) => getNotificationImportance(n) === "important").length,
+        total: vis.length,
+      });
     } finally {
       if (notifGuard.isCurrent(seq)) {
         setLoading(false);
@@ -155,6 +157,8 @@ export default function NotificationsPage() {
       const patched = prev.map((item) =>
         item.id === id ? { ...item, readAt } : item,
       );
+      // A newly-read row leaves the Unread view only; read important items
+      // stay in Important (importance ≠ unread).
       return activeFilter === "unread"
         ? patched.filter((item) => !item.readAt)
         : patched;
@@ -175,15 +179,12 @@ export default function NotificationsPage() {
     void load();
   }, [filter, search]);
 
-  const grouped = useMemo(() => {
-    const groups: Record<string, Notification[]> = {};
-    for (const n of notifications) {
-      const key = formatDateGroup(n.createdAt, settings.language);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(n);
-    }
-    return groups;
-  }, [notifications, settings.language]);
+  // Shared Today / Yesterday / Earlier grouping (explicit order, empty
+  // groups omitted) — same model as the sidebar popover.
+  const grouped = useMemo(
+    () => groupNotificationsByDay([...notifications].sort((a, b) => b.createdAt - a.createdAt)),
+    [notifications],
+  );
 
   const t = (en: string, fr: string, ar: string) => {
     if (settings.language === "fr") return fr;
@@ -206,42 +207,58 @@ export default function NotificationsPage() {
     // succeeds (using the persisted readAt value read back from the service),
     // and a mark failure leaves state untouched. A refresh failure never
     // blocks navigation nor fabricates data.
+    // A mark failure is reported but never blocks navigation.
     if (!n.readAt) {
-      await notificationService.markAsRead(n.id);
-      await patchMarked(n.id);
+      try {
+        await notificationService.markAsRead(n.id);
+        await patchMarked(n.id);
+      } catch (err) {
+        console.error("[NotificationsPage] mark-read failed", err);
+      }
     }
     await load().catch(() => {});
-    if (n.route) router.push(n.route);
+    const route = (n.route || "").trim();
+    if (route) router.push(route);
   }
 
-  const unreadCount = notifications.filter((n) => !n.readAt).length;
+  // Header unread badge uses the authoritative full-dataset count.
+  const unreadCount = counts.unread;
 
   return (
     <AppShell activePage="settings">
       <div className={styles.header}>
         <div>
-          <h1>{t("Notifications", "Notifications", "الإشعارات")}</h1>
+          <h1>
+            {t("Notifications", "Notifications", "الإشعارات")}
+            {unreadCount > 0 && <span className={styles.headerCount}>{unreadCount > 99 ? "99+" : unreadCount}</span>}
+          </h1>
           <p>{t("Stay informed about important activity across the system.", "Restez informé des activités importantes.", "ابق على اطلاع بالأنشطة المهمة.")}</p>
         </div>
         {unreadCount > 0 && (
           <button type="button" className={styles.markAllButton} onClick={handleMarkAllRead}>
-            {t("Mark all as read", "Tout marquer comme lu", "تحديد الكل كمقروء")}
+            {notifLabel("markAllRead", settings.language)}
           </button>
         )}
       </div>
 
       <div className={styles.controls}>
-        <div className={styles.filters}>
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              className={filter === f.key ? styles.filterActive : styles.filter}
-              onClick={() => setFilter(f.key)}
-            >
-              {t(f.label.en, f.label.fr, f.label.ar)}
-            </button>
-          ))}
+        <div className={styles.filters} role="tablist" aria-label={t("Notifications", "Notifications", "الإشعارات")}>
+          {FILTERS.map((key) => {
+            const count = key === "unread" ? counts.unread : key === "important" ? counts.important : counts.total;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={filter === key}
+                className={filter === key ? styles.filterActive : styles.filter}
+                onClick={() => setFilter(key)}
+              >
+                {notifLabel(key, settings.language)}
+                <span className={styles.filterCount}>{count}</span>
+              </button>
+            );
+          })}
         </div>
         <div className={styles.searchBox}>
           <Search size={16} strokeWidth={2} aria-hidden="true" />
@@ -262,28 +279,34 @@ export default function NotificationsPage() {
       ) : notifications.length === 0 ? (
         <div className={styles.emptyState}>
           <Bell size={32} strokeWidth={1.5} aria-hidden="true" />
-          <strong>{t("No notifications", "Aucune notification", "لا توجد إشعارات")}</strong>
-          <p>{t("You're all caught up.", "Vous êtes à jour.", "أنت على اطلاع دائم.")}</p>
+          <strong>
+            {filter === "unread"
+              ? notifLabel("emptyUnreadTitle", settings.language)
+              : filter === "important"
+                ? notifLabel("emptyImportantTitle", settings.language)
+                : notifLabel("emptyAllTitle", settings.language)}
+          </strong>
+          <p>
+            {filter === "unread"
+              ? notifLabel("emptyUnreadBody", settings.language)
+              : filter === "important"
+                ? notifLabel("emptyImportantBody", settings.language)
+                : notifLabel("emptyAllBody", settings.language)}
+          </p>
         </div>
       ) : (
-        Object.entries(grouped).map(([group, items]) => (
-          <section key={group} className={styles.group}>
-            <h2 className={styles.groupTitle}>{group}</h2>
+        grouped.map((group) => (
+          <section key={group.key} className={styles.group} aria-label={notifLabel(group.key, settings.language)}>
+            <h2 className={styles.groupTitle}>{notifLabel(group.key, settings.language)}</h2>
             <div className={styles.list}>
-              {items.map((n) => (
-                <button
+              {group.items.map((n) => (
+                <NotificationItem
                   key={n.id}
-                  type="button"
-                  className={`${styles.item} ${!n.readAt ? styles.unread : ""}`}
-                  onClick={() => handleMarkRead(n)}
-                >
-                  <div className={styles.itemHeader}>
-                    <strong>{n.title}</strong>
-                    <small>{formatTime(n.createdAt, settings.language)}</small>
-                  </div>
-                  <p className={styles.itemMessage}>{n.message}</p>
-                  {!n.readAt && <span className={styles.unreadDot} />}
-                </button>
+                  notification={n}
+                  language={settings.language}
+                  showDetailDate
+                  onOpen={(item) => void handleMarkRead(item)}
+                />
               ))}
             </div>
           </section>

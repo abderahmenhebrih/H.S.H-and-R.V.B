@@ -1,0 +1,199 @@
+/* Shared notification row — compact operations-feed density (~64–82px).
+   Used by the sidebar popover and the full notifications page alike. */
+
+.item {
+  width: 100%;
+  padding: 8px 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.item:hover {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.item:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.itemUnread {
+  background: var(--panel-hover);
+  border-color: var(--border);
+}
+
+.itemUnread:hover {
+  border-color: var(--border-strong);
+}
+
+/* Important: subtle amber edge + tint. Never alarm-red unless critical. */
+.itemImportant {
+  border-inline-start: 3px solid var(--purchase-border, #b98a2f);
+}
+
+.itemCritical {
+  border-inline-start: 3px solid #b93a42;
+}
+
+.iconBox {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--panel-elevated);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.iconBox[data-tone="amber"] {
+  background: rgba(185, 138, 47, 0.12);
+  color: #9a7326;
+  border-color: rgba(185, 138, 47, 0.3);
+}
+
+.iconBox[data-tone="red"] {
+  background: rgba(185, 58, 66, 0.1);
+  color: #b93a42;
+  border-color: rgba(185, 58, 66, 0.3);
+}
+
+.iconBox[data-tone="green"] {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: var(--success-border);
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemUnread .title {
+  font-weight: 800;
+}
+
+.time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--subtle);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.detailDate {
+  font-size: 11px;
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.actionRow {
+  margin-top: 2px;
+}
+
+.actionButton {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.actionButton:hover {
+  background: var(--panel-hover);
+  border-color: var(--accent);
+}
+
+.actionButton:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.tail {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.unreadDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+
+.importantMark {
+  display: grid;
+  place-items: center;
+  color: #9a7326;
+  flex: 0 0 auto;
+}
+
+.itemCritical .importantMark {
+  color: #b93a42;
+}
+
+:global([class*="themeDark"]) .iconBox[data-tone="amber"],
+:global([class*="themeDark"]) .importantMark {
+  color: #c9a24d;
+}
+
+:global([class*="themeDark"]) .itemCritical .importantMark,
+:global([class*="themeDark"]) .iconBox[data-tone="red"] {
+  color: #d4696f;
+}

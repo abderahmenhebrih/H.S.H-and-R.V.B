@@ -11,6 +11,24 @@
   font-size: 22px;
   font-weight: 800;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.headerCount {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #B93A42;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .header p {
@@ -59,6 +77,27 @@
   font-weight: 700;
   cursor: pointer;
   border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterCount {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.18);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.filterActive .filterCount {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .filter {
@@ -109,67 +148,7 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.item {
-  width: 100%;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
   gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  text-align: start;
-  cursor: pointer;
-  position: relative;
-}
-
-.item:hover {
-  border-color: var(--border-strong);
-  background: var(--panel-hover);
-}
-
-.item.unread {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.itemHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.itemHeader strong {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.itemHeader small {
-  font-size: 11px;
-  color: var(--subtle);
-  white-space: nowrap;
-}
-
-.itemMessage {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.unreadDot {
-  position: absolute;
-  top: 14px;
-  inset-inline-end: 14px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
 }
 
 .emptyState {

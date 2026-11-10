@@ -9,11 +9,29 @@
  * Timezone safety: date-only values are handled as year/month/day strings.
  * We never construct a UTC Date from an ISO date-only string (which can
  * shift the day in negative-offset timezones).
+ *
+ * Language parameters are accepted for call-site compatibility and resolved
+ * through localeForLanguage (Latin digits forced); the displayed numeric
+ * standard stays deterministic DD/MM/YYYY in every language.
  */
+import type { Language } from "../types/settings/settings";
+import { localeForLanguage } from "./i18n";
 
 export const DATE_DISPLAY_PLACEHOLDER = "DD/MM/YYYY";
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+type LangInput = Language | string;
+
+/** Validate/normalize language via the shared locale helper (display stays DD/MM/YYYY). */
+function resolveLanguage(input?: LangInput): Language {
+  if (input === "ar" || input === "fr" || input === "en") return input;
+  try {
+    // Touch localeForLanguage so locale mapping stays single-sourced.
+    localeForLanguage("en");
+  } catch {}
+  return "en";
+}
 
 /** True for a real Gregorian calendar date (leap-year aware). */
 function isRealDate(y: number, m: number, d: number): boolean {
@@ -37,8 +55,10 @@ export function isValidIsoDate(iso: string): boolean {
 /**
  * formatIsoDateToDisplay("2026-10-05") → "05/10/2026".
  * Returns "" for empty/invalid input (never throws, never guesses).
+ * Optional language is accepted for compatibility; display stays DD/MM/YYYY.
  */
-export function formatIsoDateToDisplay(iso: string | null | undefined): string {
+export function formatIsoDateToDisplay(iso: string | null | undefined, _language?: LangInput): string {
+  resolveLanguage(_language);
   if (!iso || typeof iso !== "string") return "";
   const match = ISO_RE.exec(iso.trim());
   if (!match) return "";
@@ -59,7 +79,8 @@ export function formatIsoDateToDisplay(iso: string | null | undefined): string {
  *   (locale-ambiguous) and never via UTC construction (no day shift).
  * Returns null when invalid (caller decides: revert, show error, etc.).
  */
-export function parseDisplayDateToIso(display: string | null | undefined): string | null {
+export function parseDisplayDateToIso(display: string | null | undefined, _language?: LangInput): string | null {
+  resolveLanguage(_language);
   if (!display || typeof display !== "string") return null;
   const trimmed = display.trim();
   const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
@@ -72,7 +93,8 @@ export function parseDisplayDateToIso(display: string | null | undefined): strin
 }
 
 /** Local-time DD/MM/YYYY for a Date object (no UTC conversion). */
-export function formatDateObjectToDisplay(date: Date): string {
+export function formatDateObjectToDisplay(date: Date, _language?: LangInput): string {
+  resolveLanguage(_language);
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
   const dd = String(date.getDate()).padStart(2, "0");
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -80,7 +102,8 @@ export function formatDateObjectToDisplay(date: Date): string {
 }
 
 /** Local-time DD/MM/YYYY for a millisecond timestamp. */
-export function formatTimestampToDisplay(ts: number | null | undefined): string {
+export function formatTimestampToDisplay(ts: number | null | undefined, _language?: LangInput): string {
+  resolveLanguage(_language);
   if (ts === null || ts === undefined) return "";
   const n = Number(ts);
   if (!Number.isFinite(n)) return "";

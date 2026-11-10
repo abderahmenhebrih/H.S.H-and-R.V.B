@@ -1013,8 +1013,8 @@ export default function InvoicePage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         const code = (data as any)?.code;
-        if (code === "PAYMENT_METHOD_INVALID") throw new Error((t as any).paymentMethodInvalid || "Invalid or disabled payment method");
-        if (code === "INVOICE_CURRENCY_INVALID") throw new Error((t as any).invoiceCurrencyInvalid || "Invalid currency");
+        if (code === "PAYMENT_METHOD_INVALID") throw new Error(t.paymentMethodInvalid);
+        if (code === "INVOICE_CURRENCY_INVALID") throw new Error(t.invoiceCurrencyInvalid);
         throw new Error(data.message || t.failedIssueInvoice);
       }
       const issued = data.invoice;
@@ -1046,23 +1046,23 @@ export default function InvoicePage() {
     }
     // supplier existence check (frontend mirrors backend)
     if (!suppliers.some((s:any)=> s.id === incomingForm.supplierId)) {
-      setError((t as any).supplierNotFound || "Supplier not found");
+      setError(t.supplierNotFound);
       return;
     }
     const trimmedSupplierNumber = String(incomingForm.supplierInvoiceNumber).trim();
     if (!trimmedSupplierNumber) {
-      setError((t as any).supplierInvoiceNumberRequired || "Supplier invoice number is required");
+      setError(t.supplierInvoiceNumberRequired);
       return;
     }
     const invoiceDateMs = new Date(incomingForm.invoiceDate).getTime();
     if (!Number.isFinite(invoiceDateMs)) {
-      setError((t as any).invoiceDateInvalid || "Invalid invoice date");
+      setError(t.invoiceDateInvalid);
       return;
     }
     const allowedCurrencies = ["DA","€","$"] as const;
     const rawCur = String(incomingForm.currencyCode || "").trim();
     if (rawCur && !(allowedCurrencies as readonly string[]).includes(rawCur)) {
-      setError((t as any).invoiceCurrencyInvalid || "Invalid currency — use DA, € or $");
+      setError(t.invoiceCurrencyInvalid);
       return;
     }
     const ht = Number(incomingForm.amountHT);
@@ -1128,13 +1128,13 @@ export default function InvoicePage() {
         } else if (code === "INCOMING_AMOUNT_INVALID" || msg.includes("Amount")) {
           setError(t.invalidAmount);
         } else if (code === "SUPPLIER_NOT_FOUND" || code === "SUPPLIER_NOT_FOUND" ) {
-          setError((t as any).supplierNotFound || t.failedAddIncoming);
+          setError(t.supplierNotFound);
         } else if (code === "SUPPLIER_INVOICE_NUMBER_REQUIRED") {
-          setError((t as any).supplierInvoiceNumberRequired || t.failedAddIncoming);
+          setError(t.supplierInvoiceNumberRequired);
         } else if (code === "INVOICE_DATE_INVALID") {
-          setError((t as any).invoiceDateInvalid || t.failedAddIncoming);
+          setError(t.invoiceDateInvalid);
         } else if (code === "INVOICE_CURRENCY_INVALID") {
-          setError((t as any).invoiceCurrencyInvalid || t.failedAddIncoming);
+          setError(t.invoiceCurrencyInvalid);
         } else {
           // Show translated generic or server message if safe
           setError(serverData?.message ? `${t.failedAddIncoming}: ${serverData.message}` : t.failedAddIncoming);
@@ -1287,7 +1287,7 @@ export default function InvoicePage() {
           </button>
           <button type="button" className={`${styles.tab} ${activeTab === "drafts" ? styles.tabActive : ""}`} onClick={() => setActiveTab("drafts")}>
             <FileText size={16} strokeWidth={2} aria-hidden="true" />
-            {(t as any).drafts || "Drafts"} {draftInvoices.length > 0 && <span className={styles.badge}>{draftInvoices.length}</span>}
+            {t.drafts} {draftInvoices.length > 0 && <span className={styles.badge}>{draftInvoices.length}</span>}
           </button>
         </div>
 
@@ -1457,7 +1457,7 @@ export default function InvoicePage() {
                   <StyledSelect
                     value={selectedSaleId}
                     onChange={setSelectedSaleId}
-                    placeholder={(t as any).selectSourceSale ?? t.selectSale}
+                    placeholder={t.selectSourceSale}
                     ariaLabel={t.sourceSale}
                     options={filteredSales.map(s => {
                       const total = s.items.reduce((sum, it) => sum + it.total, 0);
@@ -1677,14 +1677,14 @@ export default function InvoicePage() {
         {activeTab === "drafts" && (
           <section className={styles.historySection}>
             <div className={styles.sectionHeader}>
-              <h2>{(t as any).drafts || "Drafts"}</h2>
-              <span style={{ fontSize: 12, color: "var(--muted)" }}>{draftInvoices.length} {(t as any).drafts?.toLowerCase() || "drafts"}</span>
+              <h2>{t.drafts}</h2>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>{draftInvoices.length} {t.drafts.toLowerCase()}</span>
             </div>
             {draftInvoices.length === 0 ? (
               <div className={styles.emptyState}>
                 <FileText size={32} strokeWidth={1.5} aria-hidden="true" />
-                <h3>{(t as any).noDrafts || "No drafts"}</h3>
-                <p>{(t as any).draftsDesc || "Unfinished invoices"}</p>
+                <h3>{t.noDrafts}</h3>
+                <p>{t.draftsDesc}</p>
               </div>
             ) : (
               <div className={styles.tableCard}>
@@ -1704,7 +1704,7 @@ export default function InvoicePage() {
                     <span>{formatTimestampToDisplay(inv.invoiceDate)}</span>
                     <strong>{formatCurrency(inv.totalTTC, inv.currencyCode as Currency)}</strong>
                     <div className={styles.rowActions}>
-                      <button type="button" className={styles.iconButton} title={(t as any).editDraft || "Edit"} aria-label={(t as any).editDraft || "Edit"} onClick={() => {
+                      <button type="button" className={styles.iconButton} title={t.editDraft} aria-label={t.editDraft} onClick={() => {
                         // Load draft into create form - same ID editing
                         setEditingDraftId(inv.id);
                         setSelectedSellerId(inv.sellerProfileId);
@@ -1721,7 +1721,7 @@ export default function InvoicePage() {
                         setActiveTab("create");
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}><Pencil size={16} strokeWidth={2} aria-hidden="true" /></button>
-                      <button type="button" className={styles.iconButtonDanger} title={(t as any).deleteDraft || "Delete"} aria-label={(t as any).deleteDraft || "Delete"} onClick={() => setDraftDeleteTarget(inv as any)}><Trash2 size={16} strokeWidth={2} aria-hidden="true" /></button>
+                      <button type="button" className={styles.iconButtonDanger} title={t.deleteDraft} aria-label={t.deleteDraft} onClick={() => setDraftDeleteTarget(inv as any)}><Trash2 size={16} strokeWidth={2} aria-hidden="true" /></button>
                     </div>
                   </div>
                 ))}
@@ -1768,7 +1768,7 @@ export default function InvoicePage() {
                 <input type="number" step="0.01" value={incomingForm.amountTTC} onChange={e=>setIncomingForm({...incomingForm, amountTTC: e.target.value})} />
               </label>
               <label>
-                <span>{(t as any).currency || "Currency"}</span>
+                <span>{t.currency}</span>
                 <input value={incomingForm.currencyCode} onChange={e=>setIncomingForm({...incomingForm, currencyCode: e.target.value as any})} />
               </label>
               <label className={styles.fullWidth}>
@@ -1840,7 +1840,8 @@ export default function InvoicePage() {
         cancelLabel={t.cancel}
         deletingLabel={t.saving}
         eyebrowLabel={t.permanentAction}
-        countdownWaitingLabel={(t as any).confirmAvailableIn ?? (t as any).confirmDeletion}
+        countdownWaitingLabel={t.confirmAvailableIn}
+        language={language}
         isDeleting={incomingDeleting}
         onCancel={() => setIncomingDeleteTarget(null)}
         onConfirm={handleDeleteIncomingConfirmed}
@@ -1849,14 +1850,15 @@ export default function InvoicePage() {
 
       <ProtectedDeleteModal
         isOpen={!!draftDeleteTarget}
-        title={(t as any).deleteDraft || "Delete Draft"}
+        title={t.deleteDraft}
         entityName={draftDeleteTarget?.id ? `${(draftDeleteTarget as any).customerSnapshot?.name || draftDeleteTarget.customerId} · ${formatTimestampToDisplay((draftDeleteTarget as any).invoiceDate)}` : draftDeleteTarget?.id}
-        description={(t as any).draftsDesc || "Unfinished invoices — edit or delete before issuing."}
+        description={t.draftsDesc}
         confirmLabel={t.confirmDelete}
         cancelLabel={t.cancel}
         deletingLabel={t.saving}
         eyebrowLabel={t.permanentAction}
-        countdownWaitingLabel={(t as any).confirmAvailableIn ?? (t as any).confirmDeletion}
+        countdownWaitingLabel={t.confirmAvailableIn}
+        language={language}
         isDeleting={draftDeleting}
         onCancel={() => setDraftDeleteTarget(null)}
         onConfirm={handleDraftDeleteConfirmed}

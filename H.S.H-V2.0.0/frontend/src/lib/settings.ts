@@ -90,6 +90,23 @@ export function adoptSettingsSilent(next: Settings): void {
   writeMirroredNavigationStyle(resolveNavigationStyle(next.navigationStyle));
 }
 
+// Best-effort pre-paint language hint for fresh loads (IndexedDB is async).
+// The canonical language lives in Dexie; this localStorage copy (shared with
+// the RVB presentation service fallback) lets layout.tsx's languageInitScript
+// set <html lang/dir> synchronously on the next load, avoiding an LTR flash.
+// It is a hint only: canonical Dexie state remains authoritative after
+// hydration, and an authenticated RVB account preference still wins inside
+// the RVB service. Never a runtime value source for rendering.
+export const RVB_LANGUAGE_HINT_STORAGE_KEY = "rvb-ui-language";
+
+function writeRvbLanguageHint(language: Language): void {
+  try {
+    if (typeof window !== "undefined" && (language === "en" || language === "fr" || language === "ar")) {
+      window.localStorage.setItem(RVB_LANGUAGE_HINT_STORAGE_KEY, language);
+    }
+  } catch {}
+}
+
 // ONE subscription/update path for canonical settings mutations.
 // Publishes the SAME canonical detail to the shared live cache, the mirror,
 // and both event channels. Callers must persist via the canonical settings
@@ -97,6 +114,7 @@ export function adoptSettingsSilent(next: Settings): void {
 export function publishSettings(next: Settings): void {
   cachedSettings = next;
   writeMirroredNavigationStyle(resolveNavigationStyle(next.navigationStyle));
+  writeRvbLanguageHint(next.language);
   try {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));

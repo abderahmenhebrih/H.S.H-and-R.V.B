@@ -103,6 +103,20 @@ const TR: Record<Language, any> = {
     archivedCannotSend: "Archived account cannot send messages",
     historyRemains: "Historical messages remain",
     socketDisconnected: "Disconnected — reconnecting…",
+    messageTooLong: "Message too long",
+    sendFailed: "Send failed",
+    deleteConfirm: "Delete message?",
+    deleteFailed: "Delete failed",
+    pinFailed: "Pin failed",
+    leaveConfirm: "Leave group?",
+    leaveFailed: "Leave failed",
+    dmFailed: "DM failed",
+    groupRequired: "Name and members required",
+    groupFailed: "Group failed",
+    auditFailed: "Audit failed",
+    addMemberPrompt: "Add member @tag",
+    notFound: "Not found",
+    updateFailed: "Update failed",
   },
   fr: {
     chats: "Discussions",
@@ -189,6 +203,20 @@ const TR: Record<Language, any> = {
     archivedCannotSend: "Compte archivé ne peut envoyer",
     historyRemains: "Historique conservé",
     socketDisconnected: "Déconnecté — reconnexion…",
+    messageTooLong: "Message trop long",
+    sendFailed: "Échec d'envoi",
+    deleteConfirm: "Supprimer le message ?",
+    deleteFailed: "Échec de suppression",
+    pinFailed: "Échec d'épinglage",
+    leaveConfirm: "Quitter le groupe ?",
+    leaveFailed: "Échec",
+    dmFailed: "Échec DM",
+    groupRequired: "Nom et membres requis",
+    groupFailed: "Échec du groupe",
+    auditFailed: "Échec d'audit",
+    addMemberPrompt: "Ajouter membre @tag",
+    notFound: "Introuvable",
+    updateFailed: "Échec de mise à jour",
   },
   ar: {
     chats: "المحادثات",
@@ -275,6 +303,20 @@ const TR: Record<Language, any> = {
     archivedCannotSend: "الحساب المؤرشف لا يمكنه الإرسال",
     historyRemains: "السجل محفوظ",
     socketDisconnected: "انقطع الاتصال — إعادة المحاولة…",
+    messageTooLong: "الرسالة طويلة جداً",
+    sendFailed: "فشل الإرسال",
+    deleteConfirm: "حذف الرسالة؟",
+    deleteFailed: "فشل الحذف",
+    pinFailed: "فشل التثبيت",
+    leaveConfirm: "مغادرة المجموعة؟",
+    leaveFailed: "فشل المغادرة",
+    dmFailed: "فشلت الرسالة",
+    groupRequired: "الاسم والأعضاء مطلوبان",
+    groupFailed: "فشل المجموعة",
+    auditFailed: "فشل التدقيق",
+    addMemberPrompt: "إضافة عضو @tag",
+    notFound: "غير موجود",
+    updateFailed: "فشل التحديث",
   },
 } as const;
 
@@ -614,7 +656,7 @@ function ChatsInner() {
   const handleSend = async () => {
     const text = composer.trim();
     if ((!text && !stagedFile && !uploadedAttachment) || !selectedId) return;
-    if (text.length > 2000) { alert("Message too long"); return; }
+    if (text.length > 2000) { alert(t.messageTooLong); return; }
     // Check archived cannot send: backend will reject, but disable UI if user archived? user is active via auth
     const trimmed = text;
     // Reminder handling — server-trusted minutes (30|60|120)
@@ -661,7 +703,7 @@ function ChatsInner() {
       setComposer(prevComposer);
       // Keep staged/uploaded media so retry reuses the upload id.
       setAttachError(e?.data?.code || e?.message ? String(e?.data?.code || e?.message) : t.uploadFailed);
-      alert(e?.data?.code || e?.message || "Send failed");
+      alert(t.sendFailed);
     } finally { setSending(false); }
   };
 
@@ -706,11 +748,11 @@ function ChatsInner() {
     composerRef.current?.focus();
   };
   const handleDelete = async (m: Message) => {
-    if (!confirm("Delete message?")) return;
+    if (!confirm(t.deleteConfirm)) return;
     try {
       await chatService.deleteMessage(m.id);
       setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, isDeleted: true, content: t.deleted } : x)));
-    } catch (e: any) { alert(e?.message || "Delete failed"); }
+    } catch (e: any) { alert(t.deleteFailed); }
   };
   const handleReaction = async (m: Message) => {
     try {
@@ -725,17 +767,17 @@ function ChatsInner() {
       const conv = isPinned ? await chatService.unpin(selectedId, m.id) : await chatService.pin(selectedId, m.id);
       setSelectedConv(conv);
     } catch (e: any) {
-      alert(e?.data?.code === "RVB_PIN_LIMIT" ? t.maxPinned : e?.message || "Pin failed");
+      alert(e?.data?.code === "RVB_PIN_LIMIT" ? t.maxPinned : t.pinFailed);
     }
   };
   const handleLeave = async () => {
     if (!selectedId || !selectedConv || selectedConv.isSystemManaged) return;
-    if (!confirm(t.leaveGroup + "?")) return;
+    if (!confirm(t.leaveConfirm)) return;
     try {
       await chatService.leave(selectedId);
       setSelectedId(null); setSelectedConv(null); setMessages([]);
       void loadConversations();
-    } catch (e: any) { alert(e?.message || "Leave failed"); }
+    } catch (e: any) { alert(t.leaveFailed); }
   };
 
   // Directory load for new chat
@@ -762,17 +804,17 @@ function ChatsInner() {
       handleCategoryChange("secondary");
       await loadConversations();
       void handleSelect(conv.id);
-    } catch (e: any) { alert(e?.data?.code || e?.message || "DM failed"); }
+    } catch (e: any) { alert(t.dmFailed); }
   };
   const handleCreateGroup = async () => {
-    if (!groupName.trim() || groupMembers.length === 0) { alert("Name and members required"); return; }
+    if (!groupName.trim() || groupMembers.length === 0) { alert(t.groupRequired); return; }
     try {
       const conv = await chatService.createGroup({ name: groupName.trim(), avatar: groupAvatar, memberIds: groupMembers });
       setShowNewChat(null); setGroupName(""); setGroupMembers([]); setGroupAvatar(null);
       handleCategoryChange("secondary");
       await loadConversations();
       void handleSelect(conv.id);
-    } catch (e: any) { alert(e?.data?.code || e?.message || "Group failed"); }
+    } catch (e: any) { alert(t.groupFailed); }
   };
 
   const handleMessageSearch = async () => {
@@ -784,7 +826,7 @@ function ChatsInner() {
     try {
       const data = await chatService.getAudit(m.id);
       setAuditData(data);
-    } catch (e: any) { alert(e?.data?.code || "Audit failed"); }
+    } catch (e: any) { alert(t.auditFailed); }
   };
 
   // Group official sections for main
@@ -1149,7 +1191,7 @@ function ChatsInner() {
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                       <button className={styles.secondaryButton} onClick={() => {
                         const n = prompt(t.groupName, selectedConv.name || "");
-                        if (n && n.trim()) chatService.updateGroup(selectedConv.id, { name: n.trim() }).then((c) => setSelectedConv(c)).catch((e) => alert(e.message));
+                        if (n && n.trim()) chatService.updateGroup(selectedConv.id, { name: n.trim() }).then((c) => setSelectedConv(c)).catch(() => alert(t.updateFailed));
                       }}>{t.renameGroup}</button>
                     </div>
                   )}
@@ -1172,14 +1214,14 @@ function ChatsInner() {
                     <button className={styles.secondaryButton} style={{ marginTop: 10, width: "100%" }} onClick={async () => {
                       setShowNewChat("dm"); // reuse dir for adding
                       // For now prompt add
-                      const tag = prompt("Add member @tag");
+                      const tag = prompt(t.addMemberPrompt);
                       if (!tag) return;
                       const found = dirAccounts.find((a) => a.tag.toLowerCase() === tag.toLowerCase().replace(/^@/, ""));
-                      if (!found) { alert("Not found"); return; }
+                      if (!found) { alert(t.notFound); return; }
                       try {
                         const c = await chatService.updateGroup(selectedConv.id, { addMemberIds: [found.id] });
                         setSelectedConv(c); void loadConversations();
-                      } catch (e: any) { alert(e.message); }
+                      } catch (e: any) { alert(t.updateFailed); }
                     }}><UserPlus size={12} />{t.addMembers}</button>
                   )}
                 </div>

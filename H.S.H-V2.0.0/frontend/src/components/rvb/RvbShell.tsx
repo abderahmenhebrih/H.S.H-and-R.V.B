@@ -104,6 +104,10 @@ const translations = {
     subtitle: "The Kingdom of White Meat",
     openMenu: "Open navigation",
     closeMenu: "Close navigation",
+    toggleTheme: "Toggle theme",
+    themeToLight: "Switch to light mode",
+    themeToDark: "Switch to dark mode",
+    signOut: "Sign Out",
     rvbBrandName: "The Kingdom of White Meat",
     rvbAbbreviation: "RVB",
     switchToHsh: "Access HSH",
@@ -146,6 +150,10 @@ const translations = {
     subtitle: "Le Royaume des Viandes Blanches",
     openMenu: "Ouvrir la navigation",
     closeMenu: "Fermer la navigation",
+    toggleTheme: "Changer de thème",
+    themeToLight: "Passer en mode clair",
+    themeToDark: "Passer en mode sombre",
+    signOut: "Se déconnecter",
     rvbBrandName: "Le royaume des viandes blanches",
     rvbAbbreviation: "RVB",
     switchToHsh: "Accéder à HSH",
@@ -188,6 +196,10 @@ const translations = {
     subtitle: "مملكة اللحوم البيضاء",
     openMenu: "فتح قائمة التنقل",
     closeMenu: "إغلاق قائمة التنقل",
+    toggleTheme: "تبديل المظهر",
+    themeToLight: "التبديل إلى الوضع الفاتح",
+    themeToDark: "التبديل إلى الوضع الداكن",
+    signOut: "تسجيل الخروج",
     rvbBrandName: "مملكة اللحوم البيضاء",
     rvbAbbreviation: "RVB",
     switchToHsh: "الدخول إلى HSH",
@@ -398,23 +410,23 @@ export default function RvbShell({
   const hero = t.hero[activePage] ?? t.hero.dashboard;
 
   const navLabels: Record<string, string> = {
-    dashboard: (t.nav as any).dashboard,
-    accounts: (t.nav as any).accounts,
-    workers: (t.nav as any).workers,
-    suppliers: (t.nav as any).suppliers,
-    customers: (t.nav as any).customers,
-    orders: (t.nav as any).orders,
-    requests: (t.nav as any).requests,
-    chats: (t.nav as any).chats,
-    mainChats: (t.nav as any).mainChats,
-    secondaryChats: (t.nav as any).secondaryChats,
-    profile: (t.nav as any).profile,
-    notifications: (t.nav as any).notifications,
-    directory: (t.nav as any).directory,
-    search: (t.nav as any).search,
-    settings: (t.nav as any).settings,
-    people: (t.nav as any).people,
-    operations: (t.nav as any).operations,
+    dashboard: t.nav.dashboard,
+    accounts: t.nav.accounts,
+    workers: t.nav.workers,
+    suppliers: t.nav.suppliers,
+    customers: t.nav.customers,
+    orders: t.nav.orders,
+    requests: t.nav.requests,
+    chats: t.nav.chats,
+    mainChats: t.nav.mainChats,
+    secondaryChats: t.nav.secondaryChats,
+    profile: t.nav.profile,
+    notifications: t.nav.notifications,
+    directory: t.nav.directory,
+    search: t.nav.search,
+    settings: t.nav.settings,
+    people: t.nav.people,
+    operations: t.nav.operations,
   };
 
   // Grouped classic sidebar partition (canonical paths only — portal
@@ -447,11 +459,11 @@ export default function RvbShell({
   const isSupervisor = user?.role === "supervisor";
   const isSecondary = user && ["worker","supplier","customer","supervisor"].includes(user.role);
   const portalNav: NavItem[] = [
-    { icon: MessagesSquare, key: "chats" as any, label: (t.nav as any).mainChats, path: "/rvb/chats?category=main" },
-    { icon: Inbox, key: "chats" as any, label: (t.nav as any).secondaryChats, path: "/rvb/chats?category=secondary" },
-    { icon: LayoutDashboard, key: "dashboard" as any, label: (t.nav as any).profile || (t.nav as any).dashboard, path: "/rvb" },
-    { icon: Search, key: "directory" as any, label: (t.nav as any).search || (t.nav as any).directory, path: "/rvb/directory" },
-    { icon: SettingsIcon, key: "settings" as any, label: (t.nav as any).settings, path: "/rvb/settings" },
+    { icon: MessagesSquare, key: "chats" as any, label: t.nav.mainChats, path: "/rvb/chats?category=main" },
+    { icon: Inbox, key: "chats" as any, label: t.nav.secondaryChats, path: "/rvb/chats?category=secondary" },
+    { icon: LayoutDashboard, key: "dashboard" as any, label: t.nav.dashboard, path: "/rvb" },
+    { icon: Search, key: "directory" as any, label: t.nav.directory, path: "/rvb/directory" },
+    { icon: SettingsIcon, key: "settings" as any, label: t.nav.settings, path: "/rvb/settings" },
   ];
   const supervisorNav: NavItem[] = [
     ...portalNav,
@@ -514,8 +526,10 @@ export default function RvbShell({
   const rvbPeopleItems = visibleNav.filter((item) => RVB_PEOPLE_PATHS.includes(item.path));
   const rvbOperationsItems = visibleNav.filter((item) => RVB_OPERATIONS_PATHS.includes(item.path));
 
+  // Translated labels always win; canonical English `item.label` and the
+  // raw key are code-only fallbacks and are never preferred over `t`.
   function rvbDisplayLabel(item: NavItem): string {
-    return (item.label as string) || (navLabels as any)[item.key] || String(item.key);
+    return (navLabels as any)[item.key] || (item.label as string) || String(item.key);
   }
 
   // Floating radial entries reuse canonical icons/routes/labels.
@@ -689,7 +703,7 @@ export default function RvbShell({
       {sidebarOpen && (
         <button
           className={dashboardStyles.overlay}
-          aria-label="Close menu"
+          aria-label={t.closeMenu}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -714,16 +728,16 @@ export default function RvbShell({
       >
         <div
           className={dashboardStyles.sidebarBrand}
-          title={isDesktopCollapsed ? (t as any).rvbBrandName ?? t.brand : undefined}
+          title={isDesktopCollapsed ? t.rvbBrandName : undefined}
         >
-          <div className={dashboardStyles.brandLogo} title={isDesktopCollapsed ? (t as any).rvbBrandName ?? t.brand : undefined}>
+          <div className={dashboardStyles.brandLogo} title={isDesktopCollapsed ? t.rvbBrandName : undefined}>
             <img src="/chicken.jpg" alt="RVB logo" />
           </div>
           <div className={dashboardStyles.sidebarBrandContent}>
             <div className={dashboardStyles.sidebarBrandTitleRow}>
-              <span className={dashboardStyles.sidebarBrandTitle}>{(t as any).rvbBrandName ?? t.brand}</span>
+              <span className={dashboardStyles.sidebarBrandTitle}>{t.rvbBrandName}</span>
             </div>
-            <span className={dashboardStyles.sidebarBrandSubtitle}>{(t as any).rvbAbbreviation ?? "RVB"}</span>
+            <span className={dashboardStyles.sidebarBrandSubtitle}>{t.rvbAbbreviation}</span>
           </div>
         </div>
 
@@ -766,8 +780,8 @@ export default function RvbShell({
               type="button"
               className={dashboardStyles.rvbSignOut}
               onClick={async () => { await logout(); router.replace("/rvb/login"); }}
-              title="Sign Out"
-              aria-label="Sign Out"
+              title={t.signOut}
+              aria-label={t.signOut}
               style={{ width: 32, height: 32, placeItems: "center", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--muted)", cursor: "pointer", flex: "0 0 32px" }}
             >
               <LogOut size={14} strokeWidth={2} />
@@ -784,8 +798,8 @@ export default function RvbShell({
               type="button"
               className={dashboardStyles.sidebarUtilityButton}
               onClick={toggleTheme}
-              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-              title={dark ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={dark ? t.themeToLight : t.themeToDark}
+              title={dark ? t.themeToLight : t.themeToDark}
             >
               {dark ? (
                 <Sun size={18} strokeWidth={2} aria-hidden="true" />
@@ -844,11 +858,11 @@ export default function RvbShell({
         onNavigate={navigate}
         dark={dark}
         onToggleTheme={toggleTheme}
-        themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
+        themeLabel={dark ? t.themeToLight : t.themeToDark}
         onOpenSettings={() => navigate("/rvb/settings")}
         settingsLabel={navLabels.settings}
         onAccessRvb={rvbFloatConfig.canSeeHsh ? handleSwitchToHsh : handleRvbSignOut}
-        rvbLabel={rvbFloatConfig.canSeeHsh ? t.switchToHsh : "Sign Out"}
+        rvbLabel={rvbFloatConfig.canSeeHsh ? t.switchToHsh : t.signOut}
         utilityActionIcon={rvbFloatConfig.canSeeHsh ? "hsh" : "signout"}
         bell={<RvbNotificationBell language={settings.language} dark={dark} />}
       />
@@ -861,7 +875,7 @@ export default function RvbShell({
               type="button"
               className={dashboardStyles.menuButton}
               onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
+              aria-label={t.openMenu}
             >
               <Menu size={18} strokeWidth={2} aria-hidden="true" />
             </button>
@@ -869,14 +883,14 @@ export default function RvbShell({
 
           <div className={dashboardStyles.mobileBrand}>
             <img src="/chicken.jpg" alt="" />
-            <span>{(t as any).rvbBrandName ?? t.brand}</span>
+            <span>{t.rvbBrandName}</span>
           </div>
 
           <button
             type="button"
             className={dashboardStyles.mobileTheme}
             onClick={toggleTheme}
-            aria-label="Toggle theme"
+            aria-label={t.toggleTheme}
           >
             {dark ? (
               <Sun size={18} strokeWidth={2} aria-hidden="true" />

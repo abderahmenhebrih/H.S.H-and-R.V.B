@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronUp, FileDown, Printer, RefreshCw } from "lucide-react";
 import StyledSelect from "../../../src/components/common/StyledSelect";
-import { getPrinters, printReport, downloadReportPdf, APP_PDF_PRINTER, APP_PDF_LABEL } from "../../../src/services/printing.service";
+import { getPrinters, printReport, downloadReportPdf, APP_PDF_PRINTER, APP_PDF_LABEL, APP_PDF_LABELS } from "../../../src/services/printing.service";
 import type { PrinterInfo } from "../../../src/services/printing.service";
 import { productService } from "../../../src/services/product.service";
 import { supplierService } from "../../../src/services/supplier.service";
@@ -519,7 +519,7 @@ function PrintPreviewInner() {
     if (category === "customers") return customers.map((c) => ({ id: c.id, name: c.name }));
     if (category === "accounts") return accounts.map((a) => ({ id: a.id, name: a.name }));
     if (category === "workers") return workers.filter((w) => w.status === "active").map((w) => ({ id: w.id, name: w.name }));
-    if (category === "expenses") return [{ id: "all", name: "Expenses" }];
+    if (category === "expenses") return [{ id: "all", name: t.expenses }];
     if (category === "vehicles") return vehicles.map((v) => ({ id: v.id, name: v.name }));
     return [];
   }
@@ -588,7 +588,7 @@ function PrintPreviewInner() {
               {paymentsForCustomer.map((p) => (
                 <tr key={p.id}>
                   <td>{formatDateLocalized(p.date, language)}</td>
-                  <td>Payment</td>
+                  <td>{t.payment}</td>
                   <td>—</td>
                   <td>—</td>
                   <td>—</td>
@@ -659,7 +659,7 @@ function PrintPreviewInner() {
                 <tr key={p.id}><td>{formatDateLocalized(p.date, language)}</td><td>{p.entityType} · {formatCurrency(p.amount, currency)}</td><td>{p.note ?? ""}</td></tr>
               ))}
               {trans.map((tr) => (
-                <tr key={tr.id}><td>{formatDateLocalized(tr.date, language)}</td><td>Transfer {formatCurrency(tr.amount, currency)}</td><td>{tr.note ?? ""}</td></tr>
+                <tr key={tr.id}><td>{formatDateLocalized(tr.date, language)}</td><td>{t.transfer} {formatCurrency(tr.amount, currency)}</td><td>{tr.note ?? ""}</td></tr>
               ))}
               {exps.map((e) => (
                 <tr key={e.id}><td>{formatDateLocalized(e.date, language)}</td><td>{e.name} · {formatCurrency(e.amount, currency)}</td><td>{e.note ?? ""}</td></tr>
@@ -742,7 +742,7 @@ function PrintPreviewInner() {
     if (category === "expenses") {
       return (
         <div className={reportStyles.printEntitySection}>
-          <h3 className={reportStyles.printEntityTitle}>Expenses</h3>
+          <h3 className={reportStyles.printEntityTitle}>{t.expenses}</h3>
           {renderPrintTableForEntity("all")}
         </div>
       );
@@ -875,7 +875,7 @@ function PrintPreviewInner() {
           </div>
           <button type="button" className={styles.secondaryButton} onClick={() => router.push("/")}>
             <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
-            Go to Dashboard
+            {t.goToDashboard}
           </button>
         </header>
 
@@ -909,8 +909,8 @@ function PrintPreviewInner() {
                       <div className={reportStyles.printMeta}>
                         <span>{t.category}: {getCategoryLabel(category)}</span>
                         <span>{t.entity}: {eid === "all" ? t.all : getEntityDisplayName(eid)}</span>
-                        <span>Period: {formatPeriodDate(fromDate, language)} → {formatPeriodDate(toDate, language)}</span>
-                        <span>Generated: {formatGeneratedDate(language).split(" ")[0]} {formatGeneratedDate(language).split(" ")[1] || ""}</span>
+                        <span>{t.period}: {formatPeriodDate(fromDate, language)} → {formatPeriodDate(toDate, language)}</span>
+                        <span>{t.generated}: {formatGeneratedDate(language).split(" ")[0]} {formatGeneratedDate(language).split(" ")[1] || ""}</span>
                       </div>
                     </div>
                     <div className={`${reportStyles.printBody} ${!showHeaderFooter ? reportStyles.noHeaderFooter : ""}`}>
@@ -957,7 +957,7 @@ function PrintPreviewInner() {
                       onChange={setSelectedPrinter}
                       placeholder={t.selectPrinter}
                       ariaLabel={t.choosePrinter}
-                      options={printers.map((p) => ({ value: p.name, label: p.name === APP_PDF_PRINTER ? APP_PDF_LABEL : p.name }))}
+                      options={printers.map((p) => ({ value: p.name, label: p.name === APP_PDF_PRINTER ? (APP_PDF_LABELS[language] ?? APP_PDF_LABEL) : p.name }))}
                     />
                   )}
                 </div>
@@ -1007,9 +1007,9 @@ function PrintPreviewInner() {
                   if (!Number.isFinite(n) || n < 1) setCopies(1);
                 }}
                 className={styles.copiesInput}
-                aria-label="Copies"
+                aria-label={t.copies}
                 disabled={isAppPdf}
-                title={isAppPdf ? "{t.copiesHint}" : undefined}
+                title={isAppPdf ? t.copiesHint : undefined}
                 style={isAppPdf ? { opacity: 0.5 } : undefined}
               />
               {isAppPdf && <span className={styles.fieldHint}>{t.copiesHint}</span>}
@@ -1051,9 +1051,9 @@ function PrintPreviewInner() {
               className={styles.showMoreButton}
               onClick={() => setShowMoreSettings((v) => !v)}
               aria-expanded={showMoreSettings}
-              aria-label="Show more print settings"
+              aria-label={showMoreSettings ? t.showLess : t.showMore}
             >
-              <span>{showMoreSettings ? "Show less" : "Show more"}</span>
+              <span>{showMoreSettings ? t.showLess : t.showMore}</span>
               {showMoreSettings ? <ChevronUp size={16} strokeWidth={2} aria-hidden="true" /> : <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />}
             </button>
 
@@ -1106,7 +1106,7 @@ function PrintPreviewInner() {
             )}
 
             <button type="button" className={styles.secondaryButton} onClick={resetSettings}>
-              Reset settings
+              {t.resetSettings}
             </button>
 
             <button
@@ -1124,12 +1124,12 @@ function PrintPreviewInner() {
               ) : isAppPdf ? (
                 <>
                   <FileDown size={16} strokeWidth={2} aria-hidden="true" />
-                  Save PDF
+                  {t.savePdf}
                 </>
               ) : (
                 <>
                   <Printer size={16} strokeWidth={2} aria-hidden="true" />
-                  Print
+                  {t.print}
                 </>
               )}
             </button>
@@ -1139,14 +1139,14 @@ function PrintPreviewInner() {
               </div>
             )}
             <button type="button" className={styles.fallbackButton} onClick={handleSystemPrint}>
-              Open system print dialog
+              {t.openSystemPrint}
             </button>
 
             <div className={styles.reportDetailsBox}>
               <h4>{t.reportDetails}</h4>
               <div className={styles.detailRow}>
                 <span>{t.report}</span>
-                <strong>{getCategoryLabel(category)} Report</strong>
+                <strong>{getCategoryLabel(category)} {t.reportSuffix}</strong>
               </div>
               <div className={styles.detailRow}>
                 <span>{t.category}</span>
@@ -1154,7 +1154,7 @@ function PrintPreviewInner() {
               </div>
               <div className={styles.detailRow}>
                 <span>{t.entity}</span>
-                <strong>{entityId === "all" ? "All" : getEntityDisplayName(entityId)}</strong>
+                <strong>{entityId === "all" ? t.all : getEntityDisplayName(entityId)}</strong>
               </div>
               <div className={styles.detailRow}>
                 <span>{t.period}</span>
@@ -1190,12 +1190,12 @@ function PrintPreviewInner() {
                 </div>
               )}
               <div className={reportStyles.printTitleBlock}>
-                <h2>{getCategoryLabel(category).toUpperCase()} REPORT</h2>
+                <h2>{getCategoryLabel(category).toUpperCase()} {t.reportSuffix}</h2>
                 <div className={reportStyles.printMeta}>
-                  <span>Category: {getCategoryLabel(category)}</span>
-                  <span>Entity: {eid === "all" ? getCategoryLabel(category) : getEntityDisplayName(eid)}</span>
-                  <span>Period: {formatPeriodDate(fromDate, language)} → {formatPeriodDate(toDate, language)}</span>
-                  <span>Generated: {formatGeneratedDate(language).split(" ")[0]} {formatGeneratedDate(language).split(" ")[1] || ""}</span>
+                  <span>{t.category}: {getCategoryLabel(category)}</span>
+                  <span>{t.entity}: {eid === "all" ? getCategoryLabel(category) : getEntityDisplayName(eid)}</span>
+                  <span>{t.period}: {formatPeriodDate(fromDate, language)} → {formatPeriodDate(toDate, language)}</span>
+                  <span>{t.generated}: {formatGeneratedDate(language).split(" ")[0]} {formatGeneratedDate(language).split(" ")[1] || ""}</span>
                 </div>
               </div>
               <div className={`${reportStyles.printBody} ${!showHeaderFooter ? reportStyles.noHeaderFooter : ""}`}>
@@ -1216,7 +1216,7 @@ function PrintPreviewInner() {
 
 export default function PrintPreviewPage() {
   return (
-    <Suspense fallback={<div className={`${styles.standalonePage} themeLight`}><main className={styles.reportsPage}><div className={styles.statePanel}><h2>Loading reports...</h2></div></main></div>}>
+    <Suspense fallback={<div className={`${styles.standalonePage} themeLight`}><main className={styles.reportsPage}><div className={styles.statePanel}><h2>Loading…</h2></div></main></div>}>
       <PrintPreviewInner />
     </Suspense>
   );

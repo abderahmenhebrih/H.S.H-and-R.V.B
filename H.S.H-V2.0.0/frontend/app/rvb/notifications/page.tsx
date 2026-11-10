@@ -73,6 +73,8 @@ const TR: Record<string, any> = {
     markUnread: "Mark as unread",
     archiveBtn: "Archive",
     restoreBtn: "Restore",
+    errors: { failed: "Failed", archiveFailed: "Archive failed", bulkFailed: "Bulk failed" },
+    select: "Select",
   },
   fr: {
     title: "Notifications & Activité",
@@ -130,6 +132,8 @@ const TR: Record<string, any> = {
     markUnread: "Marquer non lu",
     archiveBtn: "Archiver",
     restoreBtn: "Restaurer",
+    errors: { failed: "Échec", archiveFailed: "Échec d'archivage", bulkFailed: "Échec groupé" },
+    select: "Sélectionner",
   },
   ar: {
     title: "الإشعارات والنشاط",
@@ -187,6 +191,8 @@ const TR: Record<string, any> = {
     markUnread: "تحديد غير مقروء",
     archiveBtn: "أرشفة",
     restoreBtn: "استعادة",
+    errors: { failed: "فشل", archiveFailed: "فشل الأرشفة", bulkFailed: "فشل العملية" },
+    select: "اختيار",
   },
 };
 
@@ -384,7 +390,7 @@ function NotificationsInner() {
     try {
       await rvbNotificationService.markRead(n.id, isRead);
     } catch (e: any) {
-      alert(e?.message || "Failed");
+      alert(t.errors.failed);
       return;
     }
     window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
@@ -398,14 +404,14 @@ function NotificationsInner() {
       window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
       // Remove from list if filtering excludes archived, else toggle
       await loadNotifications(true, 1);
-    } catch (e: any) { alert(e?.message || "Archive failed"); }
+    } catch (e: any) { alert(t.errors.archiveFailed); }
   };
 
   const handleMarkAllRead = async () => {
     try {
       await rvbNotificationService.markAllRead();
     } catch (e: any) {
-      alert(e?.message || "Failed");
+      alert(t.errors.failed);
       return;
     }
     window.dispatchEvent(new CustomEvent("hebrih-rvb-notifications-changed"));
@@ -419,7 +425,7 @@ function NotificationsInner() {
     try {
       await rvbNotificationService.bulk(ids, action);
     } catch (e: any) {
-      alert(e?.message || "Bulk failed");
+      alert(t.errors.bulkFailed);
       setBulkLoading(false);
       return;
     }
@@ -537,7 +543,7 @@ function NotificationsInner() {
                             <div className={styles.cardLeft}>
                               <span className={styles.iconWrap} aria-hidden="true">{sourceIcon(n.type)}</span>
                               {isUnread && <span className={styles.unreadDot} aria-hidden="true" />}
-                              <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(n.id); }} onClick={(e) => e.stopPropagation()} aria-label="Select" />
+                              <input type="checkbox" checked={isSelected} onChange={(e) => { e.stopPropagation(); toggleSelect(n.id); }} onClick={(e) => e.stopPropagation()} aria-label={t.select} />
                             </div>
                             <div className={styles.cardMain}>
                               <div className={styles.cardHeader}>

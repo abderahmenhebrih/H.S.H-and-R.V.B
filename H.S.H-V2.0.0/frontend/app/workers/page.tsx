@@ -29,6 +29,7 @@ import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../src/lib/
 import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Worker } from "../../src/types/entities/worker";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 import styles from "./page.module.css";
 
 type FormState = {
@@ -123,6 +124,18 @@ const TRANSLATIONS = {
     positionsSub: "Defined positions",
     outstandingBalance: "Outstanding Balance",
     outstandingBalanceSub: "Total unpaid balance",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    duplicate: "A worker with this name already exists.",
+    invalidPhone: "Phone may contain +, digits, spaces and dashes only.",
+    salaryInvalid: "Salary must be a valid number.",
+    noSalary: "No salary",
+    invalidSalary: "Invalid",
+    confirmDeletion: "Confirm deletion",
   },
   fr: {
     title: "Employés",
@@ -191,6 +204,18 @@ const TRANSLATIONS = {
     positionsSub: "Postes définis",
     outstandingBalance: "Solde Dû",
     outstandingBalanceSub: "Solde impayé total",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    duplicate: "Un employé portant ce nom existe déjà.",
+    invalidPhone: "Le téléphone peut contenir +, chiffres, espaces et tirets uniquement.",
+    salaryInvalid: "Le salaire doit être un nombre valide.",
+    noSalary: "Aucun salaire",
+    invalidSalary: "Invalide",
+    confirmDeletion: "Confirmer la suppression",
   },
   ar: {
     title: "العمال",
@@ -259,8 +284,39 @@ const TRANSLATIONS = {
     positionsSub: "مناصب محددة",
     outstandingBalance: "الرصيد المستحق",
     outstandingBalanceSub: "إجمالي الرصيد غير المدفوع",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    duplicate: "يوجد عامل بهذا الاسم بالفعل.",
+    invalidPhone: "قد يحتوي الهاتف على + وأرقام ومسافات وشرطات فقط.",
+    salaryInvalid: "يجب أن يكون الراتب رقماً صالحاً.",
+    noSalary: "لا يوجد راتب",
+    invalidSalary: "غير صالح",
+    confirmDeletion: "تأكيد الحذف",
   },
 } as const;
+
+const WORKER_ERROR_MAP: Record<string, Record<Language, string>> = {
+  "Worker name is required.": { en: TRANSLATIONS.en.nameRequired, fr: TRANSLATIONS.fr.nameRequired, ar: TRANSLATIONS.ar.nameRequired },
+  "Worker phone is required.": { en: TRANSLATIONS.en.phoneRequired, fr: TRANSLATIONS.fr.phoneRequired, ar: TRANSLATIONS.ar.phoneRequired },
+  "Invalid phone number. Phone may contain +, digits, spaces and dashes only.": { en: TRANSLATIONS.en.invalidPhone, fr: TRANSLATIONS.fr.invalidPhone, ar: TRANSLATIONS.ar.invalidPhone },
+  "Worker position is required.": { en: TRANSLATIONS.en.positionRequired, fr: TRANSLATIONS.fr.positionRequired, ar: TRANSLATIONS.ar.positionRequired },
+  "Worker starting salary must be a valid number.": { en: TRANSLATIONS.en.salaryInvalid, fr: TRANSLATIONS.fr.salaryInvalid, ar: TRANSLATIONS.ar.salaryInvalid },
+  "Starting salary must be a valid number.": { en: TRANSLATIONS.en.salaryInvalid, fr: TRANSLATIONS.fr.salaryInvalid, ar: TRANSLATIONS.ar.salaryInvalid },
+  "Worker monthly salary must be a valid number.": { en: TRANSLATIONS.en.salaryInvalid, fr: TRANSLATIONS.fr.salaryInvalid, ar: TRANSLATIONS.ar.salaryInvalid },
+  "Monthly salary must be a valid number.": { en: TRANSLATIONS.en.salaryInvalid, fr: TRANSLATIONS.fr.salaryInvalid, ar: TRANSLATIONS.ar.salaryInvalid },
+  "Worker monthly salary cannot be negative.": { en: TRANSLATIONS.en.salaryInvalid, fr: TRANSLATIONS.fr.salaryInvalid, ar: TRANSLATIONS.ar.salaryInvalid },
+  "Monthly salary cannot be negative.": { en: TRANSLATIONS.en.salaryInvalid, fr: TRANSLATIONS.fr.salaryInvalid, ar: TRANSLATIONS.ar.salaryInvalid },
+  "A worker with this name already exists.": { en: TRANSLATIONS.en.duplicate, fr: TRANSLATIONS.fr.duplicate, ar: TRANSLATIONS.ar.duplicate },
+};
+const WORKER_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 function PositionFilter({
   value,
@@ -506,7 +562,7 @@ export default function WorkersPage() {
     const starting = Number(form.startingSalary || 0);
     const monthly = Number(form.monthlySalary || 0);
     if (!Number.isFinite(starting) || !Number.isFinite(monthly) || monthly < 0) {
-      setError(t.failedSave);
+      setError(t.salaryInvalid);
       return;
     }
     setSaving(true);
@@ -543,7 +599,7 @@ export default function WorkersPage() {
       await loadWorkers();
       closeForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, WORKER_ERROR_MAP, WORKER_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -557,7 +613,7 @@ export default function WorkersPage() {
       await loadWorkers();
       setArchiveTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, WORKER_ERROR_MAP, WORKER_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -569,7 +625,7 @@ export default function WorkersPage() {
     const m = Number(restoreMonthly);
     // Restore startingSalary follows same opening-balance rule: signed finite allowed.
     if (!Number.isFinite(s) || !Number.isFinite(m) || m < 0) {
-      setError(t.failedSave);
+      setError(t.salaryInvalid);
       return;
     }
     setSaving(true);
@@ -580,7 +636,7 @@ export default function WorkersPage() {
       setRestoreStarting("");
       setRestoreMonthly("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, WORKER_ERROR_MAP, WORKER_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -602,7 +658,7 @@ export default function WorkersPage() {
       setDeleteCountdown(3.5);
       deleteStartRef.current = null;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, WORKER_ERROR_MAP, WORKER_FALLBACK_TEXT));
     } finally {
       setDeleting(false);
     }
@@ -666,7 +722,7 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalPayroll}</span>
-                <strong className={styles.summaryValue} title={formatCurrency(totalPayroll, currency)}>{formatCompactCurrency(totalPayroll, currency)}{hasInvalidPayroll && <span title="Invalid salary value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalPayroll, currency)}>{formatCompactCurrency(totalPayroll, currency)}{hasInvalidPayroll && <span title={t.dataIntegrity} style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ {t.dataIntegrity}</span>}</strong>
                 <small className={styles.summarySub}>{t.totalPayrollSub}</small>
               </div>
             </div>
@@ -688,7 +744,7 @@ export default function WorkersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.outstandingBalance}</span>
-                <strong className={styles.summaryValue} title={formatCurrency(totalOutstanding, currency)}>{formatCompactCurrency(totalOutstanding, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalOutstanding, currency)}>{formatCompactCurrency(totalOutstanding, currency)}{hasInvalidBalance && <span title={t.dataIntegrity} style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ {t.dataIntegrity}</span>}</strong>
                 <small className={styles.summarySub}>{formatCompactNumber(workersWithBalance)} {t.outstandingBalanceSub.toLowerCase()}</small>
               </div>
             </div>
@@ -745,18 +801,18 @@ export default function WorkersPage() {
                     {Number.isFinite(w.monthlySalary) ? (
                       <span className={styles.salaryText}>{formatCurrency(w.monthlySalary, currency)}</span>
                     ) : w.monthlySalary === undefined || w.monthlySalary === null ? (
-                      <span title="No salary" style={{ color: "var(--muted)" }}>—</span>
+                      <span title={t.noSalary} style={{ color: "var(--muted)" }}>—</span>
                     ) : (
-                      <span title={`Invalid salary: ${String(w.monthlySalary)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                      <span title={t.invalidSalary} style={{ color: "var(--danger)", fontWeight: 700 }}>{t.invalidSalary}</span>
                     )}
                     {Number.isFinite(w.balance) ? (
                       <strong className={w.balance === 0 ? styles.balanceZero : styles.balanceValue}>
                         {formatCurrency(w.balance, currency)}
                       </strong>
                     ) : w.balance === undefined || w.balance === null ? (
-                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                      <span title={t.noBalance} style={{ color: "var(--muted)" }}>—</span>
                     ) : (
-                      <span title={`Invalid balance: ${String(w.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                      <span title={t.invalidBalance} style={{ color: "var(--danger)", fontWeight: 700 }}>{t.invalidBalance}</span>
                     )}
                     <div className={styles.rowActions}>
                       <button
@@ -823,7 +879,7 @@ export default function WorkersPage() {
               <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
                 <div className={styles.modalHeader}>
                   <h2>{editingId ? t.editWorkerTitle : t.addWorkerTitle}</h2>
-                  <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
@@ -845,6 +901,8 @@ export default function WorkersPage() {
                   <label>
                     <span>{t.position} *</span>
                     <StyledSelect
+                      language={language}
+                      emptyLabel={t.noOptions}
                       value={form.position}
                       onChange={(value) => setForm({ ...form, position: value })}
                       placeholder={t.selectPosition}
@@ -941,7 +999,7 @@ export default function WorkersPage() {
               <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
                 <div className={styles.modalHeader}>
                   <h2>{t.restoreTitle}</h2>
-                  <button type="button" className={styles.closeButton} onClick={() => setRestoreTarget(null)} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={() => setRestoreTarget(null)} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
@@ -997,7 +1055,7 @@ export default function WorkersPage() {
                     </svg>
                     <span className={styles.circleText}>{deleteCountdown > 0 ? deleteCountdown.toFixed(1) : "0.0"}</span>
                   </div>
-                  <span className={styles.circleLabel}>{deleteCountdown > 0 ? "Confirm deletion" : t.confirmDelete}</span>
+                  <span className={styles.circleLabel}>{deleteCountdown > 0 ? t.confirmDeletion : t.confirmDelete}</span>
                 </div>
                 {error && <div className={styles.formError}>{error}</div>}
                 <div className={styles.modalFooterCompact}>

@@ -51,8 +51,15 @@ export type PrintResponse = {
   paperSize?: string;
 };
 
+import type { Language } from "../types/settings/settings";
+
 export const APP_PDF_PRINTER = "app-pdf";
-export const APP_PDF_LABEL = "Print to PDF";
+export const APP_PDF_LABELS: Record<Language, string> = {
+  en: "Print to PDF",
+  fr: "Imprimer en PDF",
+  ar: "طباعة إلى PDF",
+};
+export const APP_PDF_LABEL = APP_PDF_LABELS.en;
 
 function getApiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";

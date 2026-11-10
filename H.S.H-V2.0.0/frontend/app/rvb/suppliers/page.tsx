@@ -90,10 +90,23 @@ const TR: Record<Language, any> = {
       noPayments: "No payments recorded.",
       noRequests: "No requests yet.",
       noActivity: "No activity yet.",
+      roleLabel: "Role",
+      statusLabel: "Status",
+      onboardingLabel: "Onboarding",
+      lastLoginLabel: "Last Login",
+      passwordLabel: "Password",
+      mustChange: "Must change",
+      configured: "Configured",
+      notConfigured: "Portal access has not been configured.",
     },
     validation: { nameRequired: "Name required", phoneRequired: "Phone required" },
+    errors: { linkFailed: "Link failed", unlinkFailed: "Unlink failed", reviewFailed: "Review failed", tagInvalid: "Tag invalid", displayRequired: "Display name required", passwordShort: "Password >=8", mismatch: "Mismatch", createFailed: "Create failed" },
+    account: { displayName: "Display Name", tag: "Tag", tagHint: "3–30 chars a-z 0-9 . _", password: "Password", confirm: "Confirm", creating: "Creating..." },
+    confirm: { acceptSupply: "Accept? This will create purchase once." },
+    ui: { accept: "Accept", reject: "Reject", items: "items", reviewNotes: "Review notes", linking: "Linking...", unlinking: "Unlinking..." },
     roles: { supplier: "Supplier" },
     statuses: { active: "Active", disabled: "Disabled", archived: "Archived", noAccess: "No access" },
+    close: "Close",
   },
   fr: {
     headerTitle: "Fournisseurs",
@@ -113,10 +126,15 @@ const TR: Record<Language, any> = {
     noSuppliersDesc: "Ajoutez votre premier fournisseur.",
     create: { title: "Ajouter Fournisseur", name: "Nom", phone: "Téléphone", address: "Adresse", identificationNumber: "Numéro d'identification", email: "E-mail", notes: "Notes", cancel: "Annuler", create: "Créer", creating: "Création...", required: "Requis" },
     edit: { title: "Modifier Fournisseur", save: "Enregistrer", saving: "Enregistrement..." },
-    details: { title: "Détails Fournisseur", overview: "Aperçu", purchases: "Achats", payments: "Paiements", portal: "Accès Portail", requests: "Demandes", activity: "Activité", identity: "Identité", contact: "Contact", finance: "Finance", archive: "Archiver", close: "Fermer", balance: "Solde actuel", name: "Nom", phone: "Téléphone", email: "E-mail", address: "Adresse", identificationNumber: "Numéro d'identification", notes: "Notes", notLinked: "Non lié", linked: "Lié", viewAccount: "Voir Compte", unlink: "Dissocier", linkExisting: "Lier Compte Existant", createAccount: "Créer Compte R.V.B", searchAccounts: "Rechercher par nom ou @tag", confirmLink: "Lier", confirmUnlink: "Dissocier", unlinkConfirm: "Dissocier @tag de Supplier Name?", unlinkDesc: "Le compte reste mais sera déconnecté.", linkConfirm: "Lier @tag à Supplier Name?", noAccounts: "Aucun compte éligible.", noPurchases: "Aucun achat.", noPayments: "Aucun paiement.", noRequests: "Aucune demande.", noActivity: "Aucune activité." },
+details: { title: "Détails Fournisseur", overview: "Aperçu", purchases: "Achats", payments: "Paiements", portal: "Accès Portail", requests: "Demandes", activity: "Activité", identity: "Identité", contact: "Contact", finance: "Finance", archive: "Archiver", close: "Fermer", balance: "Solde actuel", name: "Nom", phone: "Téléphone", email: "E-mail", address: "Adresse", identificationNumber: "Numéro d'identification", notes: "Notes", notLinked: "Non lié", linked: "Lié", viewAccount: "Voir Compte", unlink: "Dissocier", linkExisting: "Lier Compte Existant", createAccount: "Créer Compte R.V.B", searchAccounts: "Rechercher par nom ou @tag", confirmLink: "Lier", confirmUnlink: "Dissocier", unlinkConfirm: "Dissocier @tag de Supplier Name?", unlinkDesc: "Le compte reste mais sera déconnecté.", linkConfirm: "Lier @tag à Supplier Name?", noAccounts: "Aucun compte éligible.", noPurchases: "Aucun achat.", noPayments: "Aucun paiement.", noRequests: "Aucune demande.", noActivity: "Aucune activité.", roleLabel: "Rôle", statusLabel: "Statut", onboardingLabel: "Onboarding", lastLoginLabel: "Dernière connexion", passwordLabel: "Mot de passe", mustChange: "À changer", configured: "Configuré", notConfigured: "L'accès portail n'a pas été configuré." },
     validation: { nameRequired: "Nom requis", phoneRequired: "Téléphone requis" },
+    errors: { linkFailed: "Échec de liaison", unlinkFailed: "Échec de dissociation", reviewFailed: "Échec de révision", tagInvalid: "Tag invalide", displayRequired: "Nom affiché requis", passwordShort: "Mot de passe >=8", mismatch: "Non concordance", createFailed: "Échec de création" },
+    account: { displayName: "Nom affiché", tag: "Tag", tagHint: "3–30 caractères a-z 0-9 . _", password: "Mot de passe", confirm: "Confirmer", creating: "Création..." },
+    confirm: { acceptSupply: "Accepter ? Cela créera un achat unique." },
+    ui: { accept: "Accepter", reject: "Rejeter", items: "articles", reviewNotes: "Notes de révision", linking: "Liaison...", unlinking: "Dissociation..." },
     roles: { supplier: "Fournisseur" },
     statuses: { active: "Actif", disabled: "Désactivé", archived: "Archivé", noAccess: "Pas d'accès" },
+    close: "Fermer",
   },
   ar: {
     headerTitle: "الموردون",
@@ -136,10 +154,15 @@ const TR: Record<Language, any> = {
     noSuppliersDesc: "أضف أول مورد للبدء.",
     create: { title: "إضافة مورد", name: "الاسم", phone: "الهاتف", address: "العنوان", identificationNumber: "رقم التعريف", email: "البريد الإلكتروني", notes: "ملاحظات", cancel: "إلغاء", create: "إنشاء", creating: "جارٍ الإنشاء...", required: "مطلوب" },
     edit: { title: "تعديل مورد", save: "حفظ", saving: "جارٍ الحفظ..." },
-    details: { title: "تفاصيل المورد", overview: "نظرة عامة", purchases: "المشتريات", payments: "المدفوعات", portal: "الوصول", requests: "الطلبات", activity: "النشاط", identity: "الهوية", contact: "الاتصال", finance: "المالية", archive: "أرشفة", close: "إغلاق", balance: "الرصيد الحالي", name: "الاسم", phone: "الهاتف", email: "البريد الإلكتروني", address: "العنوان", identificationNumber: "رقم التعريف", notes: "ملاحظات", notLinked: "غير مرتبط", linked: "مرتبط", viewAccount: "عرض الحساب", unlink: "إلغاء الربط", linkExisting: "ربط حساب موجود", createAccount: "إنشاء حساب R.V.B", searchAccounts: "ابحث بالاسم أو @tag", confirmLink: "ربط", confirmUnlink: "إلغاء الربط", unlinkConfirm: "إلغاء ربط @tag من Supplier Name؟", unlinkDesc: "يبقى الحساب لكن سيتم فصله.", linkConfirm: "ربط @tag بـ Supplier Name؟", noAccounts: "لا يوجد حسابات مؤهلة.", noPurchases: "لا توجد مشتريات.", noPayments: "لا توجد مدفوعات.", noRequests: "لا توجد طلبات بعد.", noActivity: "لا يوجد نشاط بعد." },
+    details: { title: "تفاصيل المورد", overview: "نظرة عامة", purchases: "المشتريات", payments: "المدفوعات", portal: "الوصول", requests: "الطلبات", activity: "النشاط", identity: "الهوية", contact: "الاتصال", finance: "المالية", archive: "أرشفة", close: "إغلاق", balance: "الرصيد الحالي", name: "الاسم", phone: "الهاتف", email: "البريد الإلكتروني", address: "العنوان", identificationNumber: "رقم التعريف", notes: "ملاحظات", notLinked: "غير مرتبط", linked: "مرتبط", viewAccount: "عرض الحساب", unlink: "إلغاء الربط", linkExisting: "ربط حساب موجود", createAccount: "إنشاء حساب R.V.B", searchAccounts: "ابحث بالاسم أو @tag", confirmLink: "ربط", confirmUnlink: "إلغاء الربط", unlinkConfirm: "إلغاء ربط @tag من Supplier Name؟", unlinkDesc: "يبقى الحساب لكن سيتم فصله.", linkConfirm: "ربط @tag بـ Supplier Name؟", noAccounts: "لا يوجد حسابات مؤهلة.", noPurchases: "لا توجد مشتريات.", noPayments: "لا توجد مدفوعات.", noRequests: "لا توجد طلبات بعد.", noActivity: "لا يوجد نشاط بعد.", roleLabel: "الدور", statusLabel: "الحالة", onboardingLabel: "الإعداد", lastLoginLabel: "آخر تسجيل دخول", passwordLabel: "كلمة المرور", mustChange: "يجب التغيير", configured: "مضبوط", notConfigured: "لم يتم إعداد الوصول إلى البوابة." },
     validation: { nameRequired: "الاسم مطلوب", phoneRequired: "الهاتف مطلوب" },
+    errors: { linkFailed: "فشل الربط", unlinkFailed: "فشل إلغاء الربط", reviewFailed: "فشل المراجعة", tagInvalid: "المعرّف غير صالح", displayRequired: "الاسم المعروض مطلوب", passwordShort: "كلمة المرور >=8", mismatch: "غير متطابق", createFailed: "فشل الإنشاء" },
+    account: { displayName: "الاسم المعروض", tag: "المعرّف", tagHint: "3–30 حرف a-z 0-9 . _", password: "كلمة المرور", confirm: "تأكيد كلمة المرور", creating: "جارٍ الإنشاء..." },
+    confirm: { acceptSupply: "قبول؟ سيؤدي لإنشاء عملية شراء واحدة." },
+    ui: { accept: "قبول", reject: "رفض", items: "عناصر", reviewNotes: "ملاحظات المراجعة", linking: "جارٍ الربط...", unlinking: "جارٍ إلغاء الربط..." },
     roles: { supplier: "مورد" },
     statuses: { active: "نشط", disabled: "معطّل", archived: "مؤرشف", noAccess: "لا يوجد وصول" },
+    close: "إغلاق",
   },
 } as const;
 
@@ -374,7 +397,7 @@ function RvbSuppliersInner() {
         setLinkModal(false);
         setSelectedLink(null);
       } catch (inner:any) {
-        alert(e?.data?.code || e?.message || inner?.message || "Link failed");
+        alert(t.errors.linkFailed);
       }
     } finally { setLinking(false); }
   };
@@ -407,7 +430,7 @@ function RvbSuppliersInner() {
       await load();
       setLinkModal(false);
       setSelectedLink(null);
-    } catch (e:any) { alert(e?.data?.code || e?.message || "Link failed"); }
+    } catch (e:any) { alert(t.errors.linkFailed); }
     finally { setLinking(false); }
   };
 
@@ -418,17 +441,17 @@ function RvbSuppliersInner() {
       await rvbAccountService.unlink(showUnlinkConfirm.id);
       await load();
       setShowUnlinkConfirm(null);
-    } catch (e:any) { alert(e?.message || "Unlink failed"); }
+    } catch (e:any) { alert(t.errors.unlinkFailed); }
     finally { setLinking(false); }
   };
 
   const handleCreateAccount = async () => {
     setCreateError("");
     const tag = normalizeTag(createTag);
-    if (!tag || !isValidTag(tag)) { setCreateError("Tag invalid"); return; }
-    if (!createDisplayName.trim()) { setCreateError("Display name required"); return; }
-    if (!createPassword || createPassword.length < 8) { setCreateError("Password >=8"); return; }
-    if (createPassword !== createConfirm) { setCreateError("Mismatch"); return; }
+    if (!tag || !isValidTag(tag)) { setCreateError(t.errors.tagInvalid); return; }
+    if (!createDisplayName.trim()) { setCreateError(t.errors.displayRequired); return; }
+    if (!createPassword || createPassword.length < 8) { setCreateError(t.errors.passwordShort); return; }
+    if (createPassword !== createConfirm) { setCreateError(t.errors.mismatch); return; }
     if (!details) return;
     setCreatingAccount(true);
     try {
@@ -436,7 +459,7 @@ function RvbSuppliersInner() {
       await load();
       setShowCreateAccount(false);
       setCreateTag(""); setCreateDisplayName(""); setCreatePassword(""); setCreateConfirm("");
-    } catch (e:any) { setCreateError(e?.data?.code || e?.message || "Create failed"); }
+    } catch (e:any) { setCreateError(e?.data?.code || e?.message || t.errors.createFailed); }
     finally { setCreatingAccount(false); }
   };
 
@@ -562,9 +585,9 @@ function RvbSuppliersInner() {
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setDetails(s); setActiveTab("portal" as any); setSelectedLink(null); setLinkSearch(""); setLinkModal(true); }}
                                   className={styles.linkNowButton}
-                                  aria-label={`${(t.table as any).linkNow ?? "Link now"} ${s.name}`}
+                                  aria-label={`${t.table.linkNow} ${s.name}`}
                                 >
-                                  <Link2 size={12} aria-hidden="true" />{(t.table as any).linkNow ?? "Link now"}
+                                  <Link2 size={12} aria-hidden="true" />{t.table.linkNow}
                                 </button>
                               )}
                             </span>
@@ -600,7 +623,7 @@ function RvbSuppliersInner() {
           <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2>{editing ? t.edit.title : t.create.title}</h2>
-              <button type="button" className={styles.closeButton} onClick={() => setShowAdd(false)} disabled={saving} aria-label="Close"><X size={16} /></button>
+              <button type="button" className={styles.closeButton} onClick={() => setShowAdd(false)} disabled={saving} aria-label={t.close}><X size={16} /></button>
             </div>
             <div className={styles.formBody}>
               <div className={styles.field}><label>{t.create.name} *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
@@ -624,7 +647,7 @@ function RvbSuppliersInner() {
           <section className={styles.drawer} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} dir={isRtl ? "rtl" : "ltr"} style={{ width: "min(560px, 100vw)", maxWidth: "100vw" }}>
             <div className={styles.drawerHeader}>
               <h2 className={styles.drawerTitle}>{t.details.title}</h2>
-              <button type="button" className={styles.closeButton} onClick={() => setDetails(null)} aria-label="Close"><X size={16} /></button>
+              <button type="button" className={styles.closeButton} onClick={() => setDetails(null)} aria-label={t.close}><X size={16} /></button>
             </div>
             <div style={{ display: "flex", gap: 6, padding: "10px 14px", borderBottom: "1px solid var(--border)", background: "var(--panel)", overflowX: "auto" }}>
               {[
@@ -664,7 +687,7 @@ function RvbSuppliersInner() {
                     <h3 className={styles.detailSectionTitle}>{t.details.finance}</h3>
                     <div className={styles.detailGrid}>
                       <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.balance}</span><span className={styles.detailValue} style={{ fontWeight: 800, color: Number(details.balance) > 0 ? "#3A7D52" : "var(--muted)" }}>{formatCurrency(Number(details.balance), settings.currency as any)}</span></div>
-                      <div className={styles.detailRow}><span className={styles.detailLabel}>Status</span><span className={`${styles.badge} ${supplierAccountMap.get(details.id) ? (supplierAccountMap.get(details.id)!.status === "active" ? styles.badgeStatusActive : styles.badgeStatusArchived) : styles.badgeStatusArchived}`}>{supplierAccountMap.get(details.id) ? supplierAccountMap.get(details.id)!.status : t.details.notLinked}</span></div>
+                      <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.statusLabel}</span><span className={`${styles.badge} ${supplierAccountMap.get(details.id) ? (supplierAccountMap.get(details.id)!.status === "active" ? styles.badgeStatusActive : styles.badgeStatusArchived) : styles.badgeStatusArchived}`}>{supplierAccountMap.get(details.id) ? supplierAccountMap.get(details.id)!.status : t.details.notLinked}</span></div>
                     </div>
                   </div>
                   {isManager && (
@@ -684,7 +707,7 @@ function RvbSuppliersInner() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {purchases.slice(0, 20).map((p: any) => (
                         <div key={p.id} className={styles.detailRow}>
-                          <span className={styles.detailLabel} style={{ display: "flex", flexDirection: "column", gap: 2 }}><span>{formatDate(p.date, lang)}</span><small style={{ color: "var(--subtle)", fontSize: 11 }}>{(p.items||[]).length} items · {p.items?.map((i:any)=>i.productId.slice(0,6)).join(", ")}</small></span>
+                          <span className={styles.detailLabel} style={{ display: "flex", flexDirection: "column", gap: 2 }}><span>{formatDate(p.date, lang)}</span><small style={{ color: "var(--subtle)", fontSize: 11 }}>{(p.items||[]).length} {t.ui.items} · {p.items?.map((i:any)=>i.productId.slice(0,6)).join(", ")}</small></span>
                           <span className={styles.detailValue} style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(Number(p.total), settings.currency as any)}</span>
                         </div>
                       ))}
@@ -718,7 +741,7 @@ function RvbSuppliersInner() {
                       return (
                         <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel-hover)", textAlign: "center" }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{t.details.notLinked}</div>
-                          <p style={{ margin: "6px 0 0", color: "var(--muted)", fontSize: 12 }}>Portal access has not been configured.</p>
+                          <p style={{ margin: "6px 0 0", color: "var(--muted)", fontSize: 12 }}>{t.details.notConfigured}</p>
                           {isManager && (
                             <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
                               <button type="button" className={styles.primaryButton} onClick={() => setLinkModal(true)}><Link2 size={14} />{t.details.linkExisting}</button>
@@ -739,11 +762,11 @@ function RvbSuppliersInner() {
                           <span className={`${styles.badge} ${styles.badgeRole}`}>{(t as any).roles[acc.role] ?? acc.role}</span>
                         </div>
                         <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
-                          <div className={styles.detailRow}><span className={styles.detailLabel}>Role</span><span className={styles.detailValue}>{acc.role}</span></div>
-                          <div className={styles.detailRow}><span className={styles.detailLabel}>Status</span><span className={`${styles.badge} ${acc.status === "active" ? styles.badgeStatusActive : acc.status === "archived" ? styles.badgeStatusArchived : styles.badgeStatusDisabled}`}>{acc.status}</span></div>
-                          <div className={styles.detailRow}><span className={styles.detailLabel}>Onboarding</span><span className={`${styles.badge} ${acc.onboardingStatus === "pending" ? styles.badgeOnboardingPending : styles.badgeOnboardingComplete}`}>{acc.onboardingStatus}</span></div>
-                          <div className={styles.detailRow}><span className={styles.detailLabel}>Last Login</span><span className={styles.detailValue}>{acc.lastLoginAt ? formatDate(acc.lastLoginAt, lang) : "—"}</span></div>
-                          <div className={styles.detailRow}><span className={styles.detailLabel}>Password</span><span className={styles.detailValue}>{(acc as any).mustChangePassword ? "Must change" : "Configured"}</span></div>
+                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.roleLabel}</span><span className={styles.detailValue}>{acc.role}</span></div>
+                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.statusLabel}</span><span className={`${styles.badge} ${acc.status === "active" ? styles.badgeStatusActive : acc.status === "archived" ? styles.badgeStatusArchived : styles.badgeStatusDisabled}`}>{acc.status}</span></div>
+                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.onboardingLabel}</span><span className={`${styles.badge} ${acc.onboardingStatus === "pending" ? styles.badgeOnboardingPending : styles.badgeOnboardingComplete}`}>{acc.onboardingStatus}</span></div>
+                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.lastLoginLabel}</span><span className={styles.detailValue}>{acc.lastLoginAt ? formatDate(acc.lastLoginAt, lang) : "—"}</span></div>
+                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.passwordLabel}</span><span className={styles.detailValue}>{(acc as any).mustChangePassword ? t.details.mustChange : t.details.configured}</span></div>
                         </div>
                         {isManager && (
                           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -769,12 +792,12 @@ function RvbSuppliersInner() {
                             <span className={`${styles.badge} ${r.status === "under_review" ? styles.badgeOnboardingPending : r.status === "accepted" ? styles.badgeStatusActive : styles.badgeStatusDisabled}`} style={{ fontSize: 10 }}>{r.type} · {r.status}</span>
                             <span style={{ fontSize: 11, color: "var(--muted)" }}>{formatDate(r.submittedAt, lang)}</span>
                           </div>
-                          <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 600 }}>{r.type === "new_supply" ? `${r.total ? formatCurrency(r.total, settings.currency as any) : ""} ${r.items ? `· ${(r.items as any[]).length} items` : ""}` : r.description || "—"}</div>
-                          {r.notes && <small style={{ color: "var(--muted)", fontSize: 11 }}>Review notes: {r.notes}</small>}
+                          <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 600 }}>{r.type === "new_supply" ? `${r.total ? formatCurrency(r.total, settings.currency as any) : ""} ${r.items ? `· ${(r.items as any[]).length} ${t.ui.items}` : ""}` : r.description || "—"}</div>
+                          {r.notes && <small style={{ color: "var(--muted)", fontSize: 11 }}>{t.ui.reviewNotes}: {r.notes}</small>}
                           {r.status === "under_review" && isManager && (
                             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                              <button type="button" className={styles.primaryButton} onClick={async () => { if (!confirm("Accept? This will create purchase once.")) return; try { await supplierRequestService.review(r.id, "accepted"); if (details) { const updated = await supplierRequestService.list(details.id); setSupplierRequests(updated as any); await loadPurchases(details.id); } } catch(e:any){ alert(e?.message||"Review failed"); } }} style={{ flex: 1, minHeight: 32, fontSize: 11, background: "#3A7D52", borderColor: "#3A7D52" }}>Accept</button>
-                              <button type="button" className={styles.secondaryButton} onClick={async () => { try { await supplierRequestService.review(r.id, "rejected"); if (details) setSupplierRequests(await supplierRequestService.list(details.id) as any); } catch(e:any){ alert(e?.message||"Review failed"); } }} style={{ flex: 1, minHeight: 32, fontSize: 11 }}>Reject</button>
+                              <button type="button" className={styles.primaryButton} onClick={async () => { if (!confirm(t.confirm.acceptSupply)) return; try { await supplierRequestService.review(r.id, "accepted"); if (details) { const updated = await supplierRequestService.list(details.id); setSupplierRequests(updated as any); await loadPurchases(details.id); } } catch(e:any){ alert(t.errors.reviewFailed); } }} style={{ flex: 1, minHeight: 32, fontSize: 11, background: "#3A7D52", borderColor: "#3A7D52" }}>{t.ui.accept}</button>
+                              <button type="button" className={styles.secondaryButton} onClick={async () => { try { await supplierRequestService.review(r.id, "rejected"); if (details) setSupplierRequests(await supplierRequestService.list(details.id) as any); } catch(e:any){ alert(t.errors.reviewFailed); } }} style={{ flex: 1, minHeight: 32, fontSize: 11 }}>{t.ui.reject}</button>
                             </div>
                           )}
                         </div>
@@ -853,9 +876,9 @@ function RvbSuppliersInner() {
                     await load();
                     setLinkModal(false);
                     setSelectedLink(null);
-                  } catch (inner:any) { alert(e?.message || inner?.message || "Link failed"); }
+                  } catch (inner:any) { alert(t.errors.linkFailed); }
                 } finally { setLinking(false); }
-              }} disabled={!selectedLink || linking}>{linking ? "Linking..." : t.details.confirmLink}</button>
+              }} disabled={!selectedLink || linking}>{linking ? t.ui.linking : t.details.confirmLink}</button>
             </div>
           </section>
         </div>
@@ -870,7 +893,7 @@ function RvbSuppliersInner() {
             <p style={{ margin: "8px auto 0", maxWidth: 340, color: "var(--text)", fontSize: 12, fontWeight: 700 }}>@{showUnlinkConfirm.tag}</p>
             <div style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 8 }}>
               <button type="button" className={styles.secondaryButton} onClick={() => setShowUnlinkConfirm(null)} disabled={linking}>{t.create.cancel}</button>
-              <button type="button" className={styles.primaryButton} onClick={handleUnlink} disabled={linking} style={{ background: "var(--danger)", borderColor: "var(--danger)" }}>{linking ? "Unlinking..." : t.details.unlink}</button>
+              <button type="button" className={styles.primaryButton} onClick={handleUnlink} disabled={linking} style={{ background: "var(--danger)", borderColor: "var(--danger)" }}>{linking ? t.ui.unlinking : t.details.unlink}</button>
             </div>
           </section>
         </div>
@@ -884,19 +907,19 @@ function RvbSuppliersInner() {
               <button type="button" className={styles.closeButton} onClick={() => setShowCreateAccount(false)} disabled={creatingAccount}><X size={16} /></button>
             </div>
             <div className={styles.formBody}>
-              <div className={styles.field}><label>Display Name *</label><input value={createDisplayName} onChange={(e) => setCreateDisplayName(e.target.value)} placeholder={details.name} /></div>
+              <div className={styles.field}><label>{t.account.displayName} *</label><input value={createDisplayName} onChange={(e) => setCreateDisplayName(e.target.value)} placeholder={details.name} /></div>
               <div className={styles.field}>
-                <label>Tag *</label>
+                <label>{t.account.tag} *</label>
                 <div className={styles.inputWithPrefix}><span aria-hidden="true">@</span><input value={createTag} onChange={(e) => setCreateTag(e.target.value)} placeholder="supplier.tag" dir="ltr" style={{ flex: 1, border: 0, background: "transparent", outline: 0, padding: "10px 12px 10px 4px" }} /></div>
-                <small className={styles.hint}>3–30 chars a-z 0-9 . _</small>
+                <small className={styles.hint}>{t.account.tagHint}</small>
               </div>
-              <div className={styles.field}><label>Password *</label><div style={{ position: "relative", display: "flex", alignItems: "center" }}><input type="password" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} placeholder="••••••••" dir="ltr" style={{ flex: 1, paddingInlineEnd: 60 }} /><span style={{ position: "absolute", insetInlineEnd: 6, fontSize: 11, color: "var(--muted)" }}><KeyRound size={14} /></span></div></div>
-              <div className={styles.field}><label>Confirm *</label><input type="password" value={createConfirm} onChange={(e) => setCreateConfirm(e.target.value)} placeholder="••••••••" dir="ltr" /></div>
+              <div className={styles.field}><label>{t.account.password} *</label><div style={{ position: "relative", display: "flex", alignItems: "center" }}><input type="password" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} placeholder="••••••••" dir="ltr" style={{ flex: 1, paddingInlineEnd: 60 }} /><span style={{ position: "absolute", insetInlineEnd: 6, fontSize: 11, color: "var(--muted)" }}><KeyRound size={14} /></span></div></div>
+              <div className={styles.field}><label>{t.account.confirm} *</label><input type="password" value={createConfirm} onChange={(e) => setCreateConfirm(e.target.value)} placeholder="••••••••" dir="ltr" /></div>
               {createError && <div className={styles.formError}>{createError}</div>}
             </div>
             <div className={styles.modalFooter}>
               <button type="button" className={styles.secondaryButton} onClick={() => setShowCreateAccount(false)} disabled={creatingAccount}>{t.create.cancel}</button>
-              <button type="button" className={styles.primaryButton} onClick={handleCreateAccount} disabled={creatingAccount}>{creatingAccount ? "Creating..." : t.details.createAccount}</button>
+              <button type="button" className={styles.primaryButton} onClick={handleCreateAccount} disabled={creatingAccount}>{creatingAccount ? t.account.creating : t.details.createAccount}</button>
             </div>
           </section>
         </div>

@@ -20,6 +20,27 @@ type PageFilter = (typeof FILTERS)[number];
 // Control-center tabs shared with the sidebar popover: All / Unread /
 // Important (important ≠ unread — read important items stay in Important).
 
+const TRANSLATIONS = {
+  en: {
+    title: "Notifications",
+    subtitle: "Stay informed about important activity across the system.",
+    searchPlaceholder: "Search notifications...",
+    loading: "Loading...",
+  },
+  fr: {
+    title: "Notifications",
+    subtitle: "Restez informé des activités importantes du système.",
+    searchPlaceholder: "Rechercher des notifications...",
+    loading: "Chargement...",
+  },
+  ar: {
+    title: "الإشعارات",
+    subtitle: "ابقَ على اطلاع بالأنشطة المهمة في النظام.",
+    searchPlaceholder: "البحث في الإشعارات...",
+    loading: "جارٍ التحميل...",
+  },
+} as const;
+
 function formatTime(ts: number, lang: string): string {
   try {
     return new Intl.DateTimeFormat(lang === "ar" ? "ar-DZ-u-nu-latn" : lang === "fr" ? "fr-FR" : "en-GB", {
@@ -186,11 +207,7 @@ export default function NotificationsPage() {
     [notifications],
   );
 
-  const t = (en: string, fr: string, ar: string) => {
-    if (settings.language === "fr") return fr;
-    if (settings.language === "ar") return ar;
-    return en;
-  };
+  const t = TRANSLATIONS[settings.language] ?? TRANSLATIONS.en;
 
   async function handleMarkAllRead() {
     await notificationService.markAllAsRead();
@@ -232,10 +249,10 @@ export default function NotificationsPage() {
       <div className={styles.header}>
         <div>
           <h1>
-            {t("Notifications", "Notifications", "الإشعارات")}
+            {t.title}
             {unreadCount > 0 && <span className={styles.headerCount}>{unreadCount > 99 ? "99+" : unreadCount}</span>}
           </h1>
-          <p>{t("Stay informed about important activity across the system.", "Restez informé des activités importantes.", "ابق على اطلاع بالأنشطة المهمة.")}</p>
+          <p>{t.subtitle}</p>
         </div>
         {unreadCount > 0 && (
           <button type="button" className={styles.markAllButton} onClick={handleMarkAllRead}>
@@ -245,7 +262,7 @@ export default function NotificationsPage() {
       </div>
 
       <div className={styles.controls}>
-        <div className={styles.filters} role="tablist" aria-label={t("Notifications", "Notifications", "الإشعارات")}>
+        <div className={styles.filters} role="tablist" aria-label={t.title}>
           {FILTERS.map((key) => {
             const count = key === "unread" ? counts.unread : key === "important" ? counts.important : counts.total;
             return (
@@ -267,7 +284,7 @@ export default function NotificationsPage() {
           <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
           <input
             type="search"
-            placeholder={t("Search notifications...", "Rechercher...", "البحث...")}
+            placeholder={t.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -277,7 +294,7 @@ export default function NotificationsPage() {
       {loading ? (
         <div className={styles.emptyState}>
           <div className={styles.loadingPulse} />
-          <p>Loading...</p>
+          <p>{t.loading}</p>
         </div>
       ) : notifications.length === 0 ? (
         <div className={styles.emptyState}>

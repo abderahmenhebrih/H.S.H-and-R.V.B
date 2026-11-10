@@ -44,6 +44,7 @@ import type { Supplier } from "../../src/types/entities/supplier";
 import type { Purchase } from "../../src/types/entities/purchase";
 import type { PurchaseCalculation } from "../../src/types/entities/purchase-calculation";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 import StyledDatePicker from "../../src/components/common/StyledDatePicker";
 
 import styles from "./page.module.css";
@@ -200,6 +201,20 @@ const TRANSLATIONS = {
     suppliersInvolvedSub: "Unique suppliers",
     permanentAction: "PERMANENT ACTION",
     kg: "kg",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    confirmDeletion: "Confirm deletion",
+    supplierNotFound: "Supplier not found.",
+    invoiceNumberRequired: "Supplier invoice number is required.",
+    dateInvalid: "Invoice date is invalid.",
+    currencyInvalid: "Invoice currency is invalid.",
+    duplicateInvoice: "An invoice with this number already exists for this supplier.",
+    productNotFound: "Product not found.",
+    calcInvalid: "Calculation inputs are invalid.",
   },
 
   fr: {
@@ -274,6 +289,20 @@ const TRANSLATIONS = {
     suppliersInvolvedSub: "Fournisseurs uniques",
     permanentAction: "ACTION PERMANENTE",
     kg: "kg",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    confirmDeletion: "Confirmer la suppression",
+    supplierNotFound: "Fournisseur introuvable.",
+    invoiceNumberRequired: "Le numéro de facture du fournisseur est obligatoire.",
+    dateInvalid: "La date de la facture est invalide.",
+    currencyInvalid: "La devise de la facture est invalide.",
+    duplicateInvoice: "Une facture portant ce numéro existe déjà pour ce fournisseur.",
+    productNotFound: "Produit introuvable.",
+    calcInvalid: "Les données du calcul sont invalides.",
   },
 
   ar: {
@@ -347,8 +376,48 @@ const TRANSLATIONS = {
     suppliersInvolvedSub: "موردون منفردون",
     permanentAction: "إجراء دائم",
     kg: "كغ",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    confirmDeletion: "تأكيد الحذف",
+    supplierNotFound: "المورد غير موجود.",
+    invoiceNumberRequired: "رقم فاتورة المورد مطلوب.",
+    dateInvalid: "تاريخ الفاتورة غير صالح.",
+    currencyInvalid: "عملة الفاتورة غير صالحة.",
+    duplicateInvoice: "توجد فاتورة بهذا الرقم بالفعل لهذا المورد.",
+    productNotFound: "المنتج غير موجود.",
+    calcInvalid: "مدخلات الحساب غير صالحة.",
   },
 } as const;
+
+const PURCHASE_ERROR_MAP: Record<string, Record<Language, string>> = {
+  SUPPLIER_NOT_FOUND: { en: TRANSLATIONS.en.supplierNotFound, fr: TRANSLATIONS.fr.supplierNotFound, ar: TRANSLATIONS.ar.supplierNotFound },
+  SUPPLIER_INVOICE_NUMBER_REQUIRED: { en: TRANSLATIONS.en.invoiceNumberRequired, fr: TRANSLATIONS.fr.invoiceNumberRequired, ar: TRANSLATIONS.ar.invoiceNumberRequired },
+  INVOICE_DATE_INVALID: { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  INVOICE_CURRENCY_INVALID: { en: TRANSLATIONS.en.currencyInvalid, fr: TRANSLATIONS.fr.currencyInvalid, ar: TRANSLATIONS.ar.currencyInvalid },
+  INCOMING_AMOUNT_INVALID: { en: TRANSLATIONS.en.invalidNumber, fr: TRANSLATIONS.fr.invalidNumber, ar: TRANSLATIONS.ar.invalidNumber },
+  INCOMING_INVOICE_DUPLICATE: { en: TRANSLATIONS.en.duplicateInvoice, fr: TRANSLATIONS.fr.duplicateInvoice, ar: TRANSLATIONS.ar.duplicateInvoice },
+  "Supplier not found.": { en: TRANSLATIONS.en.supplierNotFound, fr: TRANSLATIONS.fr.supplierNotFound, ar: TRANSLATIONS.ar.supplierNotFound },
+  "A purchase must contain at least one item.": { en: TRANSLATIONS.en.invalidRows, fr: TRANSLATIONS.fr.invalidRows, ar: TRANSLATIONS.ar.invalidRows },
+  "Purchase total must be a finite number >= 0.": { en: TRANSLATIONS.en.invalidNumber, fr: TRANSLATIONS.fr.invalidNumber, ar: TRANSLATIONS.ar.invalidNumber },
+  "Purchase date must be a valid finite timestamp.": { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  "Purchase total mismatch": { en: TRANSLATIONS.en.invalidNumber, fr: TRANSLATIONS.fr.invalidNumber, ar: TRANSLATIONS.ar.invalidNumber },
+  "Product not found": { en: TRANSLATIONS.en.productNotFound, fr: TRANSLATIONS.fr.productNotFound, ar: TRANSLATIONS.ar.productNotFound },
+  "Original product not found": { en: TRANSLATIONS.en.productNotFound, fr: TRANSLATIONS.fr.productNotFound, ar: TRANSLATIONS.ar.productNotFound },
+  "Invalid item": { en: TRANSLATIONS.en.invalidRows, fr: TRANSLATIONS.fr.invalidRows, ar: TRANSLATIONS.ar.invalidRows },
+  "Item total mismatch": { en: TRANSLATIONS.en.invalidRows, fr: TRANSLATIONS.fr.invalidRows, ar: TRANSLATIONS.ar.invalidRows },
+  "Weight before slaughter must be greater than zero.": { en: TRANSLATIONS.en.calcInvalid, fr: TRANSLATIONS.fr.calcInvalid, ar: TRANSLATIONS.ar.calcInvalid },
+  "Weight after slaughter cannot be negative.": { en: TRANSLATIONS.en.calcInvalid, fr: TRANSLATIONS.fr.calcInvalid, ar: TRANSLATIONS.ar.calcInvalid },
+  "Amount must be greater than zero.": { en: TRANSLATIONS.en.calcInvalid, fr: TRANSLATIONS.fr.calcInvalid, ar: TRANSLATIONS.ar.calcInvalid },
+};
+const PURCHASE_ERROR_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 export default function PurchasesPage() {
   const router = useRouter();
@@ -658,7 +727,7 @@ export default function PurchasesPage() {
       setDeleteTarget(null);
       setDeleteCountdown(10);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedDelete);
+      setError(localizeError(err, language, PURCHASE_ERROR_MAP, PURCHASE_ERROR_FALLBACK_TEXT));
     } finally {
       setDeleting(false);
     }
@@ -758,7 +827,7 @@ export default function PurchasesPage() {
 
       setCalculation(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.invalidNumber);
+      setError(localizeError(err, language, PURCHASE_ERROR_MAP, PURCHASE_ERROR_FALLBACK_TEXT));
     }
   }
 
@@ -978,7 +1047,7 @@ export default function PurchasesPage() {
               >
                 <header className={styles.modalHeader}>
                   <h2 id="select-products-title">{t.selectProducts}</h2>
-                  <button type="button" className={styles.closeButton} onClick={() => setShowProductSelector(false)} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={() => setShowProductSelector(false)} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>
@@ -1044,7 +1113,7 @@ export default function PurchasesPage() {
               <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
                 <header className={styles.modalHeader}>
                   <h2>{t.selectSuppliers}</h2>
-                  <button type="button" className={styles.closeButton} onClick={() => setShowSupplierSelector(false)} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={() => setShowSupplierSelector(false)} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>
@@ -1123,7 +1192,7 @@ export default function PurchasesPage() {
                     </span>
                   </div>
                   <span className={styles.circleLabel}>
-                    {deleteCountdown > 0 ? "Confirm deletion" : t.deleteConfirm}
+                    {deleteCountdown > 0 ? t.confirmDeletion : t.deleteConfirm}
                   </span>
                 </div>
                 {error && <div className={styles.formError}>{error}</div>}
@@ -1161,7 +1230,7 @@ export default function PurchasesPage() {
               <section className={styles.modal} role="dialog" aria-modal="true">
                 <header className={styles.modalHeader}>
                   <h2>{t.calculations}</h2>
-                  <button type="button" className={styles.closeButton} onClick={() => setShowCalculation(false)} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={() => setShowCalculation(false)} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>

@@ -26,6 +26,7 @@ import {
 } from "../../src/lib/settings";
 import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 
 import type { Supplier } from "../../src/types/entities/supplier";
 
@@ -95,6 +96,19 @@ const TRANSLATIONS = {
     delete: "Delete",
     edit: "Edit",
     invalidPhone: "Phone may contain +, digits, spaces and dashes only.",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    nameRequired: "Supplier name is required.",
+    phoneRequired: "Supplier phone is required.",
+    failedLoad: "Failed to load suppliers.",
+    failedSave: "Failed to save supplier.",
+    failedDelete: "Failed to delete supplier.",
+    duplicate: "A supplier with this name already exists.",
+    confirmDeletion: "Confirm deletion",
   },
 
   fr: {
@@ -139,6 +153,19 @@ const TRANSLATIONS = {
     delete: "Supprimer",
     edit: "Modifier",
     invalidPhone: "Le téléphone peut contenir +, chiffres, espaces et tirets uniquement.",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    nameRequired: "Le nom du fournisseur est obligatoire.",
+    phoneRequired: "Le téléphone du fournisseur est obligatoire.",
+    failedLoad: "Échec du chargement des fournisseurs.",
+    failedSave: "Échec de l'enregistrement du fournisseur.",
+    failedDelete: "Échec de la suppression du fournisseur.",
+    duplicate: "Un fournisseur portant ce nom existe déjà.",
+    confirmDeletion: "Confirmer la suppression",
   },
 
   ar: {
@@ -183,8 +210,34 @@ const TRANSLATIONS = {
     delete: "حذف",
     edit: "تعديل",
     invalidPhone: "قد يحتوي الهاتف على + وأرقام ومسافات وشرطات فقط.",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    nameRequired: "اسم المورد مطلوب.",
+    phoneRequired: "هاتف المورد مطلوب.",
+    failedLoad: "فشل تحميل الموردين.",
+    failedSave: "فشل حفظ المورد.",
+    failedDelete: "فشل حذف المورد.",
+    duplicate: "يوجد مورد بهذا الاسم بالفعل.",
+    confirmDeletion: "تأكيد الحذف",
   },
 } as const;
+
+const SUPPLIER_ERROR_MAP: Record<string, Record<Language, string>> = {
+  "Supplier name is required.": { en: TRANSLATIONS.en.nameRequired, fr: TRANSLATIONS.fr.nameRequired, ar: TRANSLATIONS.ar.nameRequired },
+  "Supplier phone is required.": { en: TRANSLATIONS.en.phoneRequired, fr: TRANSLATIONS.fr.phoneRequired, ar: TRANSLATIONS.ar.phoneRequired },
+  "Invalid phone number. Phone may contain +, digits, spaces and dashes only.": { en: TRANSLATIONS.en.invalidPhone, fr: TRANSLATIONS.fr.invalidPhone, ar: TRANSLATIONS.ar.invalidPhone },
+  "A supplier with this name already exists.": { en: TRANSLATIONS.en.duplicate, fr: TRANSLATIONS.fr.duplicate, ar: TRANSLATIONS.ar.duplicate },
+  "Supplier not found.": { en: TRANSLATIONS.en.failedDelete, fr: TRANSLATIONS.fr.failedDelete, ar: TRANSLATIONS.ar.failedDelete },
+};
+const SUPPLIER_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -231,7 +284,7 @@ export default function SuppliersPage() {
       const loadedSuppliers = await supplierService.getAll();
       setSuppliers(loadedSuppliers);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load suppliers.");
+      setError(localizeError(err, language, SUPPLIER_ERROR_MAP, SUPPLIER_FALLBACK_TEXT));
     } finally {
       setLoading(false);
     }
@@ -319,12 +372,12 @@ export default function SuppliersPage() {
     setError("");
 
     if (!form.name.trim()) {
-      setError("Supplier name is required.");
+      setError(t.nameRequired);
       return;
     }
 
     if (!form.phone.trim()) {
-      setError("Supplier phone is required.");
+      setError(t.phoneRequired);
       return;
     }
 
@@ -361,7 +414,7 @@ export default function SuppliersPage() {
       setError("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save supplier.");
+      setError(localizeError(err, language, SUPPLIER_ERROR_MAP, SUPPLIER_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -384,7 +437,7 @@ export default function SuppliersPage() {
       );
       setDeleteTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete supplier.");
+      setError(localizeError(err, language, SUPPLIER_ERROR_MAP, SUPPLIER_FALLBACK_TEXT));
       setDeleteTarget(null);
     }
   }
@@ -444,7 +497,7 @@ export default function SuppliersPage() {
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.outstandingPayable}</span>
                 <strong className={styles.summaryValue} title={formatCurrency(outstandingPayable, currency)}>
-                  {formatCompactCurrency(outstandingPayable, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}
+                  {formatCompactCurrency(outstandingPayable, currency)}{hasInvalidBalance && <span title={t.dataIntegrity} style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ {t.dataIntegrity}</span>}
                 </strong>
                 <small className={styles.summarySub}>{t.outstandingPayableSub}</small>
               </div>
@@ -532,9 +585,9 @@ export default function SuppliersPage() {
                         {formatCurrency(supplier.balance, currency)}
                       </strong>
                     ) : supplier.balance === undefined || supplier.balance === null ? (
-                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                      <span title={t.noBalance} style={{ color: "var(--muted)" }}>—</span>
                     ) : (
-                      <span title={`Invalid balance: ${String(supplier.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                      <span title={t.invalidBalance} style={{ color: "var(--danger)", fontWeight: 700 }}>{t.invalidBalance}</span>
                     )}
 
                     <span className={styles.infoText}>
@@ -577,7 +630,7 @@ export default function SuppliersPage() {
                     type="button"
                     className={styles.closeButton}
                     onClick={closeForm}
-                    aria-label="Close"
+                    aria-label={t.close}
                   >
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
@@ -759,7 +812,7 @@ export default function SuppliersPage() {
                     </span>
                   </div>
                   <span className={countdownStyles.circleLabel}>
-                    {deleteReady ? t.confirmDelete : "Confirm deletion"}
+                    {deleteReady ? t.confirmDelete : t.confirmDeletion}
                   </span>
                 </div>
                 <div className={styles.modalFooter}>

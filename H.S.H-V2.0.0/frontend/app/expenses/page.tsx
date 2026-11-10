@@ -20,6 +20,7 @@ import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../src/lib/
 import type { Expense } from "../../src/types/entities/expense";
 import type { BankAccount } from "../../src/types/entities/bank-account";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 import styles from "./page.module.css";
 
 type FormState = {
@@ -78,6 +79,17 @@ const TRANSLATIONS = {
     noAccounts: "No accounts available. Create a bank/cash account first.",
     failedLoad: "Failed to load expenses.",
     failedSave: "Failed to save expense.",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    fieldsRequired: "Please fill in all required fields.",
+    amountInvalid: "Expense amount must be greater than zero.",
+    dateInvalid: "Expense date is invalid.",
+    insufficient: "Insufficient account balance.",
+    confirmDeletion: "Confirm deletion",
   },
   fr: {
     search: "Rechercher des dépenses...",
@@ -118,6 +130,17 @@ const TRANSLATIONS = {
     noAccounts: "Aucun compte disponible. Créez d'abord un compte bancaire/espèces.",
     failedLoad: "Échec du chargement des dépenses.",
     failedSave: "Échec de l'enregistrement de la dépense.",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    fieldsRequired: "Veuillez remplir tous les champs obligatoires.",
+    amountInvalid: "Le montant de la dépense doit être supérieur à zéro.",
+    dateInvalid: "La date de la dépense est invalide.",
+    insufficient: "Solde du compte insuffisant.",
+    confirmDeletion: "Confirmer la suppression",
   },
   ar: {
     search: "البحث عن المصاريف...",
@@ -158,8 +181,32 @@ const TRANSLATIONS = {
     noAccounts: "لا توجد حسابات متاحة. أنشئ حسابًا بنكيًا/نقديًا أولاً.",
     failedLoad: "فشل تحميل المصاريف.",
     failedSave: "فشل حفظ المصروف.",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    fieldsRequired: "يرجى ملء جميع الحقول المطلوبة.",
+    amountInvalid: "يجب أن يكون مبلغ المصروف أكبر من الصفر.",
+    dateInvalid: "تاريخ المصروف غير صالح.",
+    insufficient: "رصيد الحساب غير كافٍ.",
+    confirmDeletion: "تأكيد الحذف",
   },
 } as const;
+
+const EXPENSE_ERROR_MAP: Record<string, Record<Language, string>> = {
+  EXPENSE_AMOUNT_INVALID: { en: TRANSLATIONS.en.amountInvalid, fr: TRANSLATIONS.fr.amountInvalid, ar: TRANSLATIONS.ar.amountInvalid },
+  "Expense amount must be greater than zero.": { en: TRANSLATIONS.en.amountInvalid, fr: TRANSLATIONS.fr.amountInvalid, ar: TRANSLATIONS.ar.amountInvalid },
+  "Expense amount must be a finite number greater than zero.": { en: TRANSLATIONS.en.amountInvalid, fr: TRANSLATIONS.fr.amountInvalid, ar: TRANSLATIONS.ar.amountInvalid },
+  "Expense date must be a valid finite timestamp.": { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  "Insufficient account balance.": { en: TRANSLATIONS.en.insufficient, fr: TRANSLATIONS.fr.insufficient, ar: TRANSLATIONS.ar.insufficient },
+};
+const EXPENSE_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 export default function ExpensesPage() {
   const router = useRouter();
@@ -263,12 +310,12 @@ export default function ExpensesPage() {
 
   async function saveExpense() {
     if (!form.name.trim() || !form.amount.trim() || !form.accountId) {
-      setError(t.failedSave);
+      setError(t.fieldsRequired);
       return;
     }
     const amount = Number(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError(t.failedSave);
+      setError(t.amountInvalid);
       return;
     }
     setSaving(true);
@@ -296,7 +343,7 @@ export default function ExpensesPage() {
       await loadData();
       closeForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, EXPENSE_ERROR_MAP, EXPENSE_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -318,7 +365,7 @@ export default function ExpensesPage() {
       setDeleteTarget(null);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, EXPENSE_ERROR_MAP, EXPENSE_FALLBACK_TEXT));
     } finally {
       setDeleting(false);
     }
@@ -414,7 +461,7 @@ export default function ExpensesPage() {
                   <span className={styles.modalBadge}>{editingId ? t.editExpense : t.newExpense}</span>
                   <h2>{editingId ? t.editExpenseTitle : t.addExpenseTitle}</h2>
                 </div>
-                <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving}>
+                <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving} aria-label={t.close}>
                   <X size={18} strokeWidth={2} aria-hidden="true" />
                 </button>
               </div>
@@ -430,6 +477,8 @@ export default function ExpensesPage() {
                 <label>
                   <span>{t.account} <small>{t.required}</small></span>
                   <StyledSelect
+                    language={language}
+                    emptyLabel={t.noOptions}
                     value={form.accountId}
                     onChange={(v)=>setForm((c)=>({ ...c, accountId: v }))}
                     placeholder={t.account}
@@ -497,7 +546,7 @@ export default function ExpensesPage() {
                   </span>
                 </div>
                 <span className={countdownStyles.circleLabel}>
-                  {deleteReady ? t.confirmDelete : "Confirm deletion"}
+                  {deleteReady ? t.confirmDelete : t.confirmDeletion}
                 </span>
               </div>
               {error && <div className={styles.formError}>{error}</div>}

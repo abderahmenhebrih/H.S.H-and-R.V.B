@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:hsh-client": "tsx test-hsh-sync-client-integrity.ts",
+    "test:i18n-parity": "tsx scripts/check-i18n-parity.ts",
+    "qa:i18n": "playwright test --config=playwright.config.ts e2e/i18n-localization.spec.ts --reporter=list",
     "qa:user": "playwright test --config=playwright.config.ts e2e/autonomous --reporter=list,html",
     "test:hsh-user": "npm run qa:user",
     "qa:user:headed": "playwright test --config=playwright.config.ts e2e/autonomous --headed --reporter=list",

@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
+import type { Language } from "../../types/settings/settings";
 import styles from "./StyledSelect.module.css";
 
 export type SelectOption = {
@@ -20,9 +21,17 @@ type Props = {
   disabled?: boolean;
   fitContent?: boolean;
   maxMenuHeight?: string | number;
+  language?: Language;
+  emptyLabel?: string;
 };
 
-export default function StyledSelect({ value, onChange, options, placeholder, ariaLabel, disabled, fitContent, maxMenuHeight }: Props) {
+const EMPTY_LABEL: Record<Language, string> = {
+  en: "No options",
+  fr: "Aucune option",
+  ar: "لا توجد خيارات",
+};
+
+export default function StyledSelect({ value, onChange, options, placeholder, ariaLabel, disabled, fitContent, maxMenuHeight, language = "en", emptyLabel }: Props) {
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState<number>(-1);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -261,7 +270,7 @@ export default function StyledSelect({ value, onChange, options, placeholder, ar
               aria-label={ariaLabel}
             >
               {options.length === 0 ? (
-                <div className={styles.empty}>No options</div>
+                <div className={styles.empty}>{emptyLabel ?? EMPTY_LABEL[language] ?? EMPTY_LABEL.en}</div>
               ) : (
                 options.map((opt, idx) => {
                   const isSelected = opt.value === value;

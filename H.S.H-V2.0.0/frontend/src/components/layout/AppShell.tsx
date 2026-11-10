@@ -75,11 +75,14 @@ type NavItem = {
   path: string;
 };
 
-// Canonical navigation - single source of truth shared with Dashboard
+// Canonical navigation - single source of truth shared with Dashboard.
+// NOTE: `label` here is a code-only fallback (the key itself); visible
+// labels always come from the localized `navLabels` table below so no
+// English capitalize fallback is ever rendered to users.
 const navigation: readonly NavItem[] = CANONICAL_NAVIGATION.map((item) => ({
   icon: item.icon,
   key: item.key as unknown as ActivePage,
-  label: item.key === "dashboard" ? "Management Dashboard" : item.key === "office" ? "My Office" : item.key.charAt(0).toUpperCase() + item.key.slice(1),
+  label: item.key,
   path: item.path,
 })) as unknown as readonly NavItem[];
 
@@ -109,6 +112,9 @@ const translations = {
     operations: "Operations",
     openMenu: "Open navigation",
     closeMenu: "Close navigation",
+    toggleTheme: "Toggle theme",
+    themeToLight: "Switch to light mode",
+    themeToDark: "Switch to dark mode",
     database: "Local database ready",
     ready: "Ready",
     operational: "System operational",
@@ -219,6 +225,9 @@ const translations = {
     operations: "Opérations",
     openMenu: "Ouvrir la navigation",
     closeMenu: "Fermer la navigation",
+    toggleTheme: "Changer de thème",
+    themeToLight: "Passer en mode clair",
+    themeToDark: "Passer en mode sombre",
     database: "Base de données locale prête",
     ready: "Prêt",
     operational: "Système opérationnel",
@@ -329,6 +338,9 @@ const translations = {
     operations: "العمليات",
     openMenu: "فتح قائمة التنقل",
     closeMenu: "إغلاق قائمة التنقل",
+    toggleTheme: "تبديل المظهر",
+    themeToLight: "التبديل إلى الوضع الفاتح",
+    themeToDark: "التبديل إلى الوضع الداكن",
     database: "قاعدة البيانات المحلية جاهزة",
     ready: "جاهز",
     operational: "النظام يعمل",
@@ -702,8 +714,8 @@ export default function AppShell({
           onOpenRvb={handleSwitchToRvb}
           dark={dark}
           onToggleTheme={toggleTheme}
-          themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
-          settingsLabel="Settings"
+          themeLabel={dark ? t.themeToLight : t.themeToDark}
+          settingsLabel={t.nav.settings}
           onOpenSettings={() => navigate("/settings")}
           bell={<HshNotificationBell language={settings.language} dark={dark} />}
         />
@@ -721,9 +733,9 @@ export default function AppShell({
           onNavigate={navigate}
           dark={dark}
           onToggleTheme={toggleTheme}
-          themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
+          themeLabel={dark ? t.themeToLight : t.themeToDark}
           onOpenSettings={() => navigate("/settings")}
-          settingsLabel="Settings"
+          settingsLabel={t.nav.settings}
           onAccessRvb={handleSwitchToRvb}
           rvbLabel={t.onlineAccess}
           bell={<HshNotificationBell language={settings.language} dark={dark} />}
@@ -737,7 +749,7 @@ export default function AppShell({
               type="button"
               className={dashboardStyles.menuButton}
               onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
+              aria-label={t.openMenu}
             >
               <Menu size={18} strokeWidth={2} aria-hidden="true" />
             </button>
@@ -751,7 +763,7 @@ export default function AppShell({
             type="button"
             className={dashboardStyles.mobileTheme}
             onClick={toggleTheme}
-            aria-label="Toggle theme"
+            aria-label={t.toggleTheme}
           >
             {dark ? (
               <Sun size={18} strokeWidth={2} aria-hidden="true" />

@@ -1,17 +1,24 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import type { Language } from "../../../types/settings/settings";
 
 type Props = {
   icon: LucideIcon;
   role: string;
+  language?: Language;
   activeLabel?: string;
   archivedLabel?: string;
   activeValue?: string | number;
   archivedValue?: string | number;
 };
 
-export default function RvbRoleOverviewCard({ icon: Icon, role, activeLabel = "Active", archivedLabel = "Archived", activeValue = "—", archivedValue = "—" }: Props) {
+const ACTIVE_LABEL: Record<Language, string> = { en: "Active", fr: "Actif", ar: "نشط" };
+const ARCHIVED_LABEL: Record<Language, string> = { en: "Archived", fr: "Archivé", ar: "مؤرشف" };
+
+export default function RvbRoleOverviewCard({ icon: Icon, role, language = "en", activeLabel, archivedLabel, activeValue = "—", archivedValue = "—" }: Props) {
+  const tActive = activeLabel ?? ACTIVE_LABEL[language] ?? ACTIVE_LABEL.en;
+  const tArchived = archivedLabel ?? ARCHIVED_LABEL[language] ?? ARCHIVED_LABEL.en;
   return (
     <div
       style={{
@@ -57,11 +64,11 @@ export default function RvbRoleOverviewCard({ icon: Icon, role, activeLabel = "A
         }}
       >
         <div style={{ minWidth: 0, width: "100%", padding: "8px 10px", borderRadius: 8, background: "var(--panel-hover)", border: "1px solid var(--border)", boxSizing: "border-box" }}>
-          <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{activeLabel}</span>
+          <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{tActive}</span>
           <strong style={{ display: "block", marginTop: 2, fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{String(activeValue)}</strong>
         </div>
         <div style={{ minWidth: 0, width: "100%", padding: "8px 10px", borderRadius: 8, background: "var(--panel-hover)", border: "1px solid var(--border)", boxSizing: "border-box" }}>
-          <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{archivedLabel}</span>
+          <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{tArchived}</span>
           <strong style={{ display: "block", marginTop: 2, fontSize: 14, fontWeight: 800, color: "var(--text)" }}>{String(archivedValue)}</strong>
         </div>
       </div>

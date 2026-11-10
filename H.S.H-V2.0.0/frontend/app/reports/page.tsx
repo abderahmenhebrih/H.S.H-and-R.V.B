@@ -75,6 +75,8 @@ const TRANSLATIONS = {
     workers: "Workers",
     expenses: "Expenses",
     vehicles: "Vehicles",
+    transfer: "Transfer",
+    changePeriod: "Change report period",
   },
   fr: {
     title: "Rapports périodiques",
@@ -113,6 +115,8 @@ const TRANSLATIONS = {
     workers: "Employés",
     expenses: "Dépenses",
     vehicles: "Véhicules",
+    transfer: "Transfert",
+    changePeriod: "Changer la période du rapport",
   },
   ar: {
     title: "الوضعية الدورية",
@@ -151,14 +155,15 @@ const TRANSLATIONS = {
     workers: "العمال",
     expenses: "المصاريف",
     vehicles: "المركبات",
+    transfer: "تحويل",
+    changePeriod: "تغيير فترة التقرير",
   },
 } as const;
 
 function formatDate(ts: number, _language?: string) {
   // Deterministic application-wide numeric standard: DD/MM/YYYY (same for all
   // languages — the language argument is accepted for call-site compatibility).
-  void _language;
-  return formatTimestampToDisplay(ts);
+  return formatTimestampToDisplay(ts, _language ?? "en");
 }
 
 function serialForDate(date: number, index: number) {
@@ -547,7 +552,7 @@ export default function ReportsPage() {
               <div key={p.id} className={styles.simpleRow}><span>{formatDate(p.date, language)}</span><span>{p.entityType} · {formatCurrency(p.amount, currency)}</span><span>{p.note ?? ""}</span></div>
             ))}
             {trans.map((tr) => (
-              <div key={tr.id} className={styles.simpleRow}><span>{formatDate(tr.date, language)}</span><span>Transfer {formatCurrency(tr.amount, currency)}</span><span>{tr.note ?? ""}</span></div>
+              <div key={tr.id} className={styles.simpleRow}><span>{formatDate(tr.date, language)}</span><span>{t.transfer} {formatCurrency(tr.amount, currency)}</span><span>{tr.note ?? ""}</span></div>
             ))}
             {exps.map((e) => (
               <div key={e.id} className={styles.simpleRow}><span>{formatDate(e.date, language)}</span><span>{e.name} · {formatCurrency(e.amount, currency)}</span><span>{e.note ?? ""}</span></div>
@@ -565,7 +570,7 @@ export default function ReportsPage() {
             <div key={p.id} className={styles.simpleRow}><span>{formatDate(p.date, language)}</span><span>{p.entityType} · {formatCurrency(p.amount, currency)}</span><span>{p.note ?? ""}</span></div>
           ))}
           {trans.map((tr) => (
-            <div key={tr.id} className={styles.simpleRow}><span>{formatDate(tr.date, language)}</span><span>Transfer {formatCurrency(tr.amount, currency)}</span><span>{tr.note ?? ""}</span></div>
+            <div key={tr.id} className={styles.simpleRow}><span>{formatDate(tr.date, language)}</span><span>{t.transfer} {formatCurrency(tr.amount, currency)}</span><span>{tr.note ?? ""}</span></div>
           ))}
           {exps.map((e) => (
             <div key={e.id} className={styles.simpleRow}><span>{formatDate(e.date, language)}</span><span>{e.name} · {formatCurrency(e.amount, currency)}</span><span>{e.note ?? ""}</span></div>
@@ -670,7 +675,7 @@ export default function ReportsPage() {
             <section className={styles.historySection}>
               <div className={styles.historyTitle}>
                 <h2>{t.history}</h2>
-                <button type="button" className={styles.periodControl} onClick={() => setShowDatePopup(true)} aria-label="Change report period" title="Change report period">
+                <button type="button" className={styles.periodControl} onClick={() => setShowDatePopup(true)} aria-label={t.changePeriod} title={t.changePeriod}>
                   <CalendarRange size={14} strokeWidth={2} aria-hidden="true" />
                   <span>{fromDate} → {toDate}</span>
                 </button>

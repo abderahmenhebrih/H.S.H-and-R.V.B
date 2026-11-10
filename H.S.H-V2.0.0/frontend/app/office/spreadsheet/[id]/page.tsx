@@ -12,9 +12,9 @@ import type { OfficeFile } from "../../../../src/types/entities/office-file";
 import type { Language } from "../../../../src/types/settings/settings";
 import styles from "./page.module.css";
 const SHEET_T = {
-  en: { loading:"Loading spreadsheet…", saved:"Saved", saving:"Saving...", offline:"Offline", focus:"Focus", exitFocus:"Exit Focus", hebrihData:"HEBRIH Data", insertTable:"Insert Table", print:"Print", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formulas: SUM, AVERAGE, MIN, MAX, COUNT supported via Univer engine. Use =SUM(A1:A10)", noData:"No data", tableInserted:"Table inserted", valueInserted:"Value inserted", exportFailed:"Export failed", backToOffice:"Back to Office", spreadsheetTitle:"Spreadsheet title", insertHebrihTitle:"Insert HEBRIH Data", insertTableTitle:"Insert HEBRIH Table", snapshotHelp:"Value inserted as snapshot. Editing spreadsheet does not modify business records.", tableSnapshotHelp:"Creates a snapshot table as a new sheet. Not live-linked.", entity:"Entity", record:"Record", field:"Field", cancel:"Cancel", insert:"Insert", customers:"Customers", suppliers:"Suppliers", products:"Products", sales:"Sales", purchases:"Purchases", workers:"Workers", customer:"Customer", supplier:"Supplier", worker:"Worker", product:"Product", sale:"Sale", purchase:"Purchase", invoice:"Invoice", vehicle:"Vehicle", task:"Task", amount:"Amount", date:"Date" },
-  fr: { loading:"Chargement du tableur…", saved:"Enregistré", saving:"Enregistrement…", offline:"Hors ligne", focus:"Focus", exitFocus:"Quitter focus", hebrihData:"Données HEBRIH", insertTable:"Insérer tableau", print:"Imprimer", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formules : SUM, AVERAGE, MIN, MAX, COUNT prises en charge par Univer. Utilisez =SUM(A1:A10)", noData:"Aucune donnée", tableInserted:"Tableau inséré", valueInserted:"Valeur insérée", exportFailed:"Échec de l'export", backToOffice:"Retour au bureau", spreadsheetTitle:"Titre du tableur", insertHebrihTitle:"Insérer données HEBRIH", insertTableTitle:"Insérer tableau HEBRIH", snapshotHelp:"Valeur insérée comme instantané. Modifier le tableur ne modifie pas les enregistrements.", tableSnapshotHelp:"Crée un tableau instantané comme nouvelle feuille. Non lié en direct.", entity:"Entité", record:"Enregistrement", field:"Champ", cancel:"Annuler", insert:"Insérer", customers:"Clients", suppliers:"Fournisseurs", products:"Produits", sales:"Ventes", purchases:"Achats", workers:"Employés", customer:"Client", supplier:"Fournisseur", worker:"Employé", product:"Produit", sale:"Vente", purchase:"Achat", invoice:"Facture", vehicle:"Véhicule", task:"Tâche", amount:"Montant", date:"Date" },
-  ar: { loading:"جارٍ تحميل الجدول…", saved:"تم الحفظ", saving:"جارٍ الحفظ…", offline:"غير متصل", focus:"تركيز", exitFocus:"إنهاء التركيز", hebrihData:"بيانات حبريح", insertTable:"إدراج جدول", print:"طباعة", csv:"CSV", xlsx:"XLSX", formulasHelp:"الصيغ: SUM و AVERAGE و MIN و MAX و COUNT مدعومة عبر Univer. استخدم =SUM(A1:A10)", noData:"لا توجد بيانات", tableInserted:"تم إدراج الجدول", valueInserted:"تم إدراج القيمة", exportFailed:"فشل التصدير", backToOffice:"العودة إلى المكتب", spreadsheetTitle:"عنوان الجدول", insertHebrihTitle:"إدراج بيانات حبريح", insertTableTitle:"إدراج جدول حبريح", snapshotHelp:"تم إدراج القيمة كلقطة. تعديل الجدول لا يعدل السجلات.", tableSnapshotHelp:"ينشئ جدول لقطة كورقة جديدة. غير مرتبط مباشرة.", entity:"الكيان", record:"السجل", field:"الحقل", cancel:"إلغاء", insert:"إدراج", customers:"الزبائن", suppliers:"الموردون", products:"المنتجات", sales:"المبيعات", purchases:"المشتريات", workers:"العمال", customer:"الزبون", supplier:"المورد", worker:"العامل", product:"المنتج", sale:"البيع", purchase:"الشراء", invoice:"الفاتورة", vehicle:"المركبة", task:"المهمة", amount:"المبلغ", date:"التاريخ" },
+  en: { loading:"Loading spreadsheet…", saved:"Saved", saving:"Saving...", offline:"Offline", focus:"Focus", exitFocus:"Exit Focus", hebrihData:"HEBRIH Data", insertTable:"Insert Table", print:"Print", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formulas: SUM, AVERAGE, MIN, MAX, COUNT supported via Univer engine. Use =SUM(A1:A10)", noData:"No data", tableInserted:"Table inserted", valueInserted:"Value inserted", exportFailed:"Export failed", backToOffice:"Back to Office", spreadsheetTitle:"Spreadsheet title", insertHebrihTitle:"Insert HEBRIH Data", insertTableTitle:"Insert HEBRIH Table", snapshotHelp:"Value inserted as snapshot. Editing spreadsheet does not modify business records.", tableSnapshotHelp:"Creates a snapshot table as a new sheet. Not live-linked.", entity:"Entity", record:"Record", field:"Field", cancel:"Cancel", insert:"Insert", customers:"Customers", suppliers:"Suppliers", products:"Products", sales:"Sales", purchases:"Purchases", workers:"Workers", customer:"Customer", supplier:"Supplier", worker:"Worker", product:"Product", sale:"Sale", purchase:"Purchase", invoice:"Invoice", vehicle:"Vehicle", task:"Task", amount:"Amount", date:"Date", startTyping:"Start typing...", untitledDoc:"Untitled Document", untitledSpreadsheet:"Untitled Spreadsheet", imageTooLarge:"Image too large (max 1MB for sync)", urlRequired:"URL required", invalidUrl:"Invalid URL", sheet1:"Sheet 1", phone:"Phone", close:"Close", workbookUnavailable:"Workbook not available", complexBlocked:"Complex workbook — insert blocked in fallback", insertFailed:"Insert failed", createSheetFailed:"Failed to create new sheet" },
+  fr: { loading:"Chargement du tableur…", saved:"Enregistré", saving:"Enregistrement…", offline:"Hors ligne", focus:"Focus", exitFocus:"Quitter focus", hebrihData:"Données HEBRIH", insertTable:"Insérer tableau", print:"Imprimer", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formules : SUM, AVERAGE, MIN, MAX, COUNT prises en charge par Univer. Utilisez =SUM(A1:A10)", noData:"Aucune donnée", tableInserted:"Tableau inséré", valueInserted:"Valeur insérée", exportFailed:"Échec de l'export", backToOffice:"Retour au bureau", spreadsheetTitle:"Titre du tableur", insertHebrihTitle:"Insérer données HEBRIH", insertTableTitle:"Insérer tableau HEBRIH", snapshotHelp:"Valeur insérée comme instantané. Modifier le tableur ne modifie pas les enregistrements.", tableSnapshotHelp:"Crée un tableau instantané comme nouvelle feuille. Non lié en direct.", entity:"Entité", record:"Enregistrement", field:"Champ", cancel:"Annuler", insert:"Insérer", customers:"Clients", suppliers:"Fournisseurs", products:"Produits", sales:"Ventes", purchases:"Achats", workers:"Employés", customer:"Client", supplier:"Fournisseur", worker:"Employé", product:"Produit", sale:"Vente", purchase:"Achat", invoice:"Facture", vehicle:"Véhicule", task:"Tâche", amount:"Montant", date:"Date", startTyping:"Commencez à écrire...", untitledDoc:"Sans titre", untitledSpreadsheet:"Sans titre", imageTooLarge:"Image trop grande (max 1Mo)", urlRequired:"URL requise", invalidUrl:"URL invalide", sheet1:"Feuille 1", phone:"Téléphone", close:"Fermer", workbookUnavailable:"Classeur indisponible", complexBlocked:"Classeur complexe — insertion bloquée en mode secours", insertFailed:"Échec de l'insertion", createSheetFailed:"Échec de création de feuille" },
+  ar: { loading:"جارٍ تحميل الجدول…", saved:"تم الحفظ", saving:"جارٍ الحفظ…", offline:"غير متصل", focus:"تركيز", exitFocus:"إنهاء التركيز", hebrihData:"بيانات حبريح", insertTable:"إدراج جدول", print:"طباعة", csv:"CSV", xlsx:"XLSX", formulasHelp:"الصيغ: SUM و AVERAGE و MIN و MAX و COUNT مدعومة عبر Univer. استخدم =SUM(A1:A10)", noData:"لا توجد بيانات", tableInserted:"تم إدراج الجدول", valueInserted:"تم إدراج القيمة", exportFailed:"فشل التصدير", backToOffice:"العودة إلى المكتب", spreadsheetTitle:"عنوان الجدول", insertHebrihTitle:"إدراج بيانات حبريح", insertTableTitle:"إدراج جدول حبريح", snapshotHelp:"تم إدراج القيمة كلقطة. تعديل الجدول لا يعدل السجلات.", tableSnapshotHelp:"ينشئ جدول لقطة كورقة جديدة. غير مرتبط مباشرة.", entity:"الكيان", record:"السجل", field:"الحقل", cancel:"إلغاء", insert:"إدراج", customers:"الزبائن", suppliers:"الموردون", products:"المنتجات", sales:"المبيعات", purchases:"المشتريات", workers:"العمال", customer:"الزبون", supplier:"المورد", worker:"العامل", product:"المنتج", sale:"البيع", purchase:"الشراء", invoice:"الفاتورة", vehicle:"المركبة", task:"المهمة", amount:"المبلغ", date:"التاريخ", startTyping:"ابدأ الكتابة...", untitledDoc:"بدون عنوان", untitledSpreadsheet:"بدون عنوان", imageTooLarge:"الصورة كبيرة جدًا (1MB)", urlRequired:"الرابط مطلوب", invalidUrl:"رابط غير صالح", sheet1:"ورقة 1", phone:"الهاتف", close:"إغلاق", workbookUnavailable:"المصنف غير متاح", complexBlocked:"مصنف معقد — الإدراج محظور", insertFailed:"فشل الإدراج", createSheetFailed:"فشل إنشاء ورقة جديدة" },
 } as const;
 
 import {
@@ -127,15 +127,15 @@ export default function SpreadsheetEditorPage() {
       const mod = await getSnapshotForInsert(entityType, entityId, field);
       const value = mod.value;
       if (!univerRef.current?.insertValue) {
-        setOfficeFeedback("Workbook not available");
+        setOfficeFeedback(TT.workbookUnavailable);
         setShowHebrih(false);
         return;
       }
       const res: any = await univerRef.current.insertValue(value);
       if (!res || res.success !== true) {
-        const err = res?.error || "Insert failed";
+        const err = res?.error || TT.insertFailed;
         if (err === "READ_ONLY_COMPLEX") {
-          setOfficeFeedback(language==="fr" ? "Classeur complexe — insertion bloquée en mode secours" : language==="ar" ? "مصنف معقد — الإدراج محظور" : "Complex workbook — insert blocked in fallback");
+          setOfficeFeedback(TT.complexBlocked);
         } else {
           setOfficeFeedback(err);
         }
@@ -165,15 +165,15 @@ export default function SpreadsheetEditorPage() {
       const rows = await getTableSnapshot(entityType, language);
       if (!rows || rows.length===0) { setOfficeFeedback(TT.noData); return; }
       if (!univerRef.current?.insertTable) {
-        setOfficeFeedback("Workbook not available");
+        setOfficeFeedback(TT.workbookUnavailable);
         setShowTableInsert(false);
         return;
       }
       const res: any = await univerRef.current.insertTable(entityType, rows);
       if (!res || res.success !== true) {
-        const err = res?.error || "Failed to create new sheet";
+        const err = res?.error || TT.createSheetFailed;
         if (err === "READ_ONLY_COMPLEX") {
-          setOfficeFeedback(language==="fr" ? "Classeur complexe — insertion bloquée en mode secours" : language==="ar" ? "مصنف معقد — الإدراج محظور" : "Complex workbook — insert blocked in fallback");
+          setOfficeFeedback(TT.complexBlocked);
         } else {
           setOfficeFeedback(err);
         }
@@ -262,8 +262,8 @@ export default function SpreadsheetEditorPage() {
           rows.forEach((r)=> ws.addRow(r));
         });
       } else {
-        const noDataLabel = language==="fr" ? "Aucune donnée" : language==="ar" ? "لا توجد بيانات" : "No data";
-        const fallbackSheetName = language==="fr" ? "Feuille 1" : language==="ar" ? "ورقة 1" : "Sheet 1";
+        const noDataLabel = TT.noData;
+        const fallbackSheetName = TT.sheet1;
         const ws = workbook.addWorksheet(fallbackSheetName);
         ws.addRow([noDataLabel]);
       }
@@ -282,7 +282,7 @@ export default function SpreadsheetEditorPage() {
       <main className={styles.sheetPage} dir={dir}>
         <div className={styles.sheetHeader}>
           <button type="button" onClick={()=>router.push("/office")} style={{ border:"1px solid var(--border)", background:"var(--panel-hover)", borderRadius:8, padding:"6px 10px", cursor:"pointer" }} aria-label={TT.backToOffice}>←</button>
-          <input className={styles.sheetTitleInput} value={title} onChange={(e)=>handleTitleChange(e.target.value)} placeholder={language==="fr"?"Sans titre": language==="ar"?"بدون عنوان":"Untitled Spreadsheet"} aria-label={TT.spreadsheetTitle} />
+          <input className={styles.sheetTitleInput} value={title} onChange={(e)=>handleTitleChange(e.target.value)} placeholder={TT.untitledSpreadsheet} aria-label={TT.spreadsheetTitle} />
           <span className={styles.sheetStatus}>{status==="saved"?TT.saved:status==="saving"?TT.saving:TT.offline}</span>
           <button type="button" className={styles.sheetStatus} onClick={()=>setIsFocus((v)=>!v)} aria-label={isFocus?TT.exitFocus:TT.focus} title={isFocus?TT.exitFocus:TT.focus} style={{ border:"1px solid var(--border)", background:"var(--panel-hover)", borderRadius:8, padding:"6px 10px", cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
             {isFocus ? <Minimize2 size={14} strokeWidth={2} aria-hidden="true" /> : <Maximize2 size={14} strokeWidth={2} aria-hidden="true" />} {isFocus ? TT.exitFocus : TT.focus}
@@ -301,7 +301,7 @@ export default function SpreadsheetEditorPage() {
         )}
 
         <div className={styles.univerContainer}>
-          <UniverWrapper ref={univerRef} file={file} onSave={handleWorkbookSave} language={language} defaultSheetName={language==="fr" ? "Feuille 1" : language==="ar" ? "ورقة 1" : "Sheet 1"} />
+          <UniverWrapper ref={univerRef} file={file} onSave={handleWorkbookSave} language={language} defaultSheetName={TT.sheet1} />
         </div>
 
         {officeFeedback && <div role="status" aria-live="polite" style={{ position:"fixed", bottom:16, left:"50%", transform:"translateX(-50%)", background:"var(--panel)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 14px", fontSize:12, fontWeight:700, color:"var(--text)", boxShadow:"0 6px 20px rgba(0,0,0,0.12)", zIndex: 999 }}>{officeFeedback}</div>}
@@ -388,7 +388,7 @@ function HebrihTableModal({ language, onClose, onInsert }: { language:Language; 
         <h3>{TM.insertTableTitle}</h3>
         <p style={{ margin:0, fontSize:11, color:"var(--muted)"}}>{TM.tableSnapshotHelp}</p>
         <label><span style={{ fontSize:11, fontWeight:700, color:"var(--muted)"}}>{TM.entity}</span>
-          <StyledSelect value={type} onChange={setType} placeholder={TM.entity} ariaLabel={TM.entity} options={[{value:"customer",label:TM.customers},{value:"supplier",label:TM.suppliers},{value:"product",label:TM.products},{value:"sale",label:TM.sales},{value:"purchase",label:TM.purchases},{value:"worker",label:TM.workers},{value:"vehicle",label:(TM as any).vehicle ?? "Vehicle"},{value:"task",label:(TM as any).task ?? "Task"}]} />
+          <StyledSelect value={type} onChange={setType} placeholder={TM.entity} ariaLabel={TM.entity} options={[{value:"customer",label:TM.customers},{value:"supplier",label:TM.suppliers},{value:"product",label:TM.products},{value:"sale",label:TM.sales},{value:"purchase",label:TM.purchases},{value:"worker",label:TM.workers},{value:"vehicle",label:TM.vehicle},{value:"task",label:TM.task}]} />
         </label>
         <div style={{ display:"flex", gap:6 }}>
           <button type="button" onClick={()=>onClose()} style={{ flex:1, minHeight:36, border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)", color:"var(--text)", fontWeight:700 }}>{TM.cancel}</button>
@@ -443,8 +443,8 @@ async function getSnapshotForInsert(type:string, id:string, field:string): Promi
 async function getTableSnapshot(type:string, language: import("../../../../src/types/settings/settings").Language = "en" as any): Promise<any[]> {
   const t = SHEET_T[language];
   try{
-    if(type==="customer"){ const { customerService } = await import("../../../../src/services/customer.service"); const list=await customerService.getAll(); return list.map((c:any)=>({ [t.customer ?? "Name"]:c.name, [language==="fr"?"Type":language==="ar"?"النوع":"Type"]:c.type, [language==="fr"?"Téléphone":language==="ar"?"الهاتف":"Phone"]:c.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(c.balance) })); }
-    if(type==="supplier"){ const { supplierService } = await import("../../../../src/services/supplier.service"); const list=await supplierService.getAll(); return list.map((s:any)=>({ [t.supplier ?? "Name"]:s.name, [language==="fr"?"Téléphone":language==="ar"?"الهاتف":"Phone"]:s.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(s.balance) })); }
+    if(type==="customer"){ const { customerService } = await import("../../../../src/services/customer.service"); const list=await customerService.getAll(); return list.map((c:any)=>({ [t.customer]:c.name, [language==="fr"?"Type":language==="ar"?"النوع":"Type"]:c.type, [t.phone]:c.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(c.balance) })); }
+    if(type==="supplier"){ const { supplierService } = await import("../../../../src/services/supplier.service"); const list=await supplierService.getAll(); return list.map((s:any)=>({ [t.supplier]:s.name, [t.phone]:s.phone, [language==="fr"?"Solde":language==="ar"?"الرصيد":"Balance"]:String(s.balance) })); }
     if(type==="product"){ const { productService } = await import("../../../../src/services/product.service"); const list=await productService.getAll(); return list.map((p:any)=>({ [language==="fr"?"Nom":language==="ar"?"الاسم":"Name"]:p.name, [language==="fr"?"Prix":language==="ar"?"السعر":"Price"]:String(p.price??""), [language==="fr"?"Quantité":language==="ar"?"الكمية":"Quantity"]:String(p.quantity??""), [language==="fr"?"Poids":language==="ar"?"الوزن":"Weight"]:String((p as any).weightKg ?? "") })); }
     if(type==="sale"){ const { saleService } = await import("../../../../src/services/sale.service"); const { customerService } = await import("../../../../src/services/customer.service"); const [list, customers] = await Promise.all([saleService.getAll(), customerService.getAll().catch(()=>[])]) as any; const custMap = new Map((customers||[]).map((c:any)=>[c.id, c.name])); return list.map((s:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:s.id, [t.customer]: custMap.get(s.customerId) ?? s.customerId, [t.date]:formatTimestampToDisplay(s.date), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(s.items?.reduce((a:any,b:any)=>a+(b.total||0),0) ?? "") })); }
     if(type==="purchase"){ const { purchaseService } = await import("../../../../src/services/purchase.service"); const { supplierService } = await import("../../../../src/services/supplier.service"); const [list, suppliers] = await Promise.all([purchaseService.getAll(), supplierService.getAll().catch(()=>[])]) as any; const supMap = new Map((suppliers||[]).map((s:any)=>[s.id, s.name])); return list.map((p:any)=>({ [language==="fr"?"ID":language==="ar"?"المعرف":"Id"]:p.id, [t.supplier]: supMap.get(p.supplierId) ?? p.supplierId, [t.date]:formatTimestampToDisplay(p.date), [language==="fr"?"Total":language==="ar"?"المجموع":"Total"]:String(p.total??"") })); }

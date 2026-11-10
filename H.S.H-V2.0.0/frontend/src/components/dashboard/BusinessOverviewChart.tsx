@@ -12,9 +12,37 @@ type Props = {
   currency: Currency;
   language: string;
   period: OverviewPeriod;
+  salesLabel?: string;
+  purchasesLabel?: string;
+  chartAriaLabel?: string;
+  summaryAriaLabel?: string;
 };
 
-export default function BusinessOverviewChart({ data, currency, language, period }: Props) {
+const SALES_LABEL: Record<string, string> = { en: "Sales", fr: "Ventes", ar: "المبيعات" };
+const PURCHASES_LABEL: Record<string, string> = { en: "Purchases", fr: "Achats", ar: "المشتريات" };
+
+function langKey(language: string): string {
+  return language === "fr" ? "fr" : language === "ar" ? "ar" : "en";
+}
+
+export default function BusinessOverviewChart({ data, currency, language, period, salesLabel, purchasesLabel, chartAriaLabel, summaryAriaLabel }: Props) {
+  const lk = langKey(language);
+  const tSales = salesLabel ?? SALES_LABEL[lk] ?? SALES_LABEL.en;
+  const tPurchases = purchasesLabel ?? PURCHASES_LABEL[lk] ?? PURCHASES_LABEL.en;
+  const tChartAria =
+    chartAriaLabel ??
+    (lk === "fr"
+      ? `Graphique d'aperçu comparant les ventes et les achats pour ${period}`
+      : lk === "ar"
+        ? `مخطط نظرة عامة يقارن المبيعات والمشتريات للفترة ${period}`
+        : `Business overview chart comparing sales and purchases for ${period}`);
+  const tSummaryAria =
+    summaryAriaLabel ??
+    (lk === "fr"
+      ? `Aperçu pour ${period} : ventes totales`
+      : lk === "ar"
+        ? `نظرة عامة للفترة ${period}: إجمالي المبيعات`
+        : `Business overview for ${period}: total sales`);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 260 });
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -138,16 +166,16 @@ export default function BusinessOverviewChart({ data, currency, language, period
       onMouseMove={handleMove}
       onMouseLeave={handleLeave}
       role="img"
-      aria-label={`Business overview chart comparing sales and purchases for ${period}`}
+      aria-label={tChartAria}
     >
       <div className={styles.summary} aria-hidden="true">
         <span className={styles.summaryItem}>
           <span className={styles.tooltipDot + " " + styles.dotSales} aria-hidden="true" />
-          Sales: <span className={styles.summaryValue}>{formatCurrency(totalSales, currency)}</span>
+          {tSales}: <span className={styles.summaryValue}>{formatCurrency(totalSales, currency)}</span>
         </span>
         <span className={styles.summaryItem}>
           <span className={styles.tooltipDot + " " + styles.dotPurchases} aria-hidden="true" />
-          Purchases: <span className={styles.summaryValue}>{formatCurrency(totalPurchases, currency)}</span>
+          {tPurchases}: <span className={styles.summaryValue}>{formatCurrency(totalPurchases, currency)}</span>
         </span>
       </div>
 
@@ -170,7 +198,7 @@ export default function BusinessOverviewChart({ data, currency, language, period
           const y = yFor(v);
           return (
             <text key={i} x={padding.left - 8} y={y + 3} className={styles.axisLabelY}>
-              {compactCurrencyAxis(v, currency)}
+              {compactCurrencyAxis(v, currency, language)}
             </text>
           );
         })}
@@ -215,13 +243,13 @@ export default function BusinessOverviewChart({ data, currency, language, period
           <div className={styles.tooltipDate}>{formatTooltipDate(hoverBucket, period, language)}</div>
           <div className={styles.tooltipRow}>
             <span className={styles.tooltipLabel}>
-              <span className={styles.tooltipDot + " " + styles.dotSales} /> Sales
+              <span className={styles.tooltipDot + " " + styles.dotSales} /> {tSales}
             </span>
             <span className={styles.tooltipValue}>{formatCurrency(hoverBucket.sales, currency)}</span>
           </div>
           <div className={styles.tooltipRow}>
             <span className={styles.tooltipLabel}>
-              <span className={styles.tooltipDot + " " + styles.dotPurchases} /> Purchases
+              <span className={styles.tooltipDot + " " + styles.dotPurchases} /> {tPurchases}
             </span>
             <span className={styles.tooltipValue}>{formatCurrency(hoverBucket.purchases, currency)}</span>
           </div>
@@ -230,16 +258,16 @@ export default function BusinessOverviewChart({ data, currency, language, period
 
       <div className={styles.legend} aria-hidden="true">
         <span className={styles.legendItem}>
-          <span className={styles.tooltipDot + " " + styles.dotSales} /> Sales
+          <span className={styles.tooltipDot + " " + styles.dotSales} /> {tSales}
         </span>
         <span className={styles.legendItem}>
-          <span className={styles.tooltipDot + " " + styles.dotPurchases} /> Purchases
+          <span className={styles.tooltipDot + " " + styles.dotPurchases} /> {tPurchases}
         </span>
       </div>
 
       {/* Accessible summary */}
       <div className="sr-only" style={{ position: "absolute", left: "-10000px", top: "auto", width: 1, height: 1, overflow: "hidden" }}>
-        Business overview for {period}: total sales {formatCurrency(totalSales, currency)}, total purchases {formatCurrency(totalPurchases, currency)}.
+        {tSummaryAria} {formatCurrency(totalSales, currency)}, {lk === "fr" ? "achats totaux" : lk === "ar" ? "إجمالي المشتريات" : "total purchases"} {formatCurrency(totalPurchases, currency)}.
       </div>
     </div>
   );

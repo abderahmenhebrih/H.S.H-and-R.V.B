@@ -25,6 +25,7 @@ import { supplierRequestService } from "../../src/services/supplier-request.serv
 import { customerRequestService } from "../../src/services/customer-request.service";
 import { customerOrderService } from "../../src/services/customer-order.service";
 import { rvbCustomerService } from "../../src/services/rvb-customer.service";
+import { localizeError } from "../../src/lib/i18n";
 
 const TRANSLATIONS = {
   en: {
@@ -123,6 +124,44 @@ const TRANSLATIONS = {
       save: "Save",
       customerManagement: "Customer Management",
       supervisorNote: "Supervisor Workspace - Customer Management inside Profile",
+      totalSuffix: "total",
+      kpiNoRequests: "No requests under review",
+      kpiRequestsActive: "Requests under review",
+      kpiNoOrders: "No orders under review",
+      kpiOrdersActive: "Orders under review",
+      kpiNoUnread: "No unread messages",
+      kpiUnread: "{n} unread",
+      statusActive: "Active",
+      statusArchived: "Archived",
+      accountsSuffix: "accounts",
+      statusLabel: "Status",
+      openCustomerMgmt: "Open Customer Management",
+      reviewCustomerOrders: "Review Customer Orders",
+      reviewCustomerRequests: "Review Customer Requests",
+      customersTitle: "Customers",
+      itemsLabel: "items",
+      editOrderTitle: "Edit Order",
+      optionalSuffix: "(optional)",
+      topicPlaceholder: "Topic / description",
+      paymentLeCredit: "Payment (≤ credit)",
+      loanGtCredit: "Loan (> credit)",
+      genericError: "An unexpected error occurred. Please try again.",
+      errLoad: "Failed to load",
+      errAmountPositive: "Amount must be >0",
+      errPaymentLte: "Payment amount must be <= credit balance",
+      errLoanGt: "Loan amount must be > credit",
+      errDescRequired: "Description required",
+      errDescRequiredDiscrepancy: "Description required for discrepancy",
+      errSelectProduct: "Select at least one product with quantity",
+      errSelectProducts: "Select products",
+      errAddItemsOrDesc: "Add items or description",
+      confirmCancelOrder: "Cancel order?",
+      errCancelFailed: "Cancel failed",
+      errEditFailed: "Edit failed",
+      errLoadCustomers: "Failed to load customers",
+      errLoadOrders: "Failed to load orders",
+      errFailed: "Failed",
+      supervisorSuffix: "Supervisor",
     },
   },
   fr: {
@@ -221,6 +260,44 @@ const TRANSLATIONS = {
       save: "Enregistrer",
       customerManagement: "Gestion clients",
       supervisorNote: "Espace superviseur - Gestion clients dans Profil",
+      totalSuffix: "total",
+      kpiNoRequests: "Aucune demande en examen",
+      kpiRequestsActive: "Demandes en examen",
+      kpiNoOrders: "Aucune commande en examen",
+      kpiOrdersActive: "Commandes en examen",
+      kpiNoUnread: "Aucun message non lu",
+      kpiUnread: "{n} non lus",
+      statusActive: "Actif",
+      statusArchived: "Archivé",
+      accountsSuffix: "comptes",
+      statusLabel: "Statut",
+      openCustomerMgmt: "Ouvrir la gestion clients",
+      reviewCustomerOrders: "Examiner les commandes clients",
+      reviewCustomerRequests: "Examiner les demandes clients",
+      customersTitle: "Clients",
+      itemsLabel: "articles",
+      editOrderTitle: "Modifier la commande",
+      optionalSuffix: "(optionnel)",
+      topicPlaceholder: "Sujet / description",
+      paymentLeCredit: "Paiement (≤ crédit)",
+      loanGtCredit: "Prêt (> crédit)",
+      genericError: "Une erreur inattendue s'est produite. Réessayez.",
+      errLoad: "Échec du chargement",
+      errAmountPositive: "Le montant doit être >0",
+      errPaymentLte: "Le montant du paiement doit être ≤ solde créditeur",
+      errLoanGt: "Le montant du prêt doit être > crédit",
+      errDescRequired: "Description requise",
+      errDescRequiredDiscrepancy: "Description requise pour un écart",
+      errSelectProduct: "Sélectionnez au moins un produit avec quantité",
+      errSelectProducts: "Sélectionnez des produits",
+      errAddItemsOrDesc: "Ajoutez des articles ou une description",
+      confirmCancelOrder: "Annuler la commande ?",
+      errCancelFailed: "Échec de l'annulation",
+      errEditFailed: "Échec de la modification",
+      errLoadCustomers: "Échec du chargement des clients",
+      errLoadOrders: "Échec du chargement des commandes",
+      errFailed: "Échec",
+      supervisorSuffix: "Superviseur",
     },
   },
   ar: {
@@ -319,6 +396,44 @@ const TRANSLATIONS = {
       save: "حفظ",
       customerManagement: "إدارة الزبائن",
       supervisorNote: "مساحة المشرف - إدارة الزبائن داخل الملف",
+      totalSuffix: "الإجمالي",
+      kpiNoRequests: "لا توجد طلبات قيد المراجعة",
+      kpiRequestsActive: "الطلبات قيد المراجعة",
+      kpiNoOrders: "لا توجد طلبيات قيد المراجعة",
+      kpiOrdersActive: "الطلبيات قيد المراجعة",
+      kpiNoUnread: "لا توجد رسائل غير مقروءة",
+      kpiUnread: "{n} رسائل غير مقروءة",
+      statusActive: "نشط",
+      statusArchived: "مؤرشف",
+      accountsSuffix: "حسابات",
+      statusLabel: "الحالة",
+      openCustomerMgmt: "فتح إدارة الزبائن",
+      reviewCustomerOrders: "مراجعة طلبات الزبائن",
+      reviewCustomerRequests: "مراجعة طلبات الزبائن",
+      customersTitle: "الزبائن",
+      itemsLabel: "عناصر",
+      editOrderTitle: "تعديل الطلب",
+      optionalSuffix: "(اختياري)",
+      topicPlaceholder: "الموضوع / الوصف",
+      paymentLeCredit: "دفع (≤ الرصيد)",
+      loanGtCredit: "سلفة (> الرصيد)",
+      genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+      errLoad: "فشل التحميل",
+      errAmountPositive: "يجب أن يكون المبلغ >0",
+      errPaymentLte: "يجب أن يكون مبلغ الدفع ≤ الرصيد الدائن",
+      errLoanGt: "يجب أن يكون مبلغ السلفة > الرصيد",
+      errDescRequired: "الوصف مطلوب",
+      errDescRequiredDiscrepancy: "الوصف مطلوب للتناقض",
+      errSelectProduct: "اختر منتجاً واحداً على الأقل مع الكمية",
+      errSelectProducts: "اختر المنتجات",
+      errAddItemsOrDesc: "أضف عناصر أو وصفاً",
+      confirmCancelOrder: "إلغاء الطلب؟",
+      errCancelFailed: "فشل الإلغاء",
+      errEditFailed: "فشل التعديل",
+      errLoadCustomers: "فشل تحميل الزبائن",
+      errLoadOrders: "فشل تحميل الطلبات",
+      errFailed: "فشل",
+      supervisorSuffix: "مشرف",
     },
   },
 } as const;
@@ -369,7 +484,7 @@ function WorkerPortal({ settings }: { settings: Settings }) {
       setActivities(Array.isArray(acts) ? acts : []);
       setRequests(Array.isArray(reqs) ? reqs : []);
     } catch (e: any) {
-      setError(e?.message || "Failed to load");
+      setError(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.errLoad, fr: (TRANSLATIONS as any).fr.portal.errLoad, ar: (TRANSLATIONS as any).ar.portal.errLoad }));
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -378,18 +493,18 @@ function WorkerPortal({ settings }: { settings: Settings }) {
     if (!worker) return;
     const amt = Number(reqAmount);
     if (reqType !== "discrepancy") {
-      if (!Number.isFinite(amt) || amt <= 0) { alert("Amount must be >0"); return; }
-      if (reqType === "payment" && amt > Number(worker.balance || 0)) { alert("Payment amount must be <= credit balance"); return; }
-      if (reqType === "loan" && amt <= Number(worker.balance || 0)) { alert("Loan amount must be > credit"); return; }
+      if (!Number.isFinite(amt) || amt <= 0) { alert(t.errAmountPositive); return; }
+      if (reqType === "payment" && amt > Number(worker.balance || 0)) { alert(t.errPaymentLte); return; }
+      if (reqType === "loan" && amt <= Number(worker.balance || 0)) { alert(t.errLoanGt); return; }
     } else {
-      if (!reqDesc.trim()) { alert("Description required for discrepancy"); return; }
+      if (!reqDesc.trim()) { alert(t.errDescRequiredDiscrepancy); return; }
     }
     setSubmitting(true);
     try {
       await workerRequestService.create({ workerId: worker.id, type: reqType, amount: reqType === "discrepancy" ? undefined : amt, description: reqDesc.trim() || undefined } as any);
       setReqAmount(""); setReqDesc("");
       await load();
-    } catch (e: any) { alert(e?.data?.code || e?.message || "Failed"); }
+    } catch (e: any) { alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.genericError, fr: (TRANSLATIONS as any).fr.portal.genericError, ar: (TRANSLATIONS as any).ar.portal.genericError })); }
     finally { setSubmitting(false); }
   };
 
@@ -419,7 +534,7 @@ function WorkerPortal({ settings }: { settings: Settings }) {
           <div><small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{t.salary}</small><div style={{ fontSize: 14, fontWeight: 800 }}>{formatCurrency(Number(worker.monthlySalary||0), currency)}</div></div>
           <div><small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{t.balance}</small><div style={{ fontSize: 14, fontWeight: 800, color: Number(worker.balance)>0 ? "#3A7D52" : "var(--muted)" }}>{formatCurrency(Number(worker.balance||0), currency)}</div></div>
           <div><small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{t.employment}</small><div style={{ fontSize: 12 }}>{formatDate(worker.employmentDate, lang)}</div></div>
-          <div><small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Status</small><div style={{ fontSize: 12, fontWeight: 700 }}>{worker.status}</div></div>
+          <div><small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{t.statusLabel}</small><div style={{ fontSize: 12, fontWeight: 700 }}>{worker.status}</div></div>
         </div>
       </div>
 
@@ -441,12 +556,12 @@ function WorkerPortal({ settings }: { settings: Settings }) {
         <h3 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800 }}>{t.requests} · {t.newRequest}</h3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           <select value={reqType} onChange={(e)=>setReqType(e.target.value as any)} style={{ minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }}>
-            <option value="payment">{t.payment} (≤ credit)</option>
-            <option value="loan">{t.loan} (&gt; credit)</option>
+            <option value="payment">{t.paymentLeCredit}</option>
+            <option value="loan">{t.loanGtCredit}</option>
             <option value="discrepancy">{t.discrepancy}</option>
           </select>
           {reqType !== "discrepancy" && <input type="number" min="0" step="0.01" placeholder={t.amount} value={reqAmount} onChange={(e)=>setReqAmount(e.target.value)} style={{ flex: "1 1 120px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8 }} />}
-          <input placeholder={reqType==="discrepancy" ? "Topic / description" : t.description} value={reqDesc} onChange={(e)=>setReqDesc(e.target.value)} style={{ flex: "2 1 160px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8 }} />
+          <input placeholder={reqType==="discrepancy" ? t.topicPlaceholder : t.description} value={reqDesc} onChange={(e)=>setReqDesc(e.target.value)} style={{ flex: "2 1 160px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8 }} />
           <button type="button" onClick={handleCreateRequest} disabled={submitting} style={{ minHeight: 36, padding: "0 14px", borderRadius: 8, border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{submitting ? t.submitting : t.submit}</button>
         </div>
         <h4 style={{ margin: "10px 0 8px", fontSize: 13, fontWeight: 700 }}>{t.requestHistory}</h4>
@@ -527,23 +642,23 @@ function SupplierPortal({ settings }: { settings: Settings }) {
       items.push({ productId: p.id, quantity: qty, weightKg: w, price, total: itTotal });
       total = Math.round((total + itTotal)*100)/100;
     }
-    if (items.length===0) { alert("Select at least one product with quantity"); return; }
+    if (items.length===0) { alert(t.errSelectProduct); return; }
     setSubmitting(true);
     try {
       await supplierRequestService.create({ supplierId: supplier.id, type: "new_supply", items, total } as any);
       setSelectedProducts({});
       await load();
-    } catch(e:any){ alert(e?.data?.code || e?.message || "Failed"); }
+    } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.genericError, fr: (TRANSLATIONS as any).fr.portal.genericError, ar: (TRANSLATIONS as any).ar.portal.genericError })); }
     finally{ setSubmitting(false); }
   };
   const handleDiscrepancy = async () => {
-    if (!discrepancy.trim()) { alert("Description required"); return; }
+    if (!discrepancy.trim()) { alert(t.errDescRequired); return; }
     setSubmitting(true);
     try {
       await supplierRequestService.create({ supplierId: supplier.id, type: "discrepancy", description: discrepancy.trim() } as any);
       setDiscrepancy("");
       await load();
-    } catch(e:any){ alert(e?.message || "Failed"); }
+    } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.genericError, fr: (TRANSLATIONS as any).fr.portal.genericError, ar: (TRANSLATIONS as any).ar.portal.genericError })); }
     finally{ setSubmitting(false); }
   };
 
@@ -567,7 +682,7 @@ function SupplierPortal({ settings }: { settings: Settings }) {
             <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:260, overflowY:"auto" }}>
               {purchases.slice(0,15).map((p:any)=>(
                 <div key={p.id} style={{ display:"flex", justifyContent:"space-between", gap:8, fontSize:11, padding:"6px 8px", border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)" }}>
-                  <span>{formatDate(p.date||p.createdAt, lang)} · {(p.items||[]).length} items</span><span style={{ fontWeight:700 }}>{formatCurrency(Number(p.total||0), currency)}</span>
+                  <span>{formatDate(p.date||p.createdAt, lang)} · {(p.items||[]).length} {t.itemsLabel}</span><span style={{ fontWeight:700 }}>{formatCurrency(Number(p.total||0), currency)}</span>
                 </div>
               ))}
             </div>
@@ -686,7 +801,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
 
   const handlePlaceOrder = async () => {
     const { items, total } = buildItems(catalog, orderItems);
-    if (items.length===0) { alert("Select products"); return; }
+    if (items.length===0) { alert(t.errSelectProducts); return; }
     // One stable idempotency key per submission attempt (same contract as
     // mobile): retries reuse it, the next intentional order gets a new one.
     if (!orderIdempotencyKeyRef.current) {
@@ -704,40 +819,40 @@ function CustomerPortal({ settings }: { settings: Settings }) {
       orderIdempotencyKeyRef.current = null;
       setOrderItems({}); setOrderNotes("");
       await load();
-    } catch(e:any){ alert(e?.data?.code || e?.message || "Failed"); }
+    } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.genericError, fr: (TRANSLATIONS as any).fr.portal.genericError, ar: (TRANSLATIONS as any).ar.portal.genericError })); }
     finally{ setSubmitting(false); }
   };
   const handleInsertShipment = async () => {
     const { items, total } = buildItems(catalog, shipmentItems);
-    if (items.length===0 && !shipmentDesc.trim()) { alert("Add items or description"); return; }
+    if (items.length===0 && !shipmentDesc.trim()) { alert(t.errAddItemsOrDesc); return; }
     setSubmitting(true);
     try {
       await customerRequestService.create({ customerId: customer.id, type: "insert_shipment", items: items.length?items:undefined, total: items.length?total:undefined, description: shipmentDesc.trim()||undefined } as any);
       setShipmentItems({}); setShipmentDesc("");
       await load();
-    } catch(e:any){ alert(e?.message||"Failed"); }
+    } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.genericError, fr: (TRANSLATIONS as any).fr.portal.genericError, ar: (TRANSLATIONS as any).ar.portal.genericError })); }
     finally{ setSubmitting(false); }
   };
   const handleDiscrepancy = async () => {
-    if (!discrepancy.trim()) { alert("Description required"); return; }
+    if (!discrepancy.trim()) { alert(t.errDescRequired); return; }
     setSubmitting(true);
     try {
       await customerRequestService.create({ customerId: customer.id, type: "discrepancy", description: discrepancy.trim() } as any);
       setDiscrepancy("");
       await load();
-    } catch(e:any){ alert(e?.message||"Failed"); }
+    } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.genericError, fr: (TRANSLATIONS as any).fr.portal.genericError, ar: (TRANSLATIONS as any).ar.portal.genericError })); }
     finally{ setSubmitting(false); }
   };
   const handleCancelOrder = async (id:string) => {
-    if (!confirm("Cancel order?")) return;
-    try { await customerOrderService.cancel(id); await load(); } catch(e:any){ alert(e?.message||"Cancel failed"); }
+    if (!confirm(t.confirmCancelOrder)) return;
+    try { await customerOrderService.cancel(id); await load(); } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.errCancelFailed, fr: (TRANSLATIONS as any).fr.portal.errCancelFailed, ar: (TRANSLATIONS as any).ar.portal.errCancelFailed })); }
   };
   const handleEditOrder = async () => {
     if (!editingOrder) return;
     const { items } = buildItems(catalog, editItems);
-    if (items.length===0) { alert("Select products"); return; }
+    if (items.length===0) { alert(t.errSelectProducts); return; }
     setSubmitting(true);
-    try { await customerOrderService.edit(editingOrder.id, items); setEditingOrder(null); setEditItems({}); await load(); } catch(e:any){ alert(e?.message||"Edit failed"); }
+    try { await customerOrderService.edit(editingOrder.id, items); setEditingOrder(null); setEditItems({}); await load(); } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.errEditFailed, fr: (TRANSLATIONS as any).fr.portal.errEditFailed, ar: (TRANSLATIONS as any).ar.portal.errEditFailed })); }
     finally{ setSubmitting(false); }
   };
 
@@ -762,7 +877,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
             <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:260, overflowY:"auto" }}>
               {sales.slice(0,10).map((s:any)=>(
                 <div key={s.id} style={{ display:"flex", justifyContent:"space-between", gap:8, padding:"6px 8px", border:"1px solid var(--border)", borderRadius:8, background:"var(--panel-hover)", fontSize:11 }}>
-                  <span>{formatDate(s.date, lang)} · {(s.items||[]).length} items</span><span style={{ fontWeight:700 }}>{formatCurrency(Number(s.total||0), currency)}</span>
+                  <span>{formatDate(s.date, lang)} · {(s.items||[]).length} {t.itemsLabel}</span><span style={{ fontWeight:700 }}>{formatCurrency(Number(s.total||0), currency)}</span>
                 </div>
               ))}
             </div>
@@ -793,7 +908,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
                 <input placeholder="kg" type="number" min="0" step="0.01" value={orderItems[p.id]?.weightKg || ""} onChange={(e)=>setOrderItems(prev=>({...prev, [p.id]: {...(prev[p.id]||{quantity:""}), weightKg:e.target.value }}))} style={{ width:80, minHeight:32, padding:"0 8px", border:"1px solid var(--border)", borderRadius:8 }} />
               </div>
             ))}
-            <input placeholder={t.description + " (optional)"} value={orderNotes} onChange={(e)=>setOrderNotes(e.target.value)} style={{ minHeight:36, padding:"0 10px", border:"1px solid var(--border)", borderRadius:8 }} />
+            <input placeholder={`${t.description} ${t.optionalSuffix}`} value={orderNotes} onChange={(e)=>setOrderNotes(e.target.value)} style={{ minHeight:36, padding:"0 10px", border:"1px solid var(--border)", borderRadius:8 }} />
             <button type="button" onClick={handlePlaceOrder} disabled={submitting} style={{ alignSelf:"flex-start", minHeight:36, padding:"0 14px", borderRadius:8, border:"1px solid var(--accent)", background:"var(--accent)", color:"#fff", fontWeight:700, cursor:"pointer" }}>{submitting? t.submitting : t.submit}</button>
           </div>
         )}
@@ -834,7 +949,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
                   <span style={{ fontSize:11, fontWeight:700 }}>{o.id.slice(0,8)} · {formatCurrency(Number(o.total||0), currency)}</span>
                   <span style={{ padding:"2px 6px", borderRadius:999, background: o.status==="under_review"?"var(--accent-soft)": o.status==="accepted"?"rgba(58,125,82,0.12)":"var(--danger-soft)", border:"1px solid var(--border)", fontSize:10, fontWeight:800 }}>{o.status}</span>
                 </div>
-                <div style={{ fontSize:11, color:"var(--muted)" }}>{(o.items||[]).length} items · {formatDate(o.submittedAt, lang)}</div>
+                <div style={{ fontSize:11, color:"var(--muted)" }}>{(o.items||[]).length} {t.itemsLabel} · {formatDate(o.submittedAt, lang)}</div>
                 {o.status==="under_review" && (
                   <div style={{ display:"flex", gap:6 }}>
                     <button type="button" onClick={()=>{ setEditingOrder(o); const map:Record<string, any>={}; for(const it of o.items||[]){ map[it.productId]={ quantity:String(it.quantity), weightKg:String(it.weightKg)} } setEditItems(map); }} style={{ flex:1, minHeight:32, borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", cursor:"pointer", fontSize:11, fontWeight:700 }}>{t.edit}</button>
@@ -847,7 +962,7 @@ function CustomerPortal({ settings }: { settings: Settings }) {
         )}
         {editingOrder && (
           <div style={{ marginTop:12, padding:12, border:"1px solid var(--border)", borderRadius:10, background:"var(--panel-hover)" }}>
-            <h4 style={{ margin:"0 0 8px", fontSize:13, fontWeight:700 }}>Edit Order {editingOrder.id.slice(0,8)}</h4>
+            <h4 style={{ margin:"0 0 8px", fontSize:13, fontWeight:700 }}>{t.editOrderTitle} {editingOrder.id.slice(0,8)}</h4>
             {catalog.slice(0,10).map((p:any)=>(
               <div key={"edit-"+p.id} style={{ display:"flex", gap:6, alignItems:"center", marginBottom:6 }}>
                 <span style={{ flex:"1 1 120px", fontSize:11 }}>{p.name}</span>
@@ -915,14 +1030,14 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
         const custs = await rvbCustomerService.list();
         setCustomers(Array.isArray(custs)?custs:[]);
       } catch (e:any) {
-        setCustomerError(e?.code || e?.message || "Failed to load customers");
+        setCustomerError(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.errLoadCustomers, fr: (TRANSLATIONS as any).fr.portal.errLoadCustomers, ar: (TRANSLATIONS as any).ar.portal.errLoadCustomers }));
         setCustomers([]);
       }
       try {
         const ords = await customerOrderService.list({ status: "under_review" });
         setOrders(Array.isArray(ords)?ords:[]);
       } catch (e:any) {
-        setOrderError(e?.code || e?.message || "Failed to load orders");
+        setOrderError(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.errLoadOrders, fr: (TRANSLATIONS as any).fr.portal.errLoadOrders, ar: (TRANSLATIONS as any).ar.portal.errLoadOrders }));
         setOrders([]);
       }
     } finally { setLoading(false); }
@@ -932,13 +1047,13 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
   const handleCreateRequest = async () => {
     if (!worker) return;
     const amt = Number(reqAmount);
-    if (reqType!=="discrepancy" && (!Number.isFinite(amt)||amt<=0)) { alert("Amount >0"); return; }
-    if (reqType==="discrepancy" && !reqDesc.trim()) { alert("Description required"); return; }
+    if (reqType!=="discrepancy" && (!Number.isFinite(amt)||amt<=0)) { alert(t.errAmountPositive); return; }
+    if (reqType==="discrepancy" && !reqDesc.trim()) { alert(t.errDescRequired); return; }
     setSubmitting(true);
     try {
       await workerRequestService.create({ workerId: worker.id, type: reqType, amount: reqType==="discrepancy"?undefined:amt, description: reqDesc.trim()||undefined } as any);
       setReqAmount(""); setReqDesc(""); await load();
-    } catch(e:any){ alert(e?.message||"Failed"); }
+    } catch(e:any){ alert(localizeError(e, lang, undefined, { en: (TRANSLATIONS as any).en.portal.genericError, fr: (TRANSLATIONS as any).fr.portal.genericError, ar: (TRANSLATIONS as any).ar.portal.genericError })); }
     finally{ setSubmitting(false); }
   };
 
@@ -948,7 +1063,7 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
   return (
     <div dir={isRtl?"rtl":"ltr"} style={{ display:"flex", flexDirection:"column", gap:16 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <h2 style={{ margin:0, fontSize:18, fontWeight:800 }}>{t.profile} · Supervisor</h2>
+        <h2 style={{ margin:0, fontSize:18, fontWeight:800 }}>{t.profile} · {t.supervisorSuffix}</h2>
         <button type="button" onClick={()=>window.print()} style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", cursor:"pointer", fontSize:12, fontWeight:700 }}><Download size={14}/>{t.exportPdf}</button>
       </div>
       <div style={{ padding:16, border:"1px solid var(--border)", borderRadius:12, background:"var(--panel)", display:"flex", gap:14, alignItems:"center" }}>
@@ -992,15 +1107,15 @@ function SupervisorPortal({ settings }: { settings: Settings }) {
         <h3 style={{ margin:"0 0 10px", fontSize:14, fontWeight:800 }}>{t.customerManagement}</h3>
         <p style={{ margin:"0 0 10px", color:"var(--muted)", fontSize:12 }}>{t.supervisorNote}</p>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:12 }}>
-          <a href="/rvb/customers" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--accent)", background:"var(--accent)", color:"#fff", fontSize:12, fontWeight:800, textDecoration:"none" }}>Open Customer Management</a>
-          <a href="/rvb/orders" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", color:"var(--text)", fontSize:12, fontWeight:700, textDecoration:"none" }}>Review Customer Orders</a>
-          <a href="/rvb/requests" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", color:"var(--text)", fontSize:12, fontWeight:700, textDecoration:"none" }}>Review Customer Requests</a>
+          <a href="/rvb/customers" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--accent)", background:"var(--accent)", color:"#fff", fontSize:12, fontWeight:800, textDecoration:"none" }}>{t.openCustomerMgmt}</a>
+          <a href="/rvb/orders" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", color:"var(--text)", fontSize:12, fontWeight:700, textDecoration:"none" }}>{t.reviewCustomerOrders}</a>
+          <a href="/rvb/requests" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"8px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--panel)", color:"var(--text)", fontSize:12, fontWeight:700, textDecoration:"none" }}>{t.reviewCustomerRequests}</a>
         </div>
         {customerError && <div style={{ padding:8, marginBottom:8, border:"1px solid var(--danger)", background:"rgba(185,58,66,0.08)", borderRadius:8, color:"var(--danger)", fontSize:11, fontWeight:700 }}>{customerError}</div>}
         {orderError && <div style={{ padding:8, marginBottom:8, border:"1px solid var(--danger)", background:"rgba(185,58,66,0.08)", borderRadius:8, color:"var(--danger)", fontSize:11, fontWeight:700 }}>{orderError}</div>}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
           <div>
-            <h4 style={{ margin:"0 0 6px", fontSize:13, fontWeight:700 }}>Customers ({customers.length})</h4>
+            <h4 style={{ margin:"0 0 6px", fontSize:13, fontWeight:700 }}>{t.customersTitle} ({customers.length})</h4>
             {customerError ? <div style={{ padding:8, color:"var(--danger)", fontSize:11, border:"1px solid var(--danger)", borderRadius:8, textAlign:"center" }}>{customerError}</div> : customers.length===0 ? <div style={{ padding:8, color:"var(--muted)", fontSize:11, border:"1px dashed var(--border)", borderRadius:8, textAlign:"center" }}>{t.noData}</div> : (
               <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:240, overflowY:"auto" }}>
                 {customers.slice(0,15).map((c:any)=>(
@@ -1186,7 +1301,7 @@ export default function RvbDashboardPage() {
     })();
     return () => { cancelled = true; };
   }, [user]);
-  const t = (TRANSLATIONS as any)[settings.language];
+  const t = (TRANSLATIONS as any)[settings.language] ?? (TRANSLATIONS as any).en;
 
   // Role-aware portal routing
   if (user && ["worker","supplier","customer","supervisor"].includes(user.role)) {
@@ -1209,17 +1324,17 @@ export default function RvbDashboardPage() {
     <RvbShell activePage="dashboard">
       <div className={styles.dashboardRoot}>
         <div className={styles.kpiRow}>
-          <RvbKpiCard icon={UsersRound} title={t.kpi.activeAccounts.title} value={acctCounts ? String(acctCounts.active) : "—"} status={acctCounts ? `${acctCounts.total} total${settings.language === "fr" ? " total" : settings.language === "ar" ? " الإجمالي" : ""}` : t.kpi.activeAccounts.status} />
-          <RvbKpiCard icon={Inbox} title={t.kpi.pendingRequests.title} value={pendingRequests !== null ? String(pendingRequests) : "—"} status={pendingRequests !== null ? (pendingRequests === 0 ? (settings.language === "ar" ? "لا توجد طلبات قيد المراجعة" : settings.language === "fr" ? "Aucune demande en examen" : "No requests under review") : settings.language === "ar" ? "الطلبات قيد المراجعة" : settings.language === "fr" ? "Demandes en examen" : "Requests under review") : t.kpi.pendingRequests.status} />
-          <RvbKpiCard icon={ShoppingCart} title={t.kpi.ordersReview.title} value={pendingOrders !== null ? String(pendingOrders) : "—"} status={pendingOrders !== null ? (pendingOrders === 0 ? (settings.language === "ar" ? "لا توجد طلبيات قيد المراجعة" : settings.language === "fr" ? "Aucune commande en examen" : "No orders under review") : settings.language === "ar" ? "الطلبيات قيد المراجعة" : settings.language === "fr" ? "Commandes en examen" : "Orders under review") : t.kpi.ordersReview.status} />
-          <RvbKpiCard icon={MessagesSquare} title={t.kpi.unreadMessages.title} value={unreadTotal !== null ? String(unreadTotal) : "—"} status={unreadTotal !== null ? (unreadTotal === 0 ? (settings.language === "ar" ? "لا توجد رسائل غير مقروءة" : settings.language === "fr" ? "Aucun message non lu" : "No unread messages") : settings.language === "ar" ? `${unreadTotal} رسائل غير مقروءة` : settings.language === "fr" ? `${unreadTotal} non lus` : `${unreadTotal} unread`) : t.kpi.unreadMessages.status} />
+          <RvbKpiCard icon={UsersRound} title={t.kpi.activeAccounts.title} value={acctCounts ? String(acctCounts.active) : "—"} status={acctCounts ? `${acctCounts.total} ${t.portal.totalSuffix}` : t.kpi.activeAccounts.status} />
+          <RvbKpiCard icon={Inbox} title={t.kpi.pendingRequests.title} value={pendingRequests !== null ? String(pendingRequests) : "—"} status={pendingRequests !== null ? (pendingRequests === 0 ? t.portal.kpiNoRequests : t.portal.kpiRequestsActive) : t.kpi.pendingRequests.status} />
+          <RvbKpiCard icon={ShoppingCart} title={t.kpi.ordersReview.title} value={pendingOrders !== null ? String(pendingOrders) : "—"} status={pendingOrders !== null ? (pendingOrders === 0 ? t.portal.kpiNoOrders : t.portal.kpiOrdersActive) : t.kpi.ordersReview.status} />
+          <RvbKpiCard icon={MessagesSquare} title={t.kpi.unreadMessages.title} value={unreadTotal !== null ? String(unreadTotal) : "—"} status={unreadTotal !== null ? (unreadTotal === 0 ? t.portal.kpiNoUnread : (t.portal.kpiUnread as string).replace("{n}", String(unreadTotal))) : t.kpi.unreadMessages.status} />
         </div>
 
         <div className={styles.secondaryRow}>
-          <RvbKpiCard icon={Users} title={t.secondary.workers} value={acctCounts ? String(acctCounts.workersActive + acctCounts.workersArchived) : "—"} status={acctCounts ? `${acctCounts.workersActive} active / ${acctCounts.workersArchived} archived` : "—"} />
-          <RvbKpiCard icon={Truck} title={t.secondary.suppliers} value={acctCounts ? String(acctCounts.suppliersActive + acctCounts.suppliersArchived) : "—"} status={acctCounts ? `${acctCounts.suppliersActive} active / ${acctCounts.suppliersArchived} archived` : "—"} />
-          <RvbKpiCard icon={UserRound} title={t.secondary.customers} value={acctCounts ? String(acctCounts.customersActive + acctCounts.customersArchived) : "—"} status={acctCounts ? `${acctCounts.customersActive} active / ${acctCounts.customersArchived} archived` : "—"} />
-          <RvbKpiCard icon={ShieldCheckIcon} title={t.secondary.supervisors} value={acctCounts ? String(acctCounts.supervisors) : "—"} status={acctCounts ? `${acctCounts.supervisors} accounts` : "—"} />
+          <RvbKpiCard icon={Users} title={t.secondary.workers} value={acctCounts ? String(acctCounts.workersActive + acctCounts.workersArchived) : "—"} status={acctCounts ? `${acctCounts.workersActive} ${t.portal.statusActive} / ${acctCounts.workersArchived} ${t.portal.statusArchived}` : "—"} />
+          <RvbKpiCard icon={Truck} title={t.secondary.suppliers} value={acctCounts ? String(acctCounts.suppliersActive + acctCounts.suppliersArchived) : "—"} status={acctCounts ? `${acctCounts.suppliersActive} ${t.portal.statusActive} / ${acctCounts.suppliersArchived} ${t.portal.statusArchived}` : "—"} />
+          <RvbKpiCard icon={UserRound} title={t.secondary.customers} value={acctCounts ? String(acctCounts.customersActive + acctCounts.customersArchived) : "—"} status={acctCounts ? `${acctCounts.customersActive} ${t.portal.statusActive} / ${acctCounts.customersArchived} ${t.portal.statusArchived}` : "—"} />
+          <RvbKpiCard icon={ShieldCheckIcon} title={t.secondary.supervisors} value={acctCounts ? String(acctCounts.supervisors) : "—"} status={acctCounts ? `${acctCounts.supervisors} ${t.portal.accountsSuffix}` : "—"} />
         </div>
 
         <div className={styles.twoCol}>
@@ -1240,10 +1355,10 @@ export default function RvbDashboardPage() {
               <h3>{t.portalOverview.title}</h3>
             </div>
             <div className={styles.roleGrid}>
-              <RvbRoleOverviewCard icon={Users} role={t.portalOverview.workers} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.workersActive) : "—"} archivedValue={acctCounts ? String(acctCounts.workersArchived) : "—"} />
-              <RvbRoleOverviewCard icon={Truck} role={t.portalOverview.suppliers} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.suppliersActive) : "—"} archivedValue={acctCounts ? String(acctCounts.suppliersArchived) : "—"} />
-              <RvbRoleOverviewCard icon={UserRound} role={t.portalOverview.customers} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.customersActive) : "—"} archivedValue={acctCounts ? String(acctCounts.customersArchived) : "—"} />
-              <RvbRoleOverviewCard icon={ShieldCheckIcon} role={t.portalOverview.management} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.managementActive) : "—"} archivedValue={acctCounts ? String(acctCounts.managementArchived) : "—"} />
+              <RvbRoleOverviewCard icon={Users} language={settings.language} role={t.portalOverview.workers} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.workersActive) : "—"} archivedValue={acctCounts ? String(acctCounts.workersArchived) : "—"} />
+              <RvbRoleOverviewCard icon={Truck} language={settings.language} role={t.portalOverview.suppliers} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.suppliersActive) : "—"} archivedValue={acctCounts ? String(acctCounts.suppliersArchived) : "—"} />
+              <RvbRoleOverviewCard icon={UserRound} language={settings.language} role={t.portalOverview.customers} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.customersActive) : "—"} archivedValue={acctCounts ? String(acctCounts.customersArchived) : "—"} />
+              <RvbRoleOverviewCard icon={ShieldCheckIcon} language={settings.language} role={t.portalOverview.management} activeLabel={t.portalOverview.active} archivedLabel={t.portalOverview.archived} activeValue={acctCounts ? String(acctCounts.managementActive) : "—"} archivedValue={acctCounts ? String(acctCounts.managementArchived) : "—"} />
             </div>
           </div>
         </div>

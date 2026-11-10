@@ -74,6 +74,17 @@ const TR: Record<Language, any> = {
       create: "Create Worker",
       creating: "Creating...",
       required: "Required",
+      role: "Role",
+      selectRole: "Select role",
+      displayName: "Display Name",
+      tagLabel: "Tag",
+      tagHint: "3–30 chars a-z 0-9 . _",
+      password: "Password",
+      confirmPassword: "Confirm",
+      archiveTitle: "Archive Worker",
+      reactivateTitle: "Reactivate Worker",
+      reactivateNote: "Restoring requires starting and monthly salary.",
+      noPositions: "No positions configured",
     },
     edit: { title: "Edit Worker", save: "Save Changes", saving: "Saving..." },
     details: {
@@ -125,10 +136,31 @@ const TR: Record<Language, any> = {
       requestsEmpty: "No requests yet.",
       activityEmpty: "No activity yet.",
       archivedNote: "Worker archived — portal access suspended.",
+      bonusAmount: "Amount",
+      bonusNote: "Note (optional)",
+      addBonus: "Add Bonus",
+      absenceAmount: "Amount",
+      absenceReason: "Reason/note",
+      addAbsence: "Add Absence",
+      adding: "...",
+      byActor: "by",
+      roleLabel: "Role",
+      statusLabel: "Status",
+      onboardingLabel: "Onboarding",
+      lastLoginLabel: "Last Login",
+      passwordLabel: "Password",
+      mustChange: "Must change",
+      configured: "Configured",
+      notConfigured: "Portal access has not been configured.",
+      linking: "Linking...",
+      unlinking: "Unlinking...",
     },
     validation: { nameRequired: "Name required", phoneRequired: "Phone required", positionRequired: "Position required", salaryInvalid: "Salary must be >=0" },
+    errors: { linkFailed: "Link failed", unlinkFailed: "Unlink failed", archiveFailed: "Archive failed", reactivateFailed: "Reactivate failed", bonusFailed: "Bonus failed", absenceFailed: "Absence failed", reviewFailed: "Review failed", createFailed: "Create failed", tagInvalid: "Tag invalid", displayRequired: "Display name required", passwordShort: "Password >=8", mismatch: "Mismatch" },
+    confirm: { acceptRequest: "Accept request? This will perform financial mutation once.", rejectRequest: "Reject request?" },
     archiveConfirm: { title: "Archive Worker", desc: "Worker will be archived and balance must be 0.", warning: "Archived workers lose portal access until reactivated." },
     roles: { worker: "Worker", supervisor: "Supervisor" },
+    close: "Close",
   },
   fr: {
     headerTitle: "Travailleurs",
@@ -146,12 +178,15 @@ const TR: Record<Language, any> = {
     failedLoad: "Échec chargement",
     noWorkers: "Aucun travailleur trouvé.",
     noWorkersDesc: "Ajoutez votre premier travailleur.",
-    create: { title: "Ajouter Travailleur", name: "Nom complet", phone: "Téléphone", address: "Adresse", birthDate: "Date naissance", employmentDate: "Date embauche", position: "Poste", notes: "Notes", startingSalary: "Salaire début", monthlySalary: "Salaire mensuel", cancel: "Annuler", create: "Créer", creating: "Création...", required: "Requis" },
+    create: { title: "Ajouter Travailleur", name: "Nom complet", phone: "Téléphone", address: "Adresse", birthDate: "Date naissance", employmentDate: "Date embauche", position: "Poste", notes: "Notes", startingSalary: "Salaire début", monthlySalary: "Salaire mensuel", cancel: "Annuler", create: "Créer", creating: "Création...", required: "Requis", role: "Rôle", selectRole: "Sélectionner un rôle", displayName: "Nom affiché", tagLabel: "Tag", tagHint: "3–30 caractères a-z 0-9 . _", password: "Mot de passe", confirmPassword: "Confirmer", archiveTitle: "Archiver le travailleur", reactivateTitle: "Réactiver le travailleur", reactivateNote: "La restauration nécessite le salaire initial et mensuel.", noPositions: "Aucun poste configuré" },
     edit: { title: "Modifier Travailleur", save: "Enregistrer", saving: "Enregistrement..." },
-    details: { title: "Détails Travailleur", overview: "Aperçu", financial: "Financier", attendance: "Présence", portal: "Accès Portail", requests: "Demandes", activity: "Activité", identity: "Identité", employment: "Emploi", finance: "Finance", archive: "Archiver", reactivate: "Réactiver", edit: "Modifier", close: "Fermer", salary: "Salaire", credit: "Crédit", balance: "Solde", hireDate: "Date embauche", status: "Statut", position: "Poste", phone: "Téléphone", name: "Nom", notLinked: "Non lié", linked: "Lié", viewAccount: "Voir Compte", unlink: "Dissocier", linkExisting: "Lier Compte Existant", createAccount: "Créer Compte R.V.B", searchAccounts: "Rechercher par nom ou @tag", selectAccount: "Sélectionner", confirmLink: "Lier", confirmUnlink: "Dissocier", unlinkConfirm: "Dissocier @tag de Worker Name?", unlinkDesc: "Le compte reste mais sera déconnecté.", linkConfirm: "Lier @tag à Worker Name?", noAccounts: "Aucun compte éligible.", payments: "Paiements", bonuses: "Bonus/Absences", loans: "Prêts", noPayments: "Aucun paiement.", noBonuses: "Aucun bonus/absence.", noLoans: "Aucun prêt.", absences: "Absences", noAbsences: "Aucune absence.", attendanceHint: "Les absences ajustent le crédit.", requestsEmpty: "Aucune demande.", activityEmpty: "Aucune activité.", archivedNote: "Travailleur archivé — accès suspendu." },
+    details: { title: "Détails Travailleur", overview: "Aperçu", financial: "Financier", attendance: "Présence", portal: "Accès Portail", requests: "Demandes", activity: "Activité", identity: "Identité", employment: "Emploi", finance: "Finance", archive: "Archiver", reactivate: "Réactiver", edit: "Modifier", close: "Fermer", salary: "Salaire", credit: "Crédit", balance: "Solde", hireDate: "Date embauche", status: "Statut", position: "Poste", phone: "Téléphone", name: "Nom", notLinked: "Non lié", linked: "Lié", viewAccount: "Voir Compte", unlink: "Dissocier", linkExisting: "Lier Compte Existant", createAccount: "Créer Compte R.V.B", searchAccounts: "Rechercher par nom ou @tag", selectAccount: "Sélectionner", confirmLink: "Lier", confirmUnlink: "Dissocier", unlinkConfirm: "Dissocier @tag de Worker Name?", unlinkDesc: "Le compte reste mais sera déconnecté.", linkConfirm: "Lier @tag à Worker Name?", noAccounts: "Aucun compte éligible.", payments: "Paiements", bonuses: "Bonus/Absences", loans: "Prêts", noPayments: "Aucun paiement.", noBonuses: "Aucun bonus/absence.", noLoans: "Aucun prêt.", absences: "Absences", noAbsences: "Aucune absence.", attendanceHint: "Les absences ajustent le crédit.", requestsEmpty: "Aucune demande.", activityEmpty: "Aucune activité.", archivedNote: "Travailleur archivé — accès suspendu.", bonusAmount: "Montant", bonusNote: "Note (facultatif)", addBonus: "Ajouter un bonus", absenceAmount: "Montant", absenceReason: "Motif/note", addAbsence: "Ajouter une absence", adding: "...", byActor: "par", roleLabel: "Rôle", statusLabel: "Statut", onboardingLabel: "Onboarding", lastLoginLabel: "Dernière connexion", passwordLabel: "Mot de passe", mustChange: "À changer", configured: "Configuré", notConfigured: "L'accès portail n'a pas été configuré.", linking: "Liaison...", unlinking: "Dissociation..." },
     validation: { nameRequired: "Nom requis", phoneRequired: "Téléphone requis", positionRequired: "Poste requis", salaryInvalid: "Salaire >=0" },
+    errors: { linkFailed: "Échec de liaison", unlinkFailed: "Échec de dissociation", archiveFailed: "Échec d'archivage", reactivateFailed: "Échec de réactivation", bonusFailed: "Échec du bonus", absenceFailed: "Échec de l'absence", reviewFailed: "Échec de révision", createFailed: "Échec de création", tagInvalid: "Tag invalide", displayRequired: "Nom requis", passwordShort: "Mot de passe >=8", mismatch: "Non concordance" },
+    confirm: { acceptRequest: "Accepter ? Mutation financière unique.", rejectRequest: "Rejeter ?" },
     archiveConfirm: { title: "Archiver Travailleur", desc: "Le travailleur sera archivé.", warning: "Accès portail suspendu jusqu'à réactivation." },
     roles: { worker: "Travailleur", supervisor: "Superviseur" },
+    close: "Fermer",
   },
   ar: {
     headerTitle: "العمال",
@@ -169,12 +204,15 @@ const TR: Record<Language, any> = {
     failedLoad: "فشل التحميل",
     noWorkers: "لا يوجد عمال.",
     noWorkersDesc: "أضف أول عامل للبدء.",
-    create: { title: "إضافة عامل", name: "الاسم الكامل", phone: "الهاتف", address: "العنوان", birthDate: "تاريخ الميلاد", employmentDate: "تاريخ التوظيف", position: "المنصب", notes: "ملاحظات", startingSalary: "الراتب الابتدائي", monthlySalary: "الراتب الشهري", cancel: "إلغاء", create: "إنشاء", creating: "جارٍ الإنشاء...", required: "مطلوب" },
+    create: { title: "إضافة عامل", name: "الاسم الكامل", phone: "الهاتف", address: "العنوان", birthDate: "تاريخ الميلاد", employmentDate: "تاريخ التوظيف", position: "المنصب", notes: "ملاحظات", startingSalary: "الراتب الابتدائي", monthlySalary: "الراتب الشهري", cancel: "إلغاء", create: "إنشاء", creating: "جارٍ الإنشاء...", required: "مطلوب", role: "الدور", selectRole: "اختر الدور", displayName: "الاسم المعروض", tagLabel: "المعرّف", tagHint: "3–30 حرف a-z 0-9 . _", password: "كلمة المرور", confirmPassword: "تأكيد كلمة المرور", archiveTitle: "أرشفة العامل", reactivateTitle: "إعادة تفعيل العامل", reactivateNote: "تتطلب الاستعادة الراتب الابتدائي والشهري.", noPositions: "لا توجد مناصب مُعدّة" },
     edit: { title: "تعديل عامل", save: "حفظ", saving: "جارٍ الحفظ..." },
-    details: { title: "تفاصيل العامل", overview: "نظرة عامة", financial: "المالية", attendance: "الحضور", portal: "الوصول", requests: "الطلبات", activity: "النشاط", identity: "الهوية", employment: "التوظيف", finance: "المالية", archive: "أرشفة", reactivate: "إعادة تفعيل", edit: "تعديل", close: "إغلاق", salary: "الراتب", credit: "الرصيد", balance: "الرصيد", hireDate: "تاريخ التوظيف", status: "الحالة", position: "المنصب", phone: "الهاتف", name: "الاسم", notLinked: "غير مرتبط", linked: "مرتبط", viewAccount: "عرض الحساب", unlink: "إلغاء الربط", linkExisting: "ربط حساب موجود", createAccount: "إنشاء حساب R.V.B", searchAccounts: "ابحث بالاسم أو @tag", selectAccount: "اختر حساب", confirmLink: "ربط", confirmUnlink: "إلغاء الربط", unlinkConfirm: "إلغاء ربط @tag من Worker Name؟", unlinkDesc: "يبقى الحساب لكن سيتم فصله.", linkConfirm: "ربط @tag بـ Worker Name؟", noAccounts: "لا يوجد حسابات مؤهلة.", payments: "المدفوعات", bonuses: "المكافآت/الغيابات", loans: "القروض", noPayments: "لا توجد مدفوعات.", noBonuses: "لا توجد مكافآت.", noLoans: "لا توجد قروض.", absences: "الغيابات", noAbsences: "لا توجد غيابات.", attendanceHint: "الغيابات تؤثر على الرصيد.", requestsEmpty: "لا توجد طلبات بعد.", activityEmpty: "لا يوجد نشاط بعد.", archivedNote: "العامل مؤرشف — الوصول معلق." },
+    details: { title: "تفاصيل العامل", overview: "نظرة عامة", financial: "المالية", attendance: "الحضور", portal: "الوصول", requests: "الطلبات", activity: "النشاط", identity: "الهوية", employment: "التوظيف", finance: "المالية", archive: "أرشفة", reactivate: "إعادة تفعيل", edit: "تعديل", close: "إغلاق", salary: "الراتب", credit: "الرصيد", balance: "الرصيد", hireDate: "تاريخ التوظيف", status: "الحالة", position: "المنصب", phone: "الهاتف", name: "الاسم", notLinked: "غير مرتبط", linked: "مرتبط", viewAccount: "عرض الحساب", unlink: "إلغاء الربط", linkExisting: "ربط حساب موجود", createAccount: "إنشاء حساب R.V.B", searchAccounts: "ابحث بالاسم أو @tag", selectAccount: "اختر حساب", confirmLink: "ربط", confirmUnlink: "إلغاء الربط", unlinkConfirm: "إلغاء ربط @tag من Worker Name؟", unlinkDesc: "يبقى الحساب لكن سيتم فصله.", linkConfirm: "ربط @tag بـ Worker Name؟", noAccounts: "لا يوجد حسابات مؤهلة.", payments: "المدفوعات", bonuses: "المكافآت/الغيابات", loans: "القروض", noPayments: "لا توجد مدفوعات.", noBonuses: "لا توجد مكافآت.", noLoans: "لا توجد قروض.", absences: "الغيابات", noAbsences: "لا توجد غيابات.", attendanceHint: "الغيابات تؤثر على الرصيد.", requestsEmpty: "لا توجد طلبات بعد.", activityEmpty: "لا يوجد نشاط بعد.", archivedNote: "العامل مؤرشف — الوصول معلق.", bonusAmount: "المبلغ", bonusNote: "ملاحظة (اختياري)", addBonus: "إضافة مكافأة", absenceAmount: "المبلغ", absenceReason: "السبب/ملاحظة", addAbsence: "إضافة غياب", adding: "...", byActor: "بواسطة", roleLabel: "الدور", statusLabel: "الحالة", onboardingLabel: "الإعداد", lastLoginLabel: "آخر تسجيل دخول", passwordLabel: "كلمة المرور", mustChange: "يجب التغيير", configured: "مضبوط", notConfigured: "لم يتم إعداد الوصول إلى البوابة.", linking: "جارٍ الربط...", unlinking: "جارٍ إلغاء الربط..." },
     validation: { nameRequired: "الاسم مطلوب", phoneRequired: "الهاتف مطلوب", positionRequired: "المنصب مطلوب", salaryInvalid: "الراتب >=0" },
+    errors: { linkFailed: "فشل الربط", unlinkFailed: "فشل إلغاء الربط", archiveFailed: "فشل الأرشفة", reactivateFailed: "فشل إعادة التفعيل", bonusFailed: "فشل المكافأة", absenceFailed: "فشل الغياب", reviewFailed: "فشل المراجعة", createFailed: "فشل الإنشاء", tagInvalid: "المعرف غير صالح", displayRequired: "الاسم مطلوب", passwordShort: "كلمة المرور >=8", mismatch: "غير متطابق" },
+    confirm: { acceptRequest: "قبول الطلب؟ سيؤدي لحركة مالية واحدة.", rejectRequest: "رفض الطلب؟" },
     archiveConfirm: { title: "أرشفة عامل", desc: "سيتم أرشفة العامل.", warning: "سيتم تعليق الوصول حتى إعادة التفعيل." },
     roles: { worker: "عامل", supervisor: "مشرف" },
+    close: "إغلاق",
   },
 } as const;
 
@@ -466,8 +504,7 @@ function RvbWorkersInner() {
       setSelectedLink(null);
       // refresh details payments/requests not needed but update account map
     } catch (e: any) {
-      const code = e?.code || e?.data?.code;
-      alert(code || e?.message || "Link failed");
+      alert(t.errors.linkFailed);
     } finally { setLinking(false); }
   };
   const handleUnlink = async () => {
@@ -477,16 +514,16 @@ function RvbWorkersInner() {
       await rvbAccountService.unlink(showUnlinkConfirm.id);
       await load();
       setShowUnlinkConfirm(null);
-    } catch (e: any) { alert(e?.message || "Unlink failed"); }
+    } catch (e: any) { alert(t.errors.unlinkFailed); }
     finally { setLinking(false); }
   };
   const handleCreateAccount = async () => {
     setCreateError("");
     const tag = normalizeTag(createTag);
-    if (!tag || !isValidTag(tag)) { setCreateError("Tag invalid"); return; }
-    if (!createDisplayName.trim()) { setCreateError("Display name required"); return; }
-    if (!createPassword || createPassword.length < 8) { setCreateError("Password >=8"); return; }
-    if (createPassword !== createConfirm) { setCreateError("Mismatch"); return; }
+    if (!tag || !isValidTag(tag)) { setCreateError(t.errors.tagInvalid); return; }
+    if (!createDisplayName.trim()) { setCreateError(t.errors.displayRequired); return; }
+    if (!createPassword || createPassword.length < 8) { setCreateError(t.errors.passwordShort); return; }
+    if (createPassword !== createConfirm) { setCreateError(t.errors.mismatch); return; }
     if (!details) return;
     const role = createRole === "supervisor" ? "supervisor" : "worker";
     setCreatingAccount(true);
@@ -496,7 +533,7 @@ function RvbWorkersInner() {
       setShowCreateAccount(false);
       setCreateTag(""); setCreateDisplayName(""); setCreatePassword(""); setCreateConfirm("");
       // auto link already done via creation
-    } catch (e: any) { setCreateError(e?.data?.code || e?.message || "Create failed"); }
+    } catch (e: any) { setCreateError(t.errors.createFailed); }
     finally { setCreatingAccount(false); }
   };
 
@@ -510,7 +547,7 @@ function RvbWorkersInner() {
       await load();
       setShowArchiveConfirm(null);
       setDetails(null);
-    } catch (e: any) { alert(e?.message || "Archive failed"); }
+    } catch (e: any) { alert(t.errors.archiveFailed); }
   };
   const handleReactivate = async () => {
     if (!showReactivate) return;
@@ -529,7 +566,7 @@ function RvbWorkersInner() {
       await load();
       setShowReactivate(null);
       setDetails(null);
-    } catch (e: any) { alert(e?.message || "Reactivate failed"); }
+    } catch (e: any) { alert(t.errors.reactivateFailed); }
   };
 
   const handleBonus = async () => {
@@ -559,7 +596,7 @@ function RvbWorkersInner() {
         } else await load();
         await refreshWorkerRelated(details.id);
         setBonusAmount(""); setBonusNote("");
-      } catch (er: any) { alert(er?.data?.code || er?.message || e?.data?.code || e?.message || "Bonus failed"); }
+      } catch (er: any) { alert(t.errors.bonusFailed); }
     }
     finally { setBonusLoading(false); }
   };
@@ -589,17 +626,18 @@ function RvbWorkersInner() {
         } else await load();
         await refreshWorkerRelated(details.id);
         setAbsenceAmount(""); setAbsenceNote("");
-      } catch (er: any) { alert(er?.data?.code || er?.message || e?.data?.code || e?.message || "Absence failed"); }
+      } catch (er: any) { alert(t.errors.absenceFailed); }
     }
     finally { setBonusLoading(false); }
   };
   const handleReviewRequest = async (reqId: string, status: "accepted" | "rejected") => {
     try {
-      if (status === "accepted" && !confirm(status === "accepted" ? "Accept request? This will perform financial mutation once." : "Reject request?")) return;
+      if (status === "accepted" && !confirm(t.confirm.acceptRequest)) return;
+      if (status !== "accepted" && !confirm(t.confirm.rejectRequest)) return;
       await workerRequestService.review(reqId, status);
       if (details) await refreshWorkerRelated(details.id);
       await load(); // refresh KPI etc.
-    } catch (e: any) { alert(e?.data?.code || e?.message || "Review failed"); }
+    } catch (e: any) { alert(t.errors.reviewFailed); }
   };
 
   return (
@@ -732,7 +770,7 @@ function RvbWorkersInner() {
                                   aria-label={`${t.table.linkNow} ${w.name}`}
                                 >
                                   <Link2 size={12} aria-hidden="true" />
-                                  {(t.table as any).linkNow ?? "Link now"}
+                                  {t.table.linkNow}
                                 </button>
                               )}
                             </span>
@@ -763,15 +801,15 @@ function RvbWorkersInner() {
           <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2>{editing ? t.edit.title : t.create.title}</h2>
-              <button type="button" className={styles.closeButton} onClick={() => setShowAdd(false)} disabled={saving} aria-label="Close"><X size={16} /></button>
+              <button type="button" className={styles.closeButton} onClick={() => setShowAdd(false)} disabled={saving} aria-label={t.close}><X size={16} /></button>
             </div>
             <div className={styles.formBody}>
               <div className={styles.field}><label>{t.create.name} *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div className={styles.field}><label>{t.create.phone} *</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })} inputMode="numeric" /></div>
               <div className={styles.field}>
                 <label>{t.create.position} *</label>
-                <StyledSelect value={form.position} onChange={(v) => setForm({ ...form, position: v })} options={positions.map((p) => ({ value: p, label: p }))} placeholder={positions.length ? "Select position" : t.create.position} ariaLabel={t.create.position} />
-                {positions.length === 0 && <small className={styles.hint}>No positions configured</small>}
+                <StyledSelect value={form.position} onChange={(v) => setForm({ ...form, position: v })} options={positions.map((p) => ({ value: p, label: p }))} placeholder={t.create.position} ariaLabel={t.create.position} />
+                {positions.length === 0 && <small className={styles.hint}>{t.create.noPositions}</small>}
               </div>
               <div className={styles.field}><label>{t.create.employmentDate} *</label><StyledDatePicker value={form.employmentDate} onChange={(v) => setForm({ ...form, employmentDate: v })} language={lang} placeholder={t.create.employmentDate} ariaLabel={t.create.employmentDate} /></div>
               <div className={styles.field}><label>{t.create.birthDate}</label><StyledDatePicker value={form.birthDate} onChange={(v) => setForm({ ...form, birthDate: v })} language={lang} placeholder={t.create.birthDate} ariaLabel={t.create.birthDate} /></div>
@@ -795,7 +833,7 @@ function RvbWorkersInner() {
           <section className={styles.drawer} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} dir={isRtl ? "rtl" : "ltr"} style={{ width: "min(560px, 100vw)", maxWidth: "100vw" }}>
             <div className={styles.drawerHeader}>
               <h2 className={styles.drawerTitle}>{t.details.title}</h2>
-              <button type="button" className={styles.closeButton} onClick={() => setDetails(null)} aria-label="Close"><X size={16} /></button>
+              <button type="button" className={styles.closeButton} onClick={() => setDetails(null)} aria-label={t.close}><X size={16} /></button>
             </div>
             <div style={{ display: "flex", gap: 6, padding: "10px 14px", borderBottom: "1px solid var(--border)", background: "var(--panel)", overflowX: "auto" }}>
               {[
@@ -886,7 +924,7 @@ function RvbWorkersInner() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {bonuses.slice(0, 10).map((ev) => (
                             <div key={ev.id} className={styles.detailRow}>
-                              <span className={styles.detailLabel} style={{ display: "flex", flexDirection: "column", gap: 2 }}><span>{formatDate(ev.createdAt, lang)} · {ev.amount > 0 ? "+" : ""}{formatCurrency(ev.amount, settings.currency as any)}</span>{ev.note && <small style={{ color: "var(--subtle)", fontSize: 11 }}>{ev.note}</small>}{ev.actorTag && <small style={{ color: "var(--subtle)", fontSize: 10 }}>by @{ev.actorTag}</small>}</span>
+                              <span className={styles.detailLabel} style={{ display: "flex", flexDirection: "column", gap: 2 }}><span>{formatDate(ev.createdAt, lang)} · {ev.amount > 0 ? "+" : ""}{formatCurrency(ev.amount, settings.currency as any)}</span>{ev.note && <small style={{ color: "var(--subtle)", fontSize: 11 }}>{ev.note}</small>}{ev.actorTag && <small style={{ color: "var(--subtle)", fontSize: 10 }}>{t.details.byActor} @{ev.actorTag}</small>}</span>
                               <span className={styles.detailValue} style={{ fontSize: 11, color: "var(--muted)" }}>{formatCurrency(ev.balanceAfter, settings.currency as any)}</span>
                             </div>
                           ))}
@@ -895,9 +933,9 @@ function RvbWorkersInner() {
                     })()}
                     {isManager && (
                       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                        <input type="number" min="0" step="0.01" value={bonusAmount} onChange={(e) => setBonusAmount(e.target.value)} placeholder="Amount" style={{ flex: "1 1 100px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
-                        <input value={bonusNote} onChange={(e) => setBonusNote(e.target.value)} placeholder="Note (optional)" style={{ flex: "2 1 140px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
-                        <button type="button" className={styles.primaryButton} onClick={handleBonus} disabled={bonusLoading || !bonusAmount} style={{ minHeight: 36 }}>{bonusLoading ? "..." : "Add Bonus"}</button>
+                        <input type="number" min="0" step="0.01" value={bonusAmount} onChange={(e) => setBonusAmount(e.target.value)} placeholder={t.details.bonusAmount} style={{ flex: "1 1 100px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
+                        <input value={bonusNote} onChange={(e) => setBonusNote(e.target.value)} placeholder={t.details.bonusNote} style={{ flex: "2 1 140px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
+                        <button type="button" className={styles.primaryButton} onClick={handleBonus} disabled={bonusLoading || !bonusAmount} style={{ minHeight: 36 }}>{bonusLoading ? t.details.adding : t.details.addBonus}</button>
                       </div>
                     )}
                   </div>
@@ -935,7 +973,7 @@ function RvbWorkersInner() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {absences.slice(0, 20).map((ev) => (
                             <div key={ev.id} className={styles.detailRow}>
-                              <span className={styles.detailLabel} style={{ display: "flex", flexDirection: "column", gap: 2 }}><span>{formatDate(ev.createdAt, lang)} · -{formatCurrency(ev.amount, settings.currency as any)}</span>{ev.note && <small style={{ color: "var(--subtle)", fontSize: 11 }}>{ev.note}</small>}{ev.actorTag && <small style={{ color: "var(--subtle)", fontSize: 10 }}>by @{ev.actorTag}</small>}</span>
+                              <span className={styles.detailLabel} style={{ display: "flex", flexDirection: "column", gap: 2 }}><span>{formatDate(ev.createdAt, lang)} · -{formatCurrency(ev.amount, settings.currency as any)}</span>{ev.note && <small style={{ color: "var(--subtle)", fontSize: 11 }}>{ev.note}</small>}{ev.actorTag && <small style={{ color: "var(--subtle)", fontSize: 10 }}>{t.details.byActor} @{ev.actorTag}</small>}</span>
                               <span className={styles.detailValue} style={{ fontSize: 11, color: "var(--muted)" }}>{formatCurrency(ev.balanceAfter, settings.currency as any)}</span>
                             </div>
                           ))}
@@ -944,9 +982,9 @@ function RvbWorkersInner() {
                     })()}
                     {isManager && (
                       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                        <input type="number" min="0" step="0.01" value={absenceAmount} onChange={(e) => setAbsenceAmount(e.target.value)} placeholder="Amount" style={{ flex: "1 1 100px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
-                        <input value={absenceNote} onChange={(e) => setAbsenceNote(e.target.value)} placeholder="Reason/note" style={{ flex: "2 1 140px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
-                        <button type="button" className={styles.primaryButton} onClick={handleAbsence} disabled={bonusLoading || !absenceAmount} style={{ minHeight: 36, background: "var(--danger)", borderColor: "var(--danger)" }}>Add Absence</button>
+                        <input type="number" min="0" step="0.01" value={absenceAmount} onChange={(e) => setAbsenceAmount(e.target.value)} placeholder={t.details.absenceAmount} style={{ flex: "1 1 100px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
+                        <input value={absenceNote} onChange={(e) => setAbsenceNote(e.target.value)} placeholder={t.details.absenceReason} style={{ flex: "2 1 140px", minHeight: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)" }} />
+                        <button type="button" className={styles.primaryButton} onClick={handleAbsence} disabled={bonusLoading || !absenceAmount} style={{ minHeight: 36, background: "var(--danger)", borderColor: "var(--danger)" }}>{t.details.addAbsence}</button>
                       </div>
                     )}
                   </div>
@@ -963,7 +1001,7 @@ function RvbWorkersInner() {
                         return (
                           <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel-hover)", textAlign: "center" }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{t.details.notLinked}</div>
-                            <p style={{ margin: "6px 0 0", color: "var(--muted)", fontSize: 12 }}>Portal access has not been configured.</p>
+                            <p style={{ margin: "6px 0 0", color: "var(--muted)", fontSize: 12 }}>{t.details.notConfigured}</p>
                             {isManager && (
                               <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
                                 <button type="button" className={styles.primaryButton} onClick={() => setLinkModal(true)}><Link2 size={14} />{t.details.linkExisting}</button>
@@ -984,11 +1022,11 @@ function RvbWorkersInner() {
                             <span className={`${styles.badge} ${styles.badgeRole}`}>{(t as any).roles[acc.role] ?? acc.role}</span>
                           </div>
                           <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
-                            <div className={styles.detailRow}><span className={styles.detailLabel}>Role</span><span className={styles.detailValue}>{acc.role}</span></div>
-                            <div className={styles.detailRow}><span className={styles.detailLabel}>Status</span><span className={`${styles.badge} ${acc.status === "active" ? styles.badgeStatusActive : styles.badgeStatusArchived}`}>{acc.status}</span></div>
-                            <div className={styles.detailRow}><span className={styles.detailLabel}>Onboarding</span><span className={`${styles.badge} ${acc.onboardingStatus === "pending" ? styles.badgeOnboardingPending : styles.badgeOnboardingComplete}`}>{acc.onboardingStatus}</span></div>
-                            <div className={styles.detailRow}><span className={styles.detailLabel}>Last Login</span><span className={styles.detailValue}>{acc.lastLoginAt ? formatDate(acc.lastLoginAt, lang) : "—"}</span></div>
-                            <div className={styles.detailRow}><span className={styles.detailLabel}>Password</span><span className={styles.detailValue}>{(acc as any).mustChangePassword ? "Must change" : "Configured"}</span></div>
+                            <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.roleLabel}</span><span className={styles.detailValue}>{acc.role}</span></div>
+                            <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.statusLabel}</span><span className={`${styles.badge} ${acc.status === "active" ? styles.badgeStatusActive : styles.badgeStatusArchived}`}>{acc.status}</span></div>
+                            <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.onboardingLabel}</span><span className={`${styles.badge} ${acc.onboardingStatus === "pending" ? styles.badgeOnboardingPending : styles.badgeOnboardingComplete}`}>{acc.onboardingStatus}</span></div>
+                            <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.lastLoginLabel}</span><span className={styles.detailValue}>{acc.lastLoginAt ? formatDate(acc.lastLoginAt, lang) : "—"}</span></div>
+                            <div className={styles.detailRow}><span className={styles.detailLabel}>{t.details.passwordLabel}</span><span className={styles.detailValue}>{(acc as any).mustChangePassword ? t.details.mustChange : t.details.configured}</span></div>
                           </div>
                           {isManager && (
                             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -1055,7 +1093,7 @@ function RvbWorkersInner() {
                             <span style={{ fontSize: 10, color: "var(--muted)" }}>{formatDate(a.createdAt, lang)}</span>
                           </div>
                           {a.details && <small style={{ color: "var(--muted)", fontSize: 11 }}>{a.details}</small>}
-                          {a.actorTag && <small style={{ color: "var(--subtle)", fontSize: 10 }}>by @{a.actorTag}</small>}
+                          {a.actorTag && <small style={{ color: "var(--subtle)", fontSize: 10 }}>{t.details.byActor} @{a.actorTag}</small>}
                         </div>
                       ))}
                     </div>
@@ -1101,7 +1139,7 @@ function RvbWorkersInner() {
             </div>
             <div className={styles.modalFooter}>
               <button type="button" className={styles.secondaryButton} onClick={() => setLinkModal(false)}>{t.create.cancel}</button>
-              <button type="button" className={styles.primaryButton} onClick={handleLink} disabled={!selectedLink || linking}>{linking ? "Linking..." : t.details.confirmLink}</button>
+              <button type="button" className={styles.primaryButton} onClick={handleLink} disabled={!selectedLink || linking}>{linking ? t.details.linking : t.details.confirmLink}</button>
             </div>
           </section>
         </div>
@@ -1116,7 +1154,7 @@ function RvbWorkersInner() {
             <p style={{ margin: "8px auto 0", maxWidth: 340, color: "var(--text)", fontSize: 12, fontWeight: 700 }}>@{showUnlinkConfirm.tag}</p>
             <div style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 8 }}>
               <button type="button" className={styles.secondaryButton} onClick={() => setShowUnlinkConfirm(null)} disabled={linking}>{t.create.cancel}</button>
-              <button type="button" className={styles.primaryButton} onClick={handleUnlink} disabled={linking} style={{ background: "var(--danger)", borderColor: "var(--danger)" }}>{linking ? "Unlinking..." : t.details.unlink}</button>
+              <button type="button" className={styles.primaryButton} onClick={handleUnlink} disabled={linking} style={{ background: "var(--danger)", borderColor: "var(--danger)" }}>{linking ? t.details.unlinking : t.details.unlink}</button>
             </div>
           </section>
         </div>
@@ -1131,22 +1169,22 @@ function RvbWorkersInner() {
             </div>
             <div className={styles.formBody}>
               <div className={styles.field}>
-                <label>Role *</label>
-                <StyledSelect value={createRole} onChange={setCreateRole} options={[{ value: "worker", label: "Worker" }, { value: "supervisor", label: "Supervisor" }]} placeholder="Select role" ariaLabel="Role" />
+                <label>{t.create.role} *</label>
+                <StyledSelect value={createRole} onChange={setCreateRole} options={[{ value: "worker", label: t.roles.worker }, { value: "supervisor", label: t.roles.supervisor }]} placeholder={t.create.selectRole} ariaLabel={t.create.role} />
               </div>
-              <div className={styles.field}><label>Display Name *</label><input value={createDisplayName} onChange={(e) => setCreateDisplayName(e.target.value)} placeholder="Worker name" /></div>
+              <div className={styles.field}><label>{t.create.displayName} *</label><input value={createDisplayName} onChange={(e) => setCreateDisplayName(e.target.value)} placeholder={t.create.displayName} /></div>
               <div className={styles.field}>
-                <label>Tag *</label>
+                <label>{t.create.tagLabel} *</label>
                 <div className={styles.inputWithPrefix}><span aria-hidden="true">@</span><input value={createTag} onChange={(e) => setCreateTag(e.target.value)} placeholder="worker.tag" dir="ltr" style={{ flex: 1, border: 0, background: "transparent", outline: 0, padding: "10px 12px 10px 4px" }} /></div>
-                <small className={styles.hint}>3–30 chars a-z 0-9 . _</small>
+                <small className={styles.hint}>{t.create.tagHint}</small>
               </div>
-              <div className={styles.field}><label>Password *</label><div style={{ position: "relative", display: "flex", alignItems: "center" }}><input type="password" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} placeholder="••••••••" dir="ltr" style={{ flex: 1, paddingInlineEnd: 60 }} /><span style={{ position: "absolute", insetInlineEnd: 6, fontSize: 11, color: "var(--muted)" }}><KeyRound size={14} /></span></div></div>
-              <div className={styles.field}><label>Confirm *</label><input type="password" value={createConfirm} onChange={(e) => setCreateConfirm(e.target.value)} placeholder="••••••••" dir="ltr" /></div>
+              <div className={styles.field}><label>{t.create.password} *</label><div style={{ position: "relative", display: "flex", alignItems: "center" }}><input type="password" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} placeholder="••••••••" dir="ltr" style={{ flex: 1, paddingInlineEnd: 60 }} /><span style={{ position: "absolute", insetInlineEnd: 6, fontSize: 11, color: "var(--muted)" }}><KeyRound size={14} /></span></div></div>
+              <div className={styles.field}><label>{t.create.confirmPassword} *</label><input type="password" value={createConfirm} onChange={(e) => setCreateConfirm(e.target.value)} placeholder="••••••••" dir="ltr" /></div>
               {createError && <div className={styles.formError}>{createError}</div>}
             </div>
             <div className={styles.modalFooter}>
               <button type="button" className={styles.secondaryButton} onClick={() => setShowCreateAccount(false)} disabled={creatingAccount}>{t.create.cancel}</button>
-              <button type="button" className={styles.primaryButton} onClick={handleCreateAccount} disabled={creatingAccount}>{creatingAccount ? "Creating..." : t.details.createAccount}</button>
+              <button type="button" className={styles.primaryButton} onClick={handleCreateAccount} disabled={creatingAccount}>{creatingAccount ? t.create.creating : t.details.createAccount}</button>
             </div>
           </section>
         </div>
@@ -1156,12 +1194,12 @@ function RvbWorkersInner() {
         <div className={styles.backdrop} onClick={() => setShowArchiveConfirm(null)}>
           <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ width: "min(420px, calc(100vw - 32px))", textAlign: "center" as any, padding: 20 }}>
             <div style={{ width: 42, height: 42, display: "grid", placeItems: "center", borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-ring)", margin: "0 auto 10px" }}><Archive size={20} /></div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{t.archiveConfirm.title}</h2>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{t.create.archiveTitle}</h2>
             <p style={{ margin: "8px auto 0", maxWidth: 340, color: "var(--muted)", fontSize: 12 }}>{t.archiveConfirm.desc}</p>
             <p style={{ margin: "8px auto 0", maxWidth: 340, color: "var(--muted)", fontSize: 11 }}>{t.archiveConfirm.warning}</p>
             <div style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 8 }}>
               <button type="button" className={styles.secondaryButton} onClick={() => setShowArchiveConfirm(null)}>{t.create.cancel}</button>
-              <button type="button" className={styles.primaryButton} onClick={handleArchive} style={{ background: "var(--danger)", borderColor: "var(--danger)" }}>Archive</button>
+              <button type="button" className={styles.primaryButton} onClick={handleArchive} style={{ background: "var(--danger)", borderColor: "var(--danger)" }}>{t.details.archive}</button>
             </div>
           </section>
         </div>
@@ -1170,15 +1208,15 @@ function RvbWorkersInner() {
       {showReactivate && (
         <div className={styles.backdrop} onClick={() => setShowReactivate(null)}>
           <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}><h2>Reactivate Worker</h2><button type="button" className={styles.closeButton} onClick={() => setShowReactivate(null)}><X size={16} /></button></div>
+            <div className={styles.modalHeader}><h2>{t.create.reactivateTitle}</h2><button type="button" className={styles.closeButton} onClick={() => setShowReactivate(null)}><X size={16} /></button></div>
             <div className={styles.formBody}>
-              <p style={{ margin: 0, color: "var(--muted)", fontSize: 12 }}>Restoring requires starting and monthly salary.</p>
-              <div className={styles.field}><label>Starting Salary *</label><input type="number" step="0.01" value={reactivateForm.startingSalary} onChange={(e) => setReactivateForm({ ...reactivateForm, startingSalary: e.target.value })} /></div>
-              <div className={styles.field}><label>Monthly Salary *</label><input type="number" min="0" step="0.01" value={reactivateForm.monthlySalary} onChange={(e) => setReactivateForm({ ...reactivateForm, monthlySalary: e.target.value })} /></div>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: 12 }}>{t.create.reactivateNote}</p>
+              <div className={styles.field}><label>{t.create.startingSalary} *</label><input type="number" step="0.01" value={reactivateForm.startingSalary} onChange={(e) => setReactivateForm({ ...reactivateForm, startingSalary: e.target.value })} /></div>
+              <div className={styles.field}><label>{t.create.monthlySalary} *</label><input type="number" min="0" step="0.01" value={reactivateForm.monthlySalary} onChange={(e) => setReactivateForm({ ...reactivateForm, monthlySalary: e.target.value })} /></div>
             </div>
             <div className={styles.modalFooter}>
-              <button type="button" className={styles.secondaryButton} onClick={() => setShowReactivate(null)}>Cancel</button>
-              <button type="button" className={styles.primaryButton} onClick={handleReactivate}>Reactivate</button>
+              <button type="button" className={styles.secondaryButton} onClick={() => setShowReactivate(null)}>{t.create.cancel}</button>
+              <button type="button" className={styles.primaryButton} onClick={handleReactivate}>{t.details.reactivate}</button>
             </div>
           </section>
         </div>

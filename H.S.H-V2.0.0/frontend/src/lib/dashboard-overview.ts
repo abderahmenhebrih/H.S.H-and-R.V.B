@@ -1,5 +1,39 @@
 export type OverviewPeriod = "today" | "week" | "month" | "year";
 
+import type { Language } from "../types/settings/settings";
+
+function localeForOverview(language: string): string {
+  return language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-US";
+}
+
+export function getWeekdayLabels(language: Language | string = "en"): string[] {
+  const locale = localeForOverview(language);
+  const base = new Date(2026, 0, 5); // Monday
+  const labels: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    try {
+      labels.push(new Intl.DateTimeFormat(locale, { weekday: "short", numberingSystem: "latn" } as any).format(d));
+    } catch {
+      labels.push(new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(d));
+    }
+  }
+  return labels;
+}
+
+export function getMonthLabels(language: Language | string = "en"): string[] {
+  const locale = localeForOverview(language);
+  const labels: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    try {
+      labels.push(new Intl.DateTimeFormat(locale, { month: "short", numberingSystem: "latn" } as any).format(new Date(2026, i, 1)));
+    } catch {
+      labels.push(new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(2026, i, 1)));
+    }
+  }
+  return labels;
+}
+
 export type OverviewBucket = {
   label: string;
   shortLabel: string;
@@ -39,7 +73,7 @@ function addMonths(d: Date, n: number): Date {
   return x;
 }
 
-export function getPeriodRange(period: OverviewPeriod, now = new Date()): PeriodRange {
+export function getPeriodRange(period: OverviewPeriod, now: Date = new Date(), language: Language | string = "en"): PeriodRange {
   if (period === "today") {
     const start = startOfDay(now).getTime();
     const end = endOfDay(now).getTime();
@@ -77,7 +111,7 @@ export function getPeriodRange(period: OverviewPeriod, now = new Date()): Period
     const diffToMonday = day === 0 ? -6 : 1 - day;
     const monday = startOfDay(addDays(now, diffToMonday));
     const sunday = endOfDay(addDays(monday, 6));
-    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const labels = getWeekdayLabels(language);
     const shortLabels = labels;
     const buckets: OverviewBucket[] = [];
     for (let i = 0; i < 7; i++) {
@@ -124,7 +158,7 @@ export function getPeriodRange(period: OverviewPeriod, now = new Date()): Period
   // year
   const start = startOfDay(new Date(now.getFullYear(), 0, 1)).getTime();
   const end = endOfDay(new Date(now.getFullYear(), 11, 31)).getTime();
-  const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthLabels = getMonthLabels(language);
   const buckets: OverviewBucket[] = [];
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), i, 1);
@@ -168,14 +202,26 @@ export function aggregateByBuckets(
   return result;
 }
 
-export function compactCurrencyAxis(value: number, currency: string): string {
+export function compactCurrencyAxis(value: number, currency: string, language: Language | string = "en"): string {
+  const locale = localeForOverview(typeof language === "string" ? language : (language as string));
+  // Locale-aware grouping with Latin digits (presentation only — value untouched).
+  const formatScaled = (n: number, fractionDigits: number): string => {
+    try {
+      return new Intl.NumberFormat(locale, {
+        maximumFractionDigits: fractionDigits,
+        minimumFractionDigits: 0,
+        numberingSystem: "latn",
+      } as any).format(n);
+    } catch {
+      return fractionDigits === 0 ? `${Math.round(n)}` : `${n.toFixed(fractionDigits)}`;
+    }
+  };
   const abs = Math.abs(value);
   let compact: string;
-  if (abs >= 1_000_000) compact = `${(value / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`;
-  else if (abs >= 1000) compact = `${(value / 1000).toFixed(abs >= 10000 ? 0 : 1)}K`;
-  else compact = `${value.toFixed(0)}`;
-  // Use currency formatting: if currency is DA/€/$, we need to place correctly
-  // For simplicity, use compact + " " + currency, but for $ and € we want symbol before
+  if (abs >= 1_000_000) compact = `${formatScaled(value / 1_000_000, abs >= 10_000_000 ? 0 : 1)}M`;
+  else if (abs >= 1000) compact = `${formatScaled(value / 1000, abs >= 10000 ? 0 : 1)}K`;
+  else compact = formatScaled(value, 0);
+  // Currency placement preserved: $/€ prefix, DA (and others) suffix.
   if (currency === "$") return `$${compact}`;
   if (currency === "€") return `€${compact}`;
   return `${compact} ${currency}`;

@@ -351,7 +351,7 @@
   font-size: 16px;
   font-weight: 600;
 
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 
   transition:
@@ -1135,7 +1135,7 @@
   background: var(--panel);
   color: var(--text);
 
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 
   transition:
@@ -1814,7 +1814,7 @@ html[dir="rtl"] .mainContent {
 }
 
 html[dir="rtl"] .sidebarItem {
-  text-align: right;
+  text-align: end;
 }
 
 html[dir="rtl"] .sidebar {

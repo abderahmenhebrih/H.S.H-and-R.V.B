@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { rvbDirectoryService, type DirectoryItem } from "../../services/rvb-directory.service";
+import type { Language } from "../../types/settings/settings";
 
 function initials(name: string): string {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -10,13 +11,65 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+export type DirectoryPickerLabels = {
+  searchPlaceholder?: string;
+  loading?: string;
+  empty?: string;
+  all?: string;
+  worker?: string;
+  supplier?: string;
+  customer?: string;
+  supervisor?: string;
+  management?: string;
+};
+
 type Props = {
   selectedIds: string[];
   onToggle: (id: string) => void;
   excludeIds?: string[];
+  language?: Language;
+  labels?: DirectoryPickerLabels;
 };
 
-export default function DirectoryPicker({ selectedIds, onToggle, excludeIds }: Props) {
+const DIRECTORY_DICT: Record<Language, Required<DirectoryPickerLabels>> = {
+  en: {
+    searchPlaceholder: "Search by name, @tag or role",
+    loading: "Loading…",
+    empty: "No accounts found",
+    all: "All",
+    worker: "Worker",
+    supplier: "Supplier",
+    customer: "Customer",
+    supervisor: "Supervisor",
+    management: "Management",
+  },
+  fr: {
+    searchPlaceholder: "Rechercher par nom, @tag ou rôle",
+    loading: "Chargement…",
+    empty: "Aucun compte trouvé",
+    all: "Tous",
+    worker: "Ouvrier",
+    supplier: "Fournisseur",
+    customer: "Client",
+    supervisor: "Superviseur",
+    management: "Direction",
+  },
+  ar: {
+    searchPlaceholder: "ابحث بالاسم أو @tag أو الدور",
+    loading: "جارٍ التحميل…",
+    empty: "لم يتم العثور على حسابات",
+    all: "الكل",
+    worker: "عامل",
+    supplier: "مورّد",
+    customer: "زبون",
+    supervisor: "مشرف",
+    management: "الإدارة",
+  },
+};
+
+export default function DirectoryPicker({ selectedIds, onToggle, excludeIds, language = "en", labels }: Props) {
+  const dict = DIRECTORY_DICT[language] ?? DIRECTORY_DICT.en;
+  const t = { ...dict, ...labels };
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   const [role, setRole] = useState("all");
@@ -53,21 +106,21 @@ export default function DirectoryPicker({ selectedIds, onToggle, excludeIds }: P
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel-hover)" }}>
           <Search size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, @tag or role" style={{ flex: 1, border: 0, outline: 0, background: "transparent", fontSize: 13 }} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.searchPlaceholder} style={{ flex: 1, border: 0, outline: 0, background: "transparent", fontSize: 13 }} />
         </div>
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
-        {["all", "worker", "supplier", "customer", "supervisor", "management"].map((r) => (
+        {(["all", "worker", "supplier", "customer", "supervisor", "management"] as const).map((r) => (
           <button key={r} type="button" onClick={() => setRole(r)} style={{ minHeight: 28, padding: "0 10px", borderRadius: 999, border: "1px solid var(--border)", background: role === r ? "var(--accent)" : "var(--panel)", color: role === r ? "#fff" : "var(--text)", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer" }}>
-            {r === "all" ? "All" : r === "management" ? "Management" : r.charAt(0).toUpperCase() + r.slice(1)}
+            {t[r]}
           </button>
         ))}
       </div>
       <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel)" }}>
         {loading ? (
-          <div style={{ padding: 14, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>Loading…</div>
+          <div style={{ padding: 14, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>{t.loading}</div>
         ) : items.length === 0 ? (
-          <div style={{ padding: 14, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No accounts found</div>
+          <div style={{ padding: 14, textAlign: "center", color: "var(--muted)", fontSize: 13 }}>{t.empty}</div>
         ) : (
           items.map((a) => {
             const isSelected = selectedIds.includes(a.id);

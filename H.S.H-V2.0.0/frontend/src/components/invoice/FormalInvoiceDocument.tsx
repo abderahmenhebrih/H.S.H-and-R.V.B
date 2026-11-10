@@ -51,12 +51,14 @@ const DOC_T = {
     paymentStatus: "Payment status",
     phone: "Phone",
     email: "Email",
+    fax: "Fax",
     address: "Address",
     rc: "RC",
     nif: "NIF",
     nis: "NIS",
     capital: "Capital",
     managementSystem: "Management System",
+    itemsTitle: "DESCRIPTION / ITEMS",
   },
   fr: {
     invoice: "FACTURE",
@@ -101,12 +103,14 @@ const DOC_T = {
     paymentStatus: "Statut paiement",
     phone: "Téléphone",
     email: "Email",
+    fax: "Fax",
     address: "Adresse",
     rc: "RC",
     nif: "NIF",
     nis: "NIS",
     capital: "Capital",
     managementSystem: "Système de Gestion",
+    itemsTitle: "DÉSIGNATION / ARTICLES",
   },
   ar: {
     invoice: "فاتورة",
@@ -151,12 +155,14 @@ const DOC_T = {
     paymentStatus: "حالة الدفع",
     phone: "الهاتف",
     email: "البريد",
+    fax: "فاكس",
     address: "العنوان",
     rc: "السجل التجاري",
     nif: "NIF",
     nis: "NIS",
     capital: "رأس المال",
     managementSystem: "نظام الإدارة",
+    itemsTitle: "البنود",
   },
 } as const;
 
@@ -257,15 +263,15 @@ export default function FormalInvoiceDocument(props: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, fontSize: 11, color: "#81756C" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {seller.address && <span>{seller.address}{seller.city ? `, ${seller.city}` : ""}{seller.wilaya ? ` - ${seller.wilaya}` : ""}</span>}
-          {seller.phone && <span>{t.phone}: {seller.phone}</span>}
-          {seller.email && <span>{t.email}: {seller.email}</span>}
-          {seller.fax && <span>Fax: {seller.fax}</span>}
+          {seller.phone && <span>{t.phone}: <bdi dir="ltr">{seller.phone}</bdi></span>}
+          {seller.email && <span>{t.email}: <bdi dir="ltr">{seller.email}</bdi></span>}
+          {seller.fax && <span>{t.fax}: <bdi dir="ltr">{seller.fax}</bdi></span>}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, textAlign: "right" as const }}>
-          {showRC && seller.rc && <span>{t.rc}: {seller.rc}</span>}
-          {showNIF && seller.nif && <span>{t.nif}: {seller.nif}</span>}
-          {showNIS && seller.nis && <span>{t.nis}: {seller.nis}</span>}
-          {showCapital && seller.capital && <span>{t.capital}: {seller.capital}</span>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, textAlign: "end" as const }}>
+          {showRC && seller.rc && <span>{t.rc}: <bdi dir="ltr">{seller.rc}</bdi></span>}
+          {showNIF && seller.nif && <span>{t.nif}: <bdi dir="ltr">{seller.nif}</bdi></span>}
+          {showNIS && seller.nis && <span>{t.nis}: <bdi dir="ltr">{seller.nis}</bdi></span>}
+          {showCapital && seller.capital && <span>{t.capital}: <bdi dir="ltr">{seller.capital}</bdi></span>}
         </div>
       </div>
 
@@ -315,11 +321,11 @@ export default function FormalInvoiceDocument(props: Props) {
           <strong>{seller.commercialName}</strong>
           {seller.legalDenomination && <span>{seller.legalDenomination}</span>}
           {seller.address && <span>{seller.address}{seller.city ? `, ${seller.city}` : ""}</span>}
-          {seller.phone && <span>{t.phone}: {seller.phone}</span>}
-          {seller.email && <span>{t.email}: {seller.email}</span>}
-          {showRC && seller.rc && <span>{t.rc}: {seller.rc}</span>}
-          {showNIF && seller.nif && <span>{t.nif}: {seller.nif}</span>}
-          {showNIS && seller.nis && <span>{t.nis}: {seller.nis}</span>}
+          {seller.phone && <span>{t.phone}: <bdi dir="ltr">{seller.phone}</bdi></span>}
+          {seller.email && <span>{t.email}: <bdi dir="ltr">{seller.email}</bdi></span>}
+          {showRC && seller.rc && <span>{t.rc}: <bdi dir="ltr">{seller.rc}</bdi></span>}
+          {showNIF && seller.nif && <span>{t.nif}: <bdi dir="ltr">{seller.nif}</bdi></span>}
+          {showNIS && seller.nis && <span>{t.nis}: <bdi dir="ltr">{seller.nis}</bdi></span>}
         </div>
         <div className={styles.party}>
           <h4>{t.billTo}</h4>
@@ -328,11 +334,11 @@ export default function FormalInvoiceDocument(props: Props) {
           {customer.legalForm && <span>{customer.legalForm}</span>}
           {customer.activity && <span>{customer.activity}</span>}
           {customer.address && <span>{t.address}: {customer.address}</span>}
-          {customer.phone && <span>{t.phone}: {customer.phone}</span>}
-          {customer.email && <span>{t.email}: {customer.email}</span>}
-          {customer.rc && <span>{t.rc}: {customer.rc}</span>}
-          {customer.nif && <span>{t.nif}: {customer.nif}</span>}
-          {customer.nis && <span>{t.nis}: {customer.nis}</span>}
+          {customer.phone && <span>{t.phone}: <bdi dir="ltr">{customer.phone}</bdi></span>}
+          {customer.email && <span>{t.email}: <bdi dir="ltr">{customer.email}</bdi></span>}
+          {customer.rc && <span>{t.rc}: <bdi dir="ltr">{customer.rc}</bdi></span>}
+          {customer.nif && <span>{t.nif}: <bdi dir="ltr">{customer.nif}</bdi></span>}
+          {customer.nis && <span>{t.nis}: <bdi dir="ltr">{customer.nis}</bdi></span>}
         </div>
       </div>
 
@@ -347,7 +353,7 @@ export default function FormalInvoiceDocument(props: Props) {
       {/* Line items - from snapshot, no live sale recalc */}
       <div className={styles.itemsSection}>
         <h4>
-          {docLang === "ar" ? "البنود" : docLang === "fr" ? "DÉSIGNATION / ARTICLES" : "DESCRIPTION / ITEMS"}
+          {t.itemsTitle}
         </h4>
         <table className={styles.invoiceTable}>
           <thead>
@@ -416,9 +422,9 @@ export default function FormalInvoiceDocument(props: Props) {
           {showBank && (seller.bankName || seller.bankAccount || seller.rib) && (
             <div style={{ padding: 12, background: "#F8F0E7", border: "1px solid #E2D4C5", borderRadius: 8 }}>
               <h4 style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 800, color: "#6B3A26" }}>{t.bankDetails}</h4>
-              {seller.bankName && <div>{t.bankName}: {seller.bankName}</div>}
-              {seller.bankAccount && <div>{t.bankAccount}: {seller.bankAccount}</div>}
-              {seller.rib && <div>{t.rib}: {seller.rib}</div>}
+              {seller.bankName && <div>{t.bankName}: <bdi dir="ltr">{seller.bankName}</bdi></div>}
+              {seller.bankAccount && <div>{t.bankAccount}: <bdi dir="ltr">{seller.bankAccount}</bdi></div>}
+              {seller.rib && <div>{t.rib}: <bdi dir="ltr">{seller.rib}</bdi></div>}
             </div>
           )}
           {invoice.notes && (

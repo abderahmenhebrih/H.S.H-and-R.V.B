@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronUp, FileDown, Printer, RefreshCw } from "lucide-react";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import FormalInvoiceDocument from "../../../src/components/invoice/FormalInvoiceDocument";
-import { getPrinters, printInvoice, downloadInvoicePdf, APP_PDF_PRINTER, APP_PDF_LABEL } from "../../../src/services/printing.service";
+import { getPrinters, printInvoice, downloadInvoicePdf, APP_PDF_PRINTER, APP_PDF_LABEL, APP_PDF_LABELS } from "../../../src/services/printing.service";
 import type { PrinterInfo } from "../../../src/services/printing.service";
 import { invoiceService } from "../../../src/services/invoice.service";
 import { settingsService } from "../../../src/services/settings.service";
@@ -70,6 +70,9 @@ const TRANSLATIONS = {
     customer: "Customer",
     seller: "Seller",
     status: "Status",
+    printerHint: "Printer, destination, copies, and device-specific options are selected in the system print dialog.",
+    copiesAria: "Copies",
+    showMoreAria: "Show more print settings",
   },
   fr: {
     loadingInvoice: "Chargement de la facture...",
@@ -120,6 +123,9 @@ const TRANSLATIONS = {
     customer: "Client",
     seller: "Vendeur",
     status: "Statut",
+    printerHint: "L'imprimante, la destination, les copies et les options spécifiques à l'appareil sont sélectionnées dans la boîte de dialogue d'impression système.",
+    copiesAria: "Copies",
+    showMoreAria: "Afficher plus de paramètres d'impression",
   },
   ar: {
     loadingInvoice: "جارٍ تحميل الفاتورة...",
@@ -170,6 +176,9 @@ const TRANSLATIONS = {
     customer: "الزبون",
     seller: "البائع",
     status: "الحالة",
+    printerHint: "يتم اختيار الطابعة والوجهة والنسخ والخيارات الخاصة بالجهاز في مربع حوار الطباعة النظامي.",
+    copiesAria: "النسخ",
+    showMoreAria: "عرض المزيد من إعدادات الطباعة",
   },
 } as const;
 
@@ -501,7 +510,7 @@ function PrintPreviewInner() {
                       onChange={setSelectedPrinter}
                       placeholder={t.selectPrinter}
                       ariaLabel={t.choosePrinter}
-                      options={printers.map((p) => ({ value: p.name, label: p.name === APP_PDF_PRINTER ? APP_PDF_LABEL : p.name }))}
+                      options={printers.map((p) => ({ value: p.name, label: p.name === APP_PDF_PRINTER ? (APP_PDF_LABELS[((invoice?.documentLanguage as Language) ?? language)] ?? APP_PDF_LABEL) : p.name }))}
                     />
                   )}
                 </div>
@@ -551,7 +560,7 @@ function PrintPreviewInner() {
                   if (!Number.isFinite(n) || n < 1) setCopies(1);
                 }}
                 className={styles.copiesInput}
-                aria-label="Copies"
+                aria-label={t.copiesAria}
                 disabled={isAppPdf}
                 title={isAppPdf ? t.copiesHint : undefined}
                 style={isAppPdf ? { opacity: 0.5 } : undefined}
@@ -595,7 +604,7 @@ function PrintPreviewInner() {
               className={styles.showMoreButton}
               onClick={() => setShowMoreSettings((v) => !v)}
               aria-expanded={showMoreSettings}
-              aria-label="Show more print settings"
+              aria-label={t.showMoreAria}
             >
               <span>{showMoreSettings ? t.showLess : t.showMore}</span>
               {showMoreSettings ? <ChevronUp size={16} strokeWidth={2} aria-hidden="true" /> : <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />}
@@ -705,7 +714,7 @@ function PrintPreviewInner() {
                 <strong>{invoice.status}</strong>
               </div>
             </div>
-            <p className={styles.hint}>Printer, destination, copies, and device-specific options are selected in the system print dialog.</p>
+            <p className={styles.hint}>{t.printerHint}</p>
           </aside>
         </div>
       </div>
@@ -721,7 +730,7 @@ function PrintPreviewInner() {
 
 export default function InvoicePrintPreviewPage() {
   return (
-    <Suspense fallback={<div className={`${styles.standalonePage} themeLight`}><main className={styles.reportsPage}><div className={styles.statePanel}><h2>Loading invoice...</h2></div></main></div>}>
+    <Suspense fallback={<div className={`${styles.standalonePage} themeLight`}><main className={styles.reportsPage}><div className={styles.statePanel}><h2>Loading…</h2></div></main></div>}>
       <PrintPreviewInner />
     </Suspense>
   );

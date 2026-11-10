@@ -27,6 +27,7 @@ import {
 } from "../../src/lib/settings";
 import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 
 import type { Customer } from "../../src/types/entities/customer";
 
@@ -341,6 +342,17 @@ const TRANSLATIONS = {
     customerTypeRequired: "Customer type is required.",
     failedSaveCustomer: "Failed to save customer.",
     failedDeleteCustomer: "Failed to delete customer.",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    duplicate: "A customer with this name already exists.",
+    confirmDeletion: "Confirm deletion",
+    fallbackLabel: "Fallback",
+    consumerHint: "Consumer: name + billing address.",
+    legalFormPlaceholder: "e.g. SARL",
   },
 
   fr: {
@@ -412,6 +424,17 @@ const TRANSLATIONS = {
     customerTypeRequired: "Le type de client est obligatoire.",
     failedSaveCustomer: "Échec de l'enregistrement du client.",
     failedDeleteCustomer: "Échec de la suppression du client.",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    duplicate: "Un client portant ce nom existe déjà.",
+    confirmDeletion: "Confirmer la suppression",
+    fallbackLabel: "Repli",
+    consumerHint: "Consommateur : nom + adresse de facturation.",
+    legalFormPlaceholder: "p. ex. SARL",
   },
 
   ar: {
@@ -483,8 +506,32 @@ const TRANSLATIONS = {
     customerTypeRequired: "نوع العميل مطلوب.",
     failedSaveCustomer: "فشل حفظ العميل.",
     failedDeleteCustomer: "فشل حذف العميل.",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    duplicate: "يوجد عميل بهذا الاسم بالفعل.",
+    confirmDeletion: "تأكيد الحذف",
+    fallbackLabel: "القيمة الاحتياطية",
+    consumerHint: "مستهلك: الاسم + عنوان الفوترة.",
+    legalFormPlaceholder: "مثال: SARL",
   },
 } as const;
+
+const CUSTOMER_ERROR_MAP: Record<string, Record<Language, string>> = {
+  CUSTOMER_NAME_REQUIRED: { en: TRANSLATIONS.en.nameRequired, fr: TRANSLATIONS.fr.nameRequired, ar: TRANSLATIONS.ar.nameRequired },
+  CUSTOMER_PHONE_REQUIRED: { en: TRANSLATIONS.en.phoneRequired, fr: TRANSLATIONS.fr.phoneRequired, ar: TRANSLATIONS.ar.phoneRequired },
+  CUSTOMER_PHONE_INVALID: { en: TRANSLATIONS.en.invalidPhone, fr: TRANSLATIONS.fr.invalidPhone, ar: TRANSLATIONS.ar.invalidPhone },
+  CUSTOMER_TYPE_REQUIRED: { en: TRANSLATIONS.en.customerTypeRequired, fr: TRANSLATIONS.fr.customerTypeRequired, ar: TRANSLATIONS.ar.customerTypeRequired },
+  CUSTOMER_DUPLICATE: { en: TRANSLATIONS.en.duplicate, fr: TRANSLATIONS.fr.duplicate, ar: TRANSLATIONS.ar.duplicate },
+};
+const CUSTOMER_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -554,7 +601,7 @@ export default function CustomersPage() {
       setCustomers(loadedCustomers);
       setCustomerTypes(settings?.customerTypes ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load customers.");
+      setError(localizeError(err, language, CUSTOMER_ERROR_MAP, CUSTOMER_FALLBACK_TEXT));
     } finally {
       setLoading(false);
     }
@@ -662,12 +709,12 @@ export default function CustomersPage() {
     setError("");
 
     if (!form.name.trim()) {
-      setError((t as any).nameRequired);
+      setError(t.nameRequired);
       return;
     }
 
     if (!form.phone.trim()) {
-      setError((t as any).phoneRequired);
+      setError(t.phoneRequired);
       return;
     }
 
@@ -677,7 +724,7 @@ export default function CustomersPage() {
     }
 
     if (!form.type.trim()) {
-      setError((t as any).customerTypeRequired);
+      setError(t.customerTypeRequired);
       return;
     }
 
@@ -734,12 +781,7 @@ export default function CustomersPage() {
       setError("");
       await load();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("Customer name is required")) setError((t as any).nameRequired);
-      else if (msg.includes("Customer phone is required")) setError((t as any).phoneRequired);
-      else if (msg.includes("Customer type is required")) setError((t as any).customerTypeRequired);
-      else if (msg.includes("already exists")) setError(msg); // duplicate keeps English but could be translated if needed
-      else setError(msg || (t as any).failedSaveCustomer);
+      setError(localizeError(err, language, CUSTOMER_ERROR_MAP, CUSTOMER_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -765,11 +807,7 @@ export default function CustomersPage() {
 
       setDeleteTarget(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("Customer name is required")) setError((t as any).nameRequired);
-      else if (msg.includes("Customer phone is required")) setError((t as any).phoneRequired);
-      else if (msg.includes("Customer type is required")) setError((t as any).customerTypeRequired);
-      else setError(msg || (t as any).failedDeleteCustomer);
+      setError(localizeError(err, language, CUSTOMER_ERROR_MAP, CUSTOMER_FALLBACK_TEXT));
       setDeleteTarget(null);
     }
   }
@@ -858,7 +896,7 @@ export default function CustomersPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalBalance}</span>
-                <strong className={styles.summaryValue} title={formatCurrency(totalBalance, currency)}>{formatCompactCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalBalance, currency)}>{formatCompactCurrency(totalBalance, currency)}{hasInvalidBalance && <span title={t.dataIntegrity} style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ {t.dataIntegrity}</span>}</strong>
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>
@@ -927,9 +965,9 @@ export default function CustomersPage() {
                         {formatCurrency(customer.balance, currency)}
                       </strong>
                     ) : customer.balance === undefined || customer.balance === null ? (
-                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                      <span title={t.noBalance} style={{ color: "var(--muted)" }}>—</span>
                     ) : (
-                      <span title={`Invalid balance: ${String(customer.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                      <span title={t.invalidBalance} style={{ color: "var(--danger)", fontWeight: 700 }}>{t.invalidBalance}</span>
                     )}
 
                     <div className={styles.rowActions}>
@@ -965,7 +1003,7 @@ export default function CustomersPage() {
                     type="button"
                     className={styles.closeButton}
                     onClick={closeForm}
-                    aria-label="Close"
+                    aria-label={t.close}
                   >
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
@@ -1106,32 +1144,34 @@ export default function CustomersPage() {
 
                   {/* Invoice Identity Section */}
                   <div className={styles.fullWidth} style={{ gridColumn: "1 / -1", marginTop: 8, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-                    <strong style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", letterSpacing: 0.4 }}>{(t as any).invoiceIdentity}</strong>
+                    <strong style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", letterSpacing: 0.4 }}>{t.invoiceIdentity}</strong>
                     <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).invoiceCustomerType}</span>
+                        <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.invoiceCustomerType}</span>
                         <StyledSelect
+                          language={language}
+                          emptyLabel={t.noOptions}
                           value={form.invoiceCustomerType}
                           onChange={(value) => setForm({ ...form, invoiceCustomerType: value as any })}
                           options={[
-                            { value: "consumer", label: (t as any).consumer },
-                            { value: "business", label: (t as any).business },
+                            { value: "consumer", label: t.consumer },
+                            { value: "business", label: t.business },
                           ]}
-                          placeholder={(t as any).invoiceCustomerType}
-                          ariaLabel={(t as any).invoiceCustomerType}
+                          placeholder={t.invoiceCustomerType}
+                          ariaLabel={t.invoiceCustomerType}
                         />
                       </label>
                       {/* Billing Address — always visible, consumer & business */}
                       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).billingAddress}</span>
+                        <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.billingAddress}</span>
                         <input
                           value={form.billingAddress}
                           onChange={(event) => setForm({ ...form, billingAddress: event.target.value })}
-                          placeholder={form.address && !form.billingAddress ? form.address : (t as any).addressPlaceholder}
-                          title={(t as any).billingAddressHelp}
+                          placeholder={form.address && !form.billingAddress ? form.address : t.addressPlaceholder}
+                          title={t.billingAddressHelp}
                         />
                         {!form.billingAddress && form.address && (
-                          <small style={{ color: "var(--muted)", fontSize: 11 }}>Fallback: {form.address} ({(t as any).billingAddressHelp})</small>
+                          <small style={{ color: "var(--muted)", fontSize: 11 }}>{t.fallbackLabel}: {form.address} ({t.billingAddressHelp})</small>
                         )}
                       </label>
                     </div>
@@ -1139,38 +1179,38 @@ export default function CustomersPage() {
                     {/* Consumer helper: name + billingAddress already handled (name in main form) */}
                     {form.invoiceCustomerType === "consumer" && (
                       <small style={{ color: "var(--muted)", fontSize: 11, marginTop: 8, display: "block" }}>
-                        {language === "fr" ? "Consommateur : nom + adresse de facturation." : language === "ar" ? "مستهلك: الاسم + عنوان الفوترة." : "Consumer: name + billing address."}
+                        {t.consumerHint}
                       </small>
                     )}
 
                     {form.invoiceCustomerType === "business" && (
                       <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).legalName}</span>
+                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.legalName}</span>
                           <input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} />
                         </label>
                         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).commercialName}</span>
+                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.commercialName}</span>
                           <input value={form.commercialName} onChange={(e) => setForm({ ...form, commercialName: e.target.value })} />
                         </label>
                         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).legalForm}</span>
-                          <input value={form.legalForm} onChange={(e) => setForm({ ...form, legalForm: e.target.value })} placeholder="SARL" />
+                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.legalForm}</span>
+                          <input value={form.legalForm} onChange={(e) => setForm({ ...form, legalForm: e.target.value })} placeholder={t.legalFormPlaceholder} />
                         </label>
                         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).activity}</span>
+                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.activity}</span>
                           <input value={form.activity} onChange={(e) => setForm({ ...form, activity: e.target.value })} />
                         </label>
                         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).rcLabel}</span>
+                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.rcLabel}</span>
                           <input value={form.rc} onChange={(e) => setForm({ ...form, rc: e.target.value })} />
                         </label>
                         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).nifLabel}</span>
+                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.nifLabel}</span>
                           <input value={form.nif} onChange={(e) => setForm({ ...form, nif: e.target.value })} />
                         </label>
                         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{(t as any).nisLabel}</span>
+                          <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>{t.nisLabel}</span>
                           <input value={form.nis} onChange={(e) => setForm({ ...form, nis: e.target.value })} />
                         </label>
                       </div>
@@ -1247,7 +1287,7 @@ export default function CustomersPage() {
                     </span>
                   </div>
                   <span className={countdownStyles.circleLabel}>
-                    {deleteReady ? t.confirmDelete : "Confirm deletion"}
+                    {deleteReady ? t.confirmDelete : t.confirmDeletion}
                   </span>
                 </div>
                 <div className={styles.modalFooter}>
@@ -1255,9 +1295,7 @@ export default function CustomersPage() {
                     type="button"
                     className={styles.secondaryButton}
                     onClick={() => setDeleteTarget(null)}
-                  >
-                    Cancel
-                  </button>
+                  >{t.cancel}</button>
                   <button
                     type="button"
                     className={styles.dangerButton}

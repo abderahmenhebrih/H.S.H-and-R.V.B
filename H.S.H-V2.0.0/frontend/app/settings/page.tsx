@@ -208,6 +208,32 @@ const TRANSLATIONS = {
     paymentMethodBankTransfer: "Bank transfer",
     paymentMethodCheque: "Cheque",
     paymentMethodOther: "Other",
+    loadingSettings: "Loading settings...",
+    genericError: "Something went wrong. Please try again.",
+    deleteConfirmTitle: "Are you sure you want to delete this item?",
+    deleteConfirmDesc: "This will permanently remove {item} from the list.",
+    cancelEdit: "Cancel edit",
+    required: "required",
+    settingsNavAria: "Settings navigation",
+    settingsSearchAria: "Search settings",
+    settingsSectionsAria: "Settings sections",
+    toggleTheme: "Toggle theme",
+    themeToLight: "Switch to light mode",
+    themeToDark: "Switch to dark mode",
+    breadcrumbHome: "Home",
+    breadcrumbSettings: "Settings",
+    brandSub: "Management System",
+    brandLogoAlt: "Hebrih logo",
+    searchResultsHeading: "SEARCH RESULTS",
+    emptySearch: "No settings found for {query}",
+    confirmLangTitle: "Change application language?",
+    confirmCurrencyTitle: "Change global currency?",
+    confirmLangDesc: "This will change the language used throughout Hebrih Slaughter House.",
+    confirmCurrencyDesc: "This will change the currency displayed throughout Hebrih Slaughter House.",
+    changeCurrencyNote: "Existing monetary amounts will not be converted.",
+    changeLanguage: "Change Language",
+    changeCurrency: "Change Currency",
+    changing: "Changing...",
   },
   fr: {
     eyebrow: "CONFIGURATION DU SYSTÈME",
@@ -349,6 +375,32 @@ const TRANSLATIONS = {
     paymentMethodBankTransfer: "Virement bancaire",
     paymentMethodCheque: "Chèque",
     paymentMethodOther: "Autre",
+    loadingSettings: "Chargement des paramètres...",
+    genericError: "Une erreur est survenue. Veuillez réessayer.",
+    deleteConfirmTitle: "Voulez-vous vraiment supprimer cet élément ?",
+    deleteConfirmDesc: "Cela supprimera définitivement {item} de la liste.",
+    cancelEdit: "Annuler la modification",
+    required: "requis",
+    settingsNavAria: "Navigation des paramètres",
+    settingsSearchAria: "Rechercher dans les paramètres",
+    settingsSectionsAria: "Sections des paramètres",
+    toggleTheme: "Basculer le thème",
+    themeToLight: "Passer en mode clair",
+    themeToDark: "Passer en mode sombre",
+    breadcrumbHome: "Accueil",
+    breadcrumbSettings: "Paramètres",
+    brandSub: "Système de gestion",
+    brandLogoAlt: "Logo Hebrih",
+    searchResultsHeading: "RÉSULTATS DE RECHERCHE",
+    emptySearch: "Aucun paramètre trouvé pour {query}",
+    confirmLangTitle: "Changer la langue de l'application ?",
+    confirmCurrencyTitle: "Changer la devise globale ?",
+    confirmLangDesc: "Cela changera la langue utilisée dans Abattoire Hebrih.",
+    confirmCurrencyDesc: "Cela changera la devise affichée dans Abattoire Hebrih.",
+    changeCurrencyNote: "Les montants existants ne seront pas convertis.",
+    changeLanguage: "Changer la langue",
+    changeCurrency: "Changer la devise",
+    changing: "Modification...",
   },
   ar: {
     eyebrow: "إعدادات النظام",
@@ -490,6 +542,32 @@ const TRANSLATIONS = {
     paymentMethodBankTransfer: "تحويل بنكي",
     paymentMethodCheque: "شيك",
     paymentMethodOther: "أخرى",
+    loadingSettings: "جارٍ تحميل الإعدادات...",
+    genericError: "حدث خطأ. يرجى المحاولة مجددًا.",
+    deleteConfirmTitle: "هل أنت متأكد من حذف هذا العنصر؟",
+    deleteConfirmDesc: "سيؤدي هذا إلى إزالة {item} نهائيًا من القائمة.",
+    cancelEdit: "إلغاء التعديل",
+    required: "مطلوب",
+    settingsNavAria: "التنقل في الإعدادات",
+    settingsSearchAria: "البحث في الإعدادات",
+    settingsSectionsAria: "أقسام الإعدادات",
+    toggleTheme: "تبديل المظهر",
+    themeToLight: "التبديل إلى الوضع الفاتح",
+    themeToDark: "التبديل إلى الوضع الداكن",
+    breadcrumbHome: "الرئيسية",
+    breadcrumbSettings: "الإعدادات",
+    brandSub: "نظام الإدارة",
+    brandLogoAlt: "شعار حبريح",
+    searchResultsHeading: "نتائج البحث",
+    emptySearch: "لم يتم العثور على إعدادات لـ {query}",
+    confirmLangTitle: "تغيير لغة التطبيق؟",
+    confirmCurrencyTitle: "تغيير العملة العامة؟",
+    confirmLangDesc: "سيؤدي هذا إلى تغيير اللغة المستخدمة في مذبح حبريح للدواجن.",
+    confirmCurrencyDesc: "سيؤدي هذا إلى تغيير العملة المعروضة في مذبح حبريح للدواجن.",
+    changeCurrencyNote: "لن يتم تحويل المبالغ الحالية.",
+    changeLanguage: "تغيير اللغة",
+    changeCurrency: "تغيير العملة",
+    changing: "جارٍ التغيير...",
   },
 } as const;
 
@@ -513,6 +591,10 @@ function SettingsPageInner() {
   // snapshot is saved strictly in request order, so an older save can never
   // complete after (and clobber) a newer one.
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  // Gates the document lang/dir mirror below: the mirror effect also runs on
+  // the initial DEFAULT-state render, before Dexie resolves. Writing then
+  // would clobber the pre-paint hint with the default language.
+  const canonicalReadyRef = useRef(false);
   const [dark, setDark] = useState(() => {
     try {
       if (typeof window !== "undefined") return getSavedTheme() === "dark";
@@ -572,6 +654,7 @@ function SettingsPageInner() {
     if (canonical) {
       setSettings(canonical);
       settingsRef.current = canonical;
+      canonicalReadyRef.current = true;
       document.documentElement.lang = canonical.language;
       document.documentElement.dir = getDirection(canonical.language);
     }
@@ -598,6 +681,11 @@ function SettingsPageInner() {
   }, []);
 
   useEffect(() => {
+    // Mirror committed language to the document. Gated on canonical load:
+    // this effect also runs on the initial DEFAULT-state render, and writing
+    // the default then would clobber the pre-paint hint / produce an
+    // en→ar→en flash and split lang/dir observations mid-hydration.
+    if (!canonicalReadyRef.current) return;
     document.documentElement.lang = settings.language;
     document.documentElement.dir = getDirection(settings.language);
   }, [settings.language]);
@@ -796,14 +884,14 @@ function SettingsPageInner() {
     <main className={`${styles.settingsPage} ${dark ? styles.themeDark : styles.themeLight}`}>
       <div className={styles.settingsLayout}>
         {/* LEFT: Settings Navigation */}
-        <aside className={styles.settingsNav} aria-label="Settings navigation">
+        <aside className={styles.settingsNav} aria-label={t.settingsNavAria}>
           <div className={styles.brandBlock}>
             <div className={styles.brandLogo} aria-hidden="true">
-              <img src="/chicken.jpg" alt="Hebrih logo" />
+              <img src="/chicken.jpg" alt={t.brandLogoAlt} />
             </div>
             <div className={styles.brandText}>
               <strong>Hebrih Slaughter House</strong>
-              <span>Management System</span>
+              <span>{t.brandSub}</span>
             </div>
           </div>
 
@@ -816,12 +904,12 @@ function SettingsPageInner() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={styles.searchInput}
-              aria-label="Search settings"
+              aria-label={t.settingsSearchAria}
             />
             <span className={styles.searchHint} aria-hidden="true">Ctrl + K</span>
           </div>
 
-          <nav className={styles.navList} aria-label="Settings sections">
+          <nav className={styles.navList} aria-label={t.settingsSectionsAria}>
             {navItems.map((item) => {
               const isActive = !isSearching && activeSection === item.id;
               const Icon = item.icon;
@@ -849,9 +937,9 @@ function SettingsPageInner() {
             <div className={styles.mainHeaderLeft}>
               <div className={styles.breadcrumb}>
                 <Home size={14} strokeWidth={2} aria-hidden="true" />
-                <span>Home</span>
+                <span>{t.breadcrumbHome}</span>
                 <ChevronRight size={12} strokeWidth={2} aria-hidden="true" />
-                <span>Settings</span>
+                <span>{t.breadcrumbSettings}</span>
               </div>
               <h1>{t.title}</h1>
               <p>{t.description}</p>
@@ -867,8 +955,8 @@ function SettingsPageInner() {
                 type="button"
                 className={styles.themeToggle}
                 onClick={toggleTheme}
-                aria-label="Toggle theme"
-                title={dark ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label={t.toggleTheme}
+                title={dark ? t.themeToLight : t.themeToDark}
               >
                 {dark ? <Sun size={18} strokeWidth={2} aria-hidden="true" /> : <Moon size={18} strokeWidth={2} aria-hidden="true" />}
               </button>
@@ -879,10 +967,10 @@ function SettingsPageInner() {
           <div className={styles.mainContent}>
             {isSearching ? (
               <>
-                <h2 className={styles.sectionHeading}>SEARCH RESULTS</h2>
+                <h2 className={styles.sectionHeading}>{t.searchResultsHeading}</h2>
                 <div className={styles.rowsStack}>
                   {filteredRows && filteredRows.length === 0 ? (
-                    <div className={styles.emptySearch}>No settings found for &quot;{searchQuery}&quot;</div>
+                    <div className={styles.emptySearch}>{t.emptySearch.replace("{query}", searchQuery)}</div>
                   ) : (
                     filteredRows?.map((row) => {
                       const sectionLabel = navItems.find((n) => n.id === row.section)?.label ?? row.section;
@@ -980,6 +1068,14 @@ function SettingsPageInner() {
                               placeholder={t.addCustomerType}
                               emptyText={t.empty}
                               addText={t.add}
+                              deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
                               onChange={(items) => updateSettingsPartial({ customerTypes: items })}
                             />
                           </SettingNavigationRow>
@@ -1001,6 +1097,14 @@ function SettingsPageInner() {
                               placeholder={t.addWorkerPosition}
                               emptyText={t.empty}
                               addText={t.add}
+                              deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
                               onChange={(items) => updateSettingsPartial({ workerPositions: items })}
                             />
                           </SettingNavigationRow>
@@ -1022,6 +1126,14 @@ function SettingsPageInner() {
                               placeholder={t.addVehicleType}
                               emptyText={t.empty}
                               addText={t.add}
+                              deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
                               onChange={(items) => updateSettingsPartial({ vehicleTypes: items })}
                             />
                           </SettingNavigationRow>
@@ -1043,6 +1155,14 @@ function SettingsPageInner() {
                               placeholder={t.addExpenseType}
                               emptyText={t.empty}
                               addText={t.add}
+                              deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
                               onChange={(items) => updateSettingsPartial({ expenseTypes: items })}
                             />
                           </SettingNavigationRow>
@@ -1194,7 +1314,15 @@ function SettingsPageInner() {
                       placeholder={t.addCustomerType}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettingsPartial({ customerTypes: items })}
+                      deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
+                              onChange={(items) => updateSettingsPartial({ customerTypes: items })}
                     />
                   </SettingNavigationRow>
                   <SettingNavigationRow
@@ -1209,7 +1337,15 @@ function SettingsPageInner() {
                       placeholder={t.addWorkerPosition}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettingsPartial({ workerPositions: items })}
+                      deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
+                              onChange={(items) => updateSettingsPartial({ workerPositions: items })}
                     />
                   </SettingNavigationRow>
                   <SettingNavigationRow
@@ -1224,7 +1360,15 @@ function SettingsPageInner() {
                       placeholder={t.addVehicleType}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettingsPartial({ vehicleTypes: items })}
+                      deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
+                              onChange={(items) => updateSettingsPartial({ vehicleTypes: items })}
                     />
                   </SettingNavigationRow>
                   <SettingNavigationRow
@@ -1239,7 +1383,15 @@ function SettingsPageInner() {
                       placeholder={t.addExpenseType}
                       emptyText={t.empty}
                       addText={t.add}
-                      onChange={(items) => updateSettingsPartial({ expenseTypes: items })}
+                      deleteText={t.delete}
+                              closeText={t.close}
+                              cancelText={t.cancel}
+                              saveText={t.save}
+                              editText={t.edit}
+                              cancelEditText={t.cancelEdit}
+                              confirmTitle={t.deleteConfirmTitle}
+                              confirmDesc={t.deleteConfirmDesc}
+                              onChange={(items) => updateSettingsPartial({ expenseTypes: items })}
                     />
                   </SettingNavigationRow>
                 </div>
@@ -1281,11 +1433,11 @@ function SettingsPageInner() {
                   {/* Hero */}
                   <div className={styles.aboutHero}>
                     <div className={styles.aboutHeroLogo} aria-hidden="true">
-                      <img src="/chicken.jpg" alt="Hebrih logo" />
+                      <img src="/chicken.jpg" alt={t.brandLogoAlt} />
                     </div>
                     <div className={styles.aboutHeroText}>
                       <h3>Hebrih Slaughter House</h3>
-                      <span>Management System</span>
+                      <span>{t.brandSub}</span>
                       <small>Version 1.1.0</small>
                     </div>
                   </div>
@@ -1368,9 +1520,18 @@ function SettingsPageInner() {
   );
 }
 
+function SettingsLoadingFallback() {
+  let lang: Language = DEFAULT_SETTINGS.language;
+  try {
+    const cached = getCachedSettings();
+    if (cached?.language) lang = cached.language;
+  } catch {}
+  return <div className={styles.settingsPage}><div className={styles.settingsLayout}><div>{TRANSLATIONS[lang].loadingSettings}</div></div></div>;
+}
+
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className={styles.settingsPage}><div className={styles.settingsLayout}><div>Loading settings...</div></div></div>}>
+    <Suspense fallback={<SettingsLoadingFallback />}>
       <SettingsPageInner />
     </Suspense>
   );
@@ -1394,14 +1555,12 @@ function SettingChangeConfirmModal({
   getCurrencyLabel: (cur: Currency) => string;
 }) {
   const isLanguage = pending.type === "language";
-  const title = isLanguage ? "Change application language?" : "Change global currency?";
-  const description = isLanguage
-    ? "This will change the language used throughout Hebrih Slaughter House."
-    : "This will change the currency displayed throughout Hebrih Slaughter House.";
+  const title = isLanguage ? t.confirmLangTitle : t.confirmCurrencyTitle;
+  const description = isLanguage ? t.confirmLangDesc : t.confirmCurrencyDesc;
   const settingLabel = isLanguage ? t.language : t.currency;
   const oldLabel = isLanguage ? getLanguageLabel(pending.oldValue as Language) : getCurrencyLabel(pending.oldValue as Currency);
   const newLabel = isLanguage ? getLanguageLabel(pending.newValue as Language) : getCurrencyLabel(pending.newValue as Currency);
-  const confirmLabel = isLanguage ? "Change Language" : "Change Currency";
+  const confirmLabel = isLanguage ? t.changeLanguage : t.changeCurrency;
   const Icon = isLanguage ? Languages : Banknote;
 
   useEffect(() => {
@@ -1426,7 +1585,7 @@ function SettingChangeConfirmModal({
             <Icon size={20} strokeWidth={2} />
           </div>
           <h2 id="confirm-title">{title}</h2>
-          <button type="button" className={styles.confirmClose} onClick={onCancel} aria-label="Close">
+          <button type="button" className={styles.confirmClose} onClick={onCancel} aria-label={t.close}>
             <X size={16} strokeWidth={2} />
           </button>
         </div>
@@ -1440,16 +1599,16 @@ function SettingChangeConfirmModal({
             <span className={styles.newValue}>{newLabel}</span>
           </div>
           {!isLanguage && (
-            <p className={styles.changeNote}>Existing monetary amounts will not be converted.</p>
+            <p className={styles.changeNote}>{t.changeCurrencyNote}</p>
           )}
         </div>
 
         <div className={styles.confirmActions}>
           <button type="button" className={styles.cancelButton} onClick={onCancel} disabled={loading}>
-            Cancel
+            {t.cancel}
           </button>
           <button type="button" className={styles.confirmButton} onClick={onConfirm} disabled={loading}>
-            {loading ? "Changing..." : confirmLabel}
+            {loading ? t.changing : confirmLabel}
           </button>
         </div>
       </div>
@@ -1534,13 +1693,37 @@ function ListManager({
   emptyText,
   addText,
   onChange,
+  deleteText,
+  closeText,
+  cancelText,
+  saveText,
+  editText,
+  cancelEditText,
+  confirmTitle,
+  confirmDesc,
 }: {
   items: string[];
   placeholder: string;
   emptyText: string;
   addText: string;
   onChange: (items: string[]) => void;
+  deleteText?: string;
+  closeText?: string;
+  cancelText?: string;
+  saveText?: string;
+  editText?: string;
+  cancelEditText?: string;
+  confirmTitle?: string;
+  confirmDesc?: string;
 }) {
+  const tDelete = deleteText ?? "Delete";
+  const tClose = closeText ?? "Close";
+  const tCancel = cancelText ?? "Cancel";
+  const tSave = saveText ?? "Save";
+  const tEdit = editText ?? "Edit";
+  const tCancelEdit = cancelEditText ?? "Cancel edit";
+  const tConfirmTitle = confirmTitle ?? "Are you sure you want to delete this item?";
+  const tConfirmDesc = confirmDesc ?? "This will permanently remove {item} from the list.";
   const [value, setValue] = useState("");
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
@@ -1632,7 +1815,7 @@ function ListManager({
                     <button
                       type="button"
                       onClick={handleSaveEdit}
-                      aria-label={`Save ${item}`}
+                      aria-label={`${tSave} ${item}`}
                       className={styles.saveButton}
                       disabled={!editingValue.trim() || (editingValue.trim() !== item && items.includes(editingValue.trim()))}
                     >
@@ -1641,7 +1824,7 @@ function ListManager({
                     <button
                       type="button"
                       onClick={handleCancelEdit}
-                      aria-label="Cancel edit"
+                      aria-label={tCancelEdit}
                       className={styles.cancelEditButton}
                     >
                       <X size={14} strokeWidth={2} aria-hidden="true" />
@@ -1655,7 +1838,7 @@ function ListManager({
                     <button
                       type="button"
                       onClick={() => handleEdit(item)}
-                      aria-label={`Edit ${item}`}
+                      aria-label={`${tEdit} ${item}`}
                       className={styles.editButton}
                     >
                       <Pencil size={14} strokeWidth={2} aria-hidden="true" />
@@ -1663,7 +1846,7 @@ function ListManager({
                     <button
                       type="button"
                       onClick={() => setDeleteCandidate(item)}
-                      aria-label={`Delete ${item}`}
+                      aria-label={`${tDelete} ${item}`}
                       className={styles.deleteButton}
                     >
                       <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
@@ -1689,20 +1872,20 @@ function ListManager({
               <div className={`${styles.confirmIcon} ${styles.confirmIconDanger}`} aria-hidden="true">
                 <Trash2 size={20} strokeWidth={2} />
               </div>
-              <h2 id="delete-confirm-title">Are you sure you want to delete this item?</h2>
-              <button type="button" className={styles.confirmClose} onClick={handleDeleteCancel} aria-label="Close">
+              <h2 id="delete-confirm-title">{tConfirmTitle}</h2>
+              <button type="button" className={styles.confirmClose} onClick={handleDeleteCancel} aria-label={tClose}>
                 <X size={16} strokeWidth={2} />
               </button>
             </div>
             <p className={styles.confirmDescription}>
-              This will permanently remove <strong>{deleteCandidate}</strong> from the list.
+              {tConfirmDesc.replace("{item}", deleteCandidate)}
             </p>
             <div className={styles.confirmActions}>
               <button type="button" className={styles.cancelButton} onClick={handleDeleteCancel}>
-                Cancel
+                {tCancel}
               </button>
               <button type="button" className={`${styles.confirmButton} ${styles.confirmButtonDanger}`} onClick={handleDeleteConfirm}>
-                Delete
+                {tDelete}
               </button>
             </div>
           </div>
@@ -1872,6 +2055,11 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
 
   // helpers
   const notConfigured = t.notConfigured as string;
+  const localizeError = (e: unknown) => {
+    const m = e instanceof Error ? e.message : String(e ?? "");
+    if (!m || /fail|error/i.test(m)) return t.genericError as string;
+    return m;
+  };
   const formatNext = (seller: Seller) => {
     const n = seller.nextNumber ?? 1;
     const pad = seller.paddingLength ?? 6;
@@ -2149,11 +2337,11 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
     if (!editingSeller) return;
     const form = sellerForm as Seller;
     if (!form.commercialName || !String(form.commercialName).trim()) {
-      setSellerError(t.commercialName + " " + (language === "fr" ? "requis" : language === "ar" ? "مطلوب" : "required"));
+      setSellerError(`${t.commercialName} ${t.required}`);
       return;
     }
     if (!form.invoicePrefix || !String(form.invoicePrefix).trim()) {
-      setSellerError(t.invoicePrefix + " " + (language === "fr" ? "requis" : language === "ar" ? "مطلوب" : "required"));
+      setSellerError(`${t.invoicePrefix} ${t.required}`);
       return;
     }
     const min = getMinNext(editingSeller.id);
@@ -2172,7 +2360,7 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
       setEditingSeller(null);
     } catch (e) {
       console.error(e);
-      setSellerError(e instanceof Error ? e.message : "Failed to save");
+      setSellerError(localizeError(e));
     }
   }
 
@@ -2286,7 +2474,7 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
   }
 
   if (loading) {
-    return <div className={styles.rowsStack}><div className={styles.emptySearch}>Loading...</div></div>;
+    return <div className={styles.rowsStack}><div className={styles.emptySearch}>{t.loadingSettings as string}</div></div>;
   }
 
   return (
@@ -2613,8 +2801,8 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
                   <div className={styles.invoiceField}><label>{t.defaultTaxProfile as string}</label>
                     <StyledSelect value={(sellerForm.defaultTaxProfileId as string) || ""} onChange={(v) => setSellerForm((p) => ({ ...p, defaultTaxProfileId: v || undefined }))} ariaLabel={t.defaultTaxProfile as string} placeholder={notConfigured} options={[{ value: "", label: notConfigured }, ...taxProfiles.map((tp) => ({ value: tp.id, label: `${tp.name} (${tp.vatRate}%)` }))]} />
                   </div>
-                  <div className={styles.invoiceField}><label>{(t as any).defaultPaymentMethodId as string}</label>
-                    <StyledSelect value={(sellerForm.defaultPaymentMethodId as string) || (sellerForm as any).defaultPaymentTerms || ""} onChange={(v) => setSellerForm((p) => ({ ...p, defaultPaymentMethodId: v || undefined }))} ariaLabel={(t as any).defaultPaymentMethodId as string} placeholder={notConfigured} options={[{ value: "", label: notConfigured }, ...paymentMethods.filter((pm) => pm.enabled).map((pm) => ({ value: pm.id, label: paymentLabel(pm.id) }))]} />
+                  <div className={styles.invoiceField}><label>{t.defaultPaymentMethodId as string}</label>
+                    <StyledSelect value={(sellerForm.defaultPaymentMethodId as string) || (sellerForm as any).defaultPaymentTerms || ""} onChange={(v) => setSellerForm((p) => ({ ...p, defaultPaymentMethodId: v || undefined }))} ariaLabel={t.defaultPaymentMethodId as string} placeholder={notConfigured} options={[{ value: "", label: notConfigured }, ...paymentMethods.filter((pm) => pm.enabled).map((pm) => ({ value: pm.id, label: paymentLabel(pm.id) }))]} />
                   </div>
                   <div className={styles.invoiceField}><label>{t.defaultCurrency as string}</label>
                     <StyledSelect value={(sellerForm.defaultCurrency as string) || ""} onChange={(v) => setSellerForm((p) => ({ ...p, defaultCurrency: v || undefined }))} ariaLabel={t.defaultCurrency as string} placeholder={notConfigured} options={[{ value: "", label: notConfigured }, { value: "DA", label: t.dinar as string }, { value: "€", label: t.euro as string }, { value: "$", label: t.dollar as string }]} />

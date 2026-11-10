@@ -17,9 +17,9 @@ import { exactNumberLabel, formatCompactNumber } from "../../../src/lib/compact-
 import styles from "./page.module.css";
 
 const TR: Record<string, any> = {
-  en: { title: "Orders", subtitle: "Review and manage customer orders.", searchPlaceholder: "Search by customer, order ID or @tag", all: "All", underReview: "Under Review", accepted: "Accepted", rejected: "Rejected", cancelled: "Cancelled", view: "Access", noOrders: "No orders found.", emptyFiltered: "No orders match the selected status filter.", total: "Total Orders", pending: "Under Review", acceptedKpi: "Accepted", rejectedKpi: "Rejected" },
-  fr: { title: "Commandes", subtitle: "Consulter et gérer les commandes clients.", searchPlaceholder: "Rechercher par client, commande ou @tag", all: "Tous", underReview: "En Examen", accepted: "Acceptée", rejected: "Rejetée", cancelled: "Annulée", view: "Accéder", noOrders: "Aucune commande trouvée.", emptyFiltered: "Aucune commande ne correspond au filtre.", total: "Total Commandes", pending: "En Examen", acceptedKpi: "Acceptées", rejectedKpi: "Rejetées" },
-  ar: { title: "الطلبات", subtitle: "مراجعة وإدارة طلبات الزبائن.", searchPlaceholder: "ابحث بالزبون أو الطلب أو @tag", all: "الكل", underReview: "قيد المراجعة", accepted: "مقبولة", rejected: "مرفوضة", cancelled: "ملغاة", view: "دخول", noOrders: "لا توجد طلبات.", emptyFiltered: "لا توجد طلبات مطابقة للفلتر.", total: "إجمالي الطلبات", pending: "قيد المراجعة", acceptedKpi: "مقبولة", rejectedKpi: "مرفوضة" },
+  en: { title: "Orders", subtitle: "Review and manage customer orders.", searchPlaceholder: "Search by customer, order ID or @tag", all: "All", underReview: "Under Review", accepted: "Accepted", rejected: "Rejected", cancelled: "Cancelled", view: "Access", noOrders: "No orders found.", emptyFiltered: "No orders match the selected status filter.", total: "Total Orders", pending: "Under Review", acceptedKpi: "Accepted", rejectedKpi: "Rejected", reviewFailed: "Review failed", loading: "Loading...", close: "Close" },
+  fr: { title: "Commandes", subtitle: "Consulter et gérer les commandes clients.", searchPlaceholder: "Rechercher par client, commande ou @tag", all: "Tous", underReview: "En Examen", accepted: "Acceptée", rejected: "Rejetée", cancelled: "Annulée", view: "Accéder", noOrders: "Aucune commande trouvée.", emptyFiltered: "Aucune commande ne correspond au filtre.", total: "Total Commandes", pending: "En Examen", acceptedKpi: "Acceptées", rejectedKpi: "Rejetées", reviewFailed: "Échec de révision", loading: "Chargement...", close: "Fermer" },
+  ar: { title: "الطلبات", subtitle: "مراجعة وإدارة طلبات الزبائن.", searchPlaceholder: "ابحث بالزبون أو الطلب أو @tag", all: "الكل", underReview: "قيد المراجعة", accepted: "مقبولة", rejected: "مرفوضة", cancelled: "ملغاة", view: "دخول", noOrders: "لا توجد طلبات.", emptyFiltered: "لا توجد طلبات مطابقة للفلتر.", total: "إجمالي الطلبات", pending: "قيد المراجعة", acceptedKpi: "مقبولة", rejectedKpi: "مرفوضة", reviewFailed: "فشل المراجعة", loading: "جارٍ التحميل...", close: "إغلاق" },
 };
 
 function OrdersInner() {
@@ -76,7 +76,7 @@ function OrdersInner() {
       await customerOrderService.review(id, status);
       await load();
       setSelected(null);
-    } catch (e: any) { alert(e?.message || "Review failed"); }
+    } catch (e: any) { alert(t.reviewFailed); }
   };
 
   return (
@@ -156,7 +156,7 @@ function OrdersInner() {
 
         <div className={styles.card}>
           {loading ? (
-            <div className={styles.loadingBox}><div className={styles.loadingPulse} /><strong style={{ fontSize: 13, color: "var(--muted)" }}>Loading...</strong></div>
+            <div className={styles.loadingBox}><div className={styles.loadingPulse} /><strong style={{ fontSize: 13, color: "var(--muted)" }}>{t.loading}</strong></div>
           ) : filtered.length === 0 ? (
             <div className={styles.emptyState}>
               <div className={styles.emptyIcon} aria-hidden="true"><ShoppingCart size={26} /></div>
@@ -203,7 +203,7 @@ function OrdersInner() {
           <section className={styles.drawer} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 100vw)" }}>
             <div className={styles.drawerHeader}>
               <h2 className={styles.drawerTitle}>Order {selected.id.slice(0,8)}</h2>
-              <button type="button" className={styles.closeButton} onClick={() => setSelected(null)} aria-label="Close"><X size={16} /></button>
+              <button type="button" className={styles.closeButton} onClick={() => setSelected(null)} aria-label={t.close}><X size={16} /></button>
             </div>
             <div className={styles.drawerBody}>
               <div className={styles.detailSection}>

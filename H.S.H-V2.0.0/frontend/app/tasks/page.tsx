@@ -28,6 +28,7 @@ import { taskRepository } from "../../src/repositories/task.repository";
 import { settingsService } from "../../src/services/settings.service";
 import { DEFAULT_SETTINGS, SETTINGS_EVENT } from "../../src/lib/settings";
 import { exactNumberLabel, formatCompactNumber } from "../../src/lib/compact-number";
+import { localizeError } from "../../src/lib/i18n";
 import type { Task } from "../../src/types/entities/task";
 import type { Language } from "../../src/types/settings/settings";
 import styles from "./page.module.css";
@@ -100,6 +101,8 @@ const TRANSLATIONS = {
     taskCompletedSuccess: "Task completed successfully.",
     taskRescheduledSuccess: "Task completed and next deadline scheduled.",
     completeTask: "Complete task",
+    generic: "An unexpected error occurred. Please try again.",
+    close: "Close",
   },
   fr: {
     title: "Tâches",
@@ -168,6 +171,8 @@ const TRANSLATIONS = {
     taskCompletedSuccess: "Tâche terminée avec succès.",
     taskRescheduledSuccess: "Tâche terminée et prochaine échéance planifiée.",
     completeTask: "Terminer la tâche",
+    generic: "Une erreur inattendue s'est produite. Réessayez.",
+    close: "Fermer",
   },
   ar: {
     title: "المهام",
@@ -236,6 +241,8 @@ const TRANSLATIONS = {
     taskCompletedSuccess: "اكتملت المهمة بنجاح.",
     taskRescheduledSuccess: "اكتملت المهمة وتم تحديد الموعد النهائي التالي.",
     completeTask: "إكمال المهمة",
+    generic: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    close: "إغلاق",
   },
 } as const;
 
@@ -640,7 +647,8 @@ export default function TasksPage() {
       setTimeout(() => setSuccessMessage(""), 3000);
       closeComplete();
     } catch (err) {
-      setCompleteError(err instanceof Error ? err.message : t.failedSave);
+      console.warn(err);
+      setCompleteError(localizeError(err, language, undefined, { en: TRANSLATIONS.en.generic, fr: TRANSLATIONS.fr.generic, ar: TRANSLATIONS.ar.generic }));
     } finally {
       setCompleting(false);
     }
@@ -674,7 +682,8 @@ export default function TasksPage() {
       setTimeout(() => setSuccessMessage(""), 3000);
       closeComplete();
     } catch (err) {
-      setCompleteError(err instanceof Error ? err.message : t.failedSave);
+      console.warn(err);
+      setCompleteError(localizeError(err, language, undefined, { en: TRANSLATIONS.en.generic, fr: TRANSLATIONS.fr.generic, ar: TRANSLATIONS.ar.generic }));
     } finally {
       setCompleting(false);
     }
@@ -702,7 +711,8 @@ export default function TasksPage() {
       setShowForm(false);
       setEditingId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      console.warn(err);
+      setError(localizeError(err, language, undefined, { en: TRANSLATIONS.en.generic, fr: TRANSLATIONS.fr.generic, ar: TRANSLATIONS.ar.generic }));
     } finally {
       setSaving(false);
     }
@@ -723,7 +733,8 @@ export default function TasksPage() {
       setDeleteCountdown(3.5);
       deleteStartRef.current = null;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      console.warn(err);
+      setError(localizeError(err, language, undefined, { en: TRANSLATIONS.en.generic, fr: TRANSLATIONS.fr.generic, ar: TRANSLATIONS.ar.generic }));
     } finally {
       setDeleting(false);
     }
@@ -956,7 +967,7 @@ export default function TasksPage() {
               <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
                 <div className={styles.modalHeader}>
                   <h2>{editingId ? t.editTask : t.newTask}</h2>
-                  <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
@@ -1017,7 +1028,7 @@ export default function TasksPage() {
                     </svg>
                     <span className={styles.circleText}>{deleteCountdown > 0 ? deleteCountdown.toFixed(1) : "0.0"}</span>
                   </div>
-                  <span className={styles.circleLabel}>{deleteCountdown > 0 ? "Confirm deletion" : t.confirmDelete}</span>
+                  <span className={styles.circleLabel}>{t.confirmDelete}</span>
                 </div>
                 {error && <div className={styles.formError}>{error}</div>}
                 <div className={styles.modalFooterCompact}>

@@ -53,6 +53,9 @@ const TR: Record<Language, any> = {
     view: "Access",
     loading: "Loading requests...",
     error: "Failed to load requests",
+    reviewFailed: "Review failed",
+    summaryItems: "items",
+    summaryProducts: "products",
     emptyAll: "No requests found.",
     emptyUnderReview: "No requests under review.",
     emptyUnderReviewHint: "There are no requests waiting for review.",
@@ -61,6 +64,7 @@ const TR: Record<Language, any> = {
     emptyCustomer: "No Customer requests under review.",
     pagination: { prev: "Prev", next: "Next", page: "Page" },
     forbidden: "You do not have permission to view Requests.",
+    close: "Close",
     detail: {
       requestId: "Request ID",
       requester: "Requester",
@@ -148,6 +152,9 @@ const TR: Record<Language, any> = {
     view: "Accéder",
     loading: "Chargement...",
     error: "Échec chargement",
+    reviewFailed: "Échec de révision",
+    summaryItems: "articles",
+    summaryProducts: "produits",
     emptyAll: "Aucune demande trouvée.",
     emptyUnderReview: "Aucune demande en examen.",
     emptyUnderReviewHint: "Aucune demande en attente de révision.",
@@ -156,6 +163,7 @@ const TR: Record<Language, any> = {
     emptyCustomer: "Aucune demande Client en examen.",
     pagination: { prev: "Préc.", next: "Suiv.", page: "Page" },
     forbidden: "Vous n'avez pas la permission de voir les demandes.",
+    close: "Fermer",
     detail: {
       requestId: "ID Demande",
       requester: "Demandeur",
@@ -243,6 +251,9 @@ const TR: Record<Language, any> = {
     view: "دخول",
     loading: "جارٍ التحميل...",
     error: "فشل التحميل",
+    reviewFailed: "فشل المراجعة",
+    summaryItems: "عناصر",
+    summaryProducts: "منتجات",
     emptyAll: "لا توجد طلبات.",
     emptyUnderReview: "لا توجد طلبات قيد المراجعة.",
     emptyUnderReviewHint: "لا توجد طلبات بانتظار المراجعة.",
@@ -251,6 +262,7 @@ const TR: Record<Language, any> = {
     emptyCustomer: "لا توجد طلبات زبائن قيد المراجعة.",
     pagination: { prev: "السابق", next: "التالي", page: "صفحة" },
     forbidden: "ليس لديك صلاحية عرض الطلبات.",
+    close: "إغلاق",
     detail: {
       requestId: "معرف الطلب",
       requester: "الطالب",
@@ -342,6 +354,16 @@ function getTypeLabel(raw: string, source: string, t: any): string {
 
 function RvbRequestsGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useRvbAuth();
+  const [guardLang, setGuardLang] = useState<Language>("en");
+  useEffect(() => {
+    rvbUiPreferencesService.get().then((s) => { if (s?.language) setGuardLang(s.language as Language); }).catch(() => {});
+    const h = (e: Event) => {
+      const ce = e as CustomEvent<Settings>;
+      if (ce?.detail?.language) setGuardLang(ce.detail.language as Language);
+    };
+    window.addEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
+    return () => window.removeEventListener(RVB_UI_PREFERENCES_EVENT, h as any);
+  }, []);
   if (loading) {
     return <div style={{ minHeight: "60vh", display: "grid", placeItems: "center", color: "var(--muted)" }}><Clock size={20} style={{ animation: "spin 0.8s linear infinite" } as any} /></div>;
   }
@@ -353,7 +375,7 @@ function RvbRequestsGuard({ children }: { children: React.ReactNode }) {
         <div style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>
           <FileQuestion size={32} style={{ margin: "0 auto 12px", display: "block" }} />
           <strong>403 — Forbidden</strong>
-          <p style={{ marginTop: 8 }}>{(TR as any)["en"].forbidden}</p>
+          <p style={{ marginTop: 8 }}>{((TR as any)[guardLang] ?? (TR as any).en).forbidden}</p>
         </div>
       </RvbShell>
     );
@@ -535,7 +557,7 @@ function RequestsInner() {
       setDetail(d);
       setIsEditing(false);
     } catch (e: any) {
-      alert(e?.data?.code || e?.message || "Review failed");
+      alert(t.reviewFailed);
     } finally { setActionLoading(false); }
   };
 
@@ -566,9 +588,9 @@ function RequestsInner() {
       const totStr = tot != null ? formatCurrency(Number(tot), cur) : "";
       if (r.type === "insert_shipment" && r.items) {
         const w = r.items.reduce((s: number, it: any) => s + (Number(it.weightKg) || 0), 0);
-        return `${cnt} items${w ? ` · ${w} kg` : ""}${totStr ? ` · ${totStr}` : ""}`;
+        return `${cnt} ${t.summaryItems}${w ? ` · ${w} kg` : ""}${totStr ? ` · ${totStr}` : ""}`;
       }
-      return `${cnt} products${totStr ? ` · ${totStr}` : ""}`;
+      return `${cnt} ${t.summaryProducts}${totStr ? ` · ${totStr}` : ""}`;
     }
     // discrepancy
     return (r.description || r.summary || "").slice(0, 64) + ((r.description || "").length > 64 ? "…" : "");
@@ -754,7 +776,7 @@ function RequestsInner() {
                 <small style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, fontFamily: "ui-monospace" }}>{selected.id.slice(0, 12)}…</small>
                 {detail && <span className={`${styles.badge} ${detail.status === "under_review" ? styles.badgeOnboardingPending : detail.status === "accepted" ? styles.badgeStatusActive : styles.badgeStatusArchived}`}>{(t.statuses as any)[detail.status] ?? detail.status}</span>}
               </h2>
-              <button type="button" className={styles.closeButton} onClick={() => setSelected(null)} aria-label="Close"><X size={16} /></button>
+              <button type="button" className={styles.closeButton} onClick={() => setSelected(null)} aria-label={t.close}><X size={16} /></button>
             </div>
 
             <div className={styles.drawerBody}>

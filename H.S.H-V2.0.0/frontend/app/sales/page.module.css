@@ -398,7 +398,7 @@
 .dateMenu {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  inset-inline-start: 0;
   width: 300px;
   min-width: 288px;
   padding: 12px;
@@ -1463,24 +1463,14 @@
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  margin-right: auto;
-}
-
-html[dir="rtl"] .selectionCount {
-  margin-right: 0;
-  margin-left: auto;
+  margin-inline-end: auto;
 }
 
 .modalFooterActions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
-}
-
-html[dir="rtl"] .modalFooterActions {
-  margin-left: 0;
-  margin-right: auto;
+  margin-inline-start: auto;
 }
 
 /* Sale form inner sections */
@@ -1802,12 +1792,7 @@ html[dir="rtl"] .editRow {
   direction: rtl;
 }
 
-html[dir="rtl"] .dateMenu {
-  left: auto;
-  right: 0;
-}
-
 html[dir="rtl"] .dateTriggerLabel {
-  text-align: right;
+  text-align: end;
 }
 

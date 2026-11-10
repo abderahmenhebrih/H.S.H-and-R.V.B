@@ -83,7 +83,7 @@ const TR: Record<Language, any> = {
       sharedNote: "Language and theme are personal R.V.B preferences. Currency is a company setting managed by Manager/Admin. R.V.B does not use H.S.H offline storage.",
       openHsh: "Open H.S.H workspace",
     },
-    common: { sharedBadge: "Personal", save: "Save", saving: "Saving...", error: "Failed to save", retry: "Retry" },
+    common: { sharedBadge: "Personal", save: "Save", saving: "Saving...", error: "Failed to save", retry: "Retry", imageTooLarge: "Image too large (2MB max)", photoRequired: "Photo is required — cannot remove. Please choose a replacement.", cannotRemove: "Cannot remove profile picture after onboarding — please replace it with a new photo.", removeFailed: "Remove failed", allRequired: "All fields required", invalidLength: "8–128 characters", uploadFailed: "Upload failed", failed: "Failed" },
   },
   fr: {
     title: "Paramètres",
@@ -151,7 +151,7 @@ const TR: Record<Language, any> = {
       sharedNote: "La langue et le thème sont des préférences personnelles R.V.B. La devise est un paramètre d'entreprise géré par le Manager/Admin. R.V.B n'utilise pas le stockage hors ligne H.S.H.",
       openHsh: "Ouvrir H.S.H",
     },
-    common: { sharedBadge: "Personnel", save: "Enregistrer", saving: "Enregistrement...", error: "Échec", retry: "Réessayer" },
+    common: { sharedBadge: "Personnel", save: "Enregistrer", saving: "Enregistrement...", error: "Échec", retry: "Réessayer", imageTooLarge: "Image trop volumineuse (2 Mo max)", photoRequired: "Photo requise — impossible de retirer. Choisissez un remplacement.", cannotRemove: "Impossible de retirer la photo après l'intégration — remplacez-la par une nouvelle.", removeFailed: "Échec du retrait", allRequired: "Tous les champs requis", invalidLength: "8–128 caractères", uploadFailed: "Échec d'envoi", failed: "Échec" },
   },
   ar: {
     title: "الإعدادات",
@@ -219,7 +219,7 @@ const TR: Record<Language, any> = {
       sharedNote: "اللغة والمظهر تفضيلات شخصية لـ R.V.B. العملة إعداد شركة يُدار بواسطة المدير/المسؤول. لا يستخدم R.V.B تخزين H.S.H غير المتصل.",
       openHsh: "فتح H.S.H",
     },
-    common: { sharedBadge: "شخصي", save: "حفظ", saving: "جارٍ الحفظ...", error: "فشل", retry: "إعادة" },
+    common: { sharedBadge: "شخصي", save: "حفظ", saving: "جارٍ الحفظ...", error: "فشل", retry: "إعادة", imageTooLarge: "الصورة كبيرة جداً (2MB كحد أقصى)", photoRequired: "الصورة مطلوبة — لا يمكن الإزالة. اختر بديلاً.", cannotRemove: "لا يمكن إزالة الصورة بعد الإعداد — استبدلها بصورة جديدة.", removeFailed: "فشل الإزالة", allRequired: "جميع الحقول مطلوبة", invalidLength: "8–128 حرفاً", uploadFailed: "فشل الرفع", failed: "فشل" },
   },
 };
 
@@ -348,7 +348,7 @@ function SettingsInner() {
         setPending(null);
       }
     } catch (e: any) {
-      alert(e?.code || e?.message || "Failed to save");
+      alert(t.common.error);
     } finally { setConfirmLoading(false); if (pending && !confirmLoading) setPending(null); }
   };
 
@@ -382,14 +382,14 @@ function SettingsInner() {
       setNameMsg(t.account.nameSaved);
       setTimeout(() => setNameMsg(""), 2000);
     } catch (e: any) {
-      setNameMsg(e?.code || "Failed");
+      setNameMsg(t.common.failed);
     } finally { setSavingName(false); }
   };
 
   const handlePfpChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert("Image too large (2MB max)"); return; }
+    if (file.size > 2 * 1024 * 1024) { alert(t.common.imageTooLarge); return; }
     setPfpUploading(true);
     try {
       // Canvas compress to 512 max similar to onboarding for consistency and <200k guidance
@@ -432,14 +432,14 @@ function SettingsInner() {
       const acc = await rvbAuthService.updateProfile({ profilePicture: compressed });
       setUser(acc as any);
     } catch (e: any) {
-      const msg = e?.code === "RVB_PROFILE_PICTURE_REQUIRED" ? "Photo is required — cannot remove. Please choose a replacement." : (e?.message || "Upload failed");
+      const msg = e?.code === "RVB_PROFILE_PICTURE_REQUIRED" ? t.common.photoRequired : t.common.uploadFailed;
       alert(msg);
     } finally { setPfpUploading(false); if (fileRef.current) fileRef.current.value = ""; }
   };
   const handleRemovePfp = async () => {
     // After onboarding, replace photo allowed but not leave without photo - require replacement
     if ((user as any)?.onboardingStatus === "complete") {
-      alert("Cannot remove profile picture after onboarding — please replace it with a new photo.");
+      alert(t.common.cannotRemove);
       return;
     }
     setPfpUploading(true);
@@ -447,14 +447,14 @@ function SettingsInner() {
       const acc = await rvbAuthService.updateProfile({ profilePicture: null as any });
       setUser(acc as any);
     } catch (e: any) {
-      alert(e?.code || e?.message || "Remove failed");
+      alert(t.common.removeFailed);
     } finally { setPfpUploading(false); }
   };
 
   const handleChangePw = async () => {
     setPwError(""); setPwMsg("");
-    if (!currentPw || !newPw || !confirmPw) { setPwError("All fields required"); return; }
-    if (newPw.length < 8 || newPw.length > 128) { setPwError("8–128 characters"); return; }
+    if (!currentPw || !newPw || !confirmPw) { setPwError(t.common.allRequired); return; }
+    if (newPw.length < 8 || newPw.length > 128) { setPwError(t.common.invalidLength); return; }
     setPwLoading(true);
     try {
       await changePassword({ currentPassword: currentPw, newPassword: newPw, confirmPassword: confirmPw });
@@ -462,7 +462,7 @@ function SettingsInner() {
       setCurrentPw(""); setNewPw(""); setConfirmPw("");
       setTimeout(() => setPwMsg(""), 2500);
     } catch (e: any) {
-      setPwError(e?.code || e?.message || "Failed");
+      setPwError(t.common.failed);
     } finally { setPwLoading(false); }
   };
 

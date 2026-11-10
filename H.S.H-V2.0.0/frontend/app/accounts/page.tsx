@@ -32,6 +32,7 @@ import {
 import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { BankAccount } from "../../src/types/entities/bank-account";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 import styles from "./page.module.css";
 import countdownStyles from "../../src/components/common/ProtectedDeleteModal.module.css";
 import { useCircularDeleteCountdown } from "../../src/hooks/useCircularDeleteCountdown";
@@ -126,6 +127,18 @@ const TRANSLATIONS = {
     cashAccounts: "Cash Accounts",
     cashAccountsSub: "Cash type accounts",
     selectType: "Select account type",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    duplicate: "A bank account with this name already exists.",
+    balanceInvalid: "Initial balance must be a valid number >= 0.",
+    invalidAmount: "Amount must be greater than zero.",
+    dateInvalid: "Transfer date is invalid.",
+    editHint: "Only account name is editable per specification.",
+    confirmDeletion: "Confirm deletion",
   },
   fr: {
     title: "Comptes",
@@ -194,6 +207,18 @@ const TRANSLATIONS = {
     cashAccounts: "Comptes Espèces",
     cashAccountsSub: "Type espèces",
     selectType: "Sélectionner le type de compte",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    duplicate: "Un compte portant ce nom existe déjà.",
+    balanceInvalid: "Le solde initial doit être un nombre valide supérieur ou égal à 0.",
+    invalidAmount: "Le montant doit être supérieur à zéro.",
+    dateInvalid: "La date du transfert est invalide.",
+    editHint: "Seul le nom du compte peut être modifié.",
+    confirmDeletion: "Confirmer la suppression",
   },
   ar: {
     title: "الحسابات",
@@ -262,8 +287,38 @@ const TRANSLATIONS = {
     cashAccounts: "حسابات نقدية",
     cashAccountsSub: "حسابات نقدية",
     selectType: "اختر نوع الحساب",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    duplicate: "يوجد حساب بهذا الاسم بالفعل.",
+    balanceInvalid: "يجب أن يكون الرصيد الابتدائي رقماً صالحاً أكبر من أو يساوي 0.",
+    invalidAmount: "يجب أن يكون المبلغ أكبر من الصفر.",
+    dateInvalid: "تاريخ التحويل غير صالح.",
+    editHint: "يمكن تعديل اسم الحساب فقط.",
+    confirmDeletion: "تأكيد الحذف",
   },
 } as const;
+
+const ACCOUNT_ERROR_MAP: Record<string, Record<Language, string>> = {
+  ACCOUNT_DUPLICATE: { en: TRANSLATIONS.en.duplicate, fr: TRANSLATIONS.fr.duplicate, ar: TRANSLATIONS.ar.duplicate },
+  "A bank account with this name already exists.": { en: TRANSLATIONS.en.duplicate, fr: TRANSLATIONS.fr.duplicate, ar: TRANSLATIONS.ar.duplicate },
+  ACCOUNT_BALANCE_INVALID: { en: TRANSLATIONS.en.balanceInvalid, fr: TRANSLATIONS.fr.balanceInvalid, ar: TRANSLATIONS.ar.balanceInvalid },
+  "Initial balance must be a finite number >= 0.": { en: TRANSLATIONS.en.balanceInvalid, fr: TRANSLATIONS.fr.balanceInvalid, ar: TRANSLATIONS.ar.balanceInvalid },
+  "Account name is required.": { en: TRANSLATIONS.en.nameRequired, fr: TRANSLATIONS.fr.nameRequired, ar: TRANSLATIONS.ar.nameRequired },
+  "Transfer amount must be greater than zero.": { en: TRANSLATIONS.en.invalidAmount, fr: TRANSLATIONS.fr.invalidAmount, ar: TRANSLATIONS.ar.invalidAmount },
+  "Transfer amount must be a finite number greater than zero.": { en: TRANSLATIONS.en.invalidAmount, fr: TRANSLATIONS.fr.invalidAmount, ar: TRANSLATIONS.ar.invalidAmount },
+  "Transfer date must be a valid finite timestamp.": { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  "Source and destination accounts must be different.": { en: TRANSLATIONS.en.sameAccount, fr: TRANSLATIONS.fr.sameAccount, ar: TRANSLATIONS.ar.sameAccount },
+  "Insufficient source account balance.": { en: TRANSLATIONS.en.insufficient, fr: TRANSLATIONS.fr.insufficient, ar: TRANSLATIONS.ar.insufficient },
+};
+const ACCOUNT_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 function AccountTypeDropdown({
   value,
@@ -601,7 +656,7 @@ export default function AccountsPage() {
       } else {
         const initial = form.initialBalance.trim() ? Number(form.initialBalance) : 0;
         if (!Number.isFinite(initial) || initial < 0) {
-          setError(t.failedSave);
+          setError(t.balanceInvalid);
           setSaving(false);
           return;
         }
@@ -615,7 +670,7 @@ export default function AccountsPage() {
       await loadAccounts();
       closeForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, ACCOUNT_ERROR_MAP, ACCOUNT_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -636,7 +691,7 @@ export default function AccountsPage() {
       setAccounts((c) => c.filter((a) => a.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, ACCOUNT_ERROR_MAP, ACCOUNT_FALLBACK_TEXT));
     } finally {
       setDeleting(false);
     }
@@ -670,15 +725,14 @@ export default function AccountsPage() {
       setShowTransfer(false);
       setTransferForm({ fromAccountId: "", toAccountId: "", amount: "", date: new Date().toISOString().slice(0, 10), note: "" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, ACCOUNT_ERROR_MAP, ACCOUNT_FALLBACK_TEXT));
     } finally {
       setTransferring(false);
     }
   }
 
   function typeLabel(type: string) {
-    if (language === "ar") return type === "cash" ? "سيولة نقدية" : "حساب بنكي";
-    return type === "cash" ? t.cash : t.bank;
+    return type === "cash" ? t.cashLabel : t.bankLabel;
   }
 
   return (
@@ -741,7 +795,7 @@ export default function AccountsPage() {
               </div>
               <div className={styles.summaryContent}>
                 <span className={styles.summaryLabel}>{t.totalBalance}</span>
-                <strong className={styles.summaryValue} title={formatCurrency(totalBalance, currency)}>{formatCompactCurrency(totalBalance, currency)}{hasInvalidBalance && <span title="Invalid balance value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+                <strong className={styles.summaryValue} title={formatCurrency(totalBalance, currency)}>{formatCompactCurrency(totalBalance, currency)}{hasInvalidBalance && <span title={t.dataIntegrity} style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ {t.dataIntegrity}</span>}</strong>
                 <small className={styles.summarySub}>{t.totalBalanceSub}</small>
               </div>
             </div>
@@ -819,9 +873,9 @@ export default function AccountsPage() {
                         {formatCurrency(a.balance, currency)}
                       </strong>
                     ) : a.balance === undefined || a.balance === null ? (
-                      <span title="No balance" style={{ color: "var(--muted)" }}>—</span>
+                      <span title={t.noBalance} style={{ color: "var(--muted)" }}>—</span>
                     ) : (
-                      <span title={`Invalid balance: ${String(a.balance)}`} style={{ color: "var(--danger)", fontWeight: 700 }}>Invalid</span>
+                      <span title={t.invalidBalance} style={{ color: "var(--danger)", fontWeight: 700 }}>{t.invalidBalance}</span>
                     )}
 
                     <div className={styles.rowActions}>
@@ -845,7 +899,7 @@ export default function AccountsPage() {
               <section className={styles.modal} role="dialog" aria-modal="true">
                 <header className={styles.modalHeader}>
                   <h2>{editingId ? t.editAccountTitle : t.addAccountTitle}</h2>
-                  <button type="button" className={styles.closeButton} onClick={closeForm} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={closeForm} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>
@@ -919,11 +973,7 @@ export default function AccountsPage() {
                     </>
                   ) : (
                     <p className={styles.hint} style={{ gridColumn: "1 / -1" }}>
-                      {language === "ar"
-                        ? "يمكن تعديل اسم الحساب فقط حسب المتطلبات."
-                        : language === "fr"
-                          ? "Seul le nom du compte peut être modifié."
-                          : "Only account name is editable per specification."}
+                      {t.editHint}
                     </p>
                   )}
                 </div>
@@ -947,7 +997,7 @@ export default function AccountsPage() {
               <section className={styles.modal} role="dialog" aria-modal="true">
                 <header className={styles.modalHeader}>
                   <h2>{t.transferTitle}</h2>
-                  <button type="button" className={styles.closeButton} onClick={closeTransfer} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={closeTransfer} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>
@@ -1060,7 +1110,7 @@ export default function AccountsPage() {
                     </span>
                   </div>
                   <span className={countdownStyles.circleLabel}>
-                    {deleteReady ? t.confirmDelete : "Confirm deletion"}
+                    {deleteReady ? t.confirmDelete : t.confirmDeletion}
                   </span>
                 </div>
                 {error && <div className={styles.formError}>{error}</div>}

@@ -15,6 +15,7 @@ import type { LucideIcon } from "lucide-react";
 import dashboardStyles from "../../../app/page.module.css";
 import { navGroupForKey } from "../../lib/navigation";
 import type { NavGroupKey } from "../../lib/navigation";
+import type { Language } from "../../types/settings/settings";
 
 export type ClassicSidebarItem = {
   key: string;
@@ -44,6 +45,8 @@ type ClassicSidebarProps = {
   settingsLabel: string;
   onOpenSettings: () => void;
   bell: React.ReactNode;
+  language?: Language;
+  closeMenuLabel?: string;
 };
 
 // Classic HSH sidebar restored from the last good pre-FloatingNav design:
@@ -72,6 +75,8 @@ export default function ClassicSidebar({
   settingsLabel,
   onOpenSettings,
   bell,
+  language = "en",
+  closeMenuLabel,
 }: ClassicSidebarProps) {
   // Desktop hover/focus expand — ephemeral, never persisted.
   // Desktop sidebar is collapsed unless hovered or keyboard-focused.
@@ -218,6 +223,8 @@ export default function ClassicSidebar({
     );
   }
 
+  const tCloseMenu =
+    closeMenuLabel ?? (language === "fr" ? "Fermer le menu" : language === "ar" ? "إغلاق القائمة" : "Close menu");
   const isManagementActive = managementItems.some(
     (item) => item.key === activeKey,
   );
@@ -230,7 +237,7 @@ export default function ClassicSidebar({
       {drawerOpen && (
         <button
           className={dashboardStyles.overlay}
-          aria-label="Close menu"
+          aria-label={tCloseMenu}
           onClick={onCloseDrawer}
         />
       )}

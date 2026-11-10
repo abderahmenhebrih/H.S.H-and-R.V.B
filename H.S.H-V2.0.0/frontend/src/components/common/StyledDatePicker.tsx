@@ -41,7 +41,61 @@ type Props = {
 
 type CalendarView = "days" | "months" | "years";
 
-const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+type CalendarChrome = {
+  openCalendar: string;
+  prevMonth: string;
+  nextMonth: string;
+  chooseMonthYear: string;
+  prevYear: string;
+  nextYear: string;
+  chooseYear: string;
+  backToMonths: string;
+  selectYear: string;
+  back: string;
+};
+
+const CALENDAR_CHROME: Record<Language, CalendarChrome> = {
+  en: {
+    openCalendar: "Open calendar",
+    prevMonth: "Previous month",
+    nextMonth: "Next month",
+    chooseMonthYear: "Choose month and year",
+    prevYear: "Previous year",
+    nextYear: "Next year",
+    chooseYear: "Choose year",
+    backToMonths: "Back to months",
+    selectYear: "Select year",
+    back: "Back",
+  },
+  fr: {
+    openCalendar: "Ouvrir le calendrier",
+    prevMonth: "Mois précédent",
+    nextMonth: "Mois suivant",
+    chooseMonthYear: "Choisir le mois et l'année",
+    prevYear: "Année précédente",
+    nextYear: "Année suivante",
+    chooseYear: "Choisir l'année",
+    backToMonths: "Retour aux mois",
+    selectYear: "Sélectionner l'année",
+    back: "Retour",
+  },
+  ar: {
+    openCalendar: "فتح التقويم",
+    prevMonth: "الشهر السابق",
+    nextMonth: "الشهر التالي",
+    chooseMonthYear: "اختيار الشهر والسنة",
+    prevYear: "السنة السابقة",
+    nextYear: "السنة التالية",
+    chooseYear: "اختيار السنة",
+    backToMonths: "العودة إلى الأشهر",
+    selectYear: "اختيار السنة",
+    back: "رجوع",
+  },
+};
+
+function localeForDatePicker(language: Language): string {
+  return language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB";
+}
 
 export default function StyledDatePicker({ value, onChange, language = "en", placeholder, ariaLabel, className }: Props) {
   const parsed = useMemo(() => parseISODate(value), [value]);
@@ -221,7 +275,7 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
   }
 
   const monthLabel = useMemo(() => {
-    const locale = language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB";
+    const locale = localeForDatePicker(language);
     try {
       return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", numberingSystem: "latn" } as any).format(viewDate);
     } catch {
@@ -229,10 +283,28 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
     }
   }, [viewDate, language]);
 
+  const monthAbbr = useMemo(() => {
+    const locale = localeForDatePicker(language);
+    const names: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      try {
+        names.push(new Intl.DateTimeFormat(locale, { month: "short", numberingSystem: "latn" } as any).format(new Date(2026, i, 1)));
+      } catch {
+        names.push(new Intl.DateTimeFormat("en-GB", { month: "short" }).format(new Date(2026, i, 1)));
+      }
+    }
+    return names;
+  }, [language]);
+
+  const chrome = CALENDAR_CHROME[language] ?? CALENDAR_CHROME.en;
+  const isRtl = language === "ar";
+  const PrevIcon = isRtl ? ChevronRight : ChevronLeft;
+  const NextIcon = isRtl ? ChevronLeft : ChevronRight;
+
   const weekdayNames = useMemo(() => {
     const names: string[] = [];
     const base = new Date(2026, 0, 5);
-    const locale = language === "ar" ? "ar-DZ-u-nu-latn" : language === "fr" ? "fr-FR" : "en-GB";
+    const locale = localeForDatePicker(language);
     for (let i = 0; i < 7; i++) {
       const d = new Date(base);
       d.setDate(base.getDate() + i);
@@ -299,13 +371,13 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
   const tClear = language === "fr" ? "Effacer" : language === "ar" ? "مسح" : "Clear";
 
   const monthGrid = useMemo(() => {
-    return MONTH_ABBR.map((abbr, idx) => {
+    return monthAbbr.map((abbr, idx) => {
       const isCurrentMonth = today.getMonth() === idx && today.getFullYear() === viewDate.getFullYear();
       const isSelectedMonth = parsed ? parsed.getMonth() === idx && parsed.getFullYear() === viewDate.getFullYear() : false;
       const isViewingMonth = viewDate.getMonth() === idx;
       return { abbr, idx, isCurrentMonth, isSelectedMonth, isViewingMonth };
     });
-  }, [viewDate, today, parsed]);
+  }, [viewDate, today, parsed, monthAbbr]);
 
   const yearRange = useMemo(() => {
     const center = viewDate.getFullYear();
@@ -365,7 +437,7 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
           onClick={() => setOpen((v) => !v)}
           aria-haspopup="dialog"
           aria-expanded={open}
-          aria-label={ariaLabel ? `${ariaLabel} — open calendar` : "Open calendar"}
+          aria-label={ariaLabel ? `${ariaLabel} — ${chrome.openCalendar}` : chrome.openCalendar}
           tabIndex={-1}
         >
           <span className={styles.icon} aria-hidden="true">
@@ -394,46 +466,46 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
               <div className={styles.header}>
                 {viewMode === "days" && (
                   <>
-                    <button type="button" className={styles.navButton} onClick={handlePrev} aria-label="Previous month">
-                      <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+                    <button type="button" className={styles.navButton} onClick={handlePrev} aria-label={chrome.prevMonth}>
+                      <PrevIcon size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       className={styles.monthLabelButton}
                       onClick={() => setViewMode("months")}
-                      aria-label="Choose month and year"
+                      aria-label={chrome.chooseMonthYear}
                     >
                       {monthLabel}
                     </button>
-                    <button type="button" className={styles.navButton} onClick={handleNext} aria-label="Next month">
-                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+                    <button type="button" className={styles.navButton} onClick={handleNext} aria-label={chrome.nextMonth}>
+                      <NextIcon size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                   </>
                 )}
                 {viewMode === "months" && (
                   <>
-                    <button type="button" className={styles.navButton} onClick={handleYearPrev} aria-label="Previous year">
-                      <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+                    <button type="button" className={styles.navButton} onClick={handleYearPrev} aria-label={chrome.prevYear}>
+                      <PrevIcon size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       className={styles.monthLabelButton}
                       onClick={() => setViewMode("years")}
-                      aria-label="Choose year"
+                      aria-label={chrome.chooseYear}
                     >
                       {viewDate.getFullYear()}
                     </button>
-                    <button type="button" className={styles.navButton} onClick={handleYearNext} aria-label="Next year">
-                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+                    <button type="button" className={styles.navButton} onClick={handleYearNext} aria-label={chrome.nextYear}>
+                      <NextIcon size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                   </>
                 )}
                 {viewMode === "years" && (
                   <>
-                    <button type="button" className={styles.navButton} onClick={() => setViewMode("months")} aria-label="Back to months">
-                      <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+                    <button type="button" className={styles.navButton} onClick={() => setViewMode("months")} aria-label={chrome.backToMonths}>
+                      <PrevIcon size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
-                    <span className={styles.monthLabel}>Select year</span>
+                    <span className={styles.monthLabel}>{chrome.selectYear}</span>
                     <button
                       type="button"
                       className={styles.navButton}
@@ -548,7 +620,7 @@ export default function StyledDatePicker({ value, onChange, language = "en", pla
               ) : (
                 <div className={styles.footer} style={{ justifyContent: "center", borderTop: "none", paddingTop: 4, marginTop: 4 }}>
                   <button type="button" className={styles.footerButton} onClick={() => setViewMode("days")}>
-                    Back
+                    {chrome.back}
                   </button>
                 </div>
               )}

@@ -30,6 +30,7 @@ import { useDbSync } from "../../src/hooks/useDbSync";
 import { resolvePlaceholdersInObject } from "../../src/lib/office/placeholder";
 import type { OfficeFile, OfficeFileType } from "../../src/types/entities/office-file";
 import type { Language } from "../../src/types/settings/settings";
+import { GENERIC_ERROR, localizeError } from "../../src/lib/i18n";
 import styles from "./page.module.css";
 
 const ENTITY_TEMPLATES: Record<string, { kind: "customer" | "supplier" | "worker"; label: string }> = {
@@ -99,6 +100,20 @@ const T = {
     untitledDoc: "Untitled Document",
     untitledSheet: "Untitled Spreadsheet",
     copyOf: "Copy of",
+    close: "Close",
+    xlsUnsupported: "xls format not supported — use xlsx",
+    unsupportedType: "unsupported type",
+    selectorCustomer: "Customer",
+    selectorSupplier: "Supplier",
+    selectorWorker: "Worker",
+    placeholderCustomer: "Select Customer",
+    placeholderSupplier: "Select Supplier",
+    placeholderWorker: "Select Worker",
+    emptyCustomer: "Create a Customer first",
+    emptySupplier: "Create a Supplier first",
+    emptyWorker: "Create a Worker first",
+    permanentAction: "PERMANENT ACTION",
+    confirmAvailable: "Confirm available in",
   },
   fr: {
     title: "Espace de travail",
@@ -156,6 +171,20 @@ const T = {
     untitledDoc: "Document sans titre",
     untitledSheet: "Tableur sans titre",
     copyOf: "Copie de",
+    close: "Fermer",
+    xlsUnsupported: "format xls non pris en charge — utilisez xlsx",
+    unsupportedType: "type non pris en charge",
+    selectorCustomer: "Client",
+    selectorSupplier: "Fournisseur",
+    selectorWorker: "Employé",
+    placeholderCustomer: "Choisir client",
+    placeholderSupplier: "Choisir fournisseur",
+    placeholderWorker: "Choisir employé",
+    emptyCustomer: "Créez d'abord un Client",
+    emptySupplier: "Créez d'abord un Fournisseur",
+    emptyWorker: "Créez d'abord un Employé",
+    permanentAction: "ACTION DÉFINITIVE",
+    confirmAvailable: "Confirmation disponible dans",
   },
   ar: {
     title: "مساحة العمل",
@@ -213,6 +242,20 @@ const T = {
     untitledDoc: "مستند بدون عنوان",
     untitledSheet: "جدول بدون عنوان",
     copyOf: "نسخة من",
+    close: "إغلاق",
+    xlsUnsupported: "تنسيق xls غير مدعوم — استخدم xlsx",
+    unsupportedType: "نوع غير مدعوم",
+    selectorCustomer: "الزبون",
+    selectorSupplier: "المورد",
+    selectorWorker: "العامل",
+    placeholderCustomer: "اختر الزبون",
+    placeholderSupplier: "اختر المورد",
+    placeholderWorker: "اختر العامل",
+    emptyCustomer: "أنشئ زبونا أولا",
+    emptySupplier: "أنشئ موردا أولا",
+    emptyWorker: "أنشئ عاملا أولا",
+    permanentAction: "إجراء نهائي",
+    confirmAvailable: "التأكيد متاح بعد",
   },
 } as const;
 
@@ -343,6 +386,9 @@ export default function OfficePage() {
   const [toast, setToast] = useState<string | null>(null);
   const newMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Gates the document lang/dir mirror below (same rationale as settings):
+  // the mirror effect also runs on the initial DEFAULT-state render.
+  const canonicalReadyRef = useRef(false);
   useEffect(()=>{ if(!toast) return; const id=setTimeout(()=>setToast(null), 3000); return ()=>clearTimeout(id); }, [toast]);
 
   // Hydration-safe localized date label (date only, no time).
@@ -362,7 +408,9 @@ export default function OfficePage() {
   useEffect(() => {
     async function loadLang() {
       const s = await settingsService.get();
-      setLanguage(s?.language ?? DEFAULT_SETTINGS.language);
+      const lang = s?.language ?? DEFAULT_SETTINGS.language;
+      setLanguage(lang);
+      canonicalReadyRef.current = true;
     }
     void loadLang();
     const h = () => void loadLang();
@@ -371,6 +419,9 @@ export default function OfficePage() {
   }, []);
 
   useEffect(() => {
+    // Gated on canonical load: writing the DEFAULT language on the initial
+    // render would clobber the pre-paint hint with the wrong direction.
+    if (!canonicalReadyRef.current) return;
     document.documentElement.lang = language;
     document.documentElement.dir = dir;
   }, [language, dir]);
@@ -509,7 +560,7 @@ export default function OfficePage() {
       setTemplateEntities([]);
       await loadFiles();
       router.push(type==="document" ? `/office/document/${created.id}` : `/office/spreadsheet/${created.id}`);
-    } catch (e) { console.error(e); setToast(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { console.warn(e); setToast(localizeError(e, language, undefined, GENERIC_ERROR)); }
     finally { setCreating(false); }
   }
 
@@ -522,22 +573,22 @@ export default function OfficePage() {
       setRenameFile(null);
       setRenameValue("");
       await loadFiles();
-    } catch (e) { console.error(e); setToast(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { console.warn(e); setToast(localizeError(e, language, undefined, GENERIC_ERROR)); }
   }
 
   async function handleDuplicate(f: OfficeFile) {
     try {
       await officeFileService.duplicate(f.id);
       await loadFiles();
-    } catch (e) { console.error(e); setToast(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { console.warn(e); setToast(localizeError(e, language, undefined, GENERIC_ERROR)); }
   }
 
   async function handleArchive(f: OfficeFile, archivedFlag: boolean) {
-    try { await officeFileService.archive(f.id, archivedFlag); await loadFiles(); } catch(e){console.error(e); setToast(e instanceof Error ? e.message : String(e));}
+    try { await officeFileService.archive(f.id, archivedFlag); await loadFiles(); } catch(e){console.warn(e); setToast(localizeError(e, language, undefined, GENERIC_ERROR));}
   }
 
   async function handleFavorite(f: OfficeFile) {
-    try { await officeFileService.toggleFavorite(f.id); await loadFiles(); } catch(e){console.error(e); setToast(e instanceof Error ? e.message : String(e));}
+    try { await officeFileService.toggleFavorite(f.id); await loadFiles(); } catch(e){console.warn(e); setToast(localizeError(e, language, undefined, GENERIC_ERROR));}
   }
 
   async function handleDeleteConfirm() {
@@ -547,7 +598,7 @@ export default function OfficePage() {
       await officeFileService.deletePermanent(deleteFile.id);
       setDeleteFile(null);
       await loadFiles();
-    } catch(e){ console.error(e); setToast(e instanceof Error ? e.message : String(e)); } finally{ setDeleting(false);}
+    } catch(e){ console.warn(e); setToast(localizeError(e, language, undefined, GENERIC_ERROR)); } finally{ setDeleting(false);}
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -617,11 +668,11 @@ export default function OfficePage() {
         await loadFiles();
         router.push(`/office/spreadsheet/${created.id}`);
       } else if (ext==="xls") {
-        setToast(`${file.name}: ${language==="fr"?"format xls non pris en charge — utilisez xlsx": language==="ar"?"تنسيق xls غير مدعوم — استخدم xlsx":"xls format not supported — use xlsx"}`);
+        setToast(`${file.name}: ${t.xlsUnsupported}`);
       } else {
-        setToast(`${file.name}: ${language==="fr"?"type non pris en charge": language==="ar"?"نوع غير مدعوم":"unsupported type"}`);
+        setToast(`${file.name}: ${t.unsupportedType}`);
       }
-    } catch(err){ console.error(err); setToast(String(err)); }
+    } catch(err){ console.warn(err); setToast(localizeError(err, language, undefined, GENERIC_ERROR)); }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -737,15 +788,15 @@ export default function OfficePage() {
           const isEmpty = needsSelector && templateEntities.length === 0;
           const missingSelection = needsSelector && !isEmpty && !selectedEntityId;
           const createDisabled = creating || (needsSelector && (isEmpty || !selectedEntityId));
-          const selectorLabel = requiredKind === "customer" ? (language==="fr"?"Client": language==="ar"?"الزبون":"Customer") : requiredKind==="supplier" ? (language==="fr"?"Fournisseur": language==="ar"?"المورد":"Supplier") : requiredKind==="worker" ? (language==="fr"?"Employé": language==="ar"?"العامل":"Worker") : "";
-          const placeholderSel = language==="fr" ? `Choisir ${selectorLabel.toLowerCase()}` : language==="ar" ? `اختر ${selectorLabel}` : `Select ${selectorLabel}`;
-          const emptyMsg = requiredKind==="customer" ? (language==="fr"?"Créez d'abord un Client": language==="ar"?"أنشئ زبونا أولا":"Create a Customer first") : requiredKind==="supplier" ? (language==="fr"?"Créez d'abord un Fournisseur": language==="ar"?"أنشئ موردا أولا":"Create a Supplier first") : (language==="fr"?"Créez d'abord un Employé": language==="ar"?"أنشئ عاملا أولا":"Create a Worker first");
+          const selectorLabel = requiredKind === "customer" ? t.selectorCustomer : requiredKind==="supplier" ? t.selectorSupplier : requiredKind==="worker" ? t.selectorWorker : "";
+          const placeholderSel = requiredKind === "customer" ? t.placeholderCustomer : requiredKind==="supplier" ? t.placeholderSupplier : t.placeholderWorker;
+          const emptyMsg = requiredKind==="customer" ? t.emptyCustomer : requiredKind==="supplier" ? t.emptySupplier : t.emptyWorker;
           return (
           <div className={styles.modalBackdrop} onClick={()=>{ setShowCreate(null); setSelectedEntityId(null); }} role="presentation">
             <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()}>
               <div className={styles.modalHeader}>
                 <h2>{showCreate==="document"? t.newDoc : t.newSheet}</h2>
-                <button type="button" className={styles.iconBtn} onClick={()=>{ setShowCreate(null); setSelectedEntityId(null); }} aria-label={(t as any).close ?? "Close"}><Plus size={16} strokeWidth={2} style={{ transform:"rotate(45deg)"}} aria-hidden="true" /></button>
+                <button type="button" className={styles.iconBtn} onClick={()=>{ setShowCreate(null); setSelectedEntityId(null); }} aria-label={t.close}><Plus size={16} strokeWidth={2} style={{ transform:"rotate(45deg)"}} aria-hidden="true" /></button>
               </div>
               <label><span style={{ fontSize:11, fontWeight:700, color:"var(--muted)" }}>{t.titleLabel}</span><input value={createTitle} onChange={(e)=>setCreateTitle(e.target.value)} placeholder={showCreate==="document"? t.untitledDoc : t.untitledSheet} autoFocus /></label>
               {createTemplateId && <small style={{ fontSize:11, color:"var(--muted)" }}>Template: {createTemplateId}</small>}
@@ -768,7 +819,7 @@ export default function OfficePage() {
         {renameFile && (
           <div className={styles.modalBackdrop} onClick={()=>setRenameFile(null)} role="presentation">
             <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()}>
-              <div className={styles.modalHeader}><h2>{t.renameTitle}</h2><button type="button" className={styles.iconBtn} onClick={()=>setRenameFile(null)} aria-label={(t as any).close ?? "Close"}><Plus size={16} strokeWidth={2} style={{ transform:"rotate(45deg)"}} aria-hidden="true" /></button></div>
+              <div className={styles.modalHeader}><h2>{t.renameTitle}</h2><button type="button" className={styles.iconBtn} onClick={()=>setRenameFile(null)} aria-label={t.close}><Plus size={16} strokeWidth={2} style={{ transform:"rotate(45deg)"}} aria-hidden="true" /></button></div>
               <input value={renameValue} onChange={(e)=>setRenameValue(e.target.value)} onKeyDown={(e)=>{ if(e.key==="Enter") handleRename(); }} autoFocus />
               <div className={styles.modalActions}>
                 <button type="button" className={styles.secondaryBtn} onClick={()=>setRenameFile(null)}>{t.cancel}</button>
@@ -785,8 +836,9 @@ export default function OfficePage() {
           description={t.deleteDesc}
           confirmLabel={t.delete}
           cancelLabel={t.cancel}
-          eyebrowLabel={language==="fr"?"ACTION DÉFINITIVE": language==="ar"?"إجراء نهائي":"PERMANENT ACTION"}
-          countdownWaitingLabel={language==="fr"?"Confirmation disponible dans": language==="ar"?"التأكيد متاح بعد":"Confirm available in"}
+          eyebrowLabel={t.permanentAction}
+          countdownWaitingLabel={t.confirmAvailable}
+          language={language}
           onCancel={()=>setDeleteFile(null)}
           onConfirm={handleDeleteConfirm}
           isDeleting={deleting}

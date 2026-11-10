@@ -37,7 +37,12 @@ const TR: Record<Language, any> = {
     loadMore: "Load more",
     retry: "Retry",
     errorLoad: "Failed to load directory",
+    totalSuffix: "total",
+    dmFailed: "DM failed",
     self: "You",
+    clear: "Clear",
+    roleFilters: "Role filters",
+    close: "Close",
     roleLabels: {
       manager: "Manager",
       supervisor: "Supervisor",
@@ -70,7 +75,12 @@ const TR: Record<Language, any> = {
     loadMore: "Charger plus",
     retry: "Réessayer",
     errorLoad: "Échec du chargement",
+    totalSuffix: "total",
+    dmFailed: "Échec DM",
     self: "Vous",
+    clear: "Effacer",
+    roleFilters: "Filtres par rôle",
+    close: "Fermer",
     roleLabels: {
       manager: "Manager",
       supervisor: "Superviseur",
@@ -103,7 +113,12 @@ const TR: Record<Language, any> = {
     loadMore: "تحميل المزيد",
     retry: "إعادة",
     errorLoad: "فشل التحميل",
+    totalSuffix: "الإجمالي",
+    dmFailed: "فشلت الرسالة",
     self: "أنت",
+    clear: "مسح",
+    roleFilters: "مرشحات الدور",
+    close: "إغلاق",
     roleLabels: {
       manager: "مدير",
       supervisor: "مشرف",
@@ -213,7 +228,7 @@ function DirectoryInner() {
       const conv = await chatService.createDM(targetId);
       router.push(`/rvb/chats?category=secondary&conversation=${encodeURIComponent(conv.id)}` as any);
     } catch (e: any) {
-      alert(e?.data?.code || e?.message || "DM failed");
+      alert(t.dmFailed);
     } finally { setMsgLoading(null); }
   };
 
@@ -267,11 +282,11 @@ function DirectoryInner() {
         <div className={styles.searchBar}>
           <Search size={20} strokeWidth={2} aria-hidden="true" className={styles.searchIcon} />
           <input className={styles.searchInput} type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} />
-          {search && <button className={styles.clearButton} onClick={() => setSearch("")} aria-label="Clear"><X size={14} /></button>}
+          {search && <button className={styles.clearButton} onClick={() => setSearch("")} aria-label={t.clear}><X size={14} /></button>}
         </div>
       </div>
 
-      <div className={styles.tabBar} role="tablist" aria-label="Role filters">
+      <div className={styles.tabBar} role="tablist" aria-label={t.roleFilters}>
         {ROLE_FILTERS.map((f) => (
           <button key={f.key} role="tab" aria-selected={role === f.key} className={`${styles.tab} ${role === f.key ? styles.tabActive : ""}`} onClick={() => handleSearchRole(f.key)}>
             {(t as any)[f.labelKey]}
@@ -296,7 +311,7 @@ function DirectoryInner() {
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}><User size={28} /></div>
             <strong>{emptyText}</strong>
-            <small style={{ color: "var(--muted)" }}>{total === 0 ? "" : `${total} total`}</small>
+            <small style={{ color: "var(--muted)" }}>{total === 0 ? "" : `${total} ${t.totalSuffix}`}</small>
           </div>
         ) : (
           <>
@@ -317,7 +332,7 @@ function DirectoryInner() {
                     </div>
                     <div className={styles.actions}>
                       {!isSelf && (
-                        <button className={styles.messageButton} onClick={(e) => { e.stopPropagation(); void handleMessage(acc.id); }} disabled={!!msgLoading} aria-label={`Message ${acc.displayName}`}>
+                        <button className={styles.messageButton} onClick={(e) => { e.stopPropagation(); void handleMessage(acc.id); }} disabled={!!msgLoading} aria-label={`${t.message} ${acc.displayName}`} title={`${t.message} ${acc.displayName}`}>
                           <MessageSquare size={14} /> {msgLoading === acc.id ? "…" : t.message}
                         </button>
                       )}
@@ -353,7 +368,7 @@ function DirectoryInner() {
           <section className={styles.drawer} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} dir={isRtl ? "rtl" : "ltr"}>
             <div className={styles.drawerHeader}>
               <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{t.profile}</h3>
-              <button className={styles.iconButton} onClick={() => setProfile(null)} aria-label="Close"><X size={16} /></button>
+              <button className={styles.iconButton} onClick={() => setProfile(null)} aria-label={t.close}><X size={16} /></button>
             </div>
             <div className={styles.drawerBody}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center", padding: "8px 0 12px" }}>

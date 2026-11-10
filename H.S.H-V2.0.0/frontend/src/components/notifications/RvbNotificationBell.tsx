@@ -6,20 +6,8 @@ import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { rvbNotificationService } from "../../services/rvb-notification.service";
 import type { Notification } from "../../types/entities/notification";
+import { formatRelativeTime } from "../../lib/notification-presentation";
 import styles from "./NotificationBell.module.css";
-
-function formatRelativeTime(createdAt: number, language: string): string {
-  const now = Date.now();
-  const diff = now - createdAt;
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return language === "ar" ? "الآن" : language === "fr" ? "À l'instant" : "Just now";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return language === "ar" ? `منذ ${min} د` : language === "fr" ? `il y a ${min} min` : `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return language === "ar" ? `منذ ${hr} س` : language === "fr" ? `il y a ${hr} h` : `${hr} h ago`;
-  const days = Math.floor(hr / 24);
-  return language === "ar" ? `منذ ${days} يوم` : language === "fr" ? `il y a ${days} j` : `${days} d ago`;
-}
 
 const typeIcons: Record<string, string> = {
   customer_order: "🛒",

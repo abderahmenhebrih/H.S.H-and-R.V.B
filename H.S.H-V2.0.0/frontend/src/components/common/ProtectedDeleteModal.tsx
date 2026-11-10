@@ -3,6 +3,7 @@
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { useCircularDeleteCountdown } from "../../hooks/useCircularDeleteCountdown";
 import styles from "./ProtectedDeleteModal.module.css";
+import type { Language } from "../../types/settings/settings";
 
 type Props = {
   isOpen: boolean;
@@ -16,10 +17,16 @@ type Props = {
   isDeleting?: boolean;
   eyebrowLabel?: string;
   countdownWaitingLabel?: string;
+  /** Optional UI language for built-in English/French/Arabic defaults. */
+  language?: Language | string;
   onCancel: () => void;
   onConfirm: () => void;
   resetKey?: string | null;
 };
+
+function resolveLang(language: Language | string | undefined): Language {
+  return language === "ar" || language === "fr" || language === "en" ? language : "en";
+}
 
 export default function ProtectedDeleteModal({
   isOpen,
@@ -28,10 +35,11 @@ export default function ProtectedDeleteModal({
   description,
   warning,
   confirmLabel,
-  cancelLabel = "Cancel",
-  deletingLabel = "Deleting...",
-  eyebrowLabel = "PERMANENT ACTION",
-  countdownWaitingLabel = "Confirm deletion",
+  cancelLabel,
+  deletingLabel,
+  eyebrowLabel,
+  countdownWaitingLabel,
+  language = "en",
   isDeleting = false,
   onCancel,
   onConfirm,
@@ -43,6 +51,17 @@ export default function ProtectedDeleteModal({
   );
 
   if (!isOpen) return null;
+
+  const lang = resolveLang(language);
+  const resolvedCancelLabel =
+    cancelLabel ?? (lang === "fr" ? "Annuler" : lang === "ar" ? "إلغاء" : "Cancel");
+  const resolvedDeletingLabel =
+    deletingLabel ?? (lang === "fr" ? "Suppression..." : lang === "ar" ? "جارٍ الحذف..." : "Deleting...");
+  const resolvedEyebrow =
+    eyebrowLabel ?? (lang === "fr" ? "ACTION PERMANENTE" : lang === "ar" ? "إجراء دائم" : "PERMANENT ACTION");
+  const resolvedCountdownWaiting =
+    countdownWaitingLabel ??
+    (lang === "fr" ? "Confirmer la suppression" : lang === "ar" ? "تأكيد الحذف" : "Confirm deletion");
 
   const CIRCLE_R = 28;
   const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_R;
@@ -78,7 +97,7 @@ export default function ProtectedDeleteModal({
           <AlertTriangle size={20} strokeWidth={2} />
         </div>
 
-        <span className={styles.eyebrow}>{eyebrowLabel}</span>
+        <span className={styles.eyebrow}>{resolvedEyebrow}</span>
 
         <h2 id="protected-delete-title" className={styles.title}>
           {title}
@@ -119,7 +138,7 @@ export default function ProtectedDeleteModal({
             </span>
           </div>
           <span className={styles.circleLabel}>
-            {isReady ? confirmLabel : countdownWaitingLabel}
+            {isReady ? confirmLabel : resolvedCountdownWaiting}
           </span>
         </div>
 
@@ -130,7 +149,7 @@ export default function ProtectedDeleteModal({
             onClick={handleCancel}
             disabled={isDeleting}
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             type="button"
@@ -139,7 +158,7 @@ export default function ProtectedDeleteModal({
             disabled={!isReady || isDeleting}
           >
             <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
-            {isDeleting ? deletingLabel : confirmLabel}
+            {isDeleting ? resolvedDeletingLabel : confirmLabel}
           </button>
         </div>
       </section>

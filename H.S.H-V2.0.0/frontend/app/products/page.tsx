@@ -33,6 +33,7 @@ import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "..
 
 import type { Product } from "../../src/types/entities/product";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 
 import styles from "./page.module.css";
 
@@ -127,6 +128,12 @@ const TRANSLATIONS = {
     of: "of",
     paginationPrev: "Previous",
     paginationNext: "Next",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    confirmDeletion: "Confirm deletion",
   },
 
   fr: {
@@ -203,6 +210,12 @@ const TRANSLATIONS = {
     of: "sur",
     paginationPrev: "Précédent",
     paginationNext: "Suivant",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    confirmDeletion: "Confirmer la suppression",
   },
 
   ar: {
@@ -279,8 +292,28 @@ const TRANSLATIONS = {
     of: "من",
     paginationPrev: "السابق",
     paginationNext: "التالي",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    confirmDeletion: "تأكيد الحذف",
   },
 } as const;
+
+const PRODUCT_ERROR_MAP: Record<string, Record<Language, string>> = {
+  "Product name is required.": { en: TRANSLATIONS.en.nameRequired, fr: TRANSLATIONS.fr.nameRequired, ar: TRANSLATIONS.ar.nameRequired },
+  "Product price must be a finite number >= 0.": { en: TRANSLATIONS.en.invalidPrice, fr: TRANSLATIONS.fr.invalidPrice, ar: TRANSLATIONS.ar.invalidPrice },
+  "Product quantity must be a finite integer >= 0.": { en: TRANSLATIONS.en.invalidQuantity, fr: TRANSLATIONS.fr.invalidQuantity, ar: TRANSLATIONS.ar.invalidQuantity },
+  "Product weight must be a finite number >= 0.": { en: TRANSLATIONS.en.invalidWeight, fr: TRANSLATIONS.fr.invalidWeight, ar: TRANSLATIONS.ar.invalidWeight },
+  "A product with this name already exists.": { en: TRANSLATIONS.en.duplicate, fr: TRANSLATIONS.fr.duplicate, ar: TRANSLATIONS.ar.duplicate },
+  "Product not found.": { en: TRANSLATIONS.en.productNotFound, fr: TRANSLATIONS.fr.productNotFound, ar: TRANSLATIONS.ar.productNotFound },
+};
+const PRODUCT_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -487,11 +520,7 @@ export default function ProductsPage() {
       const message =
         err instanceof Error ? err.message : "";
 
-      setError(
-        message.includes("already exists")
-          ? t.duplicate
-          : message || t.failedLoad,
-      );
+      setError(localizeError(err, language, PRODUCT_ERROR_MAP, PRODUCT_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -520,11 +549,7 @@ export default function ProductsPage() {
 
       setDeleteTarget(null);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t.failedLoad,
-      );
+      setError(localizeError(err, language, PRODUCT_ERROR_MAP, PRODUCT_FALLBACK_TEXT));
     } finally {
       setDeleting(false);
     }
@@ -996,7 +1021,7 @@ export default function ProductsPage() {
                   </span>
                 </div>
                 <span className={countdownStyles.circleLabel}>
-                  {deleteReady ? t.confirmDelete : "Confirm deletion"}
+                  {deleteReady ? t.confirmDelete : t.confirmDeletion}
                 </span>
               </div>
 

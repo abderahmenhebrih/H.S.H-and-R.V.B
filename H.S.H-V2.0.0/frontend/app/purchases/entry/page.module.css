@@ -21,7 +21,7 @@
   position: fixed !important;
   top: 0;
   bottom: 0;
-  left: 0;
+  inset-inline-start: 0;
   width: 280px !important;
   max-width: 84vw;
   height: 100vh;
@@ -216,10 +216,8 @@
   border-color: var(--accent);
 }
 
-/* RTL - drawer on right */
+/* RTL - drawer slides from the inline-end side */
 html[dir="rtl"] .drawerSidebar {
-  left: auto !important;
-  right: 0 !important;
   transform: translateX(100%) !important;
 }
 html[dir="rtl"] .drawerSidebarOpen {
@@ -1231,12 +1229,7 @@ html[dir="rtl"] .drawerSidebarOpen {
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  margin-right: auto;
-}
-
-html[dir="rtl"] .selectionCount {
-  margin-right: 0;
-  margin-left: auto;
+  margin-inline-end: auto;
 }
 
 .modalFooter {
@@ -1252,12 +1245,7 @@ html[dir="rtl"] .selectionCount {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
-}
-
-html[dir="rtl"] .modalFooterActions {
-  margin-left: 0;
-  margin-right: auto;
+  margin-inline-start: auto;
 }
 
 .formError {

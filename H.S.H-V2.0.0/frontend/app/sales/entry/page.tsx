@@ -52,6 +52,7 @@ import { CANONICAL_NAVIGATION, type NavKey } from "../../../src/lib/navigation";
 import type { Product } from "../../../src/types/entities/product";
 import type { Customer } from "../../../src/types/entities/customer";
 import type { Currency, Language } from "../../../src/types/settings/settings";
+import { localizeError } from "../../../src/lib/i18n";
 
 type SaleRow = {
   customerId: string;
@@ -135,6 +136,22 @@ const TRANSLATIONS = {
     noProducts: "No products available.",
     selected: "selected",
     kg: "kg",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    removeProduct: "Remove",
+    loading: "Loading...",
+    alreadyAdded: "Already added",
+    insufficientStock: "Insufficient stock. Check quantity or weight availability.",
+    priceOverrideHint: "Price can be overridden for this sale only — global product price stays unchanged.",
+    customerNotFound: "Customer not found.",
+    invoiceNumberRequired: "Supplier invoice number is required.",
+    dateInvalid: "Invoice date is invalid.",
+    currencyInvalid: "Invoice currency is invalid.",
+    duplicateInvoice: "An invoice with this number already exists for this supplier.",
+    productNotFound: "Product not found.",
   },
   fr: {
     backToSales: "Retour aux ventes",
@@ -172,6 +189,22 @@ const TRANSLATIONS = {
     noProducts: "Aucun produit disponible.",
     selected: "sélectionné(s)",
     kg: "kg",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    removeProduct: "Supprimer",
+    loading: "Chargement...",
+    alreadyAdded: "Déjà ajouté",
+    insufficientStock: "Stock insuffisant. Vérifiez la quantité ou le poids disponible.",
+    priceOverrideHint: "Le prix peut être remplacé pour cette vente uniquement — le prix global du produit reste inchangé.",
+    customerNotFound: "Client introuvable.",
+    invoiceNumberRequired: "Le numéro de facture du fournisseur est obligatoire.",
+    dateInvalid: "La date de la facture est invalide.",
+    currencyInvalid: "La devise de la facture est invalide.",
+    duplicateInvoice: "Une facture portant ce numéro existe déjà pour ce fournisseur.",
+    productNotFound: "Produit introuvable.",
   },
   ar: {
     backToSales: "العودة إلى المبيعات",
@@ -209,8 +242,48 @@ const TRANSLATIONS = {
     noProducts: "لا توجد سلع متاحة.",
     selected: "محدد",
     kg: "كغ",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    removeProduct: "إزالة",
+    loading: "جارٍ التحميل...",
+    alreadyAdded: "تمت إضافته مسبقاً",
+    insufficientStock: "المخزون غير كافٍ. تحقق من الكمية أو الوزن المتاح.",
+    priceOverrideHint: "يمكن تجاوز سعر البيع لهذه العملية فقط — لا يتغير السعر العام للمنتج.",
+    customerNotFound: "العميل غير موجود.",
+    invoiceNumberRequired: "رقم فاتورة المورد مطلوب.",
+    dateInvalid: "تاريخ الفاتورة غير صالح.",
+    currencyInvalid: "عملة الفاتورة غير صالحة.",
+    duplicateInvoice: "توجد فاتورة بهذا الرقم بالفعل لهذا المورد.",
+    productNotFound: "المنتج غير موجود.",
   },
 } as const;
+
+const SALE_ENTRY_ERROR_MAP: Record<string, Record<Language, string>> = {
+  SUPPLIER_NOT_FOUND: { en: TRANSLATIONS.en.customerNotFound, fr: TRANSLATIONS.fr.customerNotFound, ar: TRANSLATIONS.ar.customerNotFound },
+  SUPPLIER_INVOICE_NUMBER_REQUIRED: { en: TRANSLATIONS.en.invoiceNumberRequired, fr: TRANSLATIONS.fr.invoiceNumberRequired, ar: TRANSLATIONS.ar.invoiceNumberRequired },
+  INVOICE_DATE_INVALID: { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  INVOICE_CURRENCY_INVALID: { en: TRANSLATIONS.en.currencyInvalid, fr: TRANSLATIONS.fr.currencyInvalid, ar: TRANSLATIONS.ar.currencyInvalid },
+  INCOMING_AMOUNT_INVALID: { en: TRANSLATIONS.en.invalidNumber, fr: TRANSLATIONS.fr.invalidNumber, ar: TRANSLATIONS.ar.invalidNumber },
+  INCOMING_INVOICE_DUPLICATE: { en: TRANSLATIONS.en.duplicateInvoice, fr: TRANSLATIONS.fr.duplicateInvoice, ar: TRANSLATIONS.ar.duplicateInvoice },
+  "Customer not found.": { en: TRANSLATIONS.en.customerNotFound, fr: TRANSLATIONS.fr.customerNotFound, ar: TRANSLATIONS.ar.customerNotFound },
+  "A sale must contain at least one item.": { en: TRANSLATIONS.en.invalidRows, fr: TRANSLATIONS.fr.invalidRows, ar: TRANSLATIONS.ar.invalidRows },
+  "Sale total must be a finite number >= 0.": { en: TRANSLATIONS.en.invalidNumber, fr: TRANSLATIONS.fr.invalidNumber, ar: TRANSLATIONS.ar.invalidNumber },
+  "Sale date must be a valid finite timestamp.": { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  "Sale total mismatch": { en: TRANSLATIONS.en.invalidNumber, fr: TRANSLATIONS.fr.invalidNumber, ar: TRANSLATIONS.ar.invalidNumber },
+  "Product not found": { en: TRANSLATIONS.en.productNotFound, fr: TRANSLATIONS.fr.productNotFound, ar: TRANSLATIONS.ar.productNotFound },
+  "Original product not found": { en: TRANSLATIONS.en.productNotFound, fr: TRANSLATIONS.fr.productNotFound, ar: TRANSLATIONS.ar.productNotFound },
+  "Invalid item": { en: TRANSLATIONS.en.invalidRows, fr: TRANSLATIONS.fr.invalidRows, ar: TRANSLATIONS.ar.invalidRows },
+  "Item total mismatch": { en: TRANSLATIONS.en.invalidRows, fr: TRANSLATIONS.fr.invalidRows, ar: TRANSLATIONS.ar.invalidRows },
+  "Insufficient": { en: TRANSLATIONS.en.insufficientStock, fr: TRANSLATIONS.fr.insufficientStock, ar: TRANSLATIONS.ar.insufficientStock },
+};
+const SALE_ENTRY_ERROR_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 // Shell translations for drawer navigation — labels derived from AppShell but nav structure from canonical
 const SHELL_TRANSLATIONS = {
@@ -238,6 +311,12 @@ const SHELL_TRANSLATIONS = {
     onlineAccess: "Access RVB",
     database: "Local database ready",
     ready: "Ready",
+    closeMenu: "Close menu",
+    openMenu: "Open menu",
+    toggleTheme: "Toggle theme",
+    settingsLabel: "Settings",
+    lightMode: "Switch to light mode",
+    darkMode: "Switch to dark mode",
   },
   fr: {
     nav: {
@@ -263,6 +342,12 @@ const SHELL_TRANSLATIONS = {
     onlineAccess: "Accéder à RVB",
     database: "Base de données locale prête",
     ready: "Prêt",
+    closeMenu: "Fermer le menu",
+    openMenu: "Ouvrir le menu",
+    toggleTheme: "Basculer le thème",
+    settingsLabel: "Paramètres",
+    lightMode: "Passer en mode clair",
+    darkMode: "Passer en mode sombre",
   },
   ar: {
     nav: {
@@ -288,6 +373,12 @@ const SHELL_TRANSLATIONS = {
     onlineAccess: "الدخول إلى RVB",
     database: "قاعدة البيانات المحلية جاهزة",
     ready: "جاهز",
+    closeMenu: "إغلاق القائمة",
+    openMenu: "فتح القائمة",
+    toggleTheme: "تبديل المظهر",
+    settingsLabel: "الإعدادات",
+    lightMode: "التبديل إلى الوضع الفاتح",
+    darkMode: "التبديل إلى الوضع الداكن",
   },
 } as const;
 
@@ -655,18 +746,7 @@ export default function SaleEntryPage() {
       } catch {}
       router.push("/sales");
     } catch (err) {
-      const message = err instanceof Error ? err.message : t.failedSave;
-      if (message.includes("Insufficient")) {
-        setError(
-          language === "fr"
-            ? "Stock insuffisant. Vérifiez la quantité ou le poids disponible."
-            : language === "ar"
-              ? "المخزون غير كافٍ. تحقق من الكمية أو الوزن المتاح."
-              : "Insufficient stock. Check quantity or weight availability."
-        );
-      } else {
-        setError(message);
-      }
+      setError(localizeError(err, language, SALE_ENTRY_ERROR_MAP, SALE_ENTRY_ERROR_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -735,7 +815,7 @@ export default function SaleEntryPage() {
       {sidebarOpen && (
         <button
           className={styles.drawerOverlay}
-          aria-label="Close menu"
+          aria-label={shellT.closeMenu}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -794,7 +874,7 @@ export default function SaleEntryPage() {
             type="button"
             className={styles.hamburgerButton}
             onClick={() => setSidebarOpen((o) => !o)}
-            aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+            aria-label={sidebarOpen ? shellT.closeMenu : shellT.openMenu}
           >
             <Menu size={18} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -808,8 +888,8 @@ export default function SaleEntryPage() {
             type="button"
             className={styles.headerIconButton}
             onClick={toggleTheme}
-            aria-label="Toggle theme"
-            title={dark ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={shellT.toggleTheme}
+            title={dark ? shellT.lightMode : shellT.darkMode}
           >
             {dark ? <Sun size={18} strokeWidth={2} aria-hidden="true" /> : <Moon size={18} strokeWidth={2} aria-hidden="true" />}
           </button>
@@ -817,8 +897,8 @@ export default function SaleEntryPage() {
             type="button"
             className={styles.headerIconButton}
             onClick={() => router.push("/settings")}
-            aria-label="Settings"
-            title="Settings"
+            aria-label={shellT.settingsLabel}
+            title={shellT.settingsLabel}
           >
             <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -862,7 +942,7 @@ export default function SaleEntryPage() {
                 {loadingMeta ? (
                   <div className={styles.emptyTableState}>
                     <div className={styles.loadingPulse} />
-                    <strong>{language === "fr" ? "Chargement..." : language === "ar" ? "جارٍ التحميل..." : "Loading..."}</strong>
+                    <strong>{t.loading}</strong>
                   </div>
                 ) : rows.length === 0 ? (
                   <div className={styles.emptyTableState}>
@@ -990,7 +1070,7 @@ export default function SaleEntryPage() {
                           type="button"
                           className={styles.iconAction}
                           onClick={() => removeRow(index)}
-                          aria-label={`Remove ${productName(row.productId)}`}
+                          aria-label={`${t.removeProduct} ${productName(row.productId)}`}
                         >
                           <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
                         </button>
@@ -1015,11 +1095,7 @@ export default function SaleEntryPage() {
               lineHeight: 1.5,
             }}
           >
-            {language === "ar"
-              ? "يمكن تجاوز سعر البيع لهذه العملية فقط — لا يتغير السعر العام للمنتج."
-              : language === "fr"
-                ? "Le prix peut être remplacé pour cette vente uniquement — le prix global du produit reste inchangé."
-                : "Price can be overridden for this sale only — global product price stays unchanged."}
+            {t.priceOverrideHint}
           </p>
 
           <footer className={styles.pageActions}>
@@ -1067,7 +1143,7 @@ export default function SaleEntryPage() {
                       }}
                       aria-pressed={selected}
                       disabled={alreadyAdded}
-                      title={alreadyAdded ? (language === "ar" ? "تمت إضافته مسبقاً" : language === "fr" ? "Déjà ajouté" : "Already added") : undefined}
+                      title={alreadyAdded ? t.alreadyAdded : undefined}
                     >
                       <span className={`${styles.customCheckbox} ${selected ? styles.customCheckboxSelected : ""}`} aria-hidden="true">
                         {selected ? <Check size={12} strokeWidth={2.5} /> : null}

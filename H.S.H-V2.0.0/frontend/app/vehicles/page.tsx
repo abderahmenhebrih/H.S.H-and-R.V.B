@@ -28,6 +28,7 @@ import { DEFAULT_SETTINGS, formatCurrency, SETTINGS_EVENT } from "../../src/lib/
 import { exactNumberLabel, formatCompactCurrency, formatCompactNumber } from "../../src/lib/compact-number";
 import type { Vehicle } from "../../src/types/entities/vehicle";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 import type { Expense } from "../../src/types/entities/expense";
 import styles from "./page.module.css";
 
@@ -108,6 +109,21 @@ const TRANSLATIONS = {
     vehicleTypesSub: "Defined types",
     typesInUse: "Types in Use",
     typesInUseSub: "Active categories",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    nameRequired: "Vehicle name is required.",
+    plateRequired: "Registration number is required.",
+    typeRequired: "Vehicle type is required.",
+    duplicate: "A vehicle with this name already exists.",
+    duplicatePlate: "A vehicle with this registration number already exists.",
+    selectedImage: "Selected image",
+    existingImage: "Existing image",
+    noImage: "No image selected",
+    confirmDeletion: "Confirm deletion",
   },
   fr: {
     title: "Véhicules",
@@ -167,6 +183,21 @@ const TRANSLATIONS = {
     vehicleTypesSub: "Types définis",
     typesInUse: "Types Utilisés",
     typesInUseSub: "Catégories actives",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    nameRequired: "Le nom du véhicule est obligatoire.",
+    plateRequired: "Le numéro d'immatriculation est obligatoire.",
+    typeRequired: "Le type de véhicule est obligatoire.",
+    duplicate: "Un véhicule portant ce nom existe déjà.",
+    duplicatePlate: "Un véhicule portant ce numéro d'immatriculation existe déjà.",
+    selectedImage: "Image sélectionnée",
+    existingImage: "Image existante",
+    noImage: "Aucune image sélectionnée",
+    confirmDeletion: "Confirmer la suppression",
   },
   ar: {
     title: "المركبات",
@@ -226,8 +257,37 @@ const TRANSLATIONS = {
     vehicleTypesSub: "أنواع محددة",
     typesInUse: "الأنواع المستخدمة",
     typesInUseSub: "فئات نشطة",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    nameRequired: "اسم المركبة مطلوب.",
+    plateRequired: "رقم اللوحة مطلوب.",
+    typeRequired: "نوع المركبة مطلوب.",
+    duplicate: "توجد مركبة بهذا الاسم بالفعل.",
+    duplicatePlate: "توجد مركبة برقم اللوحة هذا بالفعل.",
+    selectedImage: "الصورة المحددة",
+    existingImage: "الصورة الحالية",
+    noImage: "لم يتم اختيار صورة",
+    confirmDeletion: "تأكيد الحذف",
   },
 } as const;
+
+const VEHICLE_ERROR_MAP: Record<string, Record<Language, string>> = {
+  "Vehicle name is required.": { en: TRANSLATIONS.en.nameRequired, fr: TRANSLATIONS.fr.nameRequired, ar: TRANSLATIONS.ar.nameRequired },
+  "Registration number is required.": { en: TRANSLATIONS.en.plateRequired, fr: TRANSLATIONS.fr.plateRequired, ar: TRANSLATIONS.ar.plateRequired },
+  "Vehicle registration number is required.": { en: TRANSLATIONS.en.plateRequired, fr: TRANSLATIONS.fr.plateRequired, ar: TRANSLATIONS.ar.plateRequired },
+  "Vehicle type is required.": { en: TRANSLATIONS.en.typeRequired, fr: TRANSLATIONS.fr.typeRequired, ar: TRANSLATIONS.ar.typeRequired },
+  "A vehicle with this name already exists.": { en: TRANSLATIONS.en.duplicate, fr: TRANSLATIONS.fr.duplicate, ar: TRANSLATIONS.ar.duplicate },
+  "A vehicle with this registration number already exists.": { en: TRANSLATIONS.en.duplicatePlate, fr: TRANSLATIONS.fr.duplicatePlate, ar: TRANSLATIONS.ar.duplicatePlate },
+};
+const VEHICLE_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 function TypeFilter({
   value,
@@ -507,8 +567,12 @@ export default function VehiclesPage() {
   }
 
   async function saveVehicle() {
-    if (!form.name.trim() || !form.registrationNumber.trim()) {
-      setError(t.failedSave);
+    if (!form.name.trim()) {
+      setError(t.nameRequired);
+      return;
+    }
+    if (!form.registrationNumber.trim()) {
+      setError(t.plateRequired);
       return;
     }
     setSaving(true);
@@ -540,7 +604,7 @@ export default function VehiclesPage() {
       await loadVehicles();
       closeForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, VEHICLE_ERROR_MAP, VEHICLE_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -561,7 +625,7 @@ export default function VehiclesPage() {
       setDeleteCountdown(3.5);
       deleteStartRef.current = null;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedSave);
+      setError(localizeError(err, language, VEHICLE_ERROR_MAP, VEHICLE_FALLBACK_TEXT));
     } finally {
       setDeleting(false);
     }
@@ -778,7 +842,7 @@ export default function VehiclesPage() {
               <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
                 <div className={styles.modalHeader}>
                   <h2>{editingId ? t.editVehicleTitle : t.addVehicleTitle}</h2>
-                  <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={closeForm} disabled={saving} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
@@ -798,6 +862,8 @@ export default function VehiclesPage() {
                   <label>
                     <span>{t.type}</span>
                     <StyledSelect
+                      language={language}
+                      emptyLabel={t.noOptions}
                       value={form.type}
                       onChange={(value) => setForm({ ...form, type: value })}
                       placeholder={t.selectType}
@@ -812,7 +878,7 @@ export default function VehiclesPage() {
                     </span>
                     <div className={styles.fileField}>
                       <button type="button" className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
-                        {form.image ? t.changeImage : "Choose Image"}
+                        {form.image ? t.changeImage : t.selectImage}
                       </button>
                       <span
                         className={form.image ? styles.fileNameSelected : styles.fileNameMuted}
@@ -822,16 +888,16 @@ export default function VehiclesPage() {
                           ? form.imageName ||
                             (() => {
                               const s = form.image;
-                              if (s.startsWith("data:")) return "Selected image";
+                              if (s.startsWith("data:")) return t.selectedImage;
                               try {
                                 const url = new URL(s);
                                 const seg = url.pathname.split("/").pop();
-                                return seg || "Existing image";
+                                return seg || t.existingImage;
                               } catch {
-                                return s.length > 30 ? s.slice(0, 30) + "…" : s || "Existing image";
+                                return s.length > 30 ? s.slice(0, 30) + "…" : s || t.existingImage;
                               }
                             })()
-                          : "No image selected"}
+                          : t.noImage}
                       </span>
                       {form.image && (
                         <button
@@ -906,7 +972,7 @@ export default function VehiclesPage() {
                     </svg>
                     <span className={styles.circleText}>{deleteCountdown > 0 ? deleteCountdown.toFixed(1) : "0.0"}</span>
                   </div>
-                  <span className={styles.circleLabel}>{deleteCountdown > 0 ? "Confirm deletion" : t.confirmDelete}</span>
+                  <span className={styles.circleLabel}>{deleteCountdown > 0 ? t.confirmDeletion : t.confirmDelete}</span>
                 </div>
                 {error && <div className={styles.formError}>{error}</div>}
                 <div className={styles.modalFooterCompact}>

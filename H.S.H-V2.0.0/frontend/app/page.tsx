@@ -116,6 +116,15 @@ const translations = {
     onlineAccess: "Access RVB",
     openMenu: "Open navigation",
     closeMenu: "Close navigation",
+    toggleTheme: "Toggle theme",
+    themeLight: "Switch to light mode",
+    themeDark: "Switch to dark mode",
+    loadingDots: "Loading…",
+    failedLoad: "Failed to load business activity.",
+    invalidValue: "Invalid financial value detected (NaN/Infinity)",
+    dataIntegrity: "Data integrity",
+    selectPeriod: "Select period",
+    chartAria: "Business overview chart comparing sales and purchases",
     management: "Management",
     operations: "Operations",
     database: "Local database ready",
@@ -172,6 +181,15 @@ const translations = {
     onlineAccess: "Accéder à RVB",
     openMenu: "Ouvrir la navigation",
     closeMenu: "Fermer la navigation",
+    toggleTheme: "Changer de thème",
+    themeLight: "Passer en mode clair",
+    themeDark: "Passer en mode sombre",
+    loadingDots: "Chargement…",
+    failedLoad: "Échec du chargement de l'activité.",
+    invalidValue: "Valeur financière invalide détectée",
+    dataIntegrity: "Intégrité des données",
+    selectPeriod: "Sélectionner la période",
+    chartAria: "Graphique d'aperçu comparant les ventes et les achats",
     management: "Gestion",
     operations: "Opérations",
     database: "Base de données locale prête",
@@ -228,6 +246,15 @@ const translations = {
     onlineAccess: "الدخول إلى RVB",
     openMenu: "فتح قائمة التنقل",
     closeMenu: "إغلاق قائمة التنقل",
+    toggleTheme: "تبديل المظهر",
+    themeLight: "التبديل إلى الوضع الفاتح",
+    themeDark: "التبديل إلى الوضع الداكن",
+    loadingDots: "جارٍ التحميل…",
+    failedLoad: "فشل تحميل نشاط الأعمال.",
+    invalidValue: "تم اكتشاف قيمة مالية غير صالحة",
+    dataIntegrity: "سلامة البيانات",
+    selectPeriod: "اختيار الفترة",
+    chartAria: "مخطط نظرة عامة يقارن المبيعات والمشتريات",
     management: "الإدارة",
     operations: "العمليات",
     database: "قاعدة البيانات المحلية جاهزة",
@@ -423,7 +450,7 @@ export default function Dashboard() {
       setOverviewLoading(true);
       setOverviewError(null);
       try {
-        const range = getPeriodRange(overviewPeriod);
+        const range = getPeriodRange(overviewPeriod, new Date(), settings.language);
         const [sales, purchases] = await Promise.all([
           saleService.getByDateRange(range.from, range.to),
           purchaseService.getByDateRange(range.from, range.to),
@@ -433,7 +460,7 @@ export default function Dashboard() {
         setOverviewData(aggregated);
       } catch (e) {
         if (cancelled) return;
-        setOverviewError(e instanceof Error ? e.message : "Failed to load");
+        setOverviewError(e instanceof Error ? e.message : translations[settings.language]?.failedLoad ?? translations.en.failedLoad);
       } finally {
         if (!cancelled) setOverviewLoading(false);
       }
@@ -442,7 +469,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [overviewPeriod]);
+  }, [overviewPeriod, settings.language]);
 
   const [kpi, setKpi] = useState({ salesToday: 0, salesCount: 0, purchasesToday: 0, purchasesCount: 0, outstanding: 0, outstandingCount: 0, activeWorkers: 0 });
   const [kpiIntegrity, setKpiIntegrity] = useState({ sales: false, purchases: false, outstanding: false });
@@ -533,7 +560,7 @@ export default function Dashboard() {
 
   const navLabels: Record<string, string> = {
     dashboard: t.dashboard,
-    office: (t as any).officeNav,
+    office: t.officeNav,
     products: t.products,
     customers: t.customers,
     suppliers: t.suppliers,
@@ -609,7 +636,7 @@ export default function Dashboard() {
           onOpenRvb={handleSwitchToRvb}
           dark={dark}
           onToggleTheme={() => setDark((current) => !current)}
-          themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
+          themeLabel={dark ? t.themeLight : t.themeDark}
           settingsLabel={t.settings}
           onOpenSettings={openSettings}
           bell={<HshNotificationBell language={settings.language} dark={dark} />}
@@ -628,7 +655,7 @@ export default function Dashboard() {
         onNavigate={navigateSidebar}
         dark={dark}
         onToggleTheme={() => setDark((current) => !current)}
-        themeLabel={dark ? "Switch to light mode" : "Switch to dark mode"}
+        themeLabel={dark ? t.themeLight : t.themeDark}
         onOpenSettings={openSettings}
         settingsLabel={t.settings}
         onAccessRvb={handleSwitchToRvb}
@@ -644,7 +671,7 @@ export default function Dashboard() {
               type="button"
               className={styles.menuButton}
               onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
+              aria-label={t.openMenu}
             >
               <Menu size={18} strokeWidth={2} aria-hidden="true" />
             </button>
@@ -658,7 +685,7 @@ export default function Dashboard() {
             type="button"
             className={styles.mobileTheme}
             onClick={() => setDark((current) => !current)}
-            aria-label="Toggle theme"
+            aria-label={t.toggleTheme}
           >
             {dark ? (
               <Sun size={18} strokeWidth={2} aria-hidden="true" />
@@ -687,8 +714,10 @@ export default function Dashboard() {
               title={t.sales}
               value={kpiLoading ? "…" : formatCompactCurrency(kpi.salesToday, settings.currency)}
               valueTitle={kpiLoading ? undefined : formatCurrency(kpi.salesToday, settings.currency)}
-              subtitle={kpiLoading ? "Loading…" : `${formatCompactNumber(kpi.salesCount)} ${t.transactions}`}
+              subtitle={kpiLoading ? t.loadingDots : `${formatCompactNumber(kpi.salesCount)} ${t.transactions}`}
               warning={kpiIntegrity.sales}
+              warningTitle={t.invalidValue}
+              warningLabel={t.dataIntegrity}
             />
 
             <KpiCard
@@ -697,8 +726,10 @@ export default function Dashboard() {
               title={t.purchases}
               value={kpiLoading ? "…" : formatCompactCurrency(kpi.purchasesToday, settings.currency)}
               valueTitle={kpiLoading ? undefined : formatCurrency(kpi.purchasesToday, settings.currency)}
-              subtitle={kpiLoading ? "Loading…" : `${formatCompactNumber(kpi.purchasesCount)} ${t.transactions}`}
+              subtitle={kpiLoading ? t.loadingDots : `${formatCompactNumber(kpi.purchasesCount)} ${t.transactions}`}
               warning={kpiIntegrity.purchases}
+              warningTitle={t.invalidValue}
+              warningLabel={t.dataIntegrity}
             />
 
             <KpiCard
@@ -707,8 +738,10 @@ export default function Dashboard() {
               title={t.outstanding}
               value={kpiLoading ? "…" : formatCompactCurrency(kpi.outstanding, settings.currency)}
               valueTitle={kpiLoading ? undefined : formatCurrency(kpi.outstanding, settings.currency)}
-              subtitle={kpiLoading ? "Loading…" : `${formatCompactNumber(kpi.outstandingCount)} ${t.pending}`}
+              subtitle={kpiLoading ? t.loadingDots : `${formatCompactNumber(kpi.outstandingCount)} ${t.pending}`}
               warning={kpiIntegrity.outstanding}
+              warningTitle={t.invalidValue}
+              warningLabel={t.dataIntegrity}
             />
 
             <KpiCard
@@ -736,7 +769,7 @@ export default function Dashboard() {
                     onClick={() => setPeriodMenuOpen((v) => !v)}
                     aria-haspopup="listbox"
                     aria-expanded={periodMenuOpen}
-                    aria-label="Select period"
+                    aria-label={t.selectPeriod}
                   >
                     <span>
                       {overviewPeriod === "today"
@@ -754,7 +787,7 @@ export default function Dashboard() {
                   {periodMenuOpen && (
                     <div
                       role="listbox"
-                      aria-label="Period"
+                      aria-label={t.selectPeriod}
                       style={{
                         position: "absolute",
                         top: "calc(100% + 6px)",
@@ -852,6 +885,9 @@ export default function Dashboard() {
                     currency={settings.currency}
                     language={settings.language}
                     period={overviewPeriod}
+                    salesLabel={t.chartSales}
+                    purchasesLabel={t.chartPurchases}
+                    chartAriaLabel={t.chartAria}
                   />
                 );
               })()}
@@ -916,6 +952,8 @@ function KpiCard({
   valueTitle,
   subtitle,
   warning,
+  warningTitle,
+  warningLabel,
 }: {
   accent: string;
   icon: LucideIcon;
@@ -924,6 +962,8 @@ function KpiCard({
   valueTitle?: string;
   subtitle: string;
   warning?: boolean;
+  warningTitle?: string;
+  warningLabel?: string;
 }) {
   return (
     <article
@@ -942,7 +982,7 @@ function KpiCard({
 
       <div className={styles.kpiContent}>
         <span>{title}</span>
-        <strong title={valueTitle} aria-label={valueTitle ?? value}>{value}{warning && <span title="Invalid financial value detected (NaN/Infinity)" style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ Data integrity</span>}</strong>
+        <strong title={valueTitle} aria-label={valueTitle ?? value}>{value}{warning && <span title={warningTitle} style={{ marginInlineStart: 6, color: "var(--danger)", fontSize: 11, fontWeight: 800 }}>⚠ {warningLabel}</span>}</strong>
         <small>{subtitle}</small>
       </div>
     </article>

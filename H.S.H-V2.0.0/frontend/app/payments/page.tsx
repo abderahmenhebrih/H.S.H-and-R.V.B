@@ -54,6 +54,7 @@ import type { Payment } from "../../src/types/entities/payment";
 import type { Expense } from "../../src/types/entities/expense";
 import type { Vehicle } from "../../src/types/entities/vehicle";
 import type { Currency, Language } from "../../src/types/settings/settings";
+import { localizeError } from "../../src/lib/i18n";
 
 import styles from "./page.module.css";
 
@@ -164,6 +165,19 @@ const TRANSLATIONS = {
     entitiesInvolved: "Entities Involved",
     entitiesInvolvedSub: "Unique entities",
     permanentAction: "PERMANENT ACTION",
+    close: "Close",
+    noBalance: "No balance",
+    invalidBalance: "Invalid",
+    dataIntegrity: "Data integrity",
+    noOptions: "No options",
+    genericError: "An unexpected error occurred. Please try again.",
+    amountInvalid: "Payment amount must be greater than zero.",
+    dateInvalid: "Payment date is invalid.",
+    archivedWorker: "Archived worker cannot receive payments.",
+    adjustmentInvalid: "Adjustment amount must be greater than zero.",
+    selectionRequired: "Please complete all required fields.",
+    categoriesLabel: "Payment categories",
+    confirmDeletion: "Confirm deletion",
   },
   fr: {
     title: "Paiements",
@@ -227,6 +241,19 @@ const TRANSLATIONS = {
     entitiesInvolved: "Entités Impliquées",
     entitiesInvolvedSub: "Entités uniques",
     permanentAction: "ACTION PERMANENTE",
+    close: "Fermer",
+    noBalance: "Aucun solde",
+    invalidBalance: "Invalide",
+    dataIntegrity: "Intégrité des données",
+    noOptions: "Aucune option",
+    genericError: "Une erreur inattendue s'est produite. Réessayez.",
+    amountInvalid: "Le montant du paiement doit être supérieur à zéro.",
+    dateInvalid: "La date du paiement est invalide.",
+    archivedWorker: "Un employé archivé ne peut pas recevoir de paiements.",
+    adjustmentInvalid: "Le montant de l'ajustement doit être supérieur à zéro.",
+    selectionRequired: "Veuillez remplir tous les champs obligatoires.",
+    categoriesLabel: "Catégories de paiement",
+    confirmDeletion: "Confirmer la suppression",
   },
   ar: {
     title: "المدفوعات",
@@ -290,8 +317,44 @@ const TRANSLATIONS = {
     entitiesInvolved: "الجهات المعنية",
     entitiesInvolvedSub: "جهات فريدة",
     permanentAction: "إجراء دائم",
+    close: "إغلاق",
+    noBalance: "لا يوجد رصيد",
+    invalidBalance: "غير صالح",
+    dataIntegrity: "سلامة البيانات",
+    noOptions: "لا توجد خيارات",
+    genericError: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    amountInvalid: "يجب أن يكون مبلغ الدفعة أكبر من الصفر.",
+    dateInvalid: "تاريخ الدفعة غير صالح.",
+    archivedWorker: "لا يمكن للعامل المؤرشف استلام المدفوعات.",
+    adjustmentInvalid: "يجب أن يكون مبلغ التسوية أكبر من الصفر.",
+    selectionRequired: "يرجى إكمال جميع الحقول المطلوبة.",
+    categoriesLabel: "فئات المدفوعات",
+    confirmDeletion: "تأكيد الحذف",
   },
 } as const;
+
+const PAYMENT_ERROR_MAP: Record<string, Record<Language, string>> = {
+  PAYMENT_AMOUNT_INVALID: { en: TRANSLATIONS.en.amountInvalid, fr: TRANSLATIONS.fr.amountInvalid, ar: TRANSLATIONS.ar.amountInvalid },
+  "Payment amount must be a finite number greater than zero.": { en: TRANSLATIONS.en.amountInvalid, fr: TRANSLATIONS.fr.amountInvalid, ar: TRANSLATIONS.ar.amountInvalid },
+  PAYMENT_DATE_INVALID: { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  "Payment date must be a valid finite timestamp.": { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  "Expense amount must be a finite number greater than zero.": { en: TRANSLATIONS.en.amountInvalid, fr: TRANSLATIONS.fr.amountInvalid, ar: TRANSLATIONS.ar.amountInvalid },
+  "Expense date must be a valid finite timestamp.": { en: TRANSLATIONS.en.dateInvalid, fr: TRANSLATIONS.fr.dateInvalid, ar: TRANSLATIONS.ar.dateInvalid },
+  "Insufficient account balance.": { en: TRANSLATIONS.en.insufficientAccount, fr: TRANSLATIONS.fr.insufficientAccount, ar: TRANSLATIONS.ar.insufficientAccount },
+  "Payment exceeds supplier balance.": { en: TRANSLATIONS.en.insufficientEntity, fr: TRANSLATIONS.fr.insufficientEntity, ar: TRANSLATIONS.ar.insufficientEntity },
+  "Payment exceeds customer balance.": { en: TRANSLATIONS.en.insufficientEntity, fr: TRANSLATIONS.fr.insufficientEntity, ar: TRANSLATIONS.ar.insufficientEntity },
+  "Payment exceeds worker balance.": { en: TRANSLATIONS.en.insufficientEntity, fr: TRANSLATIONS.fr.insufficientEntity, ar: TRANSLATIONS.ar.insufficientEntity },
+  "Archived worker": { en: TRANSLATIONS.en.archivedWorker, fr: TRANSLATIONS.fr.archivedWorker, ar: TRANSLATIONS.ar.archivedWorker },
+  "Bonus amount must be greater than zero.": { en: TRANSLATIONS.en.adjustmentInvalid, fr: TRANSLATIONS.fr.adjustmentInvalid, ar: TRANSLATIONS.ar.adjustmentInvalid },
+  "Absence amount must be greater than zero.": { en: TRANSLATIONS.en.adjustmentInvalid, fr: TRANSLATIONS.fr.adjustmentInvalid, ar: TRANSLATIONS.ar.adjustmentInvalid },
+  "Salary amount must be greater than zero.": { en: TRANSLATIONS.en.adjustmentInvalid, fr: TRANSLATIONS.fr.adjustmentInvalid, ar: TRANSLATIONS.ar.adjustmentInvalid },
+  "Absence amount exceeds worker balance.": { en: TRANSLATIONS.en.insufficientEntity, fr: TRANSLATIONS.fr.insufficientEntity, ar: TRANSLATIONS.ar.insufficientEntity },
+};
+const PAYMENT_FALLBACK_TEXT: Record<Language, string> = {
+  en: TRANSLATIONS.en.genericError,
+  fr: TRANSLATIONS.fr.genericError,
+  ar: TRANSLATIONS.ar.genericError,
+};
 
 export default function PaymentsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("supplier");
@@ -575,7 +638,7 @@ export default function PaymentsPage() {
       await loadAll();
       setDeleteCountdown(3.5);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failedDelete);
+      setError(localizeError(err, language, PAYMENT_ERROR_MAP, PAYMENT_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -584,7 +647,7 @@ export default function PaymentsPage() {
   async function savePayment() {
     const amount = Number(formAmount);
     if (!Number.isFinite(amount) || amount <= 0 || !formAccountId) {
-      setError(t.failed);
+      setError(t.selectionRequired);
       return;
     }
     let entityType: Payment["entityType"] = "supplier";
@@ -594,24 +657,24 @@ export default function PaymentsPage() {
     if (activeTab === "supplier") {
       entityType = "supplier";
       if (!entityId) {
-        setError(t.failed);
+        setError(t.selectionRequired);
         return;
       }
     } else if (activeTab === "customer") {
       entityType = "customer";
       if (!entityId) {
-        setError(t.failed);
+        setError(t.selectionRequired);
         return;
       }
     } else if (activeTab === "worker") {
       entityType = "worker";
       if (!entityId) {
-        setError(t.failed);
+        setError(t.selectionRequired);
         return;
       }
     } else if (activeTab === "expense") {
       if (!formExpenseName.trim()) {
-        setError(t.failed);
+        setError(t.selectionRequired);
         return;
       }
       // Expense branch: create/update expense
@@ -635,14 +698,14 @@ export default function PaymentsPage() {
         setEditingId(null);
         setEditingExpenseId(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : t.failed);
+        setError(localizeError(err, language, PAYMENT_ERROR_MAP, PAYMENT_FALLBACK_TEXT));
       } finally {
         setSaving(false);
       }
       return;
     } else if (activeTab === "vehicle") {
       if (!formVehicleId || !formExpenseName.trim()) {
-        setError(t.failed);
+        setError(t.selectionRequired);
         return;
       }
       const vehicle = vehicles.find((v) => v.id === formVehicleId);
@@ -666,7 +729,7 @@ export default function PaymentsPage() {
         setEditingId(null);
         setEditingExpenseId(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : t.failed);
+        setError(localizeError(err, language, PAYMENT_ERROR_MAP, PAYMENT_FALLBACK_TEXT));
       } finally {
         setSaving(false);
       }
@@ -687,10 +750,7 @@ export default function PaymentsPage() {
       setEditingId(null);
       setEditingExpenseId(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t.failed;
-      if (msg.includes("account")) setError(t.insufficientAccount);
-      else if (msg.includes("balance")) setError(t.insufficientEntity);
-      else setError(msg);
+      setError(localizeError(err, language, PAYMENT_ERROR_MAP, PAYMENT_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -699,7 +759,7 @@ export default function PaymentsPage() {
   async function doBonus() {
     const amount = Number(bonusForm.amount);
     if (!bonusForm.workerId || !Number.isFinite(amount) || amount <= 0) {
-      setError(t.failed);
+      setError(t.selectionRequired);
       return;
     }
     setSaving(true);
@@ -709,7 +769,7 @@ export default function PaymentsPage() {
       setShowBonus(false);
       setBonusForm({ workerId: "", amount: "", date: toISODate(selectedDate) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failed);
+      setError(localizeError(err, language, PAYMENT_ERROR_MAP, PAYMENT_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -718,7 +778,7 @@ export default function PaymentsPage() {
   async function doAbsence() {
     const amount = Number(absenceForm.amount);
     if (!absenceForm.workerId || !Number.isFinite(amount) || amount <= 0) {
-      setError(t.failed);
+      setError(t.selectionRequired);
       return;
     }
     setSaving(true);
@@ -728,7 +788,7 @@ export default function PaymentsPage() {
       setShowAbsence(false);
       setAbsenceForm({ workerId: "", amount: "", date: toISODate(selectedDate) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.failed);
+      setError(localizeError(err, language, PAYMENT_ERROR_MAP, PAYMENT_FALLBACK_TEXT));
     } finally {
       setSaving(false);
     }
@@ -743,11 +803,11 @@ export default function PaymentsPage() {
   };
 
   const entityColumnLabel = useMemo(() => {
-    if (activeTab === "supplier") return language === "fr" ? "Fournisseur" : language === "ar" ? "المورد" : "Supplier";
-    if (activeTab === "customer") return language === "fr" ? "Client" : language === "ar" ? "الزبون" : "Customer";
-    if (activeTab === "worker") return language === "fr" ? "Employé" : language === "ar" ? "العامل" : "Worker";
-    if (activeTab === "vehicle") return language === "fr" ? "Véhicule" : language === "ar" ? "المركبة" : "Vehicle";
-    return language === "fr" ? "Dépense" : language === "ar" ? "المصروف" : "Expense";
+    if (activeTab === "supplier") return t.supplier;
+    if (activeTab === "customer") return t.customer;
+    if (activeTab === "worker") return t.worker;
+    if (activeTab === "vehicle") return t.vehicle;
+    return t.expense;
   }, [activeTab, language]);
 
   return (
@@ -815,7 +875,7 @@ export default function PaymentsPage() {
           </div>
 
           {/* Category Tabs */}
-          <nav className={styles.categoryTabs} aria-label="Payment categories">
+          <nav className={styles.categoryTabs} aria-label={t.categoriesLabel}>
             {(["supplier", "customer", "worker", "expense", "vehicle"] as Tab[]).map((tab) => (
               <button
                 key={tab}
@@ -984,7 +1044,7 @@ export default function PaymentsPage() {
                   <h2>
                     {editingId || editingExpenseId ? t.edit : t.add} — {tabLabel(activeTab)}
                   </h2>
-                  <button type="button" className={styles.closeButton} onClick={() => setShowForm(false)} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={() => setShowForm(false)} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>
@@ -993,6 +1053,8 @@ export default function PaymentsPage() {
                     <label className={styles.fullWidth}>
                       <span>{t.selectSupplier}</span>
                       <StyledSelect
+                        language={language}
+                        emptyLabel={t.noOptions}
                         value={formEntityId}
                         onChange={setFormEntityId}
                         placeholder={t.selectSupplier}
@@ -1009,6 +1071,8 @@ export default function PaymentsPage() {
                     <label className={styles.fullWidth}>
                       <span>{t.selectCustomer}</span>
                       <StyledSelect
+                        language={language}
+                        emptyLabel={t.noOptions}
                         value={formEntityId}
                         onChange={setFormEntityId}
                         placeholder={t.selectCustomer}
@@ -1025,6 +1089,8 @@ export default function PaymentsPage() {
                     <label className={styles.fullWidth}>
                       <span>{t.selectWorker}</span>
                       <StyledSelect
+                        language={language}
+                        emptyLabel={t.noOptions}
                         value={formEntityId}
                         onChange={setFormEntityId}
                         placeholder={t.selectWorker}
@@ -1050,6 +1116,8 @@ export default function PaymentsPage() {
                       <label>
                         <span>{t.selectVehicle}</span>
                         <StyledSelect
+                          language={language}
+                          emptyLabel={t.noOptions}
                           value={formVehicleId}
                           onChange={setFormVehicleId}
                           placeholder={t.selectVehicle}
@@ -1070,6 +1138,8 @@ export default function PaymentsPage() {
                   <label>
                     <span>{t.selectAccount}</span>
                     <StyledSelect
+                      language={language}
+                      emptyLabel={t.noOptions}
                       value={formAccountId}
                       onChange={setFormAccountId}
                       placeholder={t.selectAccount}
@@ -1114,7 +1184,7 @@ export default function PaymentsPage() {
               <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
                 <header className={styles.modalHeader}>
                   <h2>{t.bonus}</h2>
-                  <button type="button" className={styles.closeButton} onClick={() => setShowBonus(false)} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={() => setShowBonus(false)} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>
@@ -1122,6 +1192,8 @@ export default function PaymentsPage() {
                   <label className={styles.fullWidth}>
                     <span>{t.selectWorker}</span>
                     <StyledSelect
+                      language={language}
+                      emptyLabel={t.noOptions}
                       value={bonusForm.workerId}
                       onChange={(v) => setBonusForm((c) => ({ ...c, workerId: v }))}
                       placeholder={t.selectWorker}
@@ -1162,7 +1234,7 @@ export default function PaymentsPage() {
               <section className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
                 <header className={styles.modalHeader}>
                   <h2>{t.absence}</h2>
-                  <button type="button" className={styles.closeButton} onClick={() => setShowAbsence(false)} aria-label="Close">
+                  <button type="button" className={styles.closeButton} onClick={() => setShowAbsence(false)} aria-label={t.close}>
                     <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </header>
@@ -1170,6 +1242,8 @@ export default function PaymentsPage() {
                   <label className={styles.fullWidth}>
                     <span>{t.selectWorker}</span>
                     <StyledSelect
+                      language={language}
+                      emptyLabel={t.noOptions}
                       value={absenceForm.workerId}
                       onChange={(v) => setAbsenceForm((c) => ({ ...c, workerId: v }))}
                       placeholder={t.selectWorker}
@@ -1237,7 +1311,7 @@ export default function PaymentsPage() {
                     </svg>
                     <span className={styles.circleText}>{deleteCountdown > 0 ? deleteCountdown.toFixed(1) : "0.0"}</span>
                   </div>
-                  <span className={styles.circleLabel}>{deleteCountdown > 0 ? "Confirm deletion" : t.confirmDelete}</span>
+                  <span className={styles.circleLabel}>{deleteCountdown > 0 ? t.confirmDeletion : t.confirmDelete}</span>
                 </div>
                 {error && <div className={styles.formError}>{error}</div>}
                 <div className={styles.modalFooterCompact}>

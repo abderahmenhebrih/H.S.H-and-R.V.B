@@ -3,9 +3,14 @@ import mongoose from "mongoose";
 
 async function startQaMemory() {
   console.log("[QA] Starting MongoMemoryReplSet for isolated QA...");
+  // QA-only: first start on Windows can take >10s (binary extraction / AV
+  // scan). The library default launchTimeout (10s) aborts Playwright runs;
+  // allow up to 120s for the isolated instance to come up. Production is
+  // unaffected (it never runs this file; MONGODB_URI is used directly).
   const mongod = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: "wiredTiger" },
-  });
+    instanceOpts: [{ launchTimeout: 120000 }],
+  } as any);
   await mongod.waitUntilRunning();
   const uri = mongod.getUri();
   process.env.MONGODB_URI = uri;

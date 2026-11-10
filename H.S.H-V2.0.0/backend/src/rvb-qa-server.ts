@@ -156,8 +156,23 @@ async function startRvbQaServer() {
   process.env.QA_ISOLATED = "true";
   process.env.SERVER_MODE = "full";
   process.env.PORT = process.env.PORT || "5001";
-  process.env.RVB_JWT_ACCESS_SECRET ||= "rvb-phase1-qa-access-secret-only";
-  process.env.RVB_JWT_REFRESH_SECRET ||= "rvb-phase1-qa-refresh-secret-only";
+  // Ephemeral QA-only fallbacks (never override a real env value): the server
+  // refuses non-loopback memory URIs above, so these can only mint tokens
+  // for this throwaway local stack.
+  if (!process.env.RVB_JWT_ACCESS_SECRET) {
+    try {
+      process.env.RVB_JWT_ACCESS_SECRET = require("crypto").randomBytes(48).toString("hex");
+    } catch {
+      process.env.RVB_JWT_ACCESS_SECRET = `qa-ephemeral-access-${Date.now()}`;
+    }
+  }
+  if (!process.env.RVB_JWT_REFRESH_SECRET) {
+    try {
+      process.env.RVB_JWT_REFRESH_SECRET = require("crypto").randomBytes(48).toString("hex");
+    } catch {
+      process.env.RVB_JWT_REFRESH_SECRET = `qa-ephemeral-refresh-${Date.now()}`;
+    }
+  }
 
   await mongoose.connect(uri);
   await seedRvbPhase1Fixtures();

@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { escapeRegex } from "../lib/escape-regex";
 import { ConversationModel } from "../models/conversation.model";
 import { MessageModel } from "../models/message.model";
 import { MessageAuditModel } from "../models/message-audit.model";
@@ -371,9 +372,14 @@ export async function createDM(requesterId: string, otherAccountId: string) {
 export async function createGroup(requesterId: string, input: { name: string; avatar?: string | null; memberIds: string[] }) {
   if (!input.name || !input.name.trim()) throw codeError("RVB_GROUP_NAME_REQUIRED", 400);
   if (!Array.isArray(input.memberIds) || input.memberIds.length === 0) throw codeError("RVB_MEMBERS_REQUIRED", 400);
+  // Coerce + bound member lists: raw objects would reach $in as operators,
+  // and unbounded arrays are a query-DoS vector. 500 covers every realistic
+  // group (directory size is orders of magnitude smaller).
+  const coercedMembers = input.memberIds.slice(0, 500).map((m: any) => String(m)).filter((m: string) => m.length > 0 && m.length <= 128);
+  if (coercedMembers.length === 0) throw codeError("RVB_MEMBERS_REQUIRED", 400);
   const me: any = await RvbAccountModel.findOne({ id: requesterId }).lean();
   if (!me || me.status !== "active") throw codeError("RVB_FORBIDDEN", 403);
-  const unique = [...new Set([requesterId, ...input.memberIds])];
+  const unique = [...new Set([String(requesterId), ...coercedMembers])];
   if (unique.length < 2) throw codeError("RVB_MEMBERS_REQUIRED", 400);
   // Validate members active
   const accs: any[] = await RvbAccountModel.find({ id: { $in: unique } }).lean();
@@ -437,7 +443,13 @@ export async function updateGroup(convId: string, accountId: string, input: { na
   }
   if (input.avatar !== undefined) conv.avatar = input.avatar || null;
   if (input.addMemberIds && input.addMemberIds.length) {
-    for (const aid of input.addMemberIds) {
+    // Same hardening as createGroup: coerce + cap. Raw objects would reach
+    // findOne as query operators and be persisted as junk participants.
+    if (!Array.isArray(input.addMemberIds) || input.addMemberIds.length > 500) {
+      throw codeError("RVB_MEMBERS_INVALID", 400);
+    }
+    const adds = (input.addMemberIds as any[]).map((m: any) => String(m)).filter((m: string) => m.length > 0 && m.length <= 128);
+    for (const aid of adds) {
       if ((conv.participants as any[]).some((p: any) => p.accountId === aid && !p.leftAt)) continue;
       const acc: any = await RvbAccountModel.findOne({ id: aid }).lean();
       if (!acc || acc.status !== "active") throw codeError("RVB_ACCOUNT_NOT_FOUND", 404);
@@ -445,7 +457,11 @@ export async function updateGroup(convId: string, accountId: string, input: { na
     }
   }
   if (input.removeMemberIds && input.removeMemberIds.length) {
-    for (const aid of input.removeMemberIds) {
+    if (!Array.isArray(input.removeMemberIds) || input.removeMemberIds.length > 500) {
+      throw codeError("RVB_MEMBERS_INVALID", 400);
+    }
+    const removes = (input.removeMemberIds as any[]).map((m: any) => String(m));
+    for (const aid of removes) {
       const p: any = (conv.participants as any[]).find((x: any) => x.accountId === aid && !x.leftAt);
       if (p) p.leftAt = now;
     }
@@ -510,6 +526,11 @@ export async function sendMessage(convId: string, senderId: string, content: str
   } else if (reminderMinutes && Number(reminderMinutes) > now) {
     // legacy call: sendMessage(..., reminderAt) where reminderAt is timestamp in 5th position
     effectiveReminderAt = Number(reminderMinutes);
+  }
+  // Bound far-future reminders (5y): unbounded timestamps skew reminder
+  // scheduling and retain rows indefinitely.
+  if (effectiveReminderAt && effectiveReminderAt > now + 5 * 365 * 24 * 60 * 60 * 1000) {
+    effectiveReminderAt = now + 5 * 365 * 24 * 60 * 60 * 1000;
   }
   const msg: any = await MessageModel.create({
     id: `msg-${uuidv4()}`,
@@ -930,7 +951,11 @@ export async function listMessages(conversationId: string, requesterId: string, 
   const limit = Math.min(Math.max(opts.limit || 30, 1), 100);
   const filter: any = { conversationId };
   if (opts.before) filter.createdAt = { $lt: opts.before };
-  if (opts.search) filter.content = { $regex: opts.search, $options: "i" };
+  if (opts.search) {
+    // Escape user input: unescaped $regex enables ReDoS/expensive scans.
+    const q = escapeRegex(String(opts.search).slice(0, 80));
+    if (q) filter.content = { $regex: q, $options: "i" };
+  }
   // Exclude deleted for normal users? We include but hide content
   const msgs = await MessageModel.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
   // Return oldest first for UI

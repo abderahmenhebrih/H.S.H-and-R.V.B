@@ -112,6 +112,20 @@ export function initChatSocket(httpServer: HttpServer, allowedOrigins: string[])
 
   io.on("connection", async (socket: any) => {
     const user = socket.data.rvbUser;
+    // Per-account connection cap: the typing throttle is per-socket, so N
+    // parallel sockets would multiply DB reads. Evict the oldest beyond 5
+    // (multi-tab friendly, script-flood hostile).
+    try {
+      const server: any = io;
+      if (!server) return;
+      const room = `user:${user.accountId}`;
+      const members: any[] = Array.from((await server.in(room).fetchSockets()).map((s: any) => s.id));
+      if (members.length >= 5) {
+        for (const staleId of members.slice(0, members.length - 4)) {
+          try { server.sockets.sockets.get(staleId)?.disconnect(true); } catch {}
+        }
+      }
+    } catch {}
     if (!user) {
       socket.disconnect();
       return;
@@ -122,11 +136,12 @@ export function initChatSocket(httpServer: HttpServer, allowedOrigins: string[])
     if (user.role) socket.join(`role:${user.role}`);
 
     // Auto-join all conversations user is participant of
+    const joinedConvs = new Set<string>();
     try {
       const convs = await ConversationModel.find({ "participants.accountId": user.accountId }).lean();
       for (const c of convs as any[]) {
         const p = (c.participants as any[]).find((x: any) => x.accountId === user.accountId && !x.leftAt);
-        if (p) socket.join(c.id);
+        if (p) { socket.join(c.id); joinedConvs.add(c.id); }
       }
     } catch {}
 
@@ -137,6 +152,7 @@ export function initChatSocket(httpServer: HttpServer, allowedOrigins: string[])
         const isMember = (conv.participants as any[]).some((p: any) => p.accountId === user.accountId && !p.leftAt);
         if (!isMember) return cb?.({ success: false, code: "RVB_FORBIDDEN" });
         socket.join(conversationId);
+        joinedConvs.add(conversationId);
         cb?.({ success: true });
       } catch (e: any) {
         cb?.({ success: false, code: e?.code || "INTERNAL_ERROR" });
@@ -144,11 +160,22 @@ export function initChatSocket(httpServer: HttpServer, allowedOrigins: string[])
     });
 
     socket.on("chat:leave", ({ conversationId }: any) => {
-      socket.leave(conversationId);
+      // Only conversation rooms may be left: user:/session:/role: rooms back
+      // targeted disconnect and must stay joined for their socket lifetime.
+      if (typeof conversationId === "string" && joinedConvs.has(conversationId)) {
+        socket.leave(conversationId);
+        joinedConvs.delete(conversationId);
+      }
     });
 
+    // Per-socket throttle for chat:typing: each event costs a DB read, so
+    // bound it (flood = unbounded reads on one persistent connection).
+    let lastTypingAt = 0;
     socket.on("chat:typing", ({ conversationId, isTyping }: any) => {
       // Ephemeral, not persisted
+      const nowMs = Date.now();
+      if (nowMs - lastTypingAt < 1000) return;
+      lastTypingAt = nowMs;
       // Verify membership
       ConversationModel.findOne({ id: conversationId }).lean().then((conv: any) => {
         if (!conv) return;

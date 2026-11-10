@@ -49,6 +49,7 @@ export interface SyncChangesResponse {
   nextRevision: number;
   hasMore: boolean;
   currentRevision: number;
+  resyncRequired?: boolean;
 }
 
 const BATCH_SIZE = 100;
@@ -388,6 +389,24 @@ export async function fetchBootstrap(): Promise<BootstrapSnapshot> {
     return { snapshot: snap, currentRevision: data.currentRevision ?? 0 };
   }
   return { snapshot: {}, currentRevision: data.currentRevision ?? 0 };
+}
+
+export interface SnapshotPage {
+  entity: string;
+  docs: any[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  currentRevision: number;
+}
+
+export async function fetchSnapshotPage(entity: string, cursor: string | null = null, limit = 200): Promise<SnapshotPage> {
+  const apiBase = getSyncApiBase();
+  const safeLimit = Math.min(Math.max(limit | 0, 1), 500);
+  const params = new URLSearchParams({ entity, limit: String(safeLimit) });
+  if (cursor) params.set("cursor", cursor);
+  const res = await fetch(`${apiBase}/api/sync/snapshot?${params.toString()}`);
+  if (!res.ok) throw new Error(`Snapshot page failed ${res.status} for ${entity}`);
+  return (await res.json()) as SnapshotPage;
 }
 
 export async function fetchCurrentRevision(): Promise<number> {

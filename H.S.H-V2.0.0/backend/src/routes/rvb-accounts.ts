@@ -16,6 +16,7 @@ import {
   unlinkRvbAccount,
 } from "../services/rvb-account.service";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import { toSafeRvbAccount } from "../lib/rvb-auth";
 import { validatePasswordPolicy } from "../lib/password";
 
@@ -59,6 +60,8 @@ function handleError(res: any, err: any) {
 
 // Protect all account management routes: Manager only
 router.use(requireRvbAuth as any, requireRvbRole("manager") as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 async function enrichAccountsWithDisplayName(accounts: any[]): Promise<any[]> {
   if (!accounts || accounts.length === 0) return accounts;

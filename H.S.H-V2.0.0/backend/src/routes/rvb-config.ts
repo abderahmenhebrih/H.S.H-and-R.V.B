@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { SettingsModel } from "../models/settings.model";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { allocateRevision } from "../sync/rvb-sync-helper";
 import { RvbActivityModel } from "../models/rvb-activity.model";
@@ -10,6 +11,8 @@ import { RvbActivityModel } from "../models/rvb-activity.model";
 const router = Router();
 
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 const DEFAULT_CURRENCY = "DA";
 const ALLOWED_CURRENCIES = ["DA", "€", "$"] as const;

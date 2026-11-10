@@ -10,6 +10,7 @@ import { SettingsModel } from "../models/settings.model";
 import { SyncChangeModel } from "../models/sync-change.model";
 import { SyncCounterModel } from "../models/sync-counter.model";
 import { InvoiceSourceReservationModel } from "../models/invoice-source-reservation.model";
+import { escapeRegex } from "../lib/escape-regex";
 import { v4 as uuidv4 } from "uuid";
 import { roundMoney, computeLineFromTaxRate, amountInWordsBackend } from "../lib/invoice-helpers";
 
@@ -48,10 +49,27 @@ router.post("/issue", async (req, res) => {
     customerSnapshot: providedCustomerSnapshot,
     documentDefaultsSnapshot,
   } = req.body as any;
+  // Free-text cap (bloat hygiene; business values unaffected).
+  if (notes !== undefined && notes !== null && (typeof notes !== "string" || notes.length > 2000)) {
+    res.status(400).json({ success: false, code: "NOTES_INVALID", message: "Invalid notes" });
+    return;
+  }
 
   if (!sellerProfileId || !customerId || !Array.isArray(sourceSaleIds) || sourceSaleIds.length === 0) {
     res.status(400).json({ success: false, message: "Missing required fields" });
     return;
+  }
+  // Coerce + bound sale ids: raw objects would reach $in as query operators,
+  // and unbounded arrays are a query-DoS vector (invoices reference few sales).
+  if (sourceSaleIds.length > 200) {
+    res.status(400).json({ success: false, code: "SOURCE_SALE_IDS_TOO_MANY", message: "Too many source sales" });
+    return;
+  }
+  for (const sid of sourceSaleIds) {
+    if (typeof sid !== "string" || sid.length === 0 || sid.length > 128) {
+      res.status(400).json({ success: false, code: "SOURCE_SALE_ID_INVALID", message: "Invalid source sale id" });
+      return;
+    }
   }
   if (!Array.isArray(clientLines) || clientLines.length === 0) {
     // Allow empty lines? No, require at least one for new pipeline
@@ -291,7 +309,7 @@ router.post("/issue", async (req, res) => {
 
       const invoiceId = draftId && typeof draftId === "string" && draftId.startsWith("inv-") ? draftId : `inv-${uuidv4()}`;
       let draftToDelete: any = null;
-      if (draftId) {
+      if (typeof draftId === "string" && draftId.startsWith("inv-") && draftId.length <= 128) {
         draftToDelete = await InvoiceModel.findOne({ id: draftId, status: "DRAFT" }).session(session);
       }
 
@@ -322,7 +340,8 @@ router.post("/issue", async (req, res) => {
           let taxProfileId: string | undefined = undefined;
           // Check if client sent taxProfileId for this product - must be enabled and valid
           const clientLineForProduct = (clientLines || []).find((cl:any)=> cl.productId === item.productId);
-          if (clientLineForProduct?.taxProfileId) {
+          if (typeof clientLineForProduct?.taxProfileId === "string" && clientLineForProduct.taxProfileId.length > 0 && clientLineForProduct.taxProfileId.length <= 128) {
+            // Coerced: a raw object here would reach findOne as a query operator.
             const tpCheck = await getTaxProfile(clientLineForProduct.taxProfileId);
             if (tpCheck && tpCheck.enabled === true && Number.isFinite(Number(tpCheck.vatRate)) && Number(tpCheck.vatRate) >= 0) taxProfileId = clientLineForProduct.taxProfileId;
           }
@@ -561,13 +580,14 @@ router.post("/issue", async (req, res) => {
       session.endSession();
     }
   } catch (error) {
-    console.error("Invoice issue failed:", error);
+    console.error("Invoice issue failed:", (req as any)?.requestId, error);
     const msg = error instanceof Error ? error.message : "Issue failed";
     if (msg.includes("SOURCE_SALE_ALREADY_INVOICED") || (error as any)?.code === 11000) {
       res.status(409).json({ success: false, code: "SOURCE_SALE_ALREADY_INVOICED", message: "Source sale already invoiced" });
       return;
     }
-    res.status(500).json({ success: false, message: msg });
+    // Generic 500: raw driver/validation strings must not reach the client.
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR", message: "Issue failed" });
   }
 });
 
@@ -631,8 +651,8 @@ router.post("/cancel", async (req, res) => {
       session.endSession();
     }
   } catch (error) {
-    console.error("Invoice cancel failed:", error);
-    res.status(500).json({ success: false, message: error instanceof Error ? error.message : "Cancel failed" });
+    console.error("Invoice cancel failed:", (req as any)?.requestId, error);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR", message: "Cancel failed" });
   }
 });
 
@@ -647,7 +667,19 @@ router.post("/incoming", async (req, res) => {
     res.status(400).json({ success: false, code: "INCOMING_AMOUNT_INVALID", message: "Missing required fields: supplierId, supplierInvoiceNumber, invoiceDate, amountHT, amountTTC" });
     return;
   }
-  // SUPPLIER validation: must exist in canonical Supplier collection
+  // SUPPLIER validation: must exist in canonical Supplier collection.
+  // Coerced: a raw object here would reach findOne as a query operator.
+  if (typeof supplierId !== "string" || supplierId.length === 0 || supplierId.length > 128) {
+    res.status(400).json({ success: false, code: "SUPPLIER_NOT_FOUND", message: "Supplier not found" });
+    return;
+  }
+  // Free-text metadata caps (bloat / stored-markup hygiene; business values unaffected).
+  for (const [label, val, max] of [["notes", notes, 2000], ["attachment", attachment, 2000], ["fileName", fileName, 2000], ["purchaseReference", purchaseReference, 128], ["paymentStatus", paymentStatus, 32]] as any[]) {
+    if (val !== undefined && val !== null && (typeof val !== "string" || val.length > max)) {
+      res.status(400).json({ success: false, code: `${String(label).toUpperCase()}_INVALID`, message: `Invalid ${label}` });
+      return;
+    }
+  }
   try {
     const supplierExists = await SupplierModel.findOne({ id: supplierId }).lean();
     if (!supplierExists) {
@@ -706,7 +738,7 @@ router.post("/incoming", async (req, res) => {
     const { IncomingInvoiceModel: DupCheckModel } = await import("../models/incoming-invoice.model");
     let dupCheck: any = await DupCheckModel.findOne({ supplierId, supplierInvoiceNumberNormalized: normalizedSupplierNumber }).lean();
     if (!dupCheck) {
-      const escaped = trimmedSupplierNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escaped = escapeRegex(trimmedSupplierNumber);
       dupCheck = await DupCheckModel.findOne({ supplierId, supplierInvoiceNumber: { $regex: `^${escaped}$`, $options: "i" } } as any).lean();
       if (dupCheck && String(dupCheck.supplierInvoiceNumber).trim().toLowerCase() !== normalizedSupplierNumber) dupCheck = null;
     }
@@ -776,8 +808,8 @@ router.post("/incoming", async (req, res) => {
       res.status(409).json({ success: false, code: "INCOMING_INVOICE_DUPLICATE", message: "An invoice with this number already exists for this supplier." });
       return;
     }
-    console.error("Incoming invoice create failed:", error);
-    res.status(500).json({ success: false, message: error instanceof Error ? error.message : "Failed" });
+    console.error("Incoming invoice create failed:", (req as any)?.requestId, error);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR", message: "Failed" });
   }
 });
 
@@ -824,8 +856,8 @@ router.delete("/incoming/:id", async (req, res) => {
       session.endSession();
     }
   } catch (error) {
-    console.error("Incoming delete failed:", error);
-    res.status(500).json({ success: false, message: error instanceof Error ? error.message : "Failed" });
+    console.error("Incoming delete failed:", (req as any)?.requestId, error);
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR", message: "Failed" });
   }
 });
 

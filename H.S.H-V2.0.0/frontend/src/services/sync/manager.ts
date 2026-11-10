@@ -62,6 +62,20 @@ async function pushPhase(): Promise<void> {
 async function pullPhase(): Promise<void> {
   let after = await getServerRevision();
   if (after === 0) {
+    // Chunked snapshot migration first (bounded memory, resumable). Any
+    // transport failure falls back to the legacy full bootstrap below —
+    // already-applied entity pages are pending-protected, so fallback
+    // converges without data loss.
+    let migrated: number | null = null;
+    try {
+      const { runSnapshotMigration } = await import("./snapshot-migration");
+      migrated = await runSnapshotMigration();
+      after = migrated;
+      console.log(`[sync] snapshot migration applied, now at ${after}`);
+    } catch (e) {
+      console.warn(`[sync] snapshot migration failed, falling back to bootstrap`, e);
+    }
+    if (migrated === null) {
     try {
       const bootstrap = await fetchBootstrap();
       // New snapshot format — always reconcile, even if empty (canonical empty)
@@ -84,6 +98,7 @@ async function pullPhase(): Promise<void> {
     } catch (e) {
       console.warn(`[sync] bootstrap failed`, e);
     }
+    }
   }
 
   let hasMore = true;
@@ -91,6 +106,16 @@ async function pullPhase(): Promise<void> {
   while (hasMore) {
     try {
       const res = await fetchRemoteChanges(after, 200);
+      if ((res as any).resyncRequired) {
+        // Server pruned history below our cursor — incremental catch-up
+        // would skip revisions. Re-migrate from scratch (pending locals are
+        // fence-protected), then continue the changes loop from the new base.
+        console.warn(`[sync] server requested resync (cursor ${after} predates retained history)`);
+        const { runSnapshotMigration } = await import("./snapshot-migration");
+        after = await runSnapshotMigration();
+        await setServerRevision(after);
+        continue;
+      }
       if (res.changes.length === 0) {
         // No new changes
         if (res.currentRevision !== after) {
@@ -141,7 +166,9 @@ export function getTabOwnerId(): string {
     if (typeof sessionStorage !== "undefined") {
       const stored = sessionStorage.getItem("hsh-tab-owner");
       if (stored) { cachedTabOwnerId = stored; return stored; }
-      const gen = (Math.random().toString(36).slice(2) + Date.now().toString(36));
+      const gen = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+        ? crypto.randomUUID()
+        : (Math.random().toString(36).slice(2) + Date.now().toString(36));
       sessionStorage.setItem("hsh-tab-owner", gen);
       cachedTabOwnerId = gen;
       return gen;
@@ -153,7 +180,9 @@ export function getTabOwnerId(): string {
     const { generateId: genFn } = require("@/src/lib/id");
     cachedTabOwnerId = genFn();
   } catch {
-    cachedTabOwnerId = `tab-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    cachedTabOwnerId = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+      ? `tab-${crypto.randomUUID()}`
+      : `tab-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   }
   return cachedTabOwnerId!;
 }

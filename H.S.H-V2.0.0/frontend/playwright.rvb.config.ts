@@ -42,8 +42,9 @@ export default defineConfig({
         QA_ISOLATED: "true",
         CORS_ORIGIN: "http://localhost:3001",
         RVB_QA_P1_PASSWORD: "Rvb-QA-P1!Base",
-        RVB_JWT_ACCESS_SECRET: "rvb-phase1-qa-access-secret-only",
-        RVB_JWT_REFRESH_SECRET: "rvb-phase1-qa-refresh-secret-only",
+        // Prefer caller env; else ephemeral per-run values (see playwright.config.ts note).
+        RVB_JWT_ACCESS_SECRET: process.env.RVB_JWT_ACCESS_SECRET || require("crypto").randomBytes(48).toString("hex"),
+        RVB_JWT_REFRESH_SECRET: process.env.RVB_JWT_REFRESH_SECRET || require("crypto").randomBytes(48).toString("hex"),
       } as any,
     },
     {

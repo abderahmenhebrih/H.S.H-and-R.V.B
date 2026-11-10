@@ -1,6 +1,7 @@
 ﻿import { Router } from "express";
 import { parsePaging, pagingMeta } from "../lib/pagination";
 import { requireRvbAuth } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { WorkerModel } from "../models/worker.model";
@@ -16,6 +17,8 @@ import { toSafeRvbAccount } from "../lib/rvb-auth";
 
 const router = Router();
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 function sanitize(doc: any) {
   if (!doc) return null;

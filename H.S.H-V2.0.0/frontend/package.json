@@ -15,7 +15,7 @@
     "qa:user": "playwright test --config=playwright.config.ts e2e/autonomous --reporter=list,html",
     "test:hsh-user": "npm run qa:user",
     "qa:user:headed": "playwright test --config=playwright.config.ts e2e/autonomous --headed --reporter=list",
-    "postinstall": "node scripts/patch-univer.js || true"
+    "postinstall": "node scripts/patch-univer.js"
   },
   "dependencies": {
     "@tiptap/extension-color": "^3.31.3",

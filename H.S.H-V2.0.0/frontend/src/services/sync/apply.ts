@@ -421,6 +421,61 @@ export async function applySnapshot(snapshot: Record<string, any[]>, currentRevi
   );
 }
 
+/**
+ * Entity-scoped snapshot apply for chunked migration. Same pending-fence
+ * semantics as applySnapshot but strictly per-entity: upserts non-pending
+ * docs, then deletes locals of THIS entity missing from serverDocs.
+ * Does NOT touch the revision cursor (finalizeSnapshotMigration does) and
+ * does NOT reconcile other entities. Memory bounded by one entity.
+ */
+export async function applySnapshotEntity(entity: string, serverDocs: any[]): Promise<void> {
+  const table = getTable(entity);
+  if (!table) return;
+  const snapshotTables = [...new Set([...getAllSyncTables(), db.syncMeta, db.syncOperations])];
+  await runAsRemote(async () => {
+    await db.transaction("rw", snapshotTables, async () => {
+      const allOps = await db.syncOperations.toArray();
+      const pendingSet = new Set<string>(
+        allOps.filter((o: any) => !o.synced && o.status !== "terminal").map((o) => `${o.entity}:${o.entityId}`),
+      );
+      const businessEntities = new Set(["sale", "purchase", "payment", "transfer"]);
+      for (const op of allOps) {
+        if (!businessEntities.has(op.entity)) continue;
+        if ((op as any).synced || (op as any).status === "terminal") continue;
+        if (!op.entity || !op.entityId) continue;
+        let localEntity: any = null;
+        try {
+          const t = getTable(op.entity);
+          if (t) localEntity = await t.get(op.entityId);
+        } catch {}
+        for (const k of collectBusinessAffectedKeys(op, localEntity)) pendingSet.add(k);
+      }
+      for (const doc of serverDocs) {
+        const key = `${entity}:${doc.id}`;
+        if (pendingSet.has(key)) continue;
+        const toStore = { ...doc, syncStatus: "synced", lastSyncedAt: Date.now(), serverRevision: 0 };
+        await preserveSettingsNavigation(entity, doc.id, toStore, (id) => table.get(id));
+        await table.put(toStore);
+      }
+      const serverIds = new Set(serverDocs.map((d: any) => d.id));
+      const localAll: any[] = await table.toArray();
+      for (const local of localAll) {
+        if (!serverIds.has(local.id) && !pendingSet.has(`${entity}:${local.id}`)) {
+          await table.delete(local.id);
+        }
+      }
+    });
+  });
+  emitDbSyncEvent(
+    serverDocs.map((d: any) => ({ revision: 0, entity, entityId: d.id, operation: "create", payload: d }) as SyncChange),
+  );
+}
+
+export async function finalizeSnapshotMigration(currentRevision: number): Promise<void> {
+  await setServerRevision(currentRevision);
+  await db.syncMeta.put({ key: "lastSuccessfulSyncAt", value: Date.now() });
+}
+
 export async function applyBootstrapChanges(changes: SyncChange[], currentRevision: number): Promise<void> {
   if (changes.length === 0) {
     await setServerRevision(currentRevision);

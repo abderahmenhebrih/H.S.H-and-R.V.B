@@ -5,6 +5,7 @@ import { WorkerFinancialEventModel } from "../models/worker-financial-event.mode
 import { WorkerModel } from "../models/worker.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { WorkerActivityModel } from "../models/worker-activity.model";
 import { RvbActivityModel } from "../models/rvb-activity.model";
@@ -13,6 +14,8 @@ import { SyncChangeModel } from "../models/sync-change.model";
 
 const router = Router();
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 async function getNextRevisionInternal(session?: any): Promise<number> {
   const opts = session ? { session } : {};

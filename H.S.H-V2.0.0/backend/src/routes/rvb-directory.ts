@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { requireRvbAuth } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import { listDirectory, getDirectoryProfile } from "../services/rvb-directory.service";
 
 const router = Router();
 
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 // GET /api/rvb/directory?q=&role=&page=&limit=
 router.get("/", async (req, res) => {

@@ -1,9 +1,6 @@
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { toSafeRvbAccount } from "../lib/rvb-auth";
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+import { escapeRegex } from "../lib/escape-regex";
 
 export type DirectoryRoleFilter = "all" | "worker" | "supervisor" | "supplier" | "customer" | "management";
 

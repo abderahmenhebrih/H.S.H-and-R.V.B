@@ -10,6 +10,8 @@ import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import multer from "multer";
 const router = Router();
 router.use(requireRvbAuth as any);
+// Router-wide flood backstop (per-endpoint strict limits below still apply).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 // Multipart parser for chat media: memory-backed buffer forwarded immediately
 // to object storage (never persisted to Render disk). Transport cap sits just
@@ -115,7 +117,9 @@ router.post("/dm", async (req: RvbAuthRequest, res) => {
   try {
     const user = req.rvbUser!;
     const { otherAccountId } = req.body as any;
-    const conv = await chatSvc.createDM(user.accountId, otherAccountId);
+    // Coerce to string: a raw object here would reach findOne as a query
+    // operator (NoSQL operator surface) and bypass the self-DM check.
+    const conv = await chatSvc.createDM(user.accountId, typeof otherAccountId === "string" ? otherAccountId : "");
     res.status(201).json({ success: true, conversation: conv });
   } catch (err: any) {
     res.status(err?.status || 500).json({ success: false, code: err?.code || "INTERNAL_ERROR", message: err?.message });

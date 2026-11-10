@@ -1,4 +1,5 @@
 import { Schema, model, type InferSchemaType } from "mongoose";
+import { escapeRegex } from "../lib/escape-regex";
 
 const notificationSchema = new Schema(
   {
@@ -235,7 +236,7 @@ export async function migrateLegacyNotificationChannels(): Promise<void> {
     if (!coll) return;
     // RVB patterns
     const rvbPrefixes = ["worker-request:", "supplier-request:", "customer-request:", "customer-order:", "chat:"];
-    const prefixRegex = rvbPrefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const prefixRegex = rvbPrefixes.map((p) => escapeRegex(p)).join("|");
     // Only classify where channel missing/null or hsh but matches RVB patterns
     // Safe non-destructive: only update docs matching RVB pattern to rvb, keep others as hsh
     // We also set channel=hsh for docs missing channel that are NOT RVB

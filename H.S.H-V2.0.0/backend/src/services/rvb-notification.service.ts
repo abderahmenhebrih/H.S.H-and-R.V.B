@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { escapeRegex } from "../lib/escape-regex";
 import { NotificationModel } from "../models/notification.model";
 import { RvbNotificationRecipientModel } from "../models/rvb-notification-recipient.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
@@ -326,7 +327,7 @@ export async function listNotificationsForUser(params: {
 
   if (search && search.trim()) {
     const q = search.trim();
-    const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const esc = escapeRegex(q);
     andFilters.push({
       $or: [
         { title: { $regex: esc, $options: "i" } },

@@ -2,10 +2,13 @@ import { Router } from "express";
 import { WorkerActivityModel } from "../models/worker-activity.model";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { requireRvbAuth } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 
 const router = Router();
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 router.get("/", async (req: RvbAuthRequest, res) => {
   try {

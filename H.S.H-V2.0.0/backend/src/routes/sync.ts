@@ -74,7 +74,7 @@ router.post("/", async (req, res) => {
       success: false,
       results: [],
     };
-    console.error("Sync request failed:", error instanceof Error ? error.message : error);
+    console.error("Sync request failed:", (req as any)?.requestId, error instanceof Error ? error.message : error);
     res.status(500).json(response);
   }
 });
@@ -87,10 +87,10 @@ router.get("/changes", async (req, res) => {
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 500) : 200;
     const safeAfter = Number.isFinite(after) && after >= 0 ? after : 0;
     const safeLimit = Number.isFinite(limit) ? limit : 200;
-    const { changes, nextRevision, hasMore, currentRevision } = await getChangesAfter(safeAfter, safeLimit);
-    res.json({ changes, nextRevision, hasMore, currentRevision });
+    const { changes, nextRevision, hasMore, currentRevision, resyncRequired } = await getChangesAfter(safeAfter, safeLimit);
+    res.json({ changes, nextRevision, hasMore, currentRevision, resyncRequired });
   } catch (error) {
-    console.error("Sync changes failed:", error);
+    console.error("Sync changes failed:", (req as any)?.requestId, error);
     res.status(500).json({ changes: [], nextRevision: 0, hasMore: false, currentRevision: 0 });
   }
 });
@@ -115,7 +115,7 @@ router.get("/bootstrap", async (req, res) => {
     }
     res.json({ snapshot, currentRevision });
   } catch (error) {
-    console.error("Bootstrap failed:", error);
+    console.error("Bootstrap failed:", (req as any)?.requestId, error);
     res.status(500).json({ snapshot: {}, currentRevision: 0 });
   }
 });
@@ -155,7 +155,7 @@ router.get("/snapshot", async (req, res) => {
       currentRevision,
     });
   } catch (error) {
-    console.error("Snapshot failed:", error);
+    console.error("Snapshot failed:", (req as any)?.requestId, error);
     res.status(500).json({ docs: [], nextCursor: null, hasMore: false, currentRevision: 0 });
   }
 });

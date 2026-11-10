@@ -1,11 +1,14 @@
 import { Router } from "express";
 import { parsePaging, pagingMeta } from "../lib/pagination";
 import { requireRvbAuth } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { ProductModel } from "../models/product.model";
 
 const router = Router();
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 // GET /api/rvb/catalog/products?for=supplier|customer -> returns safe fields without inventory leak
 router.get("/products", async (req: RvbAuthRequest, res) => {

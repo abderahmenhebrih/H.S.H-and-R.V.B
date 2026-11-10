@@ -7,6 +7,7 @@ import { WorkerFinancialEventModel } from "../models/worker-financial-event.mode
 import { WorkerActivityModel } from "../models/worker-activity.model";
 import { RvbActivityModel } from "../models/rvb-activity.model";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { allocateRevision, recordSyncChange } from "../sync/rvb-sync-helper";
 import { archiveByLinkedEntity, reactivateByLinkedEntity } from "../services/rvb-account.service";
@@ -15,6 +16,8 @@ const router = Router();
 
 // All business routes require auth; workers are manager only
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 router.use(requireRvbRole("manager") as any);
 
 function codeError(code: string, status: number, message?: string) {

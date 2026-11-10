@@ -7,12 +7,15 @@ import { SaleModel } from "../models/sale.model";
 import { PaymentModel } from "../models/payment.model";
 import { RvbActivityModel } from "../models/rvb-activity.model";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { allocateRevision } from "../sync/rvb-sync-helper";
 import { applyLinkedEntityLifecycleToRvbAccount } from "../services/rvb-account.service";
 
 const router = Router();
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 router.use(requireRvbRole("manager", "supervisor") as any);
 
 function codeError(code: string, status: number, message?: string) {

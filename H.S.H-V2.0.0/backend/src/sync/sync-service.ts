@@ -4,6 +4,7 @@ import type { SyncRequestOperation, SyncOperationResult, SyncChange } from "./ty
 import { SyncCounterModel } from "../models/sync-counter.model";
 import { SyncChangeModel } from "../models/sync-change.model";
 import { ProcessedSyncOperationModel } from "../models/processed-sync-operation.model";
+import { escapeRegex } from "../lib/escape-regex";
 import { SupplierModel } from "../models/supplier.model";
 import { IncomingInvoiceModel } from "../models/incoming-invoice.model";
 import { ProductModel } from "../models/product.model";
@@ -1429,7 +1430,7 @@ export async function validateIncomingInvoiceSync(payload: Record<string, unknow
     // Prefer normalized field (new docs), fallback to case-insensitive regex for legacy docs without normalized
     let dup: any = await IncomingInvoiceModel.findOne({ supplierId: supplierIdToCheck, supplierInvoiceNumberNormalized: normalizedToCheck }).lean();
     if (!dup) {
-      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escaped = escapeRegex(trimmed);
       dup = await IncomingInvoiceModel.findOne({ supplierId: supplierIdToCheck, supplierInvoiceNumber: { $regex: `^${escaped}$`, $options: "i" } } as any).lean();
       if (dup && String((dup as any).supplierInvoiceNumber).trim().toLowerCase() !== normalizedToCheck) dup = null;
     }
@@ -1456,6 +1457,29 @@ export async function processSyncOperation(
       error: "operationId required",
       retryable: false,
     };
+  }
+
+  // Central input shape guard: entityId reaches dozens of findOne({id})
+  // call sites below. A raw object here would act as a query operator.
+  // Reject before any DB access or persistence (terminal, not retryable).
+  const badShapeExit = (message: string): SyncOperationResult => ({
+    operationId: opId,
+    entity: typeof operation.entity === "string" ? operation.entity : "unknown",
+    entityId: typeof operation.entityId === "string" ? operation.entityId : "unknown",
+    operation: operation.operation,
+    success: false,
+    message,
+    error: message,
+    retryable: false,
+  });
+  if (typeof operation.entity !== "string" || operation.entity.length === 0 || operation.entity.length > 64) {
+    return badShapeExit("Invalid entity");
+  }
+  if (typeof operation.entityId !== "string" || operation.entityId.length === 0 || operation.entityId.length > 128) {
+    return badShapeExit("Invalid entityId");
+  }
+  if (!["create", "update", "delete", "upsert"].includes(operation.operation as string)) {
+    return badShapeExit("Invalid operation");
   }
 
   // Idempotency check
@@ -2634,7 +2658,7 @@ export async function getCurrentRevision(): Promise<number> {
 export async function getChangesAfter(
   after: number,
   limit = 200,
-): Promise<{ changes: SyncChange[]; nextRevision: number; hasMore: boolean; currentRevision: number }> {
+): Promise<{ changes: SyncChange[]; nextRevision: number; hasMore: boolean; currentRevision: number; resyncRequired: boolean }> {
   const currentRevision = await getCurrentRevision();
   const changes = await SyncChangeModel.find({ revision: { $gt: after } })
     .sort({ revision: 1 })
@@ -2642,6 +2666,17 @@ export async function getChangesAfter(
     .lean();
   const nextRevision = changes.length > 0 ? changes[changes.length - 1].revision : after;
   const hasMore = changes.length === limit && nextRevision < currentRevision;
+  // Retention guard: if the caller's cursor predates the oldest retained
+  // history row, incremental catch-up would silently skip revisions. Signal
+  // re-migration instead (additive; old clients ignore the flag). Nothing is
+  // deleted today, so this only fires after a future retention job runs.
+  let resyncRequired = false;
+  try {
+    if (after > 0) {
+      const oldest: any = await SyncChangeModel.findOne().sort({ revision: 1 }).lean();
+      if (oldest && typeof oldest.revision === "number" && after < oldest.revision) resyncRequired = true;
+    }
+  } catch {}
   // H.S.H sync must exclude R.V.B notifications: filter notification changes to channel=hsh only
   const filtered = changes.filter((c: any) => {
     if (c.entity === "notification") {
@@ -2676,7 +2711,7 @@ export async function getChangesAfter(
     sourceClientId: c.sourceClientId,
     operationId: c.operationId,
   }));
-  return { changes: mapped, nextRevision, hasMore, currentRevision };
+  return { changes: mapped, nextRevision, hasMore, currentRevision, resyncRequired };
 }
 
 // getBootstrapData removed 2026-11-10 (dead code, zero callers repo-wide; live

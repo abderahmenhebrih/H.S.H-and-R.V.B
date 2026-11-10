@@ -406,7 +406,7 @@ export async function linkRvbAccount(accountId: string, entityId: string) {
     try {
       const { WorkerActivityModel } = await import("../models/worker-activity.model");
       await WorkerActivityModel.create({
-        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: `wka-${uuidv4()}`,
         createdAt: Date.now(),
         workerId: entityId,
         accountId: account.id,
@@ -466,7 +466,7 @@ export async function unlinkRvbAccount(accountId: string) {
     try {
       const { WorkerActivityModel } = await import("../models/worker-activity.model");
       await WorkerActivityModel.create({
-        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: `wka-${uuidv4()}`,
         createdAt: Date.now(),
         workerId: entityId,
         accountId: account.id,
@@ -582,7 +582,7 @@ export async function archiveByLinkedEntity(type: string, entityId: string) {
     try {
       const { WorkerActivityModel } = await import("../models/worker-activity.model");
       await WorkerActivityModel.create({
-        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: `wka-${uuidv4()}`,
         createdAt: Date.now(),
         workerId: entityId,
         accountId: account.id,
@@ -632,7 +632,7 @@ export async function reactivateByLinkedEntity(type: string, entityId: string) {
     try {
       const { WorkerActivityModel } = await import("../models/worker-activity.model");
       await WorkerActivityModel.create({
-        id: `wka-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: `wka-${uuidv4()}`,
         createdAt: Date.now(),
         workerId: entityId,
         accountId: account.id,

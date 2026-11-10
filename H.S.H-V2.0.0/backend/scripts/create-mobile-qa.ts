@@ -26,7 +26,10 @@ async function main() {
   await client.connect();
   const db = client.db();
   const col = db.collection("rvb_accounts");
-  const password = "Mobile123!";
+  const password = process.env.MOBILE_QA_PASSWORD || "Mobile123!";
+  if (!process.env.MOBILE_QA_PASSWORD) {
+    console.warn("[create-mobile-qa] using default QA password; set MOBILE_QA_PASSWORD for non-local QA");
+  }
   const hash = await bcrypt.hash(password, 10);
   for (const qa of QA_ACCOUNTS) {
     const existing = await col.findOne({ tag: qa.tag });

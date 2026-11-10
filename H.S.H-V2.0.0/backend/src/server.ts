@@ -56,6 +56,8 @@ app.use((_req, res, next) => {
   res.setHeader("X-XSS-Protection", "0");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  // HSTS: effective on HTTPS deployments; harmless on localhost HTTP.
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   next();
 });
 
@@ -131,7 +133,46 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+// Readiness: liveness is /api/health; readiness requires a live database.
+// Orchestrators must gate traffic on this (503 = do not route).
+app.get("/api/ready", (_req, res) => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mongoose = require("mongoose").default;
+    if (mongoose.connection.readyState === 1) {
+      res.json({ success: true, ready: true });
+      return;
+    }
+  } catch {}
+  res.status(503).json({ success: false, ready: false, code: "DB_NOT_READY" });
+});
+
+// Request correlation: every /api response carries X-Request-Id (honors an
+// incoming value). Key error logs include it; no contract fields change.
+app.use("/api", (req: any, res: any, next: any) => {
+  try {
+    const incoming = typeof req.headers?.["x-request-id"] === "string" ? (req.headers["x-request-id"] as string).slice(0, 64) : "";
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { v4: uuidv4 } = require("uuid");
+    const id = incoming || `req-${uuidv4()}`;
+    req.requestId = id;
+    res.setHeader("X-Request-Id", id);
+  } catch {}
+  next();
+});
+
 async function startServer() {
+  // Fail fast on missing production configuration (clear message beats a
+  // half-booted server). Development keeps permissive local defaults.
+  if (process.env.NODE_ENV === "production") {
+    const missing = ["MONGODB_URI", "RVB_JWT_ACCESS_SECRET", "RVB_JWT_REFRESH_SECRET"].filter((k) => !process.env[k]);
+    if (missing.length > 0) {
+      throw new Error(`[config] Refusing to start: missing required env: ${missing.join(", ")}`);
+    }
+    if (SERVER_MODE === "full" && process.env.ALLOW_FULL_SERVER_IN_PRODUCTION !== "true") {
+      throw new Error("[config] Refusing to start: SERVER_MODE=full exposes /api/sync,/api/printing,/api/invoices. Set SERVER_MODE=rvb-public or ALLOW_FULL_SERVER_IN_PRODUCTION=true.");
+    }
+  }
   try {
     await connectDatabase();
     // Safe index migration for conversation official private unique bug: ensure old index dropped and new created

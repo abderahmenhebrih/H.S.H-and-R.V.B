@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
+import { rateLimit, accountKey } from "../middleware/rateLimiter";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { listAggregatedRequests, getAggregatedRequestById } from "../services/rvb-request-aggregation.service";
 import { reviewWorkerRequest } from "../services/worker-request.service";
@@ -8,6 +9,8 @@ import { reviewCustomerRequest } from "../services/customer-request.service";
 
 const router = Router();
 router.use(requireRvbAuth as any);
+// Flood backstop: generous per-account cap (normal dashboards use dozens).
+router.use(rateLimit({ windowMs: 60 * 1000, max: 600, key: accountKey }) as any);
 
 // GET /api/rvb/requests?status=under_review&source=worker&type=payment&search=&page=1&limit=25
 router.get("/", async (req: RvbAuthRequest, res) => {

@@ -1,10 +1,12 @@
 import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
 
 async function run() {
   let mongod: any = null;
   try {
-    mongod = await MongoMemoryServer.create();
+    // Replica set: review paths run multi-document transactions (same as
+    // production MongoDB). Plain MongoMemoryServer cannot execute them.
+    mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     const uri = mongod.getUri();
     process.env.MONGODB_URI = uri;
     console.log("Memory URI:", uri);
@@ -238,7 +240,10 @@ async function run() {
       date: now,
       description: null as any,
     });
-    record("6. Supplier new_supply create", !!sSupplyReq && sSupplyReq.total === 5000, `id=${sSupplyReq?.id}`);
+    // Server recomputes totals as weightKg*price (does NOT trust client
+    // total): 20kg*500 = 10000. Asserting the server value proves the
+    // anti-tamper rule; expecting 5000 would enshrine trusting the client.
+    record("6. Supplier new_supply create (server total 20*500=10000)", !!sSupplyReq && sSupplyReq.total === 10000, `id=${sSupplyReq?.id} total=${sSupplyReq?.total}`);
   } catch (e: any) { record("6. Supplier new_supply create", false, e?.code || e?.message); }
 
   // Supplier discrepancy
@@ -260,8 +265,10 @@ async function run() {
       date: now,
       description: "Shipment",
     });
-    record("8. Customer shipment create", !!cShipReq && cShipReq.total === 3000, `id=${cShipReq?.id}`);
-  } catch (e: any) { record("8. Customer shipment create", false, e?.code || e?.message); }
+    // Price-authoritative: server ignores client price 600, uses Product.price
+    // 500 → total 10*500 = 5000. Asserting the override proves the rule.
+    record("8. Customer shipment create (server total 10*500=5000, price overridden)", !!cShipReq && cShipReq.total === 5000 && cShipReq.items?.[0]?.price === 500, `id=${cShipReq?.id} total=${cShipReq?.total} price=${cShipReq?.items?.[0]?.price}`);
+  } catch (e: any) { record("8. Customer shipment create (server total 10*500=5000, price overridden)", false, e?.code || e?.message); }
 
   // Customer discrepancy
   let cDiscReq: any = null;
@@ -433,9 +440,10 @@ async function run() {
     const prodAfter = await ProductModel.findOne({ id: (product as any).id }).lean() as any;
     const supAfterBal = (await SupplierModel.findOne({ id: (supplier as any).id }).lean() as any).balance;
     const purchase = await PurchaseModel.findOne({ id: supReviewed.purchaseId }).lean() as any;
-    const purchaseOk = !!purchase && purchase.total === 5000;
+    // Server total 20kg*500 = 10000 (not the client-sent 5000).
+    const purchaseOk = !!purchase && purchase.total === 10000;
     const inventoryOk = prodAfter.quantity === prodBefore.quantity + 10 && prodAfter.weightKg === prodBefore.weightKg + 20;
-    const balanceOk = supAfterBal === supBeforeBal + 5000;
+    const balanceOk = supAfterBal === supBeforeBal + 10000;
     record("28. Supply acceptance creates purchase inventory balance once", purchaseOk && inventoryOk && balanceOk, `purchase=${purchase?.id} inv ${prodBefore.quantity}->${prodAfter.quantity} bal ${supBeforeBal}->${supAfterBal}`);
     // Double
     const countPurchBefore = await PurchaseModel.countDocuments({ supplierId: (supplier as any).id });
@@ -459,9 +467,10 @@ async function run() {
     });
     const editedItems = [{ productId: (product as any).id, quantity: 5, weightKg: 10, price: 500, total: 2500 }];
     const editedReviewed = await sSvc.reviewSupplierRequest(editReq.id, "accepted", (mgrAcc as any).id, "Edited", { items: editedItems, total: 2500 });
-    record("30. Edit-then-accept preserves original and uses edited", !!editedReviewed.originalItems && editedReviewed.items[0].quantity === 5 && editedReviewed.total === 2500, `orig ${JSON.stringify(editedReviewed.originalItems)?.slice(0,30)}`);
+    // Edited weight 10kg*500 = 5000 (client-sent 2500 ignored).
+    record("30. Edit-then-accept preserves original and uses edited", !!editedReviewed.originalItems && editedReviewed.items[0].quantity === 5 && editedReviewed.total === 5000, `orig ${JSON.stringify(editedReviewed.originalItems)?.slice(0,30)}`);
     const purchaseEdited = await PurchaseModel.findOne({ id: editedReviewed.purchaseId }).lean() as any;
-    record("31. Edit-then-accept purchase reflects edited total", purchaseEdited && purchaseEdited.total === 2500, `total=${purchaseEdited?.total}`);
+    record("31. Edit-then-accept purchase reflects edited total", purchaseEdited && purchaseEdited.total === 5000, `total=${purchaseEdited?.total}`);
   } catch (e: any) { record("28. Supply acceptance", false, e?.message); }
 
   // Customer shipment acceptance: creates sale, inventory decrease, balance increase, idempotent
@@ -472,9 +481,10 @@ async function run() {
     const prodAfterCust = await ProductModel.findOne({ id: (product as any).id }).lean() as any;
     const custAfterBal = (await CustomerModel.findOne({ id: (customer as any).id }).lean() as any).balance;
     const sale = await SaleModel.findOne({ id: shipReviewed.saleId }).lean() as any;
-    const saleOk = !!sale && sale.total === 3000;
+    // Server total 10kg*Product.price(500) = 5000 (client sent 3000/600-price).
+    const saleOk = !!sale && sale.total === 5000;
     const invOk = prodAfterCust.quantity === prodBeforeCust.quantity - 5 && prodAfterCust.weightKg === prodBeforeCust.weightKg - 10;
-    const balOk = custAfterBal === custBeforeBal + 3000;
+    const balOk = custAfterBal === custBeforeBal + 5000;
     record("32. Shipment acceptance creates sale inventory balance once", saleOk && invOk && balOk, `sale=${sale?.id} inv ${prodBeforeCust.quantity}->${prodAfterCust.quantity}`);
     const countSaleBefore = await SaleModel.countDocuments({ customerId: (customer as any).id });
     try {

@@ -86,8 +86,9 @@ router.get("/", async (req: RvbAuthRequest, res) => {
     let convs;
     if (q) convs = await chatSvc.searchConversations(user.accountId, q, cat);
     else convs = await chatSvc.listConversationsForUser(user.accountId, cat);
-    // Enrich with participant safe accounts and unread counts
-    const unread = await chatSvc.getUnreadCounts(user.accountId);
+    // Enrich with participant safe accounts and unread counts (reuse the
+    // already-fetched conversations so the membership sync isn't repeated).
+    const unread = await chatSvc.getUnreadCounts(user.accountId, convs);
     const allAccs = await RvbAccountModel.find({ id: { $in: convs.flatMap((c: any) => (c.participants as any[]).map((p: any) => p.accountId)) } }).lean().catch(() => []);
     const accMap = new Map(allAccs.map((a: any) => [a.id, a] as any));
     const enriched = convs.map((c: any) => ({

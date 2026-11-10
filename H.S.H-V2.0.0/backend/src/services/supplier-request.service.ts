@@ -123,10 +123,12 @@ export async function createSupplierRequest(input: {
   return created.toObject ? created.toObject() : created;
 }
 
-export async function listSupplierRequests(supplierId?: string) {
+export async function listSupplierRequests(supplierId?: string, paging?: { skip: number; limit: number }) {
   const filter: any = {};
   if (supplierId) filter.supplierId = supplierId;
-  const docs = await SupplierRequestModel.find(filter).sort({ submittedAt: -1 }).lean();
+  let q = SupplierRequestModel.find(filter).sort({ submittedAt: -1 });
+  if (paging) q = q.skip(paging.skip).limit(paging.limit);
+  const docs = await q.lean();
   return docs;
 }
 

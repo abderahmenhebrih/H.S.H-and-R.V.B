@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
+import { CustomerRequestModel } from "../models/customer-request.model";
 import { createCustomerRequest, listCustomerRequests, reviewCustomerRequest } from "../services/customer-request.service";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
@@ -17,6 +19,7 @@ router.get("/", async (req: RvbAuthRequest, res) => {
       return;
     }
     const { customerId } = req.query as any;
+    const paging = parsePaging(req.query, { defaultLimit: 50 });
     if (role === "customer") {
       const linkedId = (user.account as any)?.linkedEntityId;
       const linkedType = (user.account as any)?.linkedEntityType;
@@ -24,14 +27,18 @@ router.get("/", async (req: RvbAuthRequest, res) => {
         res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
         return;
       }
-      const docs = await listCustomerRequests(linkedId);
-      res.json({ success: true, requests: docs });
+      const docs = await listCustomerRequests(linkedId, paging ?? undefined);
+      const extra = paging
+        ? pagingMeta(await CustomerRequestModel.countDocuments({ customerId: linkedId }), paging)
+        : {};
+      res.json({ success: true, requests: docs, ...extra });
       return;
     }
     // Manager/Supervisor can see all or filtered
     const cid = customerId && !Array.isArray(customerId) ? customerId : Array.isArray(customerId) ? customerId[0] : undefined;
-    const docs = await listCustomerRequests(cid);
-    res.json({ success: true, requests: docs });
+    const docs = await listCustomerRequests(cid, paging ?? undefined);
+    const extra = paging ? pagingMeta(await CustomerRequestModel.countDocuments(cid ? { customerId: cid } : {}), paging) : {};
+    res.json({ success: true, requests: docs, ...extra });
   } catch (e) {
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
   }

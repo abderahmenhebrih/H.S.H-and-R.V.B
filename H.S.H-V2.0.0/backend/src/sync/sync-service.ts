@@ -2679,30 +2679,9 @@ export async function getChangesAfter(
   return { changes: mapped, nextRevision, hasMore, currentRevision };
 }
 
-export async function getBootstrapData(): Promise<{ changes: SyncChange[]; currentRevision: number }> {
-  const currentRevision = await getCurrentRevision();
-  // If no SyncChange history, we need to snapshot existing Mongo collections
-  const count = await SyncChangeModel.countDocuments();
-  if (count === 0) {
-    // Seed from existing data: iterate all models and create synthetic changes at revision 0
-    // For bootstrap, we will collect all entities and return as creates with revision 0
-    // But to avoid huge snapshot, return empty and let client know revision 0
-    // Client will then do snapshot via separate bootstrap endpoint that dumps all entities
-    return { changes: [], currentRevision };
-  }
-  const all = await SyncChangeModel.find().sort({ revision: 1 }).lean();
-  const mapped: SyncChange[] = all.map((c: any) => ({
-    revision: c.revision,
-    entity: c.entity,
-    entityId: c.entityId,
-    operation: c.operation,
-    payload: c.payload,
-    changedAt: c.changedAt,
-    sourceClientId: c.sourceClientId,
-    operationId: c.operationId,
-  }));
-  return { changes: mapped, currentRevision };
-}
+// getBootstrapData removed 2026-11-10 (dead code, zero callers repo-wide; live
+// bootstrap is GET /api/sync/bootstrap in routes/sync.ts). Recoverable from git
+// history if the chunked-bootstrap protocol needs its mapping shape.
 
 
 

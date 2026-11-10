@@ -255,9 +255,10 @@ export async function printPdfToPrinter(
 
   const printPromise = print(pdfPath, printOptions);
   const timeoutMs = 20000;
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("Print job timed out. Printer may be unavailable or requires manual interaction (e.g., Microsoft Print to PDF needs a save dialog). Please try a physical printer or use 'Open system print dialog'." )), timeoutMs)
-  );
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error("Print job timed out. Printer may be unavailable or requires manual interaction (e.g., Microsoft Print to PDF needs a save dialog). Please try a physical printer or use 'Open system print dialog'." )), timeoutMs);
+  });
 
   try {
     await Promise.race([printPromise, timeoutPromise]);
@@ -272,5 +273,8 @@ export async function printPdfToPrinter(
       throw new Error(`Printer does not support the requested sides setting (${opts.side}). ${msg}`);
     }
     throw error;
+  } finally {
+    // The timer holds the event loop; always release it once settled.
+    if (timeoutHandle) clearTimeout(timeoutHandle);
   }
 }

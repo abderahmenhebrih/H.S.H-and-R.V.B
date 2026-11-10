@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
 import { WorkerRequestModel } from "../models/worker-request.model";
 import { createWorkerRequest, listWorkerRequests, reviewWorkerRequest } from "../services/worker-request.service";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
@@ -19,9 +20,13 @@ router.get("/", async (req: RvbAuthRequest, res) => {
     const { workerId } = req.query as any;
     const wid = Array.isArray(workerId) ? workerId[0] : workerId;
     const role = user.role;
+    const paging = parsePaging(req.query, { defaultLimit: 50 });
     if (role === "manager") {
-      const docs = await listWorkerRequests(wid);
-      res.json({ success: true, requests: docs });
+      const docs = await listWorkerRequests(wid, paging ?? undefined);
+      const extra = paging
+        ? pagingMeta(await WorkerRequestModel.countDocuments(wid ? { workerId: wid } : {}), paging)
+        : {};
+      res.json({ success: true, requests: docs, ...extra });
       return;
     }
     if (role === "worker" || role === "supervisor") {
@@ -35,8 +40,9 @@ router.get("/", async (req: RvbAuthRequest, res) => {
         res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
         return;
       }
-      const docs = await listWorkerRequests(linkedId);
-      res.json({ success: true, requests: docs });
+      const docs = await listWorkerRequests(linkedId, paging ?? undefined);
+      const extra = paging ? pagingMeta(await WorkerRequestModel.countDocuments({ workerId: linkedId }), paging) : {};
+      res.json({ success: true, requests: docs, ...extra });
       return;
     }
     // supplier, customer, etc

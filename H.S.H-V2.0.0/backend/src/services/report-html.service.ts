@@ -88,17 +88,22 @@ async function buildReportPagesHtml(opts: GenerateHtmlOptions): Promise<string> 
     console.warn("[report-html] DB not connected (readyState", mongoose.connection.readyState, ") — using empty data for PDF generation");
   } else {
     try {
+      // Date-bounded collections are filtered in the database (same inclusive
+      // [fromTs, toTs] semantics as the JS filter below — narrow ranges then
+      // transfer far fewer documents). Entity master lists stay complete
+      // (dropdown options + hasActivity need them).
+      const inRange = { date: { $gte: fromTs, $lte: toTs } };
       [customers, suppliers, accounts, workers, expenses, vehicles, purchases, sales, payments, transfers, products] = await Promise.all([
         CustomerModel.find().lean(),
         SupplierModel.find().lean(),
         BankAccountModel.find().lean(),
         WorkerModel.find().lean(),
-        ExpenseModel.find().lean(),
+        ExpenseModel.find(inRange).lean(),
         VehicleModel.find().lean(),
-        PurchaseModel.find().lean(),
-        SaleModel.find().lean(),
-        PaymentModel.find().lean(),
-        TransferModel.find().lean(),
+        PurchaseModel.find(inRange).lean(),
+        SaleModel.find(inRange).lean(),
+        PaymentModel.find(inRange).lean(),
+        TransferModel.find(inRange).lean(),
         ProductModel.find().lean(),
       ]);
     } catch (e) {

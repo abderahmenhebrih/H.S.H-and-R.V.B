@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
 import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { CustomerModel } from "../models/customer.model";
@@ -28,15 +29,22 @@ function sanitize(doc: any) {
   return rest;
 }
 
-// GET /api/rvb/customers -> list
-router.get("/", async (_req: RvbAuthRequest, res) => {
+// GET /api/rvb/customers -> list (optional ?page=&limit=; absent preserves full list)
+router.get("/", async (req: RvbAuthRequest, res) => {
   try {
-    const docs = await CustomerModel.find().sort({ createdAt: -1 }).lean();
+    const paging = parsePaging(req.query, { defaultLimit: 100 });
+    let q = CustomerModel.find().sort({ createdAt: -1 });
+    if (paging) q = q.skip(paging.skip).limit(paging.limit);
+    const docs = await q.lean();
     const cleaned = docs.map((d: any) => {
       const { _id, __v, ...rest } = d;
       return rest;
     });
-    res.json({ success: true, customers: cleaned });
+    res.json({
+      success: true,
+      customers: cleaned,
+      ...(paging ? pagingMeta(await CustomerModel.countDocuments({}), paging) : {}),
+    });
   } catch (e: any) {
     console.error("GET customers failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });

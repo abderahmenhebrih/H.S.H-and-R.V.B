@@ -87,6 +87,17 @@ export async function listAggregatedRequests(params: {
   // Build filters per source
   const statusFilter: any = {};
   if (status && status !== "all") statusFilter.status = status;
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const safePage = Math.max(page, 1);
+  // Bounded window per source that provably covers the requested page slice:
+  // every item of page N in merge order sits within the first N*pageSize rows
+  // of its own source in merge order. Only usable without free-text search
+  // (search matches normalized joined fields — names/tags — which cannot be
+  // pushed without changing results, so the search path keeps full fidelity).
+  const searching = !!(search && search.trim());
+  const asc = (status || "under_review") === "under_review";
+  const sortDir = asc ? 1 : -1;
+  const perSourceNeed = safePage * safeLimit;
 
   const typeFilterWorker = type && type !== "all" ? type : null;
   const typeFilterSupplier = type && type !== "all" ? type : null;
@@ -96,6 +107,11 @@ export async function listAggregatedRequests(params: {
   let workerDocs: any[] = [];
   let supplierDocs: any[] = [];
   let customerDocs: any[] = [];
+  // Type-only filters (no status) for exact server-side counts on the
+  // bounded (no-search) path.
+  let workerCountBase: any = {};
+  let supplierCountBase: any = {};
+  let customerCountBase: any = {};
 
   const needWorker = !source || source === "all" ? allowedSources.includes("worker") : source === "worker" && allowedSources.includes("worker");
   const needSupplier = !source || source === "all" ? allowedSources.includes("supplier") : source === "supplier" && allowedSources.includes("supplier");
@@ -107,39 +123,51 @@ export async function listAggregatedRequests(params: {
   }
 
   if (needWorker) {
-    const q: any = { ...statusFilter };
+    const typeQ: any = {};
     if (typeFilterWorker) {
       // Map human type to raw? Frontend sends raw ids: payment, loan, discrepancy . We'll use raw.
       // For supply filter, we need to handle generic discrepancy shared. If type === "discrepancy", should match worker discrepancy.
       const raw = typeFilterWorker;
-      if (["payment", "loan", "discrepancy"].includes(raw)) q.type = raw;
-      else q.type = "__none__"; // will yield empty
+      if (["payment", "loan", "discrepancy"].includes(raw)) typeQ.type = raw;
+      else typeQ.type = "__none__"; // will yield empty
     }
-    workerDocs = await WorkerRequestModel.find(q).lean();
+    const q: any = { ...typeQ, ...statusFilter };
+    workerDocs = searching
+      ? await WorkerRequestModel.find(q).lean()
+      : await WorkerRequestModel.find(q).sort({ submittedAt: sortDir }).limit(perSourceNeed).lean();
+    workerCountBase = typeQ;
   }
   if (needSupplier) {
-    const q: any = { ...statusFilter };
+    const typeQ: any = {};
     if (typeFilterSupplier) {
       const raw = typeFilterSupplier;
       // supplier types: new_supply, discrepancy
       // For uniform filter like "new_supply" / "insert_shipment" etc., map correctly
-      if (raw === "new_supply" || raw === "supply") q.type = "new_supply";
-      else if (raw === "discrepancy") q.type = "discrepancy";
-      else if (["payment", "loan", "insert_shipment"].includes(raw)) q.type = "__none__";
-      else q.type = raw;
+      if (raw === "new_supply" || raw === "supply") typeQ.type = "new_supply";
+      else if (raw === "discrepancy") typeQ.type = "discrepancy";
+      else if (["payment", "loan", "insert_shipment"].includes(raw)) typeQ.type = "__none__";
+      else typeQ.type = raw;
     }
-    supplierDocs = await SupplierRequestModel.find(q).lean();
+    const q: any = { ...typeQ, ...statusFilter };
+    supplierDocs = searching
+      ? await SupplierRequestModel.find(q).lean()
+      : await SupplierRequestModel.find(q).sort({ submittedAt: sortDir }).limit(perSourceNeed).lean();
+    supplierCountBase = typeQ;
   }
   if (needCustomer) {
-    const q: any = { ...statusFilter };
+    const typeQ: any = {};
     if (typeFilterCustomer) {
       const raw = typeFilterCustomer;
-      if (raw === "insert_shipment" || raw === "shipment") q.type = "insert_shipment";
-      else if (raw === "discrepancy") q.type = "discrepancy";
-      else if (["payment", "loan", "new_supply"].includes(raw)) q.type = "__none__";
-      else q.type = raw;
+      if (raw === "insert_shipment" || raw === "shipment") typeQ.type = "insert_shipment";
+      else if (raw === "discrepancy") typeQ.type = "discrepancy";
+      else if (["payment", "loan", "new_supply"].includes(raw)) typeQ.type = "__none__";
+      else typeQ.type = raw;
     }
-    customerDocs = await CustomerRequestModel.find(q).lean();
+    const q: any = { ...typeQ, ...statusFilter };
+    customerDocs = searching
+      ? await CustomerRequestModel.find(q).lean()
+      : await CustomerRequestModel.find(q).sort({ submittedAt: sortDir }).limit(perSourceNeed).lean();
+    customerCountBase = typeQ;
   }
 
   // Collect entity ids to bulk fetch names and tags
@@ -250,27 +278,56 @@ export async function listAggregatedRequests(params: {
     all.sort((a, b) => b.submittedAt - a.submittedAt);
   }
 
-  const total = all.length;
-  const safeLimit = Math.min(Math.max(limit, 1), 100);
-  const safePage = Math.max(page, 1);
   const start = (safePage - 1) * safeLimit;
   const paged = all.slice(start, start + safeLimit);
 
   // KPI aggregation (over full filtered set before pagination but after search/source/status/type? We need total counts)
   // For KPI we compute from all (total) before pagination
-  const kpi = {
-    total,
-    underReview: all.filter((r) => r.status === "under_review").length,
-    accepted: all.filter((r) => r.status === "accepted").length,
-    rejected: all.filter((r) => r.status === "rejected").length,
-  };
+  // No-search path: exact counts come from the database (the merged window
+  // above only covers the requested page slice). Status filter semantics
+  // match the JS version: counts are taken over the type-filtered set, then
+  // restricted to the requested status when a status filter is set.
+  let kpi: { total: number; underReview: number; accepted: number; rejected: number };
+  let totalCount = all.length;
+  if (searching) {
+    kpi = {
+      total: totalCount,
+      underReview: all.filter((r) => r.status === "under_review").length,
+      accepted: all.filter((r) => r.status === "accepted").length,
+      rejected: all.filter((r) => r.status === "rejected").length,
+    };
+  } else {
+    const countByStatus = async (model: any, base: any) => {
+      try {
+        const rows = await model.aggregate([{ $match: base }, { $group: { _id: "$status", n: { $sum: 1 } } }]);
+        const m: Record<string, number> = {};
+        for (const r of rows as any[]) m[String(r._id)] = Number(r.n) || 0;
+        return m;
+      } catch {
+        return {} as Record<string, number>;
+      }
+    };
+    const [wCounts, sCounts, cCounts] = await Promise.all([
+      needWorker ? countByStatus(WorkerRequestModel, workerCountBase) : Promise.resolve({} as Record<string, number>),
+      needSupplier ? countByStatus(SupplierRequestModel, supplierCountBase) : Promise.resolve({} as Record<string, number>),
+      needCustomer ? countByStatus(CustomerRequestModel, customerCountBase) : Promise.resolve({} as Record<string, number>),
+    ]);
+    const sumStatus = (st: string) => (wCounts[st] || 0) + (sCounts[st] || 0) + (cCounts[st] || 0);
+    const matchStatus = status && status !== "all" ? status : null;
+    const sumAll = (m: Record<string, number>) => Object.values(m).reduce((a, b) => a + b, 0);
+    totalCount = matchStatus
+      ? sumStatus(matchStatus)
+      : sumAll(wCounts) + sumAll(sCounts) + sumAll(cCounts);
+    const pick = (st: string) => (matchStatus ? (matchStatus === st ? totalCount : 0) : sumStatus(st));
+    kpi = { total: totalCount, underReview: pick("under_review"), accepted: pick("accepted"), rejected: pick("rejected") };
+  }
 
   return {
     requests: paged,
-    total,
+    total: totalCount,
     page: safePage,
     limit: safeLimit,
-    totalPages: Math.ceil(total / safeLimit),
+    totalPages: Math.ceil(totalCount / safeLimit),
     kpi,
   };
 }

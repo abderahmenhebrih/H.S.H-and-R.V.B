@@ -1,4 +1,5 @@
 ﻿import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
 import { requireRvbAuth } from "../middleware/rvb-auth";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { RvbAccountModel } from "../models/rvb-account.model";
@@ -126,12 +127,19 @@ router.get("/worker/financial-events", async (req: RvbAuthRequest, res) => {
       return;
     }
     // Filtered server-side: always by linked workerId, ignore query
-    const events = await WorkerFinancialEventModel.find({ workerId: linkedId }).sort({ createdAt: -1 }).lean();
+    // Optional pagination (?page=&limit=); absent params preserve the legacy full list.
+    const paging = parsePaging(req.query, { defaultLimit: 50 });
+    let eventsQuery = WorkerFinancialEventModel.find({ workerId: linkedId }).sort({ createdAt: -1 });
+    if (paging) eventsQuery = eventsQuery.skip(paging.skip).limit(paging.limit);
+    const events = await eventsQuery.lean();
     const cleaned = events.map((d: any) => {
       const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
-    res.json({ success: true, workerId: linkedId, events: cleaned });
+    const extra = paging
+      ? pagingMeta(await WorkerFinancialEventModel.countDocuments({ workerId: linkedId }), paging)
+      : {};
+    res.json({ success: true, workerId: linkedId, events: cleaned, ...extra });
   } catch (e: any) {
     console.error("portal worker financial-events failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
@@ -208,12 +216,17 @@ router.get("/supplier/purchases", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_LINKED_ENTITY_NOT_FOUND" });
       return;
     }
-    const purchases = await PurchaseModel.find({ supplierId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
+    const purchaseFilter = { supplierId: linkedId };
+    const paging = parsePaging(req.query, { defaultLimit: 50 });
+    let purchasesQuery = PurchaseModel.find(purchaseFilter).sort({ date: -1, createdAt: -1 });
+    if (paging) purchasesQuery = purchasesQuery.skip(paging.skip).limit(paging.limit);
+    const purchases = await purchasesQuery.lean();
     const cleaned = purchases.map((d: any) => {
       const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
-    res.json({ success: true, supplierId: linkedId, purchases: cleaned });
+    const extra = paging ? pagingMeta(await PurchaseModel.countDocuments(purchaseFilter), paging) : {};
+    res.json({ success: true, supplierId: linkedId, purchases: cleaned, ...extra });
   } catch (e: any) {
     console.error("portal supplier purchases failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
@@ -235,12 +248,17 @@ router.get("/supplier/payments", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_LINKED_ENTITY_NOT_FOUND" });
       return;
     }
-    const payments = await PaymentModel.find({ entityType: "supplier", entityId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
+    const paymentFilter: any = { entityType: "supplier", entityId: linkedId };
+    const paging = parsePaging(req.query, { defaultLimit: 50 });
+    let paymentsQuery = PaymentModel.find(paymentFilter).sort({ date: -1, createdAt: -1 });
+    if (paging) paymentsQuery = paymentsQuery.skip(paging.skip).limit(paging.limit);
+    const payments = await paymentsQuery.lean();
     const cleaned = payments.map((d: any) => {
       const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
-    res.json({ success: true, supplierId: linkedId, payments: cleaned });
+    const extra = paging ? pagingMeta(await PaymentModel.countDocuments(paymentFilter), paging) : {};
+    res.json({ success: true, supplierId: linkedId, payments: cleaned, ...extra });
   } catch (e: any) {
     console.error("portal supplier payments failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
@@ -290,12 +308,17 @@ router.get("/customer/sales", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_LINKED_ENTITY_NOT_FOUND" });
       return;
     }
-    const sales = await SaleModel.find({ customerId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
+    const saleFilter = { customerId: linkedId };
+    const salePaging = parsePaging(req.query, { defaultLimit: 50 });
+    let salesQuery = SaleModel.find(saleFilter).sort({ date: -1, createdAt: -1 });
+    if (salePaging) salesQuery = salesQuery.skip(salePaging.skip).limit(salePaging.limit);
+    const sales = await salesQuery.lean();
     const cleaned = sales.map((d: any) => {
       const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
-    res.json({ success: true, customerId: linkedId, sales: cleaned });
+    const saleExtra = salePaging ? pagingMeta(await SaleModel.countDocuments(saleFilter), salePaging) : {};
+    res.json({ success: true, customerId: linkedId, sales: cleaned, ...saleExtra });
   } catch (e: any) {
     console.error("portal customer sales failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
@@ -317,12 +340,17 @@ router.get("/customer/payments", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_LINKED_ENTITY_NOT_FOUND" });
       return;
     }
-    const payments = await PaymentModel.find({ entityType: "customer", entityId: linkedId }).sort({ date: -1, createdAt: -1 }).lean();
+    const custPayFilter: any = { entityType: "customer", entityId: linkedId };
+    const custPayPaging = parsePaging(req.query, { defaultLimit: 50 });
+    let custPayQuery = PaymentModel.find(custPayFilter).sort({ date: -1, createdAt: -1 });
+    if (custPayPaging) custPayQuery = custPayQuery.skip(custPayPaging.skip).limit(custPayPaging.limit);
+    const payments = await custPayQuery.lean();
     const cleaned = payments.map((d: any) => {
       const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
     });
-    res.json({ success: true, customerId: linkedId, payments: cleaned });
+    const custPayExtra = custPayPaging ? pagingMeta(await PaymentModel.countDocuments(custPayFilter), custPayPaging) : {};
+    res.json({ success: true, customerId: linkedId, payments: cleaned, ...custPayExtra });
   } catch (e: any) {
     console.error("portal customer payments failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });
@@ -344,7 +372,11 @@ router.get("/customer/orders", async (req: RvbAuthRequest, res) => {
       res.status(404).json({ success: false, code: "RVB_LINKED_ENTITY_NOT_FOUND" });
       return;
     }
-    const orders = await CustomerOrderModel.find({ customerId: linkedId }).sort({ submittedAt: -1 }).lean();
+    const orderFilter = { customerId: linkedId };
+    const orderPaging = parsePaging(req.query, { defaultLimit: 50 });
+    let ordersQuery = CustomerOrderModel.find(orderFilter).sort({ submittedAt: -1 });
+    if (orderPaging) ordersQuery = ordersQuery.skip(orderPaging.skip).limit(orderPaging.limit);
+    const orders = await ordersQuery.lean();
     const cleaned = orders.map((d: any) => {
       const { _id, __v, syncStatus, serverRevision, lastSyncedAt, ...rest } = d;
       return rest;
@@ -356,7 +388,8 @@ router.get("/customer/orders", async (req: RvbAuthRequest, res) => {
       customerName = cust?.name || null;
     } catch {}
     const enriched = cleaned.map((o: any) => ({ ...o, customerName }));
-    res.json({ success: true, customerId: linkedId, orders: enriched });
+    const orderExtra = orderPaging ? pagingMeta(await CustomerOrderModel.countDocuments(orderFilter), orderPaging) : {};
+    res.json({ success: true, customerId: linkedId, orders: enriched, ...orderExtra });
   } catch (e: any) {
     console.error("portal customer orders failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });

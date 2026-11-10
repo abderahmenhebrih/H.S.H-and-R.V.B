@@ -120,6 +120,46 @@ router.get("/bootstrap", async (req, res) => {
   }
 });
 
+router.get("/snapshot", async (req, res) => {
+  // Additive chunked snapshot: per-entity keyset paging over unique `id`.
+  // The legacy GET /bootstrap is untouched. Clients page with
+  // ?entity=sale&cursor=<last id>&limit=200 until hasMore=false, then pull
+  // /changes after the returned currentRevision to cover concurrent writes.
+  try {
+    const entity = typeof req.query.entity === "string" ? req.query.entity : "";
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor.length > 0 ? req.query.cursor : null;
+    const rawLimit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : NaN;
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 500) : 200;
+    let model: any;
+    try {
+      model = getModel(entity);
+    } catch {
+      res.status(400).json({ docs: [], nextCursor: null, hasMore: false, currentRevision: 0 });
+      return;
+    }
+    const currentRevision = await getCurrentRevision();
+    const filter: any = cursor ? { id: { $gt: cursor } } : {};
+    if (entity === "notification") filter.channel = "hsh";
+    const rows: any[] = await model.find(filter).sort({ id: 1 }).limit(limit + 1).lean();
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const docs = page.map((d: any) => {
+      const { _id, __v, ...rest } = d;
+      return rest;
+    });
+    res.json({
+      entity,
+      docs,
+      nextCursor: docs.length > 0 ? docs[docs.length - 1].id : null,
+      hasMore,
+      currentRevision,
+    });
+  } catch (error) {
+    console.error("Snapshot failed:", error);
+    res.status(500).json({ docs: [], nextCursor: null, hasMore: false, currentRevision: 0 });
+  }
+});
+
 router.get("/status", async (_req, res) => {
   try {
     const currentRevision = await getCurrentRevision();

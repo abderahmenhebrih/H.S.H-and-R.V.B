@@ -96,6 +96,8 @@ export function startRvbChatReminderProcessor(intervalMs = 45000): void {
   };
   setTimeout(tick, 5000);
   intervalHandle = setInterval(tick, intervalMs);
+  // Do not keep the process alive for this background job alone.
+  intervalHandle.unref();
   // eslint-disable-next-line no-console
   console.log("[reminder] processor started, interval", intervalMs);
 }

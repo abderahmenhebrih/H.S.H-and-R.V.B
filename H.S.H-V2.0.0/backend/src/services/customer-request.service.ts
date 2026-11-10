@@ -117,10 +117,12 @@ export async function createCustomerRequest(input: {
   return created.toObject ? created.toObject() : created;
 }
 
-export async function listCustomerRequests(customerId?: string) {
+export async function listCustomerRequests(customerId?: string, paging?: { skip: number; limit: number }) {
   const filter: any = {};
   if (customerId) filter.customerId = customerId;
-  const docs = await CustomerRequestModel.find(filter).sort({ submittedAt: -1 }).lean();
+  let q = CustomerRequestModel.find(filter).sort({ submittedAt: -1 });
+  if (paging) q = q.skip(paging.skip).limit(paging.limit);
+  const docs = await q.lean();
   return docs;
 }
 

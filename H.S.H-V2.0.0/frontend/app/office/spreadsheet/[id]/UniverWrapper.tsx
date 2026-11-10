@@ -587,11 +587,13 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
         }, 500);
 
         // Listen for command executed to trigger save
+        let stopListening: (() => void) | null = null;
         try {
           // Univer command listener: universal via `univerAPI.onCommandExecuted` or `univer.onCommandExecuted`
           const maybeOn = (univerAPI as any).onCommandExecuted || (univer as any).onCommandExecuted;
           if (typeof maybeOn === "function") {
-            maybeOn(() => scheduleSave());
+            const off = maybeOn(() => scheduleSave());
+            if (typeof off === "function") stopListening = off;
           }
         } catch {}
 
@@ -607,6 +609,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
         }, 1200);
         dispose = () => {
           clearInterval(interval);
+          try { if (stopListening) stopListening(); } catch {}
           // Flush pending changed snapshot BEFORE clearing timer/disposal
           try {
             const snap = getSnapshot();

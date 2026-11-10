@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
 import { RvbAccountModel } from "../models/rvb-account.model";
 import { WorkerModel } from "../models/worker.model";
 import { SupplierModel } from "../models/supplier.model";
@@ -121,13 +122,20 @@ router.get("/linkable", async (req, res) => {
   }
 });
 
-// GET /api/rvb/accounts
-router.get("/", async (_req, res) => {
+// GET /api/rvb/accounts (optional ?page=&limit=; absent preserves full list)
+router.get("/", async (req: any, res) => {
   try {
-    const docs = await RvbAccountModel.find().sort({ createdAt: -1 }).lean();
+    const paging = parsePaging(req.query, { defaultLimit: 100 });
+    let q = RvbAccountModel.find().sort({ createdAt: -1 });
+    if (paging) q = q.skip(paging.skip).limit(paging.limit);
+    const docs = await q.lean();
     const cleaned = docs.map((d: any) => toSafeRvbAccount(d));
     const enriched = await enrichAccountsWithDisplayName(cleaned);
-    res.json({ success: true, accounts: enriched });
+    res.json({
+      success: true,
+      accounts: enriched,
+      ...(paging ? pagingMeta(await RvbAccountModel.countDocuments({}), paging) : {}),
+    });
   } catch (e) {
     console.error("GET rvb accounts failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });

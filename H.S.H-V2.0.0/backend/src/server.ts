@@ -149,6 +149,13 @@ async function startServer() {
     } catch (e) {
       console.warn("notification migration failed", (e as any)?.message);
     }
+    // RVB portal list compounds (additive, idempotent; safe to skip offline)
+    try {
+      const { ensurePortalListIndexes } = await import("./models/portal-list-indexes");
+      await ensurePortalListIndexes();
+    } catch (e) {
+      console.warn("portal list indexes failed", (e as any)?.message);
+    }
   } catch (error) {
     console.warn(
       "Database connection failed, continuing without DB (printing will use fallback):",
@@ -195,9 +202,7 @@ async function startServer() {
   }
   // Chat media orphan cleanup: bounded 6h interval, delayed first tick, never
   // blocks startup. The interval is unref'd and stoppable via
-  // stopChatUploadCleanupProcessor() (production server.ts has no SIGTERM /
-  // SIGINT shutdown handlers, so nothing is added here that could change
-  // Render's graceful-shutdown semantics).
+  // stopChatUploadCleanupProcessor() below on shutdown.
   try {
     const { startChatUploadCleanupProcessor } = await import("./services/chat-upload-cleanup.processor");
     startChatUploadCleanupProcessor();
@@ -207,6 +212,46 @@ async function startServer() {
   httpServer.listen(PORT, () => {
     console.log(`Backend server running on http://localhost:${PORT}`);
   });
+
+  // Graceful shutdown (Render sends SIGTERM and waits before SIGKILL; local
+  // Ctrl+C sends SIGINT). Stop accepting, halt background processors, then
+  // disconnect mongoose. A forced-exit fallback guards against hung sockets.
+  // Best-effort only: failures here must never crash shutdown itself.
+  let shuttingDown = false;
+  const gracefulShutdown = (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    void (async () => {
+      try {
+        console.log(`[server] ${signal} received, draining...`);
+      } catch {}
+      try {
+        const { stopRvbChatReminderProcessor } = await import("./services/rvb-chat-reminder.processor");
+        stopRvbChatReminderProcessor();
+      } catch {}
+      try {
+        const { stopChatUploadCleanupProcessor } = await import("./services/chat-upload-cleanup.processor");
+        stopChatUploadCleanupProcessor();
+      } catch {}
+      const forceExit = setTimeout(() => process.exit(0), 10_000);
+      try {
+        (forceExit as any).unref?.();
+      } catch {}
+      try {
+        await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+      } catch {}
+      try {
+        const mongoose = (await import("mongoose")).default;
+        await mongoose.disconnect();
+      } catch {}
+      try {
+        clearTimeout(forceExit);
+      } catch {}
+      process.exit(0);
+    })();
+  };
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 startServer();

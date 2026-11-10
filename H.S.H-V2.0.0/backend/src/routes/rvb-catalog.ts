@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
 import { requireRvbAuth } from "../middleware/rvb-auth";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
 import { ProductModel } from "../models/product.model";
@@ -31,7 +32,10 @@ router.get("/products", async (req: RvbAuthRequest, res) => {
       }
     }
 
-    const products = await ProductModel.find().sort({ name: 1 }).lean();
+    const catPaging = parsePaging(req.query, { defaultLimit: 100 });
+    let productsQuery = ProductModel.find().sort({ name: 1 });
+    if (catPaging) productsQuery = productsQuery.skip(catPaging.skip).limit(catPaging.limit);
+    const products = await productsQuery.lean();
 
     // Safe DTOs: never expose exact quantity/weightKg/taxProfileId to portal
     // Customer: id, name, price, description, available (derived, not exact stock)
@@ -50,7 +54,12 @@ router.get("/products", async (req: RvbAuthRequest, res) => {
       return base;
     });
 
-    res.json({ success: true, for: scope, products: safe });
+    res.json({
+      success: true,
+      for: scope,
+      products: safe,
+      ...(catPaging ? pagingMeta(await ProductModel.countDocuments({}), catPaging) : {}),
+    });
   } catch (e: any) {
     console.error("GET catalog products failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR" });

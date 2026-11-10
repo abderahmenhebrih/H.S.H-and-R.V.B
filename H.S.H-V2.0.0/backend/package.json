@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx test-pagination.ts && tsx test-chat-unread-reuse.ts && tsx test-hsh-sync-integrity.ts",
     "start": "node dist/server.js",
     "rvb:bootstrap-manager": "tsx scripts/bootstrap-rvb-manager.ts",
     "test:hsh-sync": "tsx test-hsh-sync-integrity.ts"

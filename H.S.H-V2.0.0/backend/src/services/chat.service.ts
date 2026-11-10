@@ -939,8 +939,10 @@ export async function listMessages(conversationId: string, requesterId: string, 
   return reversed.map((m: any) => toSafeMessage(m, isManager));
 }
 
-export async function getUnreadCounts(accountId: string) {
-  const convs = await listConversationsForUser(accountId);
+export async function getUnreadCounts(accountId: string, conversations?: any[]) {
+  // When the caller already listed conversations (e.g. GET /chats), reuse them:
+  // re-listing would repeat the full membership sync + conversation scans.
+  const convs = conversations ?? (await listConversationsForUser(accountId));
   if (convs.length === 0) return {};
   const convIds = (convs as any[]).map((c) => c.id);
   const counts: Record<string, number> = {};

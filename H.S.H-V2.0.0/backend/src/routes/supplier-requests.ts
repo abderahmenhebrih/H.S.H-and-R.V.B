@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
+import { SupplierRequestModel } from "../models/supplier-request.model";
 import { createSupplierRequest, listSupplierRequests, reviewSupplierRequest } from "../services/supplier-request.service";
 import { requireRvbAuth, requireRvbRole } from "../middleware/rvb-auth";
 import type { RvbAuthRequest } from "../middleware/rvb-auth";
@@ -14,9 +16,13 @@ router.get("/", async (req: RvbAuthRequest, res) => {
     const { supplierId } = req.query as any;
     const sid = supplierId && !Array.isArray(supplierId) ? supplierId : Array.isArray(supplierId) ? supplierId[0] : undefined;
     const role = user.role;
+    const paging = parsePaging(req.query, { defaultLimit: 50 });
     if (role === "manager") {
-      const docs = await listSupplierRequests(sid);
-      res.json({ success: true, requests: docs });
+      const docs = await listSupplierRequests(sid, paging ?? undefined);
+      const extra = paging
+        ? pagingMeta(await SupplierRequestModel.countDocuments(sid ? { supplierId: sid } : {}), paging)
+        : {};
+      res.json({ success: true, requests: docs, ...extra });
       return;
     }
     if (role === "supplier") {
@@ -30,8 +36,11 @@ router.get("/", async (req: RvbAuthRequest, res) => {
         res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });
         return;
       }
-      const docs = await listSupplierRequests(linkedId);
-      res.json({ success: true, requests: docs });
+      const docs = await listSupplierRequests(linkedId, paging ?? undefined);
+      const extra = paging
+        ? pagingMeta(await SupplierRequestModel.countDocuments({ supplierId: linkedId }), paging)
+        : {};
+      res.json({ success: true, requests: docs, ...extra });
       return;
     }
     res.status(403).json({ success: false, code: "RVB_FORBIDDEN" });

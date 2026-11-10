@@ -104,10 +104,12 @@ export async function createWorkerRequest(input: CreateWorkerRequestInput) {
   return created.toObject ? created.toObject() : created;
 }
 
-export async function listWorkerRequests(workerId?: string) {
+export async function listWorkerRequests(workerId?: string, paging?: { skip: number; limit: number }) {
   const filter: any = {};
   if (workerId) filter.workerId = workerId;
-  const docs = await WorkerRequestModel.find(filter).sort({ submittedAt: -1 }).lean();
+  let q = WorkerRequestModel.find(filter).sort({ submittedAt: -1 });
+  if (paging) q = q.skip(paging.skip).limit(paging.limit);
+  const docs = await q.lean();
   return docs;
 }
 

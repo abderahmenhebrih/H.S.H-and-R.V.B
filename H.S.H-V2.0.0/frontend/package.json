@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/check-i18n-parity.ts && tsx test-notification-i18n.ts && tsx test-notification-presentation.ts && tsx test-date-format.ts && tsx test-compact-number.ts",
     "test:hsh-client": "tsx test-hsh-sync-client-integrity.ts",
     "test:i18n-parity": "tsx scripts/check-i18n-parity.ts",
     "qa:i18n": "playwright test --config=playwright.config.ts e2e/i18n-localization.spec.ts --reporter=list",

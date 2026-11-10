@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { parsePaging, pagingMeta } from "../lib/pagination";
 import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { WorkerModel } from "../models/worker.model";
@@ -30,15 +31,22 @@ function sanitize(doc: any) {
   return rest;
 }
 
-// GET /api/rvb/workers -> list
+// GET /api/rvb/workers -> list (optional ?page=&limit=; absent preserves full list)
 router.get("/", async (req: RvbAuthRequest, res) => {
   try {
-    const workers = await WorkerModel.find().sort({ createdAt: -1 }).lean();
+    const paging = parsePaging(req.query, { defaultLimit: 100 });
+    let q = WorkerModel.find().sort({ createdAt: -1 });
+    if (paging) q = q.skip(paging.skip).limit(paging.limit);
+    const workers = await q.lean();
     const cleaned = workers.map((d: any) => {
       const { _id, __v, ...rest } = d;
       return rest;
     });
-    res.json({ success: true, workers: cleaned });
+    res.json({
+      success: true,
+      workers: cleaned,
+      ...(paging ? pagingMeta(await WorkerModel.countDocuments({}), paging) : {}),
+    });
   } catch (e: any) {
     console.error("GET workers failed", e);
     res.status(500).json({ success: false, code: "INTERNAL_ERROR", message: e?.message });

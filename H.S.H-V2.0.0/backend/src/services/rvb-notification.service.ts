@@ -66,26 +66,6 @@ async function resolveRecipients(input: { audienceType: "all" | "role" | "user";
   return [];
 }
 
-async function shouldDeliverToAccount(accountId: string, category: RvbPreferenceCategory, mandatory: boolean): Promise<boolean> {
-  if (mandatory) return true;
-  const acc: any = await RvbAccountModel.findOne({ id: accountId }).lean();
-  const prefs = acc?.preferences?.notifications;
-  if (!prefs) return true;
-  // Map category to pref key
-  const keyMap: Record<string, string> = {
-    chats: "chats",
-    mentions: "mentions",
-    requests: "requests",
-    orders: "orders",
-    statusUpdates: "statusUpdates",
-    reminders: "reminders",
-    system: "statusUpdates",
-  };
-  const key = keyMap[category] || "statusUpdates";
-  if (prefs[key] === false) return false;
-  return true;
-}
-
 export async function createRvbNotification(input: {
   type: string;
   severity: "info" | "success" | "warning" | "critical";
@@ -136,10 +116,37 @@ export async function createRvbNotification(input: {
 
     // Resolve recipients and create per-recipient state
     const recipientIds = await resolveRecipients({ audienceType: input.audienceType, audienceIds: input.audienceIds });
+    // Preference check needs each account's notification prefs. Fetch once
+    // (single $in) instead of one findOne per recipient; missing account
+    // behaves as "no prefs → deliver", exactly like the old per-id lookup.
+    let prefByAccount = new Map<string, any>();
+    if (!mandatory && recipientIds.length > 0) {
+      try {
+        const accs: any[] = await RvbAccountModel.find({ id: { $in: recipientIds } }).lean();
+        for (const a of accs) prefByAccount.set(a.id, a?.preferences?.notifications);
+      } catch {}
+    }
+    const shouldDeliverFromPrefs = (accountId: string): boolean => {
+      if (mandatory) return true;
+      const prefs = prefByAccount.get(accountId);
+      if (!prefs) return true;
+      const keyMap: Record<string, string> = {
+        chats: "chats",
+        mentions: "mentions",
+        requests: "requests",
+        orders: "orders",
+        statusUpdates: "statusUpdates",
+        reminders: "reminders",
+        system: "statusUpdates",
+      };
+      const key = keyMap[category as string] || "statusUpdates";
+      if (prefs[key] === false) return false;
+      return true;
+    };
     const delivered: string[] = [];
     const bulkOps: any[] = [];
     for (const accountId of recipientIds) {
-      const should = await shouldDeliverToAccount(accountId, category as RvbPreferenceCategory, mandatory);
+      const should = shouldDeliverFromPrefs(accountId);
       if (!should) {
         // Create suppressed recipient so we don't re-attempt, but mark suppressed
         bulkOps.push({

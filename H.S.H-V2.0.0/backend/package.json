@@ -36,7 +36,6 @@
     "@types/node": "^20",
     "@types/supertest": "^7.2.1",
     "@types/uuid": "^10.0.0",
-    "dexie": "^4.4.6",
     "fake-indexeddb": "^6.2.5",
     "mongodb-memory-server": "^11.3.0",
     "socket.io-client": "^4.8.4",

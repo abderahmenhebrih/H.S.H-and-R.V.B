@@ -113,6 +113,11 @@ const TR: Record<Language, any> = {
       original: "Original submission preserved",
       edited: "Edited values will be processed",
       loanGap: "Loan acceptance will credit worker balance. Ensure loan policy is authoritative.",
+      rejectHint: "Reject — optional management note will be visible to requester.",
+      optional: "(optional)",
+      editedSuffix: "(edited)",
+      itemsUnit: "items",
+      preserved: "preserved",
     },
   },
   fr: {
@@ -212,6 +217,11 @@ const TR: Record<Language, any> = {
       original: "Soumission originale préservée",
       edited: "Valeurs modifiées seront traitées",
       loanGap: "L'acceptation créditera le solde. Vérifiez la politique prêt.",
+      rejectHint: "Rejet — une note de gestion optionnelle sera visible par le demandeur.",
+      optional: "(optionnel)",
+      editedSuffix: "(modifié)",
+      itemsUnit: "articles",
+      preserved: "conservés",
     },
   },
   ar: {
@@ -311,6 +321,11 @@ const TR: Record<Language, any> = {
       original: "التقديم الأصلي محفوظ",
       edited: "سيتم معالجة القيم المعدلة",
       loanGap: "سيتم إضافة الرصيد. تأكد من سياسة القرض.",
+      rejectHint: "رفض — ملاحظة إدارية اختيارية ستكون مرئية للطالب.",
+      optional: "(اختياري)",
+      editedSuffix: "(معدّل)",
+      itemsUnit: "عناصر",
+      preserved: "محفوظة",
     },
   },
 } as const;
@@ -866,7 +881,7 @@ function RequestsInner() {
                         <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.supplyDate}</span><span className={styles.detailValue}>{formatDate(detail.date, lang)}</span></div>
                         <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.total}</span><span className={styles.detailValue}>{formatCurrency(Number(detail.total || 0), (settings.currency as any) || "DA")}</span></div>
                         {detail.notes && <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.response}</span><span className={styles.detailValueWrap}>{detail.notes}</span></div>}
-                        {detail.originalItems && <div style={{ padding: 8, border: "1px dashed var(--border)", borderRadius: 8, fontSize: 11, color: "var(--muted)" }}>{t.detail.original}: {(detail.originalItems as any[]).length} items preserved</div>}
+                        {detail.originalItems && <div style={{ padding: 8, border: "1px dashed var(--border)", borderRadius: 8, fontSize: 11, color: "var(--muted)" }}>{t.detail.original}: {(detail.originalItems as any[]).length} {t.detail.itemsUnit} {t.detail.preserved}</div>}
                       </div>
 
                       <h4 style={{ margin: "8px 0 0", fontSize: 12, fontWeight: 800, color: "var(--text)" }}>{t.detail.products}</h4>
@@ -914,7 +929,7 @@ function RequestsInner() {
                               </div>
                             </div>
                           ))}
-                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.total} (edited)</span><span className={styles.detailValue}>{formatCurrency(editedItems.reduce((s: number, it: any) => s + (Number(it.quantity) * Number(it.price) || 0), 0), (settings.currency as any) || "DA")}</span></div>
+                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.total} {t.detail.editedSuffix}</span><span className={styles.detailValue}>{formatCurrency(editedItems.reduce((s: number, it: any) => s + (Number(it.quantity) * Number(it.price) || 0), 0), (settings.currency as any) || "DA")}</span></div>
                         </div>
                       )}
                     </div>
@@ -927,7 +942,7 @@ function RequestsInner() {
                         <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.date}</span><span className={styles.detailValue}>{formatDate(detail.date, lang)}</span></div>
                         <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.total}</span><span className={styles.detailValue}>{formatCurrency(Number(detail.total || 0), (settings.currency as any) || "DA")}</span></div>
                         {detail.description && <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.reason}</span><span className={styles.detailValueWrap}>{detail.description}</span></div>}
-                        {detail.originalItems && <div style={{ padding: 8, border: "1px dashed var(--border)", borderRadius: 8, fontSize: 11, color: "var(--muted)" }}>{t.detail.original}: {(detail.originalItems as any[]).length} items</div>}
+                        {detail.originalItems && <div style={{ padding: 8, border: "1px dashed var(--border)", borderRadius: 8, fontSize: 11, color: "var(--muted)" }}>{t.detail.original}: {(detail.originalItems as any[]).length} {t.detail.itemsUnit}</div>}
                         <div style={{ fontSize: 11, color: "var(--muted)", padding: "6px 0" }}>{t.detail.insufficientStock}</div>
                       </div>
                       <h4 style={{ margin: "8px 0 0", fontSize: 12, fontWeight: 800, color: "var(--text)" }}>{t.detail.products}</h4>
@@ -972,7 +987,7 @@ function RequestsInner() {
                               </div>
                             </div>
                           ))}
-                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.total} (edited)</span><span className={styles.detailValue}>{formatCurrency(editedItems.reduce((s: number, it: any) => s + (Number(it.quantity) * Number(it.price) || 0), 0), (settings.currency as any) || "DA")}</span></div>
+                          <div className={styles.detailRow}><span className={styles.detailLabel}>{t.detail.total} {t.detail.editedSuffix}</span><span className={styles.detailValue}>{formatCurrency(editedItems.reduce((s: number, it: any) => s + (Number(it.quantity) * Number(it.price) || 0), 0), (settings.currency as any) || "DA")}</span></div>
                         </div>
                       )}
                     </div>
@@ -1031,11 +1046,11 @@ function RequestsInner() {
               )}
               {reviewDialog.status === "rejected" && (
                 <div style={{ padding: 12, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", borderRadius: 10, fontSize: 12, color: "var(--danger)" }}>
-                  Reject — optional management note will be visible to requester.
+                  {t.detail.rejectHint}
                 </div>
               )}
               <div className={styles.field}>
-                <label>{t.detail.response} <small style={{ color: "var(--muted)", fontWeight: 500 }}>(optional)</small></label>
+                <label>{t.detail.response} <small style={{ color: "var(--muted)", fontWeight: 500 }}>{t.detail.optional}</small></label>
                 <textarea value={reviewDialog.notes} onChange={(e) => setReviewDialog({ ...reviewDialog, notes: e.target.value })} placeholder={t.detail.notesPlaceholder} rows={3} style={{ width: "100%", padding: 10, border: "1px solid var(--border)", borderRadius: 8, background: "var(--panel)", color: "var(--text)", fontFamily: "inherit", fontSize: 13 }} />
               </div>
             </div>

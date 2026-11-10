@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { rvbNotificationService } from "../../services/rvb-notification.service";
 import type { Notification } from "../../types/entities/notification";
-import { formatRelativeTime } from "../../lib/notification-presentation";
+import { formatRelativeTime, resolveNotificationMessage, resolveNotificationTitle } from "../../lib/notification-presentation";
 import styles from "./NotificationBell.module.css";
 
 const typeIcons: Record<string, string> = {
@@ -229,8 +229,8 @@ export default function RvbNotificationBell({ language = "en", dark = false }: {
                   >
                     <span className={styles.itemIcon} aria-hidden="true">{typeIcons[n.type] ?? "•"}</span>
                     <span className={styles.itemText}>
-                      <strong className={styles.itemTitle}>{n.title}</strong>
-                      <span className={styles.itemMessage}>{n.message}</span>
+                      <strong className={styles.itemTitle}>{resolveNotificationTitle(n as any, language)}</strong>
+                      <span className={styles.itemMessage}>{resolveNotificationMessage(n as any, language)}</span>
                       <small className={styles.itemTime}>{formatRelativeTime(n.createdAt, language)}</small>
                     </span>
                     {!n.readAt && <span className={styles.unreadDot} aria-hidden="true" />}

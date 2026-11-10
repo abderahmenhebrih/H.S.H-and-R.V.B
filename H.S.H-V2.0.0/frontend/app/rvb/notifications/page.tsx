@@ -7,6 +7,7 @@ import RvbShell from "../../../src/components/rvb/RvbShell";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { resolveRvbError } from "@/src/lib/rvb-errors";
 import { DEFAULT_SETTINGS } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbNotificationService } from "../../../src/services/rvb-notification.service";
@@ -320,7 +321,7 @@ function NotificationsInner() {
       setUnreadCount(data.unreadCount ?? 0);
       setPage(targetPage);
     } catch (e: any) {
-      setError(e?.message || t.loadError);
+      setError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.loadError, fr: TR.fr.loadError, ar: TR.ar.loadError } }));
     } finally { setLoading(false); }
   }, [tab, status, source, priority, date, debouncedSearch, page, t.loadError]);
 
@@ -337,7 +338,7 @@ function NotificationsInner() {
       setActPages(data.totalPages ?? 1);
       setActPage(targetPage);
     } catch (e: any) {
-      setActError(e?.message || t.loadError);
+      setActError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.loadError, fr: TR.fr.loadError, ar: TR.ar.loadError } }));
     } finally { setActLoading(false); }
   }, [tab, actSource, actDebounced, actDate, actPage, t.loadError]);
 

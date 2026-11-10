@@ -28,7 +28,6 @@ async function currentDir(page: Page): Promise<string> {
 async function setLanguage(page: Page, code: "en" | "fr" | "ar") {
   await gotoSettings(page);
   // Language row uses StyledSelect; open it and pick the option.
-  // Fallback: click by visible label text.
   const label = code === "en" ? "English" : code === "fr" ? "Français" : "العربية";
   // Language row: the listbox trigger showing the current language name.
   // (Currency select shows DA/€/$, so filter by language labels.)
@@ -36,10 +35,20 @@ async function setLanguage(page: Page, code: "en" | "fr" | "ar") {
     .locator('button[aria-haspopup="listbox"]', { hasText: /English|Français|العربية/ })
     .first();
   await expect(trigger).toBeVisible({ timeout: 15000 });
-  const current = ((await trigger.textContent()) || "").trim();
+  // Stabilize: right after navigation the trigger may still show the DEFAULT
+  // language until the canonical Dexie row loads. Acting on the stale text
+  // makes the option click a no-op (already-that-language) with no dialog.
+  let current = ((await trigger.textContent()) || "").trim();
+  for (let i = 0; i < 5 && current !== label; i++) {
+    await page.waitForTimeout(700);
+    const next = ((await trigger.textContent()) || "").trim();
+    if (next === current) break;
+    current = next;
+  }
   if (current !== label) {
-    // Select + confirm with one retry: the confirm dialog always closes
-    // (finally block), so a stale click is detectable via the poll below.
+    // Select + confirm with full retry: a portaled menu click can miss, and
+    // a confirm can land while a save is still settling — the final poll is
+    // the arbiter, and a miss restarts the whole select.
     for (let attempt = 0; attempt < 2; attempt++) {
       await trigger.click({ timeout: 10000 });
       const menu = page.locator('[role="listbox"]').last();
@@ -48,15 +57,25 @@ async function setLanguage(page: Page, code: "en" | "fr" | "ar") {
       // Confirm modal (SettingChangeConfirmModal, role=dialog): click the
       // primary confirm button deterministically (CSS-module class).
       const dialog = page.locator('[role="dialog"]').last();
-      await expect(dialog).toBeVisible({ timeout: 10000 });
+      try {
+        await expect(dialog).toBeVisible({ timeout: 8000 });
+      } catch {
+        // No dialog: missed click, or state already converged. Re-read first.
+        await page.waitForTimeout(500);
+        if (((await trigger.textContent()) || "").trim() === label) break;
+        if (attempt === 1) throw new Error(`language select did not open confirm dialog for ${code}`);
+        continue;
+      }
       await dialog.locator('button[class*="confirmButton"]').first().click({ timeout: 10000 });
       await expect(dialog).toBeHidden({ timeout: 10000 });
       try {
         await expect.poll(() => currentLang(page), { timeout: 15000 }).toBe(code);
         break;
       } catch (e) {
+        // Confirm closed without applying (save still settling). Re-select.
         if (attempt === 1) throw e;
         await gotoSettings(page);
+        await expect(trigger).toBeVisible({ timeout: 15000 });
       }
     }
     return;

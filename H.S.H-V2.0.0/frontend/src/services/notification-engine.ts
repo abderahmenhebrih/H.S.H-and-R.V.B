@@ -29,7 +29,7 @@ async function shouldCreateInApp(type: string): Promise<boolean> {
   return true;
 }
 
-async function maybeShowDesktopToast(notification: { title: string; message: string; type: string }): Promise<void> {
+async function maybeShowDesktopToast(notification: { title: string; message: string; type: string; titleKey?: string; titleParams?: Record<string, string | number>; messageKey?: string; messageParams?: Record<string, string | number> }): Promise<void> {
   try {
     const prefs: any = await getNotificationSettings();
     if (!prefs.desktopEnabled) return;
@@ -38,8 +38,15 @@ async function maybeShowDesktopToast(notification: { title: string; message: str
     // Only for important categories by default
     const important = ["customer_order", "task", "inventory", "sync", "system"];
     if (!important.includes(notification.type)) return;
+    // Resolve in the viewer's current language; keyed rows translate, legacy
+    // rows fall back to the stored text captured at creation time.
+    const { getCachedSettings, DEFAULT_SETTINGS } = await import("../lib/settings");
+    const { resolveNotificationTitle, resolveNotificationMessage } = await import("../lib/notification-presentation");
+    const lang = getCachedSettings()?.language ?? DEFAULT_SETTINGS.language;
+    const title = resolveNotificationTitle(notification as any, lang);
+    const body = resolveNotificationMessage(notification as any, lang);
     // Use a simple notification
-    new Notification(notification.title, { body: notification.message });
+    new Notification(title, { body });
     // Sound if enabled
     if (prefs.soundEnabled) {
       try {
@@ -62,6 +69,10 @@ export async function notifyCustomerOrder(input: { orderId: string; customerName
     severity: "info",
     title: "New customer order",
     message: `${input.customerName} submitted a new order.`,
+    titleKey: "customer_order.submitted",
+    titleParams: { customerName: input.customerName },
+    messageKey: "customer_order.submittedBody",
+    messageParams: { customerName: input.customerName },
     entityType: "customer",
     entityId: input.orderId,
     route: input.route ?? "/sales",
@@ -83,6 +94,11 @@ export async function notifyTaskDue(input: { taskId: string; taskName: string; d
     "due-today": "Task due today",
     overdue: "Task overdue",
   };
+  const titleKeys: Record<string, string> = {
+    "due-tomorrow": "task.dueTomorrow",
+    "due-today": "task.dueToday",
+    overdue: "task.overdue",
+  };
   const severities: Record<string, NotificationSeverity> = {
     "due-tomorrow": "info",
     "due-today": "warning",
@@ -93,6 +109,7 @@ export async function notifyTaskDue(input: { taskId: string; taskName: string; d
     severity: severities[input.kind] ?? "info",
     title: titles[input.kind] ?? "Task reminder",
     message: input.taskName,
+    titleKey: titleKeys[input.kind] ?? "task.reminder",
     entityType: "task",
     entityId: input.taskId,
     route: input.route ?? "/tasks",
@@ -120,6 +137,9 @@ export async function notifyPayment(input: { paymentId: string; amount: number; 
     severity: "success",
     title,
     message,
+    titleKey: input.isReversal ? "payment.reversed" : "payment.recorded",
+    messageKey: input.isReversal ? "payment.reversedBody" : "payment.recordedBody",
+    messageParams: { amount: input.amount, currency: (input.currency as any) ?? "DA", entity: input.entityName ?? formatted },
     entityType: "payment",
     entityId: input.paymentId,
     route: "/payments",
@@ -140,6 +160,9 @@ export async function notifyTransfer(input: { transferId: string; amount: number
     severity: "success",
     title: `Transfer ${kind}`,
     message: `${formatted} ${input.fromAccount} → ${input.toAccount}`,
+    titleKey: input.isReversal ? "transfer.reversed" : "transfer.completed",
+    messageKey: input.isReversal ? "transfer.reversedBody" : "transfer.completedBody",
+    messageParams: { amount: input.amount, currency: (input.currency as any) ?? "DA", from: input.fromAccount, to: input.toAccount },
     entityType: "transfer",
     entityId: input.transferId,
     route: "/accounts",
@@ -160,6 +183,9 @@ export async function notifyExpense(input: { expenseId: string; amount: number; 
     severity: "success",
     title: `Expense ${kind}`,
     message: `${input.name} · ${formatted}`,
+    titleKey: input.isReversal ? "expense.reversed" : "expense.recorded",
+    messageKey: input.isReversal ? "expense.reversedBody" : "expense.recordedBody",
+    messageParams: { name: input.name, amount: input.amount, currency: (input.currency as any) ?? "DA" },
     entityType: "expense",
     entityId: input.expenseId,
     route: "/reports",
@@ -179,6 +205,9 @@ export async function notifySalePurchase(input: { id: string; type: "sale" | "pu
     severity: "success",
     title: `${input.type === "sale" ? "Sale" : "Purchase"} recorded`,
     message: formatted,
+    titleKey: input.type === "sale" ? "sale.recorded" : "purchase.recorded",
+    messageKey: input.type === "sale" ? "sale.recordedBody" : "purchase.recordedBody",
+    messageParams: { total: input.total, currency: (input.currency as any) ?? "DA" },
     entityType: input.type,
     entityId: input.id,
     route: input.type === "sale" ? "/sales" : "/purchases",
@@ -210,6 +239,7 @@ export async function notifyInventory(input: { productId: string; productName: s
     severity,
     title,
     message: input.productName,
+    titleKey: key === "out-of-stock" ? "inventory.outOfStock" : "inventory.restored",
     entityType: "product",
     entityId: input.productId,
     route: "/products",
@@ -226,6 +256,7 @@ export async function notifyWorker(input: { workerId: string; workerName: string
     severity: "info",
     title: input.action === "archived" ? "Worker archived" : "Salary operation completed",
     message: input.workerName,
+    titleKey: input.action === "archived" ? "worker.archived" : "worker.salaryDone",
     entityType: "worker",
     entityId: input.workerId,
     route: "/workers",
@@ -242,6 +273,7 @@ export async function notifySyncTerminal(input: { operationId: string; entity: s
     severity: "critical",
     title: "Synchronization requires attention",
     message: input.message,
+    titleKey: "sync.attention",
     entityType: input.entity,
     sourceEventId,
     route: "/settings",

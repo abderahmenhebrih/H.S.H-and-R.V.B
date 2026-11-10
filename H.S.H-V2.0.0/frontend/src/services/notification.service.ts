@@ -35,6 +35,11 @@ export class NotificationService {
     severity: NotificationSeverity;
     title: string;
     message: string;
+    /** Stable i18n key resolved at render; legacy `title` stays as fallback. */
+    titleKey?: string;
+    titleParams?: Record<string, string | number>;
+    messageKey?: string;
+    messageParams?: Record<string, string | number>;
     entityType?: string;
     entityId?: string;
     route?: string;
@@ -66,6 +71,10 @@ export class NotificationService {
       severity: input.severity,
       title: input.title,
       message: input.message,
+      titleKey: input.titleKey,
+      titleParams: input.titleParams,
+      messageKey: input.messageKey,
+      messageParams: input.messageParams,
       entityType: input.entityType,
       entityId: input.entityId,
       route: input.route,

@@ -12,14 +12,31 @@ import type { OfficeFile } from "../../../../src/types/entities/office-file";
 import type { Language } from "../../../../src/types/settings/settings";
 import styles from "./page.module.css";
 const SHEET_T = {
-  en: { loading:"Loading spreadsheet…", saved:"Saved", saving:"Saving...", offline:"Offline", focus:"Focus", exitFocus:"Exit Focus", hebrihData:"HEBRIH Data", insertTable:"Insert Table", print:"Print", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formulas: SUM, AVERAGE, MIN, MAX, COUNT supported via Univer engine. Use =SUM(A1:A10)", noData:"No data", tableInserted:"Table inserted", valueInserted:"Value inserted", exportFailed:"Export failed", backToOffice:"Back to Office", spreadsheetTitle:"Spreadsheet title", insertHebrihTitle:"Insert HEBRIH Data", insertTableTitle:"Insert HEBRIH Table", snapshotHelp:"Value inserted as snapshot. Editing spreadsheet does not modify business records.", tableSnapshotHelp:"Creates a snapshot table as a new sheet. Not live-linked.", entity:"Entity", record:"Record", field:"Field", cancel:"Cancel", insert:"Insert", customers:"Customers", suppliers:"Suppliers", products:"Products", sales:"Sales", purchases:"Purchases", workers:"Workers", customer:"Customer", supplier:"Supplier", worker:"Worker", product:"Product", sale:"Sale", purchase:"Purchase", invoice:"Invoice", vehicle:"Vehicle", task:"Task", amount:"Amount", date:"Date", startTyping:"Start typing...", untitledDoc:"Untitled Document", untitledSpreadsheet:"Untitled Spreadsheet", imageTooLarge:"Image too large (max 1MB for sync)", urlRequired:"URL required", invalidUrl:"Invalid URL", sheet1:"Sheet 1", phone:"Phone", close:"Close", workbookUnavailable:"Workbook not available", complexBlocked:"Complex workbook — insert blocked in fallback", insertFailed:"Insert failed", createSheetFailed:"Failed to create new sheet" },
-  fr: { loading:"Chargement du tableur…", saved:"Enregistré", saving:"Enregistrement…", offline:"Hors ligne", focus:"Focus", exitFocus:"Quitter focus", hebrihData:"Données HEBRIH", insertTable:"Insérer tableau", print:"Imprimer", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formules : SUM, AVERAGE, MIN, MAX, COUNT prises en charge par Univer. Utilisez =SUM(A1:A10)", noData:"Aucune donnée", tableInserted:"Tableau inséré", valueInserted:"Valeur insérée", exportFailed:"Échec de l'export", backToOffice:"Retour au bureau", spreadsheetTitle:"Titre du tableur", insertHebrihTitle:"Insérer données HEBRIH", insertTableTitle:"Insérer tableau HEBRIH", snapshotHelp:"Valeur insérée comme instantané. Modifier le tableur ne modifie pas les enregistrements.", tableSnapshotHelp:"Crée un tableau instantané comme nouvelle feuille. Non lié en direct.", entity:"Entité", record:"Enregistrement", field:"Champ", cancel:"Annuler", insert:"Insérer", customers:"Clients", suppliers:"Fournisseurs", products:"Produits", sales:"Ventes", purchases:"Achats", workers:"Employés", customer:"Client", supplier:"Fournisseur", worker:"Employé", product:"Produit", sale:"Vente", purchase:"Achat", invoice:"Facture", vehicle:"Véhicule", task:"Tâche", amount:"Montant", date:"Date", startTyping:"Commencez à écrire...", untitledDoc:"Sans titre", untitledSpreadsheet:"Sans titre", imageTooLarge:"Image trop grande (max 1Mo)", urlRequired:"URL requise", invalidUrl:"URL invalide", sheet1:"Feuille 1", phone:"Téléphone", close:"Fermer", workbookUnavailable:"Classeur indisponible", complexBlocked:"Classeur complexe — insertion bloquée en mode secours", insertFailed:"Échec de l'insertion", createSheetFailed:"Échec de création de feuille" },
-  ar: { loading:"جارٍ تحميل الجدول…", saved:"تم الحفظ", saving:"جارٍ الحفظ…", offline:"غير متصل", focus:"تركيز", exitFocus:"إنهاء التركيز", hebrihData:"بيانات حبريح", insertTable:"إدراج جدول", print:"طباعة", csv:"CSV", xlsx:"XLSX", formulasHelp:"الصيغ: SUM و AVERAGE و MIN و MAX و COUNT مدعومة عبر Univer. استخدم =SUM(A1:A10)", noData:"لا توجد بيانات", tableInserted:"تم إدراج الجدول", valueInserted:"تم إدراج القيمة", exportFailed:"فشل التصدير", backToOffice:"العودة إلى المكتب", spreadsheetTitle:"عنوان الجدول", insertHebrihTitle:"إدراج بيانات حبريح", insertTableTitle:"إدراج جدول حبريح", snapshotHelp:"تم إدراج القيمة كلقطة. تعديل الجدول لا يعدل السجلات.", tableSnapshotHelp:"ينشئ جدول لقطة كورقة جديدة. غير مرتبط مباشرة.", entity:"الكيان", record:"السجل", field:"الحقل", cancel:"إلغاء", insert:"إدراج", customers:"الزبائن", suppliers:"الموردون", products:"المنتجات", sales:"المبيعات", purchases:"المشتريات", workers:"العمال", customer:"الزبون", supplier:"المورد", worker:"العامل", product:"المنتج", sale:"البيع", purchase:"الشراء", invoice:"الفاتورة", vehicle:"المركبة", task:"المهمة", amount:"المبلغ", date:"التاريخ", startTyping:"ابدأ الكتابة...", untitledDoc:"بدون عنوان", untitledSpreadsheet:"بدون عنوان", imageTooLarge:"الصورة كبيرة جدًا (1MB)", urlRequired:"الرابط مطلوب", invalidUrl:"رابط غير صالح", sheet1:"ورقة 1", phone:"الهاتف", close:"إغلاق", workbookUnavailable:"المصنف غير متاح", complexBlocked:"مصنف معقد — الإدراج محظور", insertFailed:"فشل الإدراج", createSheetFailed:"فشل إنشاء ورقة جديدة" },
+  en: { loading:"Loading spreadsheet…", saved:"Saved", saving:"Saving...", offline:"Offline", focus:"Focus", exitFocus:"Exit Focus", hebrihData:"HEBRIH Data", insertTable:"Insert Table", print:"Print", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formulas: SUM, AVERAGE, MIN, MAX, COUNT supported via Univer engine. Use =SUM(A1:A10)", noData:"No data", tableInserted:"Table inserted", valueInserted:"Value inserted", exportFailed:"Export failed", backToOffice:"Back to Office", spreadsheetTitle:"Spreadsheet title", insertHebrihTitle:"Insert HEBRIH Data", insertTableTitle:"Insert HEBRIH Table", snapshotHelp:"Value inserted as snapshot. Editing spreadsheet does not modify business records.", tableSnapshotHelp:"Creates a snapshot table as a new sheet. Not live-linked.", entity:"Entity", record:"Record", field:"Field", cancel:"Cancel", insert:"Insert", customers:"Customers", suppliers:"Suppliers", products:"Products", sales:"Sales", purchases:"Purchases", workers:"Workers", customer:"Customer", supplier:"Supplier", worker:"Worker", product:"Product", sale:"Sale", purchase:"Purchase", invoice:"Invoice", vehicle:"Vehicle", task:"Task", amount:"Amount", date:"Date", startTyping:"Start typing...", untitledDoc:"Untitled Document", untitledSpreadsheet:"Untitled Spreadsheet", imageTooLarge:"Image too large (max 1MB for sync)", urlRequired:"URL required", invalidUrl:"Invalid URL", sheet1:"Sheet 1", phone:"Phone", close:"Close", workbookUnavailable:"Workbook not available", complexBlocked:"Complex workbook — insert blocked in fallback", insertFailed:"Insert failed", createSheetFailed:"Failed to create new sheet", createUnavailable:"New sheet creation is not available in this view", createFailed:"Could not create the new sheet", writeFailed:"Could not write the table cells", unavailableFallback:"Spreadsheet engine unavailable — simplified grid shown. Formulas: =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT" },
+  fr: { loading:"Chargement du tableur…", saved:"Enregistré", saving:"Enregistrement…", offline:"Hors ligne", focus:"Focus", exitFocus:"Quitter focus", hebrihData:"Données HEBRIH", insertTable:"Insérer tableau", print:"Imprimer", csv:"CSV", xlsx:"XLSX", formulasHelp:"Formules : SUM, AVERAGE, MIN, MAX, COUNT prises en charge par Univer. Utilisez =SUM(A1:A10)", noData:"Aucune donnée", tableInserted:"Tableau inséré", valueInserted:"Valeur insérée", exportFailed:"Échec de l'export", backToOffice:"Retour au bureau", spreadsheetTitle:"Titre du tableur", insertHebrihTitle:"Insérer données HEBRIH", insertTableTitle:"Insérer tableau HEBRIH", snapshotHelp:"Valeur insérée comme instantané. Modifier le tableur ne modifie pas les enregistrements.", tableSnapshotHelp:"Crée un tableau instantané comme nouvelle feuille. Non lié en direct.", entity:"Entité", record:"Enregistrement", field:"Champ", cancel:"Annuler", insert:"Insérer", customers:"Clients", suppliers:"Fournisseurs", products:"Produits", sales:"Ventes", purchases:"Achats", workers:"Employés", customer:"Client", supplier:"Fournisseur", worker:"Employé", product:"Produit", sale:"Vente", purchase:"Achat", invoice:"Facture", vehicle:"Véhicule", task:"Tâche", amount:"Montant", date:"Date", startTyping:"Commencez à écrire...", untitledDoc:"Sans titre", untitledSpreadsheet:"Sans titre", imageTooLarge:"Image trop grande (max 1Mo)", urlRequired:"URL requise", invalidUrl:"URL invalide", sheet1:"Feuille 1", phone:"Téléphone", close:"Fermer", workbookUnavailable:"Classeur indisponible", complexBlocked:"Classeur complexe — insertion bloquée en mode secours", insertFailed:"Échec de l'insertion", createSheetFailed:"Échec de création de feuille", createUnavailable:"Création d'une nouvelle feuille indisponible dans cette vue", createFailed:"Impossible de créer la nouvelle feuille", writeFailed:"Impossible d'écrire les cellules du tableau", unavailableFallback:"Moteur du tableur indisponible — grille simplifiée affichée. Formules : =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT" },
+  ar: { loading:"جارٍ تحميل الجدول…", saved:"تم الحفظ", saving:"جارٍ الحفظ…", offline:"غير متصل", focus:"تركيز", exitFocus:"إنهاء التركيز", hebrihData:"بيانات حبريح", insertTable:"إدراج جدول", print:"طباعة", csv:"CSV", xlsx:"XLSX", formulasHelp:"الصيغ: SUM و AVERAGE و MIN و MAX و COUNT مدعومة عبر Univer. استخدم =SUM(A1:A10)", noData:"لا توجد بيانات", tableInserted:"تم إدراج الجدول", valueInserted:"تم إدراج القيمة", exportFailed:"فشل التصدير", backToOffice:"العودة إلى المكتب", spreadsheetTitle:"عنوان الجدول", insertHebrihTitle:"إدراج بيانات حبريح", insertTableTitle:"إدراج جدول حبريح", snapshotHelp:"تم إدراج القيمة كلقطة. تعديل الجدول لا يعدل السجلات.", tableSnapshotHelp:"ينشئ جدول لقطة كورقة جديدة. غير مرتبط مباشرة.", entity:"الكيان", record:"السجل", field:"الحقل", cancel:"إلغاء", insert:"إدراج", customers:"الزبائن", suppliers:"الموردون", products:"المنتجات", sales:"المبيعات", purchases:"المشتريات", workers:"العمال", customer:"الزبون", supplier:"المورد", worker:"العامل", product:"المنتج", sale:"البيع", purchase:"الشراء", invoice:"الفاتورة", vehicle:"المركبة", task:"المهمة", amount:"المبلغ", date:"التاريخ", startTyping:"ابدأ الكتابة...", untitledDoc:"بدون عنوان", untitledSpreadsheet:"بدون عنوان", imageTooLarge:"الصورة كبيرة جدًا (1MB)", urlRequired:"الرابط مطلوب", invalidUrl:"رابط غير صالح", sheet1:"ورقة 1", phone:"الهاتف", close:"إغلاق", workbookUnavailable:"المصنف غير متاح", complexBlocked:"مصنف معقد — الإدراج محظور", insertFailed:"فشل الإدراج", createSheetFailed:"فشل إنشاء ورقة جديدة", createUnavailable:"إنشاء ورقة جديدة غير متاح في هذا العرض", createFailed:"تعذر إنشاء الورقة الجديدة", writeFailed:"تعذر كتابة خلايا الجدول", unavailableFallback:"محرك الجداول غير متاح — يتم عرض شبكة مبسطة. الصيغ: =SUM(A1:A10)، =AVERAGE، =MIN، =MAX، =COUNT" },
 } as const;
+
+/** Stable engine error codes → localized messages (single source: SHEET_T). */
+const OFFICE_SHEET_ERROR_MAP: Record<string, { en: string; fr: string; ar: string }> = {
+  OFFICE_WORKBOOK_UNAVAILABLE: { en: SHEET_T.en.workbookUnavailable, fr: SHEET_T.fr.workbookUnavailable, ar: SHEET_T.ar.workbookUnavailable },
+  OFFICE_SHEET_INSERT_FAILED: { en: SHEET_T.en.insertFailed, fr: SHEET_T.fr.insertFailed, ar: SHEET_T.ar.insertFailed },
+  OFFICE_SHEET_CREATE_UNAVAILABLE: { en: SHEET_T.en.createUnavailable, fr: SHEET_T.fr.createUnavailable, ar: SHEET_T.ar.createUnavailable },
+  OFFICE_SHEET_CREATE_FAILED: { en: SHEET_T.en.createFailed, fr: SHEET_T.fr.createFailed, ar: SHEET_T.ar.createFailed },
+  OFFICE_SHEET_WRITE_FAILED: { en: SHEET_T.en.writeFailed, fr: SHEET_T.fr.writeFailed, ar: SHEET_T.ar.writeFailed },
+  // Legacy English sentences (prefix matching handles "Failed to write N cells").
+  "New sheet creation not available": { en: SHEET_T.en.createUnavailable, fr: SHEET_T.fr.createUnavailable, ar: SHEET_T.ar.createUnavailable },
+  "Failed to create new sheet": { en: SHEET_T.en.createFailed, fr: SHEET_T.fr.createFailed, ar: SHEET_T.ar.createFailed },
+  "Failed to write": { en: SHEET_T.en.writeFailed, fr: SHEET_T.fr.writeFailed, ar: SHEET_T.ar.writeFailed },
+  "Workbook not available": { en: SHEET_T.en.workbookUnavailable, fr: SHEET_T.fr.workbookUnavailable, ar: SHEET_T.ar.workbookUnavailable },
+  "No active workbook/sheet": { en: SHEET_T.en.workbookUnavailable, fr: SHEET_T.fr.workbookUnavailable, ar: SHEET_T.ar.workbookUnavailable },
+  "No sheet": { en: SHEET_T.en.workbookUnavailable, fr: SHEET_T.fr.workbookUnavailable, ar: SHEET_T.ar.workbookUnavailable },
+};
 
 import {
   Printer, Download, Database, Table as TableIcon, FileSpreadsheet, Maximize2, Minimize2
 } from "lucide-react";
+import { localizeError } from "../../../../src/lib/i18n";
 import { getCellValue, getCellDisplayValue, getSheetBounds } from "../../../../src/lib/office/sheet-data";
 
 // Dynamically import Univer wrapper to avoid SSR
@@ -133,11 +150,12 @@ export default function SpreadsheetEditorPage() {
       }
       const res: any = await univerRef.current.insertValue(value);
       if (!res || res.success !== true) {
-        const err = res?.error || TT.insertFailed;
+        const err = res?.error || "OFFICE_SHEET_INSERT_FAILED";
         if (err === "READ_ONLY_COMPLEX") {
           setOfficeFeedback(TT.complexBlocked);
         } else {
-          setOfficeFeedback(err);
+          console.warn("[spreadsheet] insertValue failed:", err);
+          setOfficeFeedback(localizeError(err, language, OFFICE_SHEET_ERROR_MAP, { en: SHEET_T.en.insertFailed, fr: SHEET_T.fr.insertFailed, ar: SHEET_T.ar.insertFailed }));
         }
         setShowHebrih(false);
         return;
@@ -156,7 +174,7 @@ export default function SpreadsheetEditorPage() {
           setFile((prev)=> prev? { ...prev, linkedEntities: nextLinked } as any : prev);
         }
       }
-    } catch(e){ console.error(e); setOfficeFeedback(String(e)); }
+    } catch(e){ console.warn("[spreadsheet] insertValue error:", e); setOfficeFeedback(localizeError(e, language, OFFICE_SHEET_ERROR_MAP, { en: SHEET_T.en.insertFailed, fr: SHEET_T.fr.insertFailed, ar: SHEET_T.ar.insertFailed })); }
     setShowHebrih(false);
   }, [file, id, language]);
 
@@ -171,11 +189,12 @@ export default function SpreadsheetEditorPage() {
       }
       const res: any = await univerRef.current.insertTable(entityType, rows);
       if (!res || res.success !== true) {
-        const err = res?.error || TT.createSheetFailed;
+        const err = res?.error || "OFFICE_SHEET_CREATE_FAILED";
         if (err === "READ_ONLY_COMPLEX") {
           setOfficeFeedback(TT.complexBlocked);
         } else {
-          setOfficeFeedback(err);
+          console.warn("[spreadsheet] insertTable failed:", err);
+          setOfficeFeedback(localizeError(err, language, OFFICE_SHEET_ERROR_MAP, { en: SHEET_T.en.createSheetFailed, fr: SHEET_T.fr.createSheetFailed, ar: SHEET_T.ar.createSheetFailed }));
         }
         setShowTableInsert(false);
         return;
@@ -184,7 +203,7 @@ export default function SpreadsheetEditorPage() {
       if (updated) setFile(updated);
       setOfficeFeedback(TT.tableInserted);
       setShowTableInsert(false);
-    } catch(e){ console.error(e); setOfficeFeedback(String(e)); setShowTableInsert(false); }
+    } catch(e){ console.warn("[spreadsheet] insertTable error:", e); setOfficeFeedback(localizeError(e, language, OFFICE_SHEET_ERROR_MAP, { en: SHEET_T.en.createSheetFailed, fr: SHEET_T.fr.createSheetFailed, ar: SHEET_T.ar.createSheetFailed })); setShowTableInsert(false); }
   }, [file, id, language]);
 
   const handleExportCSV = async () => {

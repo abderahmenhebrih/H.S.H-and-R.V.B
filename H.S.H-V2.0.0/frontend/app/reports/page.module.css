@@ -46,7 +46,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  text-align: left;
+  text-align: start;
   margin-bottom: 18px;
 }
 
@@ -501,7 +501,7 @@
   letter-spacing: 0.04em;
   padding: 8px 6px;
   border: 1px solid #E2D4C5;
-  text-align: left;
+  text-align: start;
   white-space: nowrap;
 }
 

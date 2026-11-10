@@ -17,9 +17,9 @@ import { exactNumberLabel, formatCompactNumber } from "../../../src/lib/compact-
 import styles from "./page.module.css";
 
 const TR: Record<string, any> = {
-  en: { title: "Orders", subtitle: "Review and manage customer orders.", searchPlaceholder: "Search by customer, order ID or @tag", all: "All", underReview: "Under Review", accepted: "Accepted", rejected: "Rejected", cancelled: "Cancelled", view: "Access", noOrders: "No orders found.", emptyFiltered: "No orders match the selected status filter.", total: "Total Orders", pending: "Under Review", acceptedKpi: "Accepted", rejectedKpi: "Rejected", reviewFailed: "Review failed", loading: "Loading...", close: "Close" },
-  fr: { title: "Commandes", subtitle: "Consulter et gérer les commandes clients.", searchPlaceholder: "Rechercher par client, commande ou @tag", all: "Tous", underReview: "En Examen", accepted: "Acceptée", rejected: "Rejetée", cancelled: "Annulée", view: "Accéder", noOrders: "Aucune commande trouvée.", emptyFiltered: "Aucune commande ne correspond au filtre.", total: "Total Commandes", pending: "En Examen", acceptedKpi: "Acceptées", rejectedKpi: "Rejetées", reviewFailed: "Échec de révision", loading: "Chargement...", close: "Fermer" },
-  ar: { title: "الطلبات", subtitle: "مراجعة وإدارة طلبات الزبائن.", searchPlaceholder: "ابحث بالزبون أو الطلب أو @tag", all: "الكل", underReview: "قيد المراجعة", accepted: "مقبولة", rejected: "مرفوضة", cancelled: "ملغاة", view: "دخول", noOrders: "لا توجد طلبات.", emptyFiltered: "لا توجد طلبات مطابقة للفلتر.", total: "إجمالي الطلبات", pending: "قيد المراجعة", acceptedKpi: "مقبولة", rejectedKpi: "مرفوضة", reviewFailed: "فشل المراجعة", loading: "جارٍ التحميل...", close: "إغلاق" },
+  en: { title: "Orders", subtitle: "Review and manage customer orders.", searchPlaceholder: "Search by customer, order ID or @tag", all: "All", underReview: "Under Review", accepted: "Accepted", rejected: "Rejected", cancelled: "Cancelled", view: "Access", noOrders: "No orders found.", emptyFiltered: "No orders match the selected status filter.", total: "Total Orders", pending: "Under Review", acceptedKpi: "Accepted", rejectedKpi: "Rejected", reviewFailed: "Review failed", loading: "Loading...", close: "Close", orderTitle: "Order", details: "Details", items: "Items", accept: "Accept", reject: "Reject", table: { customer: "Customer", orderId: "Order ID", total: "Total", status: "Status", actions: "Actions" }, statuses: { under_review: "Under Review", accepted: "Accepted", rejected: "Rejected" } },
+  fr: { title: "Commandes", subtitle: "Consulter et gérer les commandes clients.", searchPlaceholder: "Rechercher par client, commande ou @tag", all: "Tous", underReview: "En Examen", accepted: "Acceptée", rejected: "Rejetée", cancelled: "Annulée", view: "Accéder", noOrders: "Aucune commande trouvée.", emptyFiltered: "Aucune commande ne correspond au filtre.", total: "Total Commandes", pending: "En Examen", acceptedKpi: "Acceptées", rejectedKpi: "Rejetées", reviewFailed: "Échec de révision", loading: "Chargement...", close: "Fermer", orderTitle: "Commande", details: "Détails", items: "Articles", accept: "Accepter", reject: "Rejeter", table: { customer: "Client", orderId: "N° commande", total: "Total", status: "Statut", actions: "Actions" }, statuses: { under_review: "En Examen", accepted: "Acceptée", rejected: "Rejetée" } },
+  ar: { title: "الطلبات", subtitle: "مراجعة وإدارة طلبات الزبائن.", searchPlaceholder: "ابحث بالزبون أو الطلب أو @tag", all: "الكل", underReview: "قيد المراجعة", accepted: "مقبولة", rejected: "مرفوضة", cancelled: "ملغاة", view: "دخول", noOrders: "لا توجد طلبات.", emptyFiltered: "لا توجد طلبات مطابقة للفلتر.", total: "إجمالي الطلبات", pending: "قيد المراجعة", acceptedKpi: "مقبولة", rejectedKpi: "مرفوضة", reviewFailed: "فشل المراجعة", loading: "جارٍ التحميل...", close: "إغلاق", orderTitle: "طلب", details: "التفاصيل", items: "العناصر", accept: "قبول", reject: "رفض", table: { customer: "الزبون", orderId: "معرف الطلب", total: "الإجمالي", status: "الحالة", actions: "إجراءات" }, statuses: { under_review: "قيد المراجعة", accepted: "مقبولة", rejected: "مرفوضة" } },
 };
 
 function OrdersInner() {
@@ -168,11 +168,11 @@ function OrdersInner() {
               <table className={styles.table} role="table" aria-label={t.title}>
                 <thead className={styles.tableHead}>
                   <tr>
-                    <th style={{ width: "25%" }}>Customer</th>
-                    <th style={{ width: "25%" }}>Order ID</th>
-                    <th style={{ width: "15%" }}>Total</th>
-                    <th style={{ width: "15%" }}>Status</th>
-                    <th style={{ width: "20%", textAlign: "center" }}>Actions</th>
+                    <th style={{ width: "25%" }}>{t.table.customer}</th>
+                    <th style={{ width: "25%" }}>{t.table.orderId}</th>
+                    <th style={{ width: "15%" }}>{t.table.total}</th>
+                    <th style={{ width: "15%" }}>{t.table.status}</th>
+                    <th style={{ width: "20%", textAlign: "center" }}>{t.table.actions}</th>
                   </tr>
                 </thead>
                 <tbody className={styles.tableBody}>
@@ -182,7 +182,7 @@ function OrdersInner() {
                         <td><span style={{ fontWeight: 700, fontSize: 12 }}>{o.customerName || o.customerId.slice(0,8)}</span>{o.customerName && <small dir="ltr" style={{ display: "block", color: "var(--muted)", fontSize: 11 }}>{o.customerId.slice(0,8)}</small>}</td>
                         <td><span style={{ fontFamily: "ui-monospace", fontSize: 11, color: "var(--muted)" }}>{o.id.slice(0,12)}…</span></td>
                         <td style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 12 }}>{formatCurrency(o.total, settings.currency as any)}</td>
-                        <td><span className={`${styles.badge} ${o.status === "under_review" ? styles.badgeOnboardingPending : o.status === "accepted" ? styles.badgeStatusActive : o.status === "rejected" ? styles.badgeStatusDisabled : styles.badgeStatusArchived}`}>{o.status}</span></td>
+                        <td><span className={`${styles.badge} ${o.status === "under_review" ? styles.badgeOnboardingPending : o.status === "accepted" ? styles.badgeStatusActive : o.status === "rejected" ? styles.badgeStatusDisabled : styles.badgeStatusArchived}`}>{(t.statuses as any)[o.status] ?? o.status}</span></td>
                         <td>
                           <div className={styles.actionsCell} style={{ justifyContent: "center" }}>
                             <button type="button" className={styles.viewButton} onClick={() => setSelected(o)}><Eye size={14} />{t.view}</button>
@@ -202,20 +202,20 @@ function OrdersInner() {
         <div className={styles.drawerBackdrop} onClick={() => setSelected(null)}>
           <section className={styles.drawer} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 100vw)" }}>
             <div className={styles.drawerHeader}>
-              <h2 className={styles.drawerTitle}>Order {selected.id.slice(0,8)}</h2>
+              <h2 className={styles.drawerTitle}>{t.orderTitle} {selected.id.slice(0,8)}</h2>
               <button type="button" className={styles.closeButton} onClick={() => setSelected(null)} aria-label={t.close}><X size={16} /></button>
             </div>
             <div className={styles.drawerBody}>
               <div className={styles.detailSection}>
-                <h3 className={styles.detailSectionTitle}>Details</h3>
+                <h3 className={styles.detailSectionTitle}>{t.details}</h3>
                 <div className={styles.detailGrid}>
-                  <div className={styles.detailRow}><span className={styles.detailLabel}>Customer</span><span className={styles.detailValue}>{selected.customerName || selected.customerId}</span></div>
-                  <div className={styles.detailRow}><span className={styles.detailLabel}>Total</span><span className={styles.detailValue}>{formatCurrency(selected.total, settings.currency as any)}</span></div>
-                  <div className={styles.detailRow}><span className={styles.detailLabel}>Status</span><span className={`${styles.badge} ${selected.status === "under_review" ? styles.badgeOnboardingPending : selected.status === "accepted" ? styles.badgeStatusActive : selected.status === "rejected" ? styles.badgeStatusDisabled : styles.badgeStatusArchived}`}>{selected.status}</span></div>
+                  <div className={styles.detailRow}><span className={styles.detailLabel}>{t.table.customer}</span><span className={styles.detailValue}>{selected.customerName || selected.customerId}</span></div>
+                  <div className={styles.detailRow}><span className={styles.detailLabel}>{t.table.total}</span><span className={styles.detailValue}>{formatCurrency(selected.total, settings.currency as any)}</span></div>
+                  <div className={styles.detailRow}><span className={styles.detailLabel}>{t.table.status}</span><span className={`${styles.badge} ${selected.status === "under_review" ? styles.badgeOnboardingPending : selected.status === "accepted" ? styles.badgeStatusActive : selected.status === "rejected" ? styles.badgeStatusDisabled : styles.badgeStatusArchived}`}>{(t.statuses as any)[selected.status] ?? selected.status}</span></div>
                 </div>
               </div>
               <div className={styles.detailSection}>
-                <h3 className={styles.detailSectionTitle}>Items</h3>
+                <h3 className={styles.detailSectionTitle}>{t.items}</h3>
                 {(selected.items || []).map((it: any, idx: number) => (
                   <div key={idx} className={styles.detailRow}>
                     <span className={styles.detailLabel}>{it.productId.slice(0,8)} · {it.quantity} × {it.weightKg}kg</span>
@@ -225,8 +225,8 @@ function OrdersInner() {
               </div>
               {selected.status === "under_review" && (
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className={styles.primaryButton} onClick={() => handleReview(selected.id, "accepted")} style={{ flex: 1, background: "#3A7D52", borderColor: "#3A7D52" }}>Accept</button>
-                  <button type="button" className={styles.secondaryButton} onClick={() => handleReview(selected.id, "rejected")} style={{ flex: 1 }}>Reject</button>
+                  <button type="button" className={styles.primaryButton} onClick={() => handleReview(selected.id, "accepted")} style={{ flex: 1, background: "#3A7D52", borderColor: "#3A7D52" }}>{t.accept}</button>
+                  <button type="button" className={styles.secondaryButton} onClick={() => handleReview(selected.id, "rejected")} style={{ flex: 1 }}>{t.reject}</button>
                 </div>
               )}
             </div>

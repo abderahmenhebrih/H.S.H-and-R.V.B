@@ -23,6 +23,17 @@ export interface Notification extends SyncedEntity {
   severity: NotificationSeverity;
   title: string;
   message: string;
+  /**
+   * Optional i18n key for the title, resolved at render time in the viewer's
+   * language. Legacy rows (and sync diagnostics) omit it; renderers fall back
+   * to `title`. Params carry RAW values (names, amounts); formatting happens
+   * at render so locale follows the viewer, never the creator.
+   */
+  titleKey?: string;
+  titleParams?: Record<string, string | number>;
+  /** Optional i18n key for structured messages (same fallback rule as title). */
+  messageKey?: string;
+  messageParams?: Record<string, string | number>;
   entityType?: string;
   entityId?: string;
   route?: string;

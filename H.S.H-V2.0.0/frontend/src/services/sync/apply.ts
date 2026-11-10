@@ -1,7 +1,7 @@
 import { db } from "@/src/lib/database/db";
 import { setServerRevision, getServerRevision } from "./queue";
 import { runAsRemote } from "@/src/lib/database/sync-hooks";
-import { isValidNavigationStyleValue } from "@/src/lib/settings";
+import { isValidNavigationStyleValue, publishSettings, DEFAULT_SETTINGS } from "@/src/lib/settings";
 import { getAllSyncTables, getTableForSyncEntity, SYNC_ENTITIES } from "./tables";
 
 export interface SyncChange {
@@ -52,6 +52,38 @@ export async function preserveSettingsNavigation(
   }
   // Both invalid: leave the payload untouched so the canonical loader can
   // still migrate a legacy field on next mount.
+}
+
+function isValidLanguageValue(v: unknown): v is "en" | "fr" | "ar" {
+  return v === "en" || v === "fr" || v === "ar";
+}
+
+/**
+ * Notify the app after a remote settings row was accepted into Dexie.
+ * The row is already canonical at this point (pending local intent was
+ * fenced above; a valid remote value always wins as a genuine newer
+ * revision). Previously the row landed silently, so shells kept rendering
+ * the previous language until reload/navigation. This ONLY publishes the
+ * accepted canonical value through the existing event channels — it never
+ * re-decides precedence and never writes Dexie (no sync-loop risk:
+ * subscribers read, they don't save).
+ */
+async function notifyCanonicalSettingsIfApplied(changes: Array<{ entity: string; operation: string }>): Promise<void> {
+  try {
+    const touched = changes.some((c) => c.entity === "settings" && c.operation !== "delete");
+    if (!touched) return;
+    const table = getTable("settings");
+    if (!table) return;
+    const stored = await table.get("settings").catch(() => undefined);
+    if (!stored || typeof stored !== "object") return;
+    const canonical: any = {
+      ...DEFAULT_SETTINGS,
+      ...(stored as object),
+      expenseTypes: (stored as any).expenseTypes ?? [],
+    };
+    if (!isValidLanguageValue(canonical.language)) canonical.language = "en";
+    publishSettings(canonical);
+  } catch {}
 }
 
 export async function applyRemoteChange(change: SyncChange): Promise<void> {
@@ -171,6 +203,9 @@ export async function applyRemoteChanges(changes: SyncChange[]): Promise<void> {
     );
   });
   emitDbSyncEvent(toApply);
+  // Surface remotely-accepted canonical settings (e.g. language changed on
+  // another tab/device). See notifyCanonicalSettingsIfApplied.
+  await notifyCanonicalSettingsIfApplied(toApply.map((c) => ({ entity: c.entity, operation: c.operation })));
   // Desktop toast for new remote notifications (not bootstrap)
   try {
     const { notificationService } = await import("../notification.service");
@@ -185,8 +220,17 @@ export async function applyRemoteChanges(changes: SyncChange[]): Promise<void> {
           const important = ["customer_order", "task", "inventory", "sync", "system"];
           if (!important.includes(n.type)) continue;
           try {
-            new Notification(n.title, { body: n.message });
-          } catch {}
+            // Keyed rows resolve in the viewer's language; legacy rows fall
+            // back to the stored text (same output as before for old rows).
+            const { resolveNotificationTitle, resolveNotificationMessage } = await import("../../lib/notification-presentation");
+            const { getCachedSettings, DEFAULT_SETTINGS } = await import("../../lib/settings");
+            const lang = getCachedSettings()?.language ?? DEFAULT_SETTINGS.language;
+            new Notification(resolveNotificationTitle(n as any, lang), { body: resolveNotificationMessage(n as any, lang) });
+          } catch {
+            try {
+              new Notification(n.title, { body: n.message });
+            } catch {}
+          }
         }
       }
     }
@@ -372,6 +416,9 @@ export async function applySnapshot(snapshot: Record<string, any[]>, currentRevi
     );
   });
   emitDbSyncEvent(allChanges);
+  await notifyCanonicalSettingsIfApplied(
+    allChanges.map((c: any) => ({ entity: c.entity, operation: c.operation })),
+  );
 }
 
 export async function applyBootstrapChanges(changes: SyncChange[], currentRevision: number): Promise<void> {

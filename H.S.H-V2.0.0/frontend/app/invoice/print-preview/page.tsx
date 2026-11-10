@@ -10,6 +10,7 @@ import type { PrinterInfo } from "../../../src/services/printing.service";
 import { invoiceService } from "../../../src/services/invoice.service";
 import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, formatCurrency, getDirection, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { localizeError } from "../../../src/lib/i18n";
 import type { Invoice } from "../../../src/types/entities/invoice";
 import type { Currency, Language } from "../../../src/types/settings/settings";
 import styles from "./page.module.css";
@@ -399,8 +400,8 @@ function PrintPreviewInner() {
         setPrintFeedback({ type: "success", message: result.message || `${t.printSuccess} ${result.printer || selectedPrinter} ${t.successfully}` });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : t.printFailed;
-      setPrintFeedback({ type: "error", message: msg });
+      console.warn("[invoice-print-preview] print failed", e);
+      setPrintFeedback({ type: "error", message: localizeError(e, language, undefined, { en: TRANSLATIONS.en.printFailed, fr: TRANSLATIONS.fr.printFailed, ar: TRANSLATIONS.ar.printFailed }) });
     } finally {
       setPrinting(false);
     }

@@ -31,6 +31,12 @@ const EMPTY_LABEL: Record<Language, string> = {
   ar: "لا توجد خيارات",
 };
 
+const SELECT_PLACEHOLDER: Record<Language, string> = {
+  en: "Select",
+  fr: "Sélectionner",
+  ar: "اختيار",
+};
+
 export default function StyledSelect({ value, onChange, options, placeholder, ariaLabel, disabled, fitContent, maxMenuHeight, language = "en", emptyLabel }: Props) {
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState<number>(-1);
@@ -243,7 +249,7 @@ export default function StyledSelect({ value, onChange, options, placeholder, ar
         {selected ? (
           <span className={styles.value}>{selected.label}</span>
         ) : (
-          <span className={styles.placeholder}>{placeholder ?? "Select"}</span>
+          <span className={styles.placeholder}>{placeholder ?? SELECT_PLACEHOLDER[language] ?? SELECT_PLACEHOLDER.en}</span>
         )}
         <span className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`} aria-hidden="true">
           <ChevronDown size={14} strokeWidth={2} />

@@ -148,7 +148,6 @@ function checkPageDictionaries() {
       }
       // Empty values.
       for (const lang of ["en", "fr", "ar"] as Lang[]) {
-        const langBlock = new RegExp(`\\b${lang}\\s*:\\s*\\{`, "g");
         // crude empty-string value check inside the language block
         const idx = source.indexOf(`${lang}:`);
         if (idx !== -1 && new RegExp(`${lang}\\s*:\\s*\\{[^}]*:\\s*""`).test(source.slice(idx, idx + 20000))) {

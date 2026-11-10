@@ -178,6 +178,8 @@ const TRANSLATIONS = {
     selectionRequired: "Please complete all required fields.",
     categoriesLabel: "Payment categories",
     confirmDeletion: "Confirm deletion",
+    vehicleExpenseLabel: "Vehicle Expense",
+    expenseLabel: "Expense",
   },
   fr: {
     title: "Paiements",
@@ -254,6 +256,8 @@ const TRANSLATIONS = {
     selectionRequired: "Veuillez remplir tous les champs obligatoires.",
     categoriesLabel: "Catégories de paiement",
     confirmDeletion: "Confirmer la suppression",
+    vehicleExpenseLabel: "Dépense véhicule",
+    expenseLabel: "Dépense",
   },
   ar: {
     title: "المدفوعات",
@@ -330,6 +334,8 @@ const TRANSLATIONS = {
     selectionRequired: "يرجى إكمال جميع الحقول المطلوبة.",
     categoriesLabel: "فئات المدفوعات",
     confirmDeletion: "تأكيد الحذف",
+    vehicleExpenseLabel: "مصروف مركبة",
+    expenseLabel: "مصروف",
   },
 } as const;
 
@@ -525,9 +531,9 @@ export default function PaymentsPage() {
     if (p.entityType === "expense") {
       if (p.note?.startsWith("vehicle:")) {
         const parts = p.note.split("|");
-        return parts[1] || "Vehicle Expense";
+        return parts[1] || t.vehicleExpenseLabel;
       }
-      return p.note || "Expense";
+      return p.note || t.expenseLabel;
     }
     return p.entityId.slice(0, 8);
   }

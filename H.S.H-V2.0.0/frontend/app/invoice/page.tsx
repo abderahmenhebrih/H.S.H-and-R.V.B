@@ -85,6 +85,7 @@ const TRANSLATIONS = {
     draft: "Draft",
     issued: "Issued",
     cancelled: "Cancelled",
+    cancelledHint: "Cancelled invoices remain stored with original number.",
     noInvoiceSelected: "No invoice selected",
     selectSellerCustomerSale: "Select a seller, customer and source sale to preview the invoice.",
     noIssuedInvoices: "No issued invoices",
@@ -206,6 +207,7 @@ const TRANSLATIONS = {
     draft: "Brouillon",
     issued: "Émise",
     cancelled: "Annulée",
+    cancelledHint: "Les factures annulées restent stockées avec leur numéro d'origine.",
     noInvoiceSelected: "Aucune facture sélectionnée",
     selectSellerCustomerSale: "Sélectionnez un vendeur, un client et une vente source pour prévisualiser la facture.",
     noIssuedInvoices: "Aucune facture émise",
@@ -326,6 +328,7 @@ const TRANSLATIONS = {
     draft: "مسودة",
     issued: "صادرة",
     cancelled: "ملغاة",
+    cancelledHint: "تبقى الفواتير الملغاة مخزنة برقمها الأصلي.",
     noInvoiceSelected: "لم يتم اختيار فاتورة",
     selectSellerCustomerSale: "اختر البائع والزبون والبيع المصدر لمعاينة الفاتورة.",
     noIssuedInvoices: "لا توجد فواتير صادرة",
@@ -1570,7 +1573,7 @@ export default function InvoicePage() {
                 </div>
                 {filteredIssued.map(inv => (
                   <div key={inv.id} className={styles.tableRow}>
-                    <strong>{inv.invoiceNumber || "DRAFT"}</strong>
+                    <strong>{inv.invoiceNumber || t.draft}</strong>
                     <span>{sellerProfiles.find(s => s.id === inv.sellerProfileId)?.commercialName || inv.sellerProfileId}</span>
                     <span>{inv.customerSnapshot.name}</span>
                     <span>{formatTimestampToDisplay(inv.invoiceDate)}</span>
@@ -1601,7 +1604,7 @@ export default function InvoicePage() {
               <div className={styles.emptyState}>
                 <Ban size={32} strokeWidth={1.5} aria-hidden="true" />
                 <h3>{t.noCancelledInvoices}</h3>
-                <p>{t.cancelled} invoices remain stored with original number.</p>
+                <p>{t.cancelledHint}</p>
               </div>
             ) : (
               <div className={styles.tableCard}>
@@ -1788,7 +1791,7 @@ export default function InvoicePage() {
         <div className={styles.modalBackdrop} onClick={() => setViewingInvoice(null)}>
           <section className={styles.modal} role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}>
             <header className={styles.modalHeader}>
-              <h2>{(viewingInvoice as any).invoiceNumber || (viewingInvoice as any).supplierInvoiceNumber || "Invoice"}</h2>
+              <h2>{(viewingInvoice as any).invoiceNumber || (viewingInvoice as any).supplierInvoiceNumber || t.invoicePreview}</h2>
               <button type="button" className={styles.closeButton} onClick={() => setViewingInvoice(null)} aria-label={t.close}><X size={18} strokeWidth={2} aria-hidden="true" /></button>
             </header>
             <div className={styles.formGrid}>

@@ -62,17 +62,6 @@ export function formatNumberForLanguage(value: number, language: Language, optio
   }
 }
 
-/** Language-aware date formatting (presentation only). */
-export function formatDateForLanguage(date: Date | number, language: Language, options?: Intl.DateTimeFormatOptions): string {
-  try {
-    return new Intl.DateTimeFormat(localeForLanguage(language), { numberingSystem: "latn", ...options } as Intl.DateTimeFormatOptions).format(
-      typeof date === "number" ? new Date(date) : date,
-    );
-  } catch {
-    return new Intl.DateTimeFormat("en-GB", options).format(typeof date === "number" ? new Date(date) : date);
-  }
-}
-
 /**
  * Map a thrown service/backend error to a localized user-facing message.
  * - Known stable codes (e.g. SUPPLIER_NOT_FOUND, INVOICE_DATE_INVALID) are

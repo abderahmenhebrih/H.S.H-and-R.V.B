@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import RvbShell from "../../../src/components/rvb/RvbShell";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { resolveRvbError } from "@/src/lib/rvb-errors";
 import { DEFAULT_SETTINGS } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
@@ -117,6 +118,14 @@ const TR: Record<Language, any> = {
     addMemberPrompt: "Add member @tag",
     notFound: "Not found",
     updateFailed: "Update failed",
+    workersGroup: "Workers",
+    suppliersGroup: "Suppliers",
+    customersGroup: "Customers",
+    groupFallback: "Group",
+    officialChat: "Official Chat",
+    directMessage: "Direct Message",
+    hide: "Hide",
+    view: "View",
   },
   fr: {
     chats: "Discussions",
@@ -217,6 +226,14 @@ const TR: Record<Language, any> = {
     addMemberPrompt: "Ajouter membre @tag",
     notFound: "Introuvable",
     updateFailed: "Échec de mise à jour",
+    workersGroup: "Travailleurs",
+    suppliersGroup: "Fournisseurs",
+    customersGroup: "Clients",
+    groupFallback: "Groupe",
+    officialChat: "Discussion officielle",
+    directMessage: "Message direct",
+    hide: "Masquer",
+    view: "Voir",
   },
   ar: {
     chats: "المحادثات",
@@ -317,6 +334,14 @@ const TR: Record<Language, any> = {
     addMemberPrompt: "إضافة عضو @tag",
     notFound: "غير موجود",
     updateFailed: "فشل التحديث",
+    workersGroup: "العمال",
+    suppliersGroup: "الموردون",
+    customersGroup: "الزبائن",
+    groupFallback: "مجموعة",
+    officialChat: "محادثة رسمية",
+    directMessage: "رسالة مباشرة",
+    hide: "إخفاء",
+    view: "عرض",
   },
 } as const;
 
@@ -341,20 +366,20 @@ function formatDateShort(ts: number, lang: string) {
 
 function getConversationDisplayName(conv: Conversation, myId: string, t: any): string {
   if (conv.type === "official_group") {
-    if (conv.officialKind === "workers_group") return "Workers";
-    if (conv.officialKind === "suppliers_group") return "Suppliers";
-    if (conv.officialKind === "customers_group") return "Customers";
-    return conv.name || "Group";
+    if (conv.officialKind === "workers_group") return t.workersGroup;
+    if (conv.officialKind === "suppliers_group") return t.suppliersGroup;
+    if (conv.officialKind === "customers_group") return t.customersGroup;
+    return conv.name || t.groupFallback;
   }
   if (conv.type === "official_private") {
     const other = (conv.participants as any[]).find((p: any) => p.accountId !== myId);
-    return other?.account?.displayName || other?.account?.tag || "Official Chat";
+    return other?.account?.displayName || other?.account?.tag || t.officialChat;
   }
   if (conv.type === "dm") {
     const other = (conv.participants as any[]).find((p: any) => p.accountId !== myId);
-    return other?.account?.displayName || other?.account?.tag || "Direct Message";
+    return other?.account?.displayName || other?.account?.tag || t.directMessage;
   }
-  return conv.name || "Group";
+  return conv.name || t.groupFallback;
 }
 
 function ChatsInner() {
@@ -456,7 +481,7 @@ function ChatsInner() {
       const convs = await chatService.list(category, debouncedSearch || undefined);
       setConversations(convs);
     } catch (e: any) {
-      setConvError(e?.data?.code || e?.message || t.errorLoad);
+      setConvError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.errorLoad, fr: TR.fr.errorLoad, ar: TR.ar.errorLoad } }));
     } finally { setLoadingConvs(false); }
   }, [category, debouncedSearch, t.errorLoad]);
 
@@ -491,7 +516,7 @@ function ChatsInner() {
         }, 80);
       }
     } catch (e: any) {
-      setMessagesError(e?.data?.code || e?.message || t.errorLoad);
+      setMessagesError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.errorLoad, fr: TR.fr.errorLoad, ar: TR.ar.errorLoad } }));
     } finally { setMessagesLoading(false); }
   }, [t.errorLoad]);
 
@@ -895,7 +920,7 @@ function ChatsInner() {
                   <div className={styles.sectionLabel}>{t.officialPrivate}</div>
                   {mainPrivates.length === 0 ? <div className={styles.emptyState} style={{ padding: 12 }}>{t.noMain}</div> : mainPrivates.map((c) => {
                     const other = (c.participants as any[]).find((p: any) => p.accountId !== myId);
-                    const display = other?.account?.displayName || "Official";
+                    const display = other?.account?.displayName || t.officialChat;
                     const tag = other?.account?.tag ? `@${other.account.tag}` : "";
                     return (
                       <div key={c.id} className={`${styles.convItem} ${selectedId === c.id ? styles.convItemActive : ""}`} onClick={() => void handleSelect(c.id)}>
@@ -937,7 +962,7 @@ function ChatsInner() {
                     <div key={c.id} className={`${styles.convItem} ${selectedId === c.id ? styles.convItemActive : ""}`} onClick={() => void handleSelect(c.id)}>
                       <span className={styles.convAvatar}><Users size={16} /></span>
                       <span className={styles.convMeta}>
-                        <span className={styles.convName}>{c.name || "Group"}</span>
+                        <span className={styles.convName}>{c.name || t.groupFallback}</span>
                         <span className={styles.convPreview}>{c.lastMessagePreview || `${(c.participants as any[]).length} ${t.members}`}</span>
                       </span>
                       <span className={styles.convRight}>
@@ -984,7 +1009,7 @@ function ChatsInner() {
                 {selectedConv.pinnedMessages && selectedConv.pinnedMessages.length > 0 && (
                   <div className={styles.pinnedBar}>
                     <Pin size={14} /> {selectedConv.pinnedMessages.length} {t.pinned} · {t.pinnedMessages}
-                    <button className={styles.secondaryButton} style={{ marginInlineStart: "auto", minHeight: 28, padding: "0 8px", fontSize: 11 }} onClick={() => setPinnedExpanded((v) => !v)}>{pinnedExpanded ? "Hide" : "View"}</button>
+                    <button className={styles.secondaryButton} style={{ marginInlineStart: "auto", minHeight: 28, padding: "0 8px", fontSize: 11 }} onClick={() => setPinnedExpanded((v) => !v)}>{pinnedExpanded ? t.hide : t.view}</button>
                   </div>
                 )}
 

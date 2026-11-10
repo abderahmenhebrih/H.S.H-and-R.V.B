@@ -5,6 +5,7 @@ import RvbShell from "../../../src/components/rvb/RvbShell";
 import RvbAuthGuard from "../../../src/components/rvb/RvbAuthGuard";
 import { useRvbAuth } from "../../../src/contexts/RvbAuthContext";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { resolveRvbError } from "@/src/lib/rvb-errors";
 import { DEFAULT_SETTINGS } from "../../../src/lib/settings";
 import type { Settings, Language } from "../../../src/types/settings/settings";
 import { rvbDirectoryService, type DirectoryItem } from "../../../src/services/rvb-directory.service";
@@ -197,7 +198,7 @@ function DirectoryInner() {
       setTotalPages(res.totalPages);
       setPage(targetPage);
     } catch (e: any) {
-      setError(e?.data?.code || e?.message || t.errorLoad);
+      setError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.errorLoad, fr: TR.fr.errorLoad, ar: TR.ar.errorLoad } }));
     } finally { setLoading(false); }
   }, [debounced, role, t.errorLoad]);
 
@@ -319,7 +320,7 @@ function DirectoryInner() {
               {items.map((acc) => {
                 const isSelf = acc.id === myId;
                 return (
-                  <div key={acc.id} className={styles.account} onClick={() => void handleOpenProfile(acc)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") void handleOpenProfile(acc); }} aria-label={`${acc.displayName} profile`}>
+                  <div key={acc.id} className={styles.account} onClick={() => void handleOpenProfile(acc)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") void handleOpenProfile(acc); }} aria-label={`${t.profile} — ${acc.displayName}`}>
                     <div className={styles.identity}>
                       <span className={styles.avatar}>
                         {acc.profilePicture ? <img src={acc.profilePicture} alt="" /> : initials(acc.displayName)}

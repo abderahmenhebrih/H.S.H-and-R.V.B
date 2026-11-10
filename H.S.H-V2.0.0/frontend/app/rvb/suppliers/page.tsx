@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import RvbShell from "../../../src/components/rvb/RvbShell";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { resolveRvbError } from "@/src/lib/rvb-errors";
 import { DEFAULT_SETTINGS, formatCurrency } from "../../../src/lib/settings";
 import { exactNumberLabel, formatCompactNumber, formatCompactCurrency } from "../../../src/lib/compact-number";
 import type { Settings, Language } from "../../../src/types/settings/settings";
@@ -365,7 +366,7 @@ function RvbSuppliersInner() {
       await load();
       setShowAdd(false);
       setEditing(null);
-    } catch (e:any) { setFormError(e?.message || t.failedLoad); }
+    } catch (e:any) { setFormError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.failedLoad, fr: TR.fr.failedLoad, ar: TR.ar.failedLoad } })); }
     finally { setSaving(false); }
   };
 

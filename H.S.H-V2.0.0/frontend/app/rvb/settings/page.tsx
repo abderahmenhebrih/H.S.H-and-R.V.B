@@ -19,6 +19,7 @@ import styles from "./page.module.css";
 const TR: Record<Language, any> = {
   en: {
     title: "Settings",
+    settingsNavAria: "Settings navigation",
     subtitle: "Manage currency configuration and personal preferences.",
     nav: { general: "General", appearance: "Appearance", notifications: "Notifications", account: "Account & Security", about: "About" },
     general: {
@@ -72,6 +73,10 @@ const TR: Record<Language, any> = {
       revokeOthers: "Sign out other sessions",
       revoked: "Other sessions revoked",
       logout: "Log Out",
+      permanent: "Permanent",
+      noSessions: "No active sessions",
+      unknownDevice: "Unknown device",
+      currentBadge: "Current",
       show: "Show", hide: "Hide",
     },
     about: {
@@ -82,11 +87,13 @@ const TR: Record<Language, any> = {
       env: "Environment",
       sharedNote: "Language and theme are personal R.V.B preferences. Currency is a company setting managed by Manager/Admin. R.V.B does not use H.S.H offline storage.",
       openHsh: "Open H.S.H workspace",
+      logoAlt: "RVB logo",
     },
     common: { sharedBadge: "Personal", save: "Save", saving: "Saving...", error: "Failed to save", retry: "Retry", imageTooLarge: "Image too large (2MB max)", photoRequired: "Photo is required — cannot remove. Please choose a replacement.", cannotRemove: "Cannot remove profile picture after onboarding — please replace it with a new photo.", removeFailed: "Remove failed", allRequired: "All fields required", invalidLength: "8–128 characters", uploadFailed: "Upload failed", failed: "Failed" },
   },
   fr: {
     title: "Paramètres",
+    settingsNavAria: "Navigation des paramètres",
     subtitle: "Gérez la devise d'entreprise et vos préférences personnelles.",
     nav: { general: "Général", appearance: "Apparence", notifications: "Notifications", account: "Compte et sécurité", about: "À propos" },
     general: {
@@ -140,6 +147,10 @@ const TR: Record<Language, any> = {
       revokeOthers: "Déconnecter autres sessions",
       revoked: "Autres sessions révoquées",
       logout: "Se déconnecter",
+      permanent: "Permanent",
+      noSessions: "Aucune session active",
+      unknownDevice: "Appareil inconnu",
+      currentBadge: "Actuelle",
       show: "Afficher", hide: "Masquer",
     },
     about: {
@@ -150,11 +161,13 @@ const TR: Record<Language, any> = {
       env: "Environnement",
       sharedNote: "La langue et le thème sont des préférences personnelles R.V.B. La devise est un paramètre d'entreprise géré par le Manager/Admin. R.V.B n'utilise pas le stockage hors ligne H.S.H.",
       openHsh: "Ouvrir H.S.H",
+      logoAlt: "Logo RVB",
     },
     common: { sharedBadge: "Personnel", save: "Enregistrer", saving: "Enregistrement...", error: "Échec", retry: "Réessayer", imageTooLarge: "Image trop volumineuse (2 Mo max)", photoRequired: "Photo requise — impossible de retirer. Choisissez un remplacement.", cannotRemove: "Impossible de retirer la photo après l'intégration — remplacez-la par une nouvelle.", removeFailed: "Échec du retrait", allRequired: "Tous les champs requis", invalidLength: "8–128 caractères", uploadFailed: "Échec d'envoi", failed: "Échec" },
   },
   ar: {
     title: "الإعدادات",
+    settingsNavAria: "التنقل في الإعدادات",
     subtitle: "إدارة إعدادات العملة وتفضيلاتك الشخصية.",
     nav: { general: "عام", appearance: "المظهر", notifications: "الإشعارات", account: "الحساب والأمان", about: "حول" },
     general: {
@@ -208,6 +221,10 @@ const TR: Record<Language, any> = {
       revokeOthers: "تسجيل خروج الجلسات الأخرى",
       revoked: "تم إنهاء الجلسات الأخرى",
       logout: "تسجيل الخروج",
+      permanent: "دائم",
+      noSessions: "لا توجد جلسات نشطة",
+      unknownDevice: "جهاز غير معروف",
+      currentBadge: "الحالية",
       show: "إظهار", hide: "إخفاء",
     },
     about: {
@@ -218,6 +235,7 @@ const TR: Record<Language, any> = {
       env: "البيئة",
       sharedNote: "اللغة والمظهر تفضيلات شخصية لـ R.V.B. العملة إعداد شركة يُدار بواسطة المدير/المسؤول. لا يستخدم R.V.B تخزين H.S.H غير المتصل.",
       openHsh: "فتح H.S.H",
+      logoAlt: "شعار RVB",
     },
     common: { sharedBadge: "شخصي", save: "حفظ", saving: "جارٍ الحفظ...", error: "فشل", retry: "إعادة", imageTooLarge: "الصورة كبيرة جداً (2MB كحد أقصى)", photoRequired: "الصورة مطلوبة — لا يمكن الإزالة. اختر بديلاً.", cannotRemove: "لا يمكن إزالة الصورة بعد الإعداد — استبدلها بصورة جديدة.", removeFailed: "فشل الإزالة", allRequired: "جميع الحقول مطلوبة", invalidLength: "8–128 حرفاً", uploadFailed: "فشل الرفع", failed: "فشل" },
   },
@@ -492,7 +510,7 @@ function SettingsInner() {
     <RvbShell activePage="settings">
       <div className={styles.settingsRoot} dir={isRtl ? "rtl" : "ltr"}>
         <div className={styles.layout}>
-          <nav className={styles.sidebar} aria-label="Settings navigation">
+          <nav className={styles.sidebar} aria-label={t.settingsNavAria}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = active === item.id;
@@ -626,7 +644,7 @@ function SettingsInner() {
                   </div>
                   {nameMsg && <small style={{ color: "var(--success)" }}>{nameMsg}</small>}
                   <div className={styles.infoGrid}>
-                    <div><small>{t.account.tag}</small><strong dir="ltr">@{user?.tag}</strong><small style={{ color: "var(--subtle)" }}>Permanent</small></div>
+                    <div><small>{t.account.tag}</small><strong dir="ltr">@{user?.tag}</strong><small style={{ color: "var(--subtle)" }}>{t.account.permanent}</small></div>
                     <div><small>{t.account.role}</small><strong>{roleLabel(user?.role)}</strong></div>
                     <div><small>{t.account.status}</small><strong>{user?.status}</strong></div>
                     <div><small>{t.account.linked}</small><strong>{user?.linkedEntityType ? `${user.linkedEntityType} ${String(user.linkedEntityId).slice(0, 8)}` : t.account.notLinked}</strong></div>
@@ -646,13 +664,13 @@ function SettingsInner() {
                 <div className={styles.card}>
                   <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}><Monitor size={16} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} /> {t.account.sessions}</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {sessions.length === 0 ? <small style={{ color: "var(--muted)" }}>No active sessions</small> : sessions.map((s) => (
+                    {sessions.length === 0 ? <small style={{ color: "var(--muted)" }}>{t.account.noSessions}</small> : sessions.map((s) => (
                       <div key={s.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 9, background: s.isCurrent ? "var(--accent-soft)" : "var(--panel)" }}>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <strong style={{ display: "block", fontSize: 12 }}>{s.isCurrent ? t.account.currentSession : t.account.otherSessions} {s.isCurrent ? "· " + s.id.slice(0, 8) : ""}</strong>
-                          <small style={{ color: "var(--muted)" }}>{s.userAgent ? s.userAgent.slice(0, 60) : "Unknown device"} · {new Date(s.lastUsedAt).toLocaleString()}</small>
+                          <small style={{ color: "var(--muted)" }}>{s.userAgent ? s.userAgent.slice(0, 60) : t.account.unknownDevice} · {new Date(s.lastUsedAt).toLocaleString()}</small>
                         </span>
-                        {s.isCurrent && <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 999, background: "var(--accent)", color: "#fff" }}>Current</span>}
+                        {s.isCurrent && <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 999, background: "var(--accent)", color: "#fff" }}>{t.account.currentBadge}</span>}
                       </div>
                     ))}
                   </div>
@@ -669,7 +687,7 @@ function SettingsInner() {
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>{t.about.title}</h2>
                 <div className={styles.card} style={{ textAlign: "center", gap: 12 }}>
-                  <div style={{ width: 64, height: 64, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}><img src="/chicken.jpg" alt="RVB logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
+                  <div style={{ width: 64, height: 64, margin: "0 auto", borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)" }}><img src="/chicken.jpg" alt={t.about.logoAlt} style={{ width: "100%", height: "100%", objectFit: "contain" }} /></div>
                   <h3 style={{ margin: 0 }}>{t.about.rvb}</h3>
                   <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>{t.about.desc}</p>
                   <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", fontSize: 12, color: "var(--muted)" }}>

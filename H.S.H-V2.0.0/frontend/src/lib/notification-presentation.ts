@@ -215,3 +215,125 @@ export function formatRelativeTime(createdAt: number, language: string): string 
   if (days === 1) return language === "ar" ? "أمس" : language === "fr" ? "Hier" : "Yesterday";
   return language === "ar" ? `منذ ${days} يوم` : language === "fr" ? `il y a ${days} j` : `${days} d ago`;
 }
+
+/**
+ * Language-independent notification copy. The engine stores a stable
+ * `titleKey` (+ raw `titleParams`) at creation; renderers resolve it here in
+ * the viewer's language. User-generated values (names) travel inside params
+ * and are never translated; amounts are formatted at render so grouping
+ * follows the viewer locale. Rows without a key (legacy rows, sync engine
+ * diagnostics) fall back to the stored English strings — never blank.
+ */
+export type NotifTitleKey =
+  | "customer_order.submitted"
+  | "task.dueTomorrow"
+  | "task.dueToday"
+  | "task.overdue"
+  | "task.reminder"
+  | "payment.recorded"
+  | "payment.reversed"
+  | "transfer.completed"
+  | "transfer.reversed"
+  | "expense.recorded"
+  | "expense.reversed"
+  | "sale.recorded"
+  | "purchase.recorded"
+  | "inventory.restored"
+  | "inventory.outOfStock"
+  | "worker.archived"
+  | "worker.salaryDone"
+  | "sync.attention";
+
+export type NotifMessageKey =
+  | "customer_order.submittedBody"
+  | "payment.recordedBody"
+  | "payment.reversedBody"
+  | "transfer.completedBody"
+  | "transfer.reversedBody"
+  | "expense.recordedBody"
+  | "expense.reversedBody"
+  | "sale.recordedBody"
+  | "purchase.recordedBody";
+
+const NOTIF_TITLES: Record<string, { en: string; fr: string; ar: string }> = {
+  "customer_order.submitted": { en: "New customer order", fr: "Nouvelle commande client", ar: "طلب زبون جديد" },
+  "task.dueTomorrow": { en: "Task due tomorrow", fr: "Tâche due demain", ar: "مهمة مستحقة غدًا" },
+  "task.dueToday": { en: "Task due today", fr: "Tâche due aujourd'hui", ar: "مهمة مستحقة اليوم" },
+  "task.overdue": { en: "Task overdue", fr: "Tâche en retard", ar: "مهمة متأخرة" },
+  "task.reminder": { en: "Task reminder", fr: "Rappel de tâche", ar: "تذكير بمهمة" },
+  "payment.recorded": { en: "Payment recorded", fr: "Paiement enregistré", ar: "تم تسجيل الدفعة" },
+  "payment.reversed": { en: "Payment reversed", fr: "Paiement annulé", ar: "تم عكس الدفعة" },
+  "transfer.completed": { en: "Transfer completed", fr: "Transfert effectué", ar: "تم إتمام التحويل" },
+  "transfer.reversed": { en: "Transfer reversed", fr: "Transfert annulé", ar: "تم عكس التحويل" },
+  "expense.recorded": { en: "Expense recorded", fr: "Dépense enregistrée", ar: "تم تسجيل المصروف" },
+  "expense.reversed": { en: "Expense reversed", fr: "Dépense annulée", ar: "تم عكس المصروف" },
+  "sale.recorded": { en: "Sale recorded", fr: "Vente enregistrée", ar: "تم تسجيل البيع" },
+  "purchase.recorded": { en: "Purchase recorded", fr: "Achat enregistré", ar: "تم تسجيل الشراء" },
+  "inventory.restored": { en: "Stock restored", fr: "Stock rétabli", ar: "تمت استعادة المخزون" },
+  "inventory.outOfStock": { en: "Out of stock", fr: "Rupture de stock", ar: "نفد المخزون" },
+  "worker.archived": { en: "Worker archived", fr: "Travailleur archivé", ar: "تمت أرشفة العامل" },
+  "worker.salaryDone": { en: "Salary operation completed", fr: "Opération de salaire terminée", ar: "تمت عملية الراتب" },
+  "sync.attention": { en: "Synchronization requires attention", fr: "La synchronisation nécessite une attention", ar: "المزامنة تتطلب انتباهًا" },
+};
+
+const NOTIF_MESSAGES: Record<string, { en: string; fr: string; ar: string }> = {
+  "customer_order.submittedBody": { en: "{customerName} submitted a new order.", fr: "{customerName} a soumis une nouvelle commande.", ar: "{customerName} قدّم طلبًا جديدًا." },
+  "payment.recordedBody": { en: "{amount} · {entity}", fr: "{amount} · {entity}", ar: "{amount} · {entity}" },
+  "payment.reversedBody": { en: "{amount} reversed", fr: "{amount} annulé", ar: "تم عكس {amount}" },
+  "transfer.completedBody": { en: "{amount} {from} → {to}", fr: "{amount} {from} → {to}", ar: "{amount} {from} ← {to}" },
+  "transfer.reversedBody": { en: "{amount} {from} → {to} (reversed)", fr: "{amount} {from} → {to} (annulé)", ar: "{amount} {from} ← {to} (معكوس)" },
+  "expense.recordedBody": { en: "{name} · {amount}", fr: "{name} · {amount}", ar: "{name} · {amount}" },
+  "expense.reversedBody": { en: "{name} · {amount} (reversed)", fr: "{name} · {amount} (annulé)", ar: "{name} · {amount} (معكوس)" },
+  "sale.recordedBody": { en: "{total}", fr: "{total}", ar: "{total}" },
+  "purchase.recordedBody": { en: "{total}", fr: "{total}", ar: "{total}" },
+};
+
+function fillTemplate(template: string, params?: Record<string, string | number>): string {
+  if (!params) return template;
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => {
+    const v = params[k];
+    return v === undefined || v === null ? m : String(v);
+  });
+}
+
+function pickTableText(table: Record<string, { en: string; fr: string; ar: string }>, key: string | undefined, language: string): string | null {
+  if (!key) return null;
+  const entry = table[key];
+  if (!entry) {
+    if (process.env.NODE_ENV !== "production") console.warn(`[i18n] unknown notification key "${key}"; using stored text.`);
+    return null;
+  }
+  if (language === "fr") return entry.fr;
+  if (language === "ar") return entry.ar;
+  return entry.en;
+}
+
+/** Viewer-language title: keyed lookup first, stored legacy text as fallback. */
+export function resolveNotificationTitle(n: { title: string; titleKey?: string; titleParams?: Record<string, string | number> }, language: string): string {
+  const t = pickTableText(NOTIF_TITLES, n.titleKey, language);
+  if (t === null) return n.title;
+  return fillTemplate(t, n.titleParams);
+}
+
+/** Viewer-language message: keyed lookup first, stored text (often user data) as fallback. */
+export function resolveNotificationMessage(
+  n: { message: string; messageKey?: string; messageParams?: Record<string, string | number> },
+  language: string,
+  formatAmount?: (amount: number, currency: string) => string,
+): string {
+  const t = pickTableText(NOTIF_MESSAGES, n.messageKey, language);
+  if (t === null) return n.message;
+  const params = { ...(n.messageParams ?? {}) };
+  // Amounts arrive raw ({amount, currency}) and are formatted at render time
+  // so grouping follows the viewer's locale. Pre-formatted fallbacks stay.
+  if (typeof params.amount === "number" && typeof params.currency === "string" && formatAmount) {
+    try {
+      params.amount = formatAmount(params.amount, params.currency);
+    } catch {}
+  } else if (typeof params.total === "number" && typeof params.currency === "string" && formatAmount) {
+    try {
+      params.total = formatAmount(params.total, params.currency);
+    } catch {}
+  }
+  return fillTemplate(t, params);
+}

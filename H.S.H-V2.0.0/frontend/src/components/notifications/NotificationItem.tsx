@@ -11,6 +11,8 @@ import {
   isCriticalAlert,
   isUnread,
   notifLabel,
+  resolveNotificationMessage,
+  resolveNotificationTitle,
 } from "../../lib/notification-presentation";
 import { formatTimestampToDisplay } from "../../lib/date-format";
 import styles from "./NotificationItem.module.css";
@@ -42,8 +44,12 @@ export default function NotificationItem({ notification: n, language, showDetail
   const tone = getNotificationTone(n);
   const action = getNotificationAction(n);
   const page = variant === "page";
+  // Viewer-language copy: keyed notifications resolve here (language switch
+  // re-renders instantly); legacy rows fall back to stored text.
+  const displayTitle = resolveNotificationTitle(n, language);
+  const displayMessage = resolveNotificationMessage(n, language);
 
-  const ariaBits = [n.title, n.message];
+  const ariaBits = [displayTitle, displayMessage];
   if (unread) ariaBits.push(language === "fr" ? "non lu" : language === "ar" ? "غير مقروء" : "unread");
   if (important) ariaBits.push(language === "fr" ? "important" : language === "ar" ? "مهم" : "important");
 
@@ -59,7 +65,7 @@ export default function NotificationItem({ notification: n, language, showDetail
       </span>
       <span className={styles.body}>
         <span className={styles.topRow}>
-          <span className={styles.title}>{n.title}</span>
+          <span className={styles.title}>{displayTitle}</span>
           <span className={styles.time}>{formatRelativeTime(n.createdAt, language)}</span>
           {unread && <span className={styles.unreadDot} aria-hidden="true" />}
           {important && (
@@ -68,7 +74,7 @@ export default function NotificationItem({ notification: n, language, showDetail
             </span>
           )}
         </span>
-        <span className={styles.detail}>{n.message}</span>
+        <span className={styles.detail}>{displayMessage}</span>
         {(showDetailDate || (page && action)) && (
           <span className={styles.metaRow}>
             {showDetailDate && <span className={styles.detailDate}>{formatTimestampToDisplay(n.createdAt)}</span>}

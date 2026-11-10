@@ -132,7 +132,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
           } else if (content?.sheets && typeof content.sheets === "object" && !Array.isArray(content.sheets)) {
             const sheetsObj = content.sheets as any;
             const firstId = content.sheetOrder?.[0] || Object.keys(sheetsObj)[0];
-            if (!firstId || !sheetsObj[firstId]) return { success: false, error: "No sheet" };
+            if (!firstId || !sheetsObj[firstId]) { console.warn("[UniverWrapper] insertValue: sheet missing"); return { success: false, error: "OFFICE_WORKBOOK_UNAVAILABLE" }; }
             const sh = sheetsObj[firstId];
             const cellData = sh.cellData || {};
             let found: string | null = null;
@@ -156,13 +156,13 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
           try { lastSnapshotRef.current = JSON.stringify(nextContent); } catch {}
           await onSave(nextContent);
           return { success: true };
-        } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertValue fallback failed", e); return { success: false, error: msg }; }
+        } catch (e) { console.warn("[UniverWrapper] insertValue fallback failed", e); return { success: false, error: "OFFICE_SHEET_INSERT_FAILED" }; }
       }
       // univer mode
       try {
         const api = apiRef.current;
         const wb = api?.getActiveWorkbook?.();
-        if (!wb) return { success: false, error: "Workbook not available" };
+        if (!wb) { console.warn("[UniverWrapper] insertValue: workbook unavailable"); return { success: false, error: "OFFICE_WORKBOOK_UNAVAILABLE" }; }
         const sheet = (wb as any)?.getActiveSheet?.() || (wb as any)?.getActiveWorksheet?.();
         let mutated = false;
         if (sheet) {
@@ -192,8 +192,8 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
           }
           return { success: true };
         }
-        return { success: false, error: "No active workbook/sheet" };
-      } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertValue failed", e); return { success: false, error: msg }; }
+        return { success: false, error: "OFFICE_WORKBOOK_UNAVAILABLE" };
+      } catch (e) { console.warn("[UniverWrapper] insertValue failed", e); return { success: false, error: "OFFICE_SHEET_INSERT_FAILED" }; }
     },
     getSnapshot: () => getSnapshot(),
     flushSave: () => flushSave(),
@@ -228,7 +228,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
           try { lastSnapshotRef.current = JSON.stringify(nextContent); } catch {}
           await onSave(nextContent);
           return { success: true, sheetId: newSheetId };
-        } catch (e) { const msg = e instanceof Error ? e.message : String(e); console.error("insertTable fallback failed", e); return { success: false, error: msg }; }
+        } catch (e) { console.warn("[UniverWrapper] insertTable fallback failed", e); return { success: false, error: "OFFICE_SHEET_CREATE_FAILED" }; }
       }
       // univer mode with rollback
       let newSheet: any = null;
@@ -238,7 +238,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
       try {
         const api = apiRef.current;
         const wb = api?.getActiveWorkbook?.();
-        if (!wb) return { success: false, error: "Workbook not available" };
+        if (!wb) { console.warn("[UniverWrapper] insertTable: workbook unavailable"); return { success: false, error: "OFFICE_WORKBOOK_UNAVAILABLE" }; }
         // capture preSnapshot before insertion
         try { preSnapshot = getSnapshot(); preStr = preSnapshot ? JSON.stringify(preSnapshot) : null; } catch {}
         const header = Object.keys(rows[0] || {});
@@ -257,12 +257,14 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
             newSheet = (wb as any).addSheet(entityType);
             newSheetId = newSheet?.getSheetId?.() || newSheet?.getId?.() || newSheet?.id || undefined;
           } else {
-            return { success: false, error: "New sheet creation not available" };
+            console.warn("[UniverWrapper] insertTable: sheet creation API unavailable");
+            return { success: false, error: "OFFICE_SHEET_CREATE_UNAVAILABLE" };
           }
         } catch (err) {
-          return { success: false, error: err instanceof Error ? err.message : String(err) };
+          console.warn("[UniverWrapper] insertTable: create sheet threw", err);
+          return { success: false, error: "OFFICE_SHEET_CREATE_FAILED" };
         }
-        if (!newSheet) return { success: false, error: "Failed to create new sheet" };
+        if (!newSheet) { console.warn("[UniverWrapper] insertTable: new sheet is null"); return { success: false, error: "OFFICE_SHEET_CREATE_FAILED" }; }
         const targetSheet = newSheet;
         // set header — collect failures
         let writeErrors = 0;
@@ -301,7 +303,8 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
             }
           } catch {}
           if (preStr !== null) lastSnapshotRef.current = preStr;
-          return { success: false, error: `Failed to write ${writeErrors} cells` };
+          console.warn(`[UniverWrapper] insertTable: failed to write ${writeErrors} cells, rolled back`);
+          return { success: false, error: "OFFICE_SHEET_WRITE_FAILED" };
         }
         const snap = getSnapshot();
         if (snap) {
@@ -334,7 +337,7 @@ const UniverWrapper = forwardRef<UniverHandle, Props>(function UniverWrapper({ f
           }
         } catch {}
         if (preStr !== null) lastSnapshotRef.current = preStr;
-        const msg = e instanceof Error ? e.message : String(e); console.error("insertTable failed", e); return { success: false, error: msg };
+        console.warn("[UniverWrapper] insertTable failed", e); return { success: false, error: "OFFICE_SHEET_CREATE_FAILED" };
       }
     },
     exportCSV: async () => {
@@ -745,10 +748,16 @@ function FallbackGrid({ file, onSave, language, defaultSheetName }: { file: Offi
     ? "معاينة آمنة — لن يتم حفظ أي تعديل."
     : "Safe preview — no changes will be saved.";
 
+  const unavailableFallbackNote = language==="fr"
+    ? "Moteur du tableur indisponible — grille simplifiée affichée. Formules : =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT"
+    : language==="ar"
+    ? "محرك الجداول غير متاح — يتم عرض شبكة مبسطة. الصيغ: =SUM(A1:A10)، =AVERAGE، =MIN، =MAX، =COUNT"
+    : "Spreadsheet engine unavailable — simplified grid shown. Formulas: =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT";
+
   return (
     <div className={styles.fallbackGrid}>
       <div style={{ fontSize:11, color:"var(--muted)", marginBottom:8 }}>
-        {isComplex ? readOnlyMessage : "Fallback grid — Univer failed to load. Formulas: =SUM(A1:A10), =AVERAGE, =MIN, =MAX, =COUNT"}
+        {isComplex ? readOnlyMessage : unavailableFallbackNote}
       </div>
       {isComplex && <div style={{ fontSize:11, color:"var(--danger, #c00)", background:"var(--panel-hover)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", marginBottom:8 }}>{previewNote}</div>}
       <table className={styles.fallbackTable}>

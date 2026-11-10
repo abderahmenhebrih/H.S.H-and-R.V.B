@@ -16,6 +16,7 @@ import {
   resolveNavigationStyle,
 } from "../../src/lib/settings";
 import { getSavedTheme, applyTheme } from "../../src/lib/theme";
+import { localizeError, type Trilingual } from "../../src/lib/i18n";
 import {
   ArrowLeft,
   ArrowRight,
@@ -25,6 +26,7 @@ import {
   CarFront,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   CreditCard,
@@ -119,6 +121,18 @@ const TRANSLATIONS = {
     aboutDescription: "Management System for poultry slaughter operations.",
     aboutVersion: "Version",
     aboutDetails: "All settings are stored locally and synchronized with the backend when available.",
+    applicationHeading: "APPLICATION",
+    systemHeading: "SYSTEM",
+    languageRegionHeading: "LANGUAGE & REGION",
+    productLabel: "Product",
+    managementSystemLabel: "Management System",
+    currentReleaseLabel: "Current release",
+    applicationModeLabel: "Application Mode",
+    applicationModeDesc: "Offline-first operation",
+    applicationModeValue: "Offline-first",
+    dataStorageLabel: "Data Storage",
+    dataStorageDesc: "Local data with backend synchronization",
+    dataStorageValue: "Local + Sync",
     // Invoice
     invoiceTitle: "Invoice",
     invoiceDesc: "Manage invoicing legal entities, taxes, numbering and document appearance.",
@@ -218,6 +232,7 @@ const TRANSLATIONS = {
     settingsSearchAria: "Search settings",
     settingsSectionsAria: "Settings sections",
     toggleTheme: "Toggle theme",
+    toggleVerb: "Toggle",
     themeToLight: "Switch to light mode",
     themeToDark: "Switch to dark mode",
     breadcrumbHome: "Home",
@@ -287,6 +302,18 @@ const TRANSLATIONS = {
     aboutDescription: "Système de gestion pour les opérations d'abattage de volaille.",
     aboutVersion: "Version",
     aboutDetails: "Tous les paramètres sont stockés localement et synchronisés avec le backend lorsqu'il est disponible.",
+    applicationHeading: "APPLICATION",
+    systemHeading: "SYSTÈME",
+    languageRegionHeading: "LANGUE & RÉGION",
+    productLabel: "Produit",
+    managementSystemLabel: "Système de gestion",
+    currentReleaseLabel: "Version actuelle",
+    applicationModeLabel: "Mode d'application",
+    applicationModeDesc: "Fonctionnement hors ligne prioritaire",
+    applicationModeValue: "Hors ligne prioritaire",
+    dataStorageLabel: "Stockage des données",
+    dataStorageDesc: "Données locales avec synchronisation backend",
+    dataStorageValue: "Local + Synchro",
     invoiceTitle: "Facturation",
     invoiceDesc: "Gérez les entités légales, taxes, numérotation et apparence des factures.",
     invoiceSellerProfiles: "Profils vendeurs",
@@ -385,6 +412,7 @@ const TRANSLATIONS = {
     settingsSearchAria: "Rechercher dans les paramètres",
     settingsSectionsAria: "Sections des paramètres",
     toggleTheme: "Basculer le thème",
+    toggleVerb: "Basculer",
     themeToLight: "Passer en mode clair",
     themeToDark: "Passer en mode sombre",
     breadcrumbHome: "Accueil",
@@ -454,6 +482,18 @@ const TRANSLATIONS = {
     aboutDescription: "نظام إدارة عمليات ذبح الدواجن.",
     aboutVersion: "الإصدار",
     aboutDetails: "يتم تخزين جميع الإعدادات محلياً ومزامنتها مع الخادم عند توفره.",
+    applicationHeading: "التطبيق",
+    systemHeading: "النظام",
+    languageRegionHeading: "اللغة والمنطقة",
+    productLabel: "المنتج",
+    managementSystemLabel: "نظام الإدارة",
+    currentReleaseLabel: "الإصدار الحالي",
+    applicationModeLabel: "وضع التطبيق",
+    applicationModeDesc: "تشغيل دون اتصال أولاً",
+    applicationModeValue: "دون اتصال أولاً",
+    dataStorageLabel: "تخزين البيانات",
+    dataStorageDesc: "بيانات محلية مع مزامنة الخادم",
+    dataStorageValue: "محلي + مزامنة",
     invoiceTitle: "الفوترة",
     invoiceDesc: "إدارة الكيانات القانونية والضرائب والترقيم ومظهر الفاتورة.",
     invoiceSellerProfiles: "ملفات البائع",
@@ -552,6 +592,7 @@ const TRANSLATIONS = {
     settingsSearchAria: "البحث في الإعدادات",
     settingsSectionsAria: "أقسام الإعدادات",
     toggleTheme: "تبديل المظهر",
+    toggleVerb: "تبديل",
     themeToLight: "التبديل إلى الوضع الفاتح",
     themeToDark: "التبديل إلى الوضع الداكن",
     breadcrumbHome: "الرئيسية",
@@ -938,7 +979,7 @@ function SettingsPageInner() {
               <div className={styles.breadcrumb}>
                 <Home size={14} strokeWidth={2} aria-hidden="true" />
                 <span>{t.breadcrumbHome}</span>
-                <ChevronRight size={12} strokeWidth={2} aria-hidden="true" />
+                {settings.language === "ar" ? <ChevronLeft size={12} strokeWidth={2} aria-hidden="true" /> : <ChevronRight size={12} strokeWidth={2} aria-hidden="true" />}
                 <span>{t.breadcrumbSettings}</span>
               </div>
               <h1>{t.title}</h1>
@@ -1047,7 +1088,7 @@ function SettingsPageInner() {
                               </div>
                             </div>
                             <span className={styles.rowChevron} aria-hidden="true">
-                              <ChevronRight size={18} strokeWidth={2} />
+                              {settings.language === "ar" ? <ChevronLeft size={18} strokeWidth={2} /> : <ChevronRight size={18} strokeWidth={2} />}
                             </span>
                           </div>
                         );
@@ -1223,7 +1264,7 @@ function SettingsPageInner() {
                               </div>
                             </div>
                             <span className={styles.rowChevron} aria-hidden="true">
-                              <ChevronRight size={18} strokeWidth={2} />
+                              {settings.language === "ar" ? <ChevronLeft size={18} strokeWidth={2} /> : <ChevronRight size={18} strokeWidth={2} />}
                             </span>
                           </div>
                         );
@@ -1438,64 +1479,64 @@ function SettingsPageInner() {
                     <div className={styles.aboutHeroText}>
                       <h3>Hebrih Slaughter House</h3>
                       <span>{t.brandSub}</span>
-                      <small>Version 1.1.0</small>
+                      <small>{t.aboutVersion} 1.1.0</small>
                     </div>
                   </div>
 
                   {/* APPLICATION */}
-                  <h3 className={styles.subSectionHeading}>APPLICATION</h3>
+                  <h3 className={styles.subSectionHeading}>{t.applicationHeading}</h3>
                   <div className={styles.infoRows}>
                     <div className={styles.infoRow}>
                       <div className={styles.infoRowLeft}>
                         <div className={styles.rowIcon} aria-hidden="true"><Info size={18} strokeWidth={2} /></div>
-                        <div className={styles.rowText}><strong>Product</strong><span>Hebrih Slaughter House Management System</span></div>
+                        <div className={styles.rowText}><strong>{t.productLabel}</strong><span>Hebrih Slaughter House {t.managementSystemLabel}</span></div>
                       </div>
                       <span className={styles.infoValue}>Hebrih Slaughter House</span>
                     </div>
                     <div className={styles.infoRow}>
                       <div className={styles.infoRowLeft}>
                         <div className={styles.rowIcon} aria-hidden="true"><Info size={18} strokeWidth={2} /></div>
-                        <div className={styles.rowText}><strong>Version</strong><span>Current release</span></div>
+                        <div className={styles.rowText}><strong>{t.aboutVersion}</strong><span>{t.currentReleaseLabel}</span></div>
                       </div>
                       <span className={styles.infoValue}>1.1.0</span>
                     </div>
                   </div>
 
                   {/* SYSTEM */}
-                  <h3 className={styles.subSectionHeading}>SYSTEM</h3>
+                  <h3 className={styles.subSectionHeading}>{t.systemHeading}</h3>
                   <div className={styles.infoRows}>
                     <div className={styles.infoRow}>
                       <div className={styles.infoRowLeft}>
                         <div className={styles.rowIcon} aria-hidden="true"><Database size={18} strokeWidth={2} /></div>
-                        <div className={styles.rowText}><strong>Application Mode</strong><span>Offline-first operation</span></div>
+                        <div className={styles.rowText}><strong>{t.applicationModeLabel}</strong><span>{t.applicationModeDesc}</span></div>
                       </div>
-                      <span className={styles.infoValue}>Offline-first</span>
+                      <span className={styles.infoValue}>{t.applicationModeValue}</span>
                     </div>
                     <div className={styles.infoRow}>
                       <div className={styles.infoRowLeft}>
                         <div className={styles.rowIcon} aria-hidden="true"><ShoppingCart size={18} strokeWidth={2} /></div>
-                        <div className={styles.rowText}><strong>Data Storage</strong><span>Local data with backend synchronization</span></div>
+                        <div className={styles.rowText}><strong>{t.dataStorageLabel}</strong><span>{t.dataStorageDesc}</span></div>
                       </div>
-                      <span className={styles.infoValue}>Local + Sync</span>
+                      <span className={styles.infoValue}>{t.dataStorageValue}</span>
                     </div>
                   </div>
 
                   {/* LANGUAGE & REGION */}
-                  <h3 className={styles.subSectionHeading}>LANGUAGE & REGION</h3>
+                  <h3 className={styles.subSectionHeading}>{t.languageRegionHeading}</h3>
                   <div className={styles.infoRows}>
                     <button type="button" className={styles.infoRowClickable} onClick={() => navigateSection("general")}>
                       <div className={styles.infoRowLeft}>
                         <div className={styles.rowIcon} aria-hidden="true"><Languages size={18} strokeWidth={2} /></div>
                         <div className={styles.rowText}><strong>{t.language}</strong><span>{t.languageDescription}</span></div>
                       </div>
-                      <span className={styles.infoValue}>{getLanguageLabel(settings.language)} <ChevronRight size={14} strokeWidth={2} aria-hidden="true" /></span>
+                      <span className={styles.infoValue}>{getLanguageLabel(settings.language)} {settings.language === "ar" ? <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" /> : <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />}</span>
                     </button>
                     <button type="button" className={styles.infoRowClickable} onClick={() => navigateSection("general")}>
                       <div className={styles.infoRowLeft}>
                         <div className={styles.rowIcon} aria-hidden="true"><Banknote size={18} strokeWidth={2} /></div>
                         <div className={styles.rowText}><strong>{t.currency}</strong><span>{t.currencyDescription}</span></div>
                       </div>
-                      <span className={styles.infoValue}>{getCurrencyLabel(settings.currency)} <ChevronRight size={14} strokeWidth={2} aria-hidden="true" /></span>
+                      <span className={styles.infoValue}>{getCurrencyLabel(settings.currency)} {settings.language === "ar" ? <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" /> : <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />}</span>
                     </button>
                   </div>
                 </div>
@@ -2055,11 +2096,16 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
 
   // helpers
   const notConfigured = t.notConfigured as string;
-  const localizeError = (e: unknown) => {
-    const m = e instanceof Error ? e.message : String(e ?? "");
-    if (!m || /fail|error/i.test(m)) return t.genericError as string;
-    return m;
+  // Seller-profile server errors: resolve through the shared helper so raw
+  // backend English never reaches the UI. Client-side validation above
+  // already uses t.* directly; this covers service/network failures.
+  const sellerErrorGeneric: Trilingual<string> = {
+    en: TRANSLATIONS.en.genericError as string,
+    fr: TRANSLATIONS.fr.genericError as string,
+    ar: TRANSLATIONS.ar.genericError as string,
   };
+  const localizeSellerError = (e: unknown) =>
+    localizeError(e, language, undefined, sellerErrorGeneric);
   const formatNext = (seller: Seller) => {
     const n = seller.nextNumber ?? 1;
     const pad = seller.paddingLength ?? 6;
@@ -2092,20 +2138,20 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
 
   const paymentLabel = (id: string) => {
     if (language === "fr") {
-      if (id === "cash") return t.paymentMethodCash || "Espèces";
-      if (id === "bank_transfer") return t.paymentMethodBankTransfer || "Virement bancaire";
-      if (id === "cheque") return t.paymentMethodCheque || "Chèque";
-      if (id === "other") return t.paymentMethodOther || "Autre";
+      if (id === "cash") return t.paymentMethodCash;
+      if (id === "bank_transfer") return t.paymentMethodBankTransfer;
+      if (id === "cheque") return t.paymentMethodCheque;
+      if (id === "other") return t.paymentMethodOther;
     } else if (language === "ar") {
-      if (id === "cash") return t.paymentMethodCash || "نقداً";
-      if (id === "bank_transfer") return t.paymentMethodBankTransfer || "تحويل بنكي";
-      if (id === "cheque") return t.paymentMethodCheque || "شيك";
-      if (id === "other") return t.paymentMethodOther || "أخرى";
+      if (id === "cash") return t.paymentMethodCash;
+      if (id === "bank_transfer") return t.paymentMethodBankTransfer;
+      if (id === "cheque") return t.paymentMethodCheque;
+      if (id === "other") return t.paymentMethodOther;
     }
-    if (id === "cash") return t.paymentMethodCash || "Cash";
-    if (id === "bank_transfer") return t.paymentMethodBankTransfer || "Bank transfer";
-    if (id === "cheque") return t.paymentMethodCheque || "Cheque";
-    if (id === "other") return t.paymentMethodOther || "Other";
+    if (id === "cash") return t.paymentMethodCash;
+    if (id === "bank_transfer") return t.paymentMethodBankTransfer;
+    if (id === "cheque") return t.paymentMethodCheque;
+    if (id === "other") return t.paymentMethodOther;
     return id;
   };
 
@@ -2360,7 +2406,7 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
       setEditingSeller(null);
     } catch (e) {
       console.error(e);
-      setSellerError(localizeError(e));
+      setSellerError(localizeSellerError(e));
     }
   }
 
@@ -2566,7 +2612,7 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
                 <button type="button" className={styles.invoiceIconBtn} onClick={() => openEditTax(tax)} aria-label={`${t.edit as string} ${tax.name}`}>
                   <Pencil size={14} strokeWidth={2} aria-hidden="true" />
                 </button>
-                <button type="button" className={styles.invoiceToggle} data-enabled={String(tax.enabled)} onClick={() => void toggleTaxEnabled(tax)} aria-label={`Toggle ${tax.name}`} role="switch" aria-checked={tax.enabled}>
+                <button type="button" className={styles.invoiceToggle} data-enabled={String(tax.enabled)} onClick={() => void toggleTaxEnabled(tax)} aria-label={`${t.toggleVerb as string} ${tax.name}`} role="switch" aria-checked={tax.enabled}>
                   <span className={styles.invoiceToggleKnob} aria-hidden="true" />
                 </button>
                 {!isBuiltInTax(tax) && (
@@ -2601,7 +2647,7 @@ function InvoiceSettingsSection({ t, language, currency }: { t: any; language: L
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: pm.enabled ? "var(--success)" : "var(--muted)" }}>{pm.enabled ? (t.enabledLabel as string) : (t.disabledLabel as string)}</span>
-                <button type="button" className={styles.invoiceToggle} data-enabled={String(pm.enabled)} onClick={() => handleTogglePayment(pm.id)} role="switch" aria-checked={pm.enabled} aria-label={`Toggle ${pm.label}`}>
+                <button type="button" className={styles.invoiceToggle} data-enabled={String(pm.enabled)} onClick={() => handleTogglePayment(pm.id)} role="switch" aria-checked={pm.enabled} aria-label={`${t.toggleVerb as string} ${pm.label}`}>
                   <span className={styles.invoiceToggleKnob} aria-hidden="true" />
                 </button>
                 {pm.isCustom && (

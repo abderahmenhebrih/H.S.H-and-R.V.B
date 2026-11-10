@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import RvbShell from "../../../src/components/rvb/RvbShell";
 import StyledSelect from "../../../src/components/common/StyledSelect";
 import { rvbUiPreferencesService, RVB_UI_PREFERENCES_EVENT } from "@/src/services/rvb-ui-preferences.service";
+import { resolveRvbError } from "@/src/lib/rvb-errors";
 import { DEFAULT_SETTINGS, formatCurrency } from "../../../src/lib/settings";
 import { exactNumberLabel, formatCompactNumber, formatCompactCurrency } from "../../../src/lib/compact-number";
 import type { Settings, Language } from "../../../src/types/settings/settings";
@@ -419,7 +420,7 @@ function RvbCustomersInner() {
       await load();
       setShowAdd(false);
       setEditing(null);
-    } catch (e:any) { setFormError(e?.message || t.failedLoad); }
+    } catch (e:any) { setFormError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.failedLoad, fr: TR.fr.failedLoad, ar: TR.ar.failedLoad } })); }
     finally { setSaving(false); }
   };
 
@@ -474,7 +475,7 @@ function RvbCustomersInner() {
       await load();
       setShowCreateAccount(false);
       setCreateTag(""); setCreateDisplayName(""); setCreatePassword(""); setCreateConfirm("");
-    } catch (e:any) { setCreateError(e?.data?.code || e?.message || t.errors.createFailed); }
+    } catch (e:any) { setCreateError(resolveRvbError(e, TR, lang, { generic: { en: TR.en.errors.createFailed, fr: TR.fr.errors.createFailed, ar: TR.ar.errors.createFailed } })); }
     finally { setCreatingAccount(false); }
   };
 

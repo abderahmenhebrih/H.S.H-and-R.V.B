@@ -19,6 +19,7 @@ import { paymentService } from "../../../src/services/payment.service";
 import { transferService } from "../../../src/services/transfer.service";
 import { settingsService } from "../../../src/services/settings.service";
 import { DEFAULT_SETTINGS, formatCurrency, getDirection, SETTINGS_EVENT } from "../../../src/lib/settings";
+import { localizeError } from "../../../src/lib/i18n";
 import type { Settings } from "../../../src/types/settings/settings";
 import type { Supplier } from "../../../src/types/entities/supplier";
 import type { Customer } from "../../../src/types/entities/customer";
@@ -827,8 +828,8 @@ function PrintPreviewInner() {
         setPrintFeedback({ type: "success", message: result.message || `${t.printSuccess} ${result.printer || selectedPrinter} ${t.successfully}` });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : t.printFailed;
-      setPrintFeedback({ type: "error", message: msg });
+      console.warn("[reports-print-preview] print failed", e);
+      setPrintFeedback({ type: "error", message: localizeError(e, language, undefined, { en: TRANSLATIONS.en.printFailed, fr: TRANSLATIONS.fr.printFailed, ar: TRANSLATIONS.ar.printFailed }) });
     } finally {
       setPrinting(false);
     }

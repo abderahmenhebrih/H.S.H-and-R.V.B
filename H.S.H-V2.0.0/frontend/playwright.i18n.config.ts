@@ -8,7 +8,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "i18n-localization.spec.ts",
+  testMatch: ["i18n-localization.spec.ts", "i18n-phase2.spec.ts"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -17,7 +17,8 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
   use: {
-    baseURL: "http://localhost:3000",
+    // Overridable for environments where :3000 is occupied (e.g. another app).
+    baseURL: process.env.HSH_BASE_URL || "http://localhost:3000",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

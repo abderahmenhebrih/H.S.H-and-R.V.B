@@ -1,3 +1,4 @@
+import { resolveApiBase } from "../lib/api-base";
 export type PrinterInfo = {
   name: string;
   deviceId: string;
@@ -62,7 +63,7 @@ export const APP_PDF_LABELS: Record<Language, string> = {
 export const APP_PDF_LABEL = APP_PDF_LABELS.en;
 
 function getApiBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  return resolveApiBase();
 }
 
 function triggerPdfDownload(blob: Blob, fallbackFilename: string, disposition?: string | null) {

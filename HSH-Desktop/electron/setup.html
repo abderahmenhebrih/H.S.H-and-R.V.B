@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HSH Desktop — Server Setup</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Segoe UI", system-ui, sans-serif;
+    background: #0e1512; color: #eef4ef;
+    display: flex; align-items: center; justify-content: center; height: 100vh;
+  }
+  .card { width: 460px; padding: 28px; background: #16211b; border: 1px solid #26382d; border-radius: 12px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 18px; color: #9db3a4; font-size: 13px; }
+  label { display: block; font-size: 13px; margin: 12px 0 6px; color: #c6d4cb; }
+  input {
+    width: 100%; padding: 10px 12px; font-size: 14px; border-radius: 8px;
+    border: 1px solid #31473a; background: #0c130f; color: #fff; outline: none;
+  }
+  input:focus { border-color: #4caf7d; }
+  .row { display: flex; gap: 10px; margin-top: 18px; }
+  button {
+    flex: 1; padding: 10px; font-size: 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #31473a; background: #1d2c23; color: #eef4ef;
+  }
+  button.primary { background: #1f7a4d; border-color: #1f7a4d; font-weight: 600; }
+  button.primary:disabled { background: #2a3a30; border-color: #2a3a30; color: #7d8f84; cursor: not-allowed; }
+  button:not(:disabled):hover { filter: brightness(1.15); }
+  #status { margin-top: 14px; font-size: 13px; min-height: 40px; line-height: 1.5; }
+  #status.ok { color: #7fd79f; } #status.warn { color: #e8c36a; } #status.err { color: #ef9a9a; }
+  .hint { font-size: 12px; color: #7d8f84; margin-top: 10px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Connect to your HSH server</h1>
+  <p class="sub">Enter the address of the computer running the HSH backend.</p>
+  <label for="url">Server URL</label>
+  <input id="url" type="text" spellcheck="false" autocomplete="off" placeholder="http://localhost:5000" />
+  <div class="row">
+    <button id="test">Test connection</button>
+    <button id="go" class="primary" disabled>Continue</button>
+  </div>
+  <div id="status"></div>
+  <div class="hint">Examples: same computer <b>http://localhost:5000</b> · another computer on your network <b>http://192.168.1.20:5000</b> · hosted server <b>https://hsh.example.com</b>. The address is checked before you continue. Your administrator must allow this app in the backend <b>CORS_ORIGIN</b> list.</div>
+</div>
+<script>
+(function () {
+  var input = document.getElementById("url");
+  var testBtn = document.getElementById("test");
+  var goBtn = document.getElementById("go");
+  var status = document.getElementById("status");
+  var lastGood = "";
+  function setStatus(cls, text) { status.className = cls; status.textContent = text; }
+  function api() { return window.hshDesktop; }
+  async function current() {
+    try { var c = await api().getConfig(); if (c && c.backendUrl && !input.value) input.value = c.backendUrl; } catch (e) {}
+  }
+  // Renderer-side probe: proves real browser connectivity INCLUDING CORS.
+  async function probeFromRenderer(base) {
+    var clean = String(base).replace(/\/+$/, "");
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 8000);
+    try {
+      var res = await fetch(clean + "/api/health", { signal: ctrl.signal });
+      if (!res.ok) return { ok: false, text: "Server answered HTTP " + res.status + " — is this an HSH backend?" };
+      var data = await res.json().catch(function () { return null; });
+      if (!data || data.success !== true) return { ok: false, text: "Unexpected answer — is this an HSH backend?" };
+      return { ok: true, text: "Connection OK (browser check passed)." };
+    } catch (e) {
+      var msg = String((e && e.message) || e);
+      if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+        return { ok: false, text: "Unreachable from this app — check the address, network, and the backend CORS_ORIGIN list." };
+      }
+      return { ok: false, text: "Connection failed: " + msg };
+    } finally { clearTimeout(timer); }
+  }
+  testBtn.addEventListener("click", async function () {
+    var url = input.value.trim();
+    if (!url) { setStatus("err", "Enter a server URL first."); return; }
+    testBtn.disabled = true; goBtn.disabled = true;
+    setStatus("", "Checking…");
+    try {
+      // Main-process check first (shape validation + DB readiness detail).
+      var main = await api().validateBackend(url);
+      var render = await probeFromRenderer(url);
+      if (render.ok && main && main.health) {
+        lastGood = url;
+        var extra = main.ready ? "" : " Note: database not ready yet — you can work offline until it is.";
+        setStatus(main.ready ? "ok" : "warn", render.text + " " + (main.detail || "") + extra);
+        goBtn.disabled = false;
+      } else {
+        setStatus("err", render.ok ? (main.detail || "Verification failed.") : render.text);
+      }
+    } catch (e) {
+      setStatus("err", (e && e.message) || "Verification failed.");
+    } finally { testBtn.disabled = false; }
+  });
+  goBtn.addEventListener("click", async function () {
+    if (!lastGood) return;
+    goBtn.disabled = true;
+    setStatus("", "Saving…");
+    try {
+      await api().setBackendUrl(lastGood);
+      setStatus("ok", "Saved. Opening HSH…");
+    } catch (e) {
+      setStatus("err", (e && e.message) || "Could not save.");
+      goBtn.disabled = false;
+    }
+  });
+  current();
+})();
+</script>
+</body>
+</html>

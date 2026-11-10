@@ -38,6 +38,7 @@ self-service access to their own data.
 │   ├── frontend/                  # Next.js app (HSH workspace + /rvb portal)
 │   ├── backend/                   # Express API (HSH sync + /api/rvb/*)
 │   └── RVB-MOBILE-CONTRACT.md     # frozen web/mobile API + deployment-mode contract
+├── HSH-Desktop/                   # native Windows client (Electron shell + installer)
 └── R.V.B-mobile/                  # mobile client (separate ownership — do not modify)
 ```
 
@@ -130,5 +131,6 @@ node release-gate.mjs --skip-build    # suites only
 | `docs/DEVELOPMENT.md` | Setup, env reference, workflow, troubleshooting |
 | `docs/TESTING.md` | Test layers, commands, replica-set rules, budgets, release gate |
 | `docs/DEPLOYMENT.md` | Build, production config, health, backup, rollback, shutdown |
+| `HSH-Desktop/README.md` | Windows desktop client (Electron shell, installer, backend setup) |
 | `H.S.H-V2.0.0/RVB-MOBILE-CONTRACT.md` | Frozen web/mobile contract (deployment modes, auth, DTO rules) |
 | `AGENTS.md` | Mandatory instructions for agents and contributors |

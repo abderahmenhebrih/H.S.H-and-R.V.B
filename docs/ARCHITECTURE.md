@@ -124,3 +124,9 @@ sequenceDiagram
 - **RVB isolation from HSH Dexie.** No `/rvb` import path may reach
   `src/lib/database/db.ts`; RVB language preference is `preferences.ui.language`,
   company currency comes from `GET /api/rvb/config`.
+- **Desktop client reuses the same architecture.** `HSH-Desktop/` is an Electron
+  shell around the packaged Next.js production build (`output: "standalone"`,
+  served on loopback) with a runtime backend-URL override
+  (`resolveApiBase()` in `src/lib/api-base.ts`). Same API contracts, same
+  Dexie/outbox/sync protocol, same backend — no forked logic (see
+  `HSH-Desktop/README.md`).

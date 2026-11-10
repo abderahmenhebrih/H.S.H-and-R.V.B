@@ -2,7 +2,8 @@
 
 import { rvbAuthService } from "./rvb-auth.service";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+import { resolveApiBase } from "../lib/api-base";
+const API_BASE = resolveApiBase();
 const BASE = `${API_BASE}/api/rvb/worker-activities`;
 
 function getAuthHeaders(): Record<string, string> {

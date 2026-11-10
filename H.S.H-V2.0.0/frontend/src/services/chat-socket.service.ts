@@ -3,7 +3,8 @@
 import { io, Socket } from "socket.io-client";
 import { rvbAuthService } from "./rvb-auth.service";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+import { resolveApiBase } from "../lib/api-base";
+const API_BASE = resolveApiBase();
 let socket: Socket | null = null;
 let listenersBound = false;
 

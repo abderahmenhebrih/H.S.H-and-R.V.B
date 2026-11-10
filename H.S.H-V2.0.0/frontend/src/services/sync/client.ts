@@ -12,6 +12,7 @@ import {
 } from "./queue";
 import { db } from "@/src/lib/database/db";
 import { getTableForSyncEntity } from "./tables";
+import { resolveApiBase } from "@/src/lib/api-base";
 
 interface SyncOperationResult {
   operationId: string;
@@ -58,7 +59,7 @@ const BATCH_SIZE = 100;
 // slash; without trimming, every sync URL becomes //api/... which Express
 // rejects with 404. All sync requests below must use this, never the raw env.
 function getSyncApiBase(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const raw = resolveApiBase();
   return raw.replace(/\/+$/, "");
 }
 

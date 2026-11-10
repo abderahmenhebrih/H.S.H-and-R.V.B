@@ -1,0 +1,62 @@
+{
+  "name": "hsh-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HSH Desktop — native Windows client reusing the HSH Next.js frontend and Express backend",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/stage-frontend.mjs && tsc && node scripts/copy-assets.mjs",
+    "dist": "npm run build && electron-builder --win nsis",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && node --test \"tests/*.test.mjs\"",
+    "stage-frontend": "node scripts/stage-frontend.mjs",
+    "make-icon": "node scripts/make-icon.mjs",
+    "package-clean-check": "node scripts/assert-package-clean.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "electron": "45.2.3",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.0.0"
+  },
+  "build": {
+    "appId": "com.hebrih.hsh-desktop",
+    "productName": "HSH Desktop",
+    "copyright": "Copyright © Hebrih Slaughter House",
+    "directories": {
+      "output": "dist"
+    },
+    "artifactName": "HSH-Desktop-Setup-${version}.${ext}",
+    "files": [
+      "dist-electron/**/*",
+      "staging/**/*",
+      "!staging/**/*.map",
+      "!**/.env*"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "staging/frontend-standalone/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "HSH Desktop",
+      "uninstallDisplayName": "HSH Desktop",
+      "differentialPackage": false
+    }
+  }
+}
